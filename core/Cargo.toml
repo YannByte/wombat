@@ -29,6 +29,7 @@ percent-encoding = "=2.3.2"
 shlex = "=2.0.1"
 typed-path = "=0.12.3"
 regex = "=1.13.1"
+zstd = { version = "=0.13.3", default-features = false }
 
 [profile.release]
 lto = "thin"
@@ -40,3 +41,6 @@ tokio = { version = "=1.53.2", features = ["io-util", "net", "rt-multi-thread", 
 widestring = "=1.2.1"
 winapi-util = "=0.1.11"
 windows-sys = { version = "=0.61.2", features = ["Win32_Security"] }
+
+[target."cfg(unix)".dependencies]
+libc = "=0.2.189"

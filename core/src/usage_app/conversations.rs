@@ -1,10 +1,37 @@
 //! Thread, turn and step queries preserve their native identities and ledger attribution.
 use super::*;
+#[derive(serde::Serialize)]
+pub(super) struct ThreadSummary {
+    pub usage: UsageSummary,
+    pub models: Vec<String>,
+    pub reasoning_efforts: Vec<String>,
+    pub turns: Option<usize>,
+    pub latest: Option<String>,
+}
+pub(super) fn prepare_thread(rows: &[&PricedMeasurement]) -> Result<ThreadSummary> {
+    let (models, reasoning_efforts) = dimensions(rows);
+    let turns = rows
+        .iter()
+        .filter_map(|r| r.fact.turn_id.as_deref())
+        .collect::<BTreeSet<_>>()
+        .len();
+    Ok(ThreadSummary {
+        usage: summarize(rows)?,
+        models,
+        reasoning_efforts,
+        turns: (turns > 0).then_some(turns),
+        latest: rows
+            .iter()
+            .filter_map(|r| r.fact.timestamp.as_ref())
+            .max()
+            .cloned(),
+    })
+}
 pub(super) fn group_measurements<'a>(
     rows: &[&'a PricedMeasurement],
     key: impl Fn(&'a PricedMeasurement) -> Option<&'a str>,
-) -> BTreeMap<&'a str, Vec<&'a PricedMeasurement>> {
-    let mut grouped = BTreeMap::<_, Vec<_>>::new();
+) -> std::collections::HashMap<&'a str, Vec<&'a PricedMeasurement>> {
+    let mut grouped = std::collections::HashMap::<_, Vec<_>>::new();
     for &row in rows {
         if let Some(id) = key(row) {
             grouped.entry(id).or_default().push(row);
@@ -28,7 +55,11 @@ pub(super) fn thread_items(
         || request.scope.effort_unknown == Some(true)
         || request.scope.undated == Some(true);
     let full_by_thread = group_measurements(rows, |r| r.fact.thread_id.as_deref());
-    let matched_by_thread = group_measurements(selected, |r| r.fact.thread_id.as_deref());
+    let same = rows.len() == selected.len()
+        && rows.iter().zip(selected).all(|(a, b)| std::ptr::eq(*a, *b));
+    let matched_groups =
+        (!same).then(|| group_measurements(selected, |r| r.fact.thread_id.as_deref()));
+    let matched_by_thread = matched_groups.as_ref().unwrap_or(&full_by_thread);
     let mut result = vec![];
     for entry in &snapshot.manifest.threads {
         let t = &entry.thread;
@@ -87,18 +118,50 @@ pub(super) fn thread_items(
             .get(t.id.as_str())
             .map(Vec::as_slice)
             .unwrap_or_default();
-        let matched_turns = matched
-            .iter()
-            .filter_map(|row| row.fact.turn_id.as_deref())
-            .collect::<BTreeSet<_>>();
-        let (models, reasoning_efforts) = dimensions(full);
+        let prepared = snapshot
+            .summary_index
+            .thread(&t.id)
+            .filter(|s| s.usage.measurement_count == full.len());
+        let same = full.len() == matched.len()
+            && full.iter().zip(matched).all(|(a, b)| std::ptr::eq(*a, *b));
+        let (models, reasoning_efforts) = prepared.map_or_else(
+            || dimensions(full),
+            |s| (s.models.clone(), s.reasoning_efforts.clone()),
+        );
+        let thread_usage = match prepared {
+            Some(s) => s.usage.clone(),
+            None => summarize_view(snapshot, full)?,
+        };
+        let matched_usage = if same {
+            thread_usage.clone()
+        } else {
+            summarize_view(snapshot, matched)?
+        };
+        let (matched_turn_count, latest) = if let Some(prepared) = prepared.filter(|_| same) {
+            (prepared.turns, prepared.latest.clone())
+        } else {
+            let turns = matched
+                .iter()
+                .filter_map(|r| r.fact.turn_id.as_deref())
+                .collect::<BTreeSet<_>>()
+                .len();
+            (
+                (turns > 0).then_some(turns),
+                matched
+                    .iter()
+                    .filter_map(|r| r.fact.timestamp.as_ref())
+                    .max()
+                    .cloned(),
+            )
+        };
         result.push(Item::Thread {
             upstream_id: Some(t.upstream_id.clone()),
-            matched_last_activity_at: matched
-                .iter()
-                .filter_map(|r| r.fact.timestamp.clone())
-                .chain((!scoped).then(|| t.last_activity_at.clone()).flatten())
-                .max(),
+            matched_last_activity_at: latest
+                .as_ref()
+                .into_iter()
+                .chain((!scoped).then_some(t.last_activity_at.as_ref()).flatten())
+                .max()
+                .cloned(),
             id: t.id.clone(),
             agent_kind: t.agent_kind.clone(),
             source_instance_id: t.source_instance_id.clone(),
@@ -108,9 +171,9 @@ pub(super) fn thread_items(
             last_activity_at: t.last_activity_at.clone(),
             models,
             reasoning_efforts,
-            matched_turn_count: (!matched_turns.is_empty()).then_some(matched_turns.len()),
-            matched_usage: summarize(matched)?,
-            thread_usage: summarize(full)?,
+            matched_turn_count,
+            matched_usage,
+            thread_usage,
         });
     }
     result.sort_by(|a, b| {

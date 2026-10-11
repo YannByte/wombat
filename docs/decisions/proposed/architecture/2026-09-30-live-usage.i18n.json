@@ -2,40 +2,72 @@
   "version": 2,
   "sections": {
     "/proposal-persistent-live-index-views-and-scale-targets": {
-      "zh": "ab151b59dd75812f321385d9b1d993eda56b456d9ebcb5387a1dc0796386028f",
-      "en": "b9cc1e10bcae5b05ac3c4272330da3578845e2004eba0deec613c7ac5cd72a0c"
+      "zh": "28c014b2c5c51f609a53bf20c72aecbc81f7ac03d8b281629818634e982b1b07",
+      "en": "bdf11b1ad877530134525782fe76abeb5b8cd7dce56b58846ad23c6f74f5f283"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/problem": {
-      "zh": "e3e06578eebed0c228c6fcd5634c2caa4505c4146ff105b8abd7ebd391371f39",
-      "en": "495af8c5bad12555e1d4065eda3538f65d8b3a531dc5d954ae960a22c14331e4"
+      "zh": "a200d07dc280d11f7b1974c569ed12a80dc935b486ebaaff84c2be9c65344528",
+      "en": "d1a2bfc3435716bda20b666f7f0f8956141a52de25e352e225a72bf2bdd4144e"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/proposal": {
       "zh": "ca258a5d37ffa6a0ba7c117647724fda51cdfe6385c17e4b18e9127ab0445f72",
       "en": "986dd8097aac4d3d9e25cf3e2cef01c77daedde5ce18afa375f7c433f9d8bc72"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/proposal/business-value-and-retention": {
+      "zh": "35007a758f3480d3cf6ad1ed19356509379f5c622b4eb06f9e95ee7c6f7b7fc4",
+      "en": "7d3ec58bb720cf7af080e2436c6acac42773d1538b39c7aa72d2de40be83ba18"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/proposal/compact-facts-and-evidence": {
+      "zh": "ee024586e705cbc768ede48bff07e80dff55276e58d49b49d40e9744775f2936",
+      "en": "c4b434fb89cc92958725589a24f4de5f6786a07857cb138f024ce4a065e6a0f8"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/proposal/query-cost-and-storage-lifecycle": {
+      "zh": "2d9a5c24dc889741d6bc3db09235ce9b9fd731246eb2715554fba4773b7f2568",
+      "en": "55363a5d25ada8a7e7f2ba50cce96eace00ab259e8a720213aaaf95238b885c0"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/proposal/dependency-reconciliation-and-atomic-commits": {
       "zh": "dfcadf95f09d68a8aff6d4d7074aca124bab45b2883832c06e93d09326e24576",
       "en": "ee31316dba7be33b5aa389e5668f6a7e77c3c1a24c47a95e4af7433b73925bf6"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/proposal/persistent-views-and-database-aggregation": {
-      "zh": "89f39b44926dded193a8c572583972e7ebc1ded94cbf62c51ceb762fc5006196",
-      "en": "e95f6a0c8aaf54b64dcbac335034edec74d45072c0baded8f0ac8f71d3257e3b"
+      "zh": "d43bd73631fcbe9b95777e4c0d3efe9de5dbb7fe29b80309c44eaa932b527471",
+      "en": "031e39f0c6665b0975eeb96cb135d7285c852cc3f0089eaf86b1cf03f6db360c"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered": {
-      "zh": "35b69a6fe390bcb038511f0b9d9978c198dafe538601f1c45af64de0e30672c1",
-      "en": "068f23ac644fc7d6ad4f40e838a9f9a0cca78137909eab3f76b7445e388640ce"
+      "zh": "337aa5553805691b7f0c54d9e1734e3d43c80d8e31b58aa57d3346820995f366",
+      "en": "7559f54d05f6402687d4ec3f143ce80202bee478c4e34418f4c42cd606e54e56"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/storage-and-algorithm-selection": {
+      "zh": "d6c92d8023a0038f47422a5ef091a967e2805a14c5da6411dd7996909a3bf209",
+      "en": "f0e480bbd999df0b73d9f5e958b1965fcbdcbb711103a1b5182f19340aabf0a6"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/preliminary-technical-validation": {
+      "zh": "42ffda65554af01c447e38fc2b5f50e0f590a53cddf94470080a02f9da3ceb31",
+      "en": "70b62a463d876a9ed9012804ea1d3be59c95d9d7c5fc6596c46bf448ce8c2a50"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/delivery-sequence": {
+      "zh": "72053eb82b4e48629eea83255b74d4e7aae8b4788db00a13d0bb99d5d87e0f67",
+      "en": "c6b9fb1e6b821fc4164241f22672351db4e87283d61fad25929694bd90d6e0a2"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/acceptance-criteria": {
       "zh": "1c7a9e56d0fd24fc2214dc0a69fb3cfe5fde6939ba1902df4fde470ee5a2e01c",
       "en": "26911898ffeba8bead0ae6853d0820117e7c96c4f4c1bca98297d533c9a4e0bc"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/acceptance-criteria/storage-targets-and-measurement": {
+      "zh": "357bbb6546b0657a7ae2bde3f6c99acd9f4e2a45f7f1a552f90a1e0388b03f2a",
+      "en": "0f8822e71bbf72cb2a79e534a524689ca702789f502627aafbf77d83dc25bd81"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/acceptance-criteria/query-latency-gate": {
+      "zh": "ca91a2d3ad39321eeb14690071fe323abdcd22a9f88fd29b283d35929b31d44c",
+      "en": "d0767785757db9ecd41906a76824b48d25670bf216fb0833a3ad1e3b67441ce8"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/acceptance-criteria/correctness-and-recovery": {
       "zh": "ecd37f346a4dafb7eba455fcf0ac3ed4fcd90a275e0326126062d32b6f2c8567",
       "en": "69b9deba2361c1c1271e46d7a99e00c0a32c7df3e2371ce8ca03590b7741add7"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/acceptance-criteria/performance-targets-pending-acceptance": {
-      "zh": "8d0defe3192b44011fe88a2e6f5a607be64597d72cd57388912751e031ef666d",
-      "en": "95288a28e59f02169187b40d3158bcd74e1ff5430fbe5bd4b96b42c00fb36376"
+      "zh": "def5e35f6d0d915343294574f66422a878f7d0d385a4a59b8b0b6c9324a70d11",
+      "en": "5e64e6f784a73c2abfdb4022a1308724918386889d0231b7d8cb2dfead9edc0c"
     }
   }
 }

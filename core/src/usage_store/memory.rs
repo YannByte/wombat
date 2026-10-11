@@ -103,6 +103,8 @@ fn memory_inner(
         }
     }
     crate::usage_app::summarize(&rows.iter().map(Arc::as_ref).collect::<Vec<_>>())?;
+    let summary_index =
+        crate::usage_app::SummaryIndex::build(&rows.iter().map(Arc::as_ref).collect::<Vec<_>>())?;
     let mut unassigned_uses = BTreeMap::<String, UnassignedUseRecords>::new();
     for op in collected.operations {
         if op.turn_id.as_deref().is_none_or(|id| id.is_empty()) {
@@ -181,6 +183,7 @@ fn memory_inner(
         threads,
     };
     Ok(Snapshot {
+        summary_index,
         publication_change: None,
         project_loads: vec![],
         project_rows: Some(project_rows),

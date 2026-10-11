@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-note-bounded-compressed-live-index-facts": {
+      "zh": "774a84fe7c67411c3b98da68b027ffe908f157538fac64f001d9fb3bda559d7e",
+      "en": "4e3a104b583cba2b7cd18fa13962b8cbb4385a38733ab90b52c54ff9f6ed59ee"
+    },
+    "/decision-note-bounded-compressed-live-index-facts/problem": {
+      "zh": "d3bc032ab0bf57a8785d574e5633f37578544e460ad8f376acf5e6c175a44658",
+      "en": "3eec7eb83bf80ff1ebe6c6f8b050ddd3467f984c8ed1f760e4ced0555ea203d3"
+    },
+    "/decision-note-bounded-compressed-live-index-facts/decision": {
+      "zh": "ebef77746f707fe083b6e067672a58b4bccc6ceaa24938d7b81f0ff34b6c0273",
+      "en": "934be94b48f77cbdbd5938207a8c88295baa454c63babb631e69d740f477c25d"
+    },
+    "/decision-note-bounded-compressed-live-index-facts/alternatives-considered": {
+      "zh": "ab6a5e3b7f9beafbb972e451cd007eb096a8c4bef00a05e753cf9065ce7e0bc2",
+      "en": "84d2d48dc4611be9984d7b41a8e7eb274c4498d4d975247b068ffc06387e2811"
+    },
+    "/decision-note-bounded-compressed-live-index-facts/consequences-and-verification": {
+      "zh": "5e4cf1391b517d9fa7aad55675963ae1e256c457672b43ca151a404a87048248",
+      "en": "0f8391b9f00707cfb17475a34b90988444f5771f59dd636b5dcf94dd915ebc39"
+    }
+  }
+}

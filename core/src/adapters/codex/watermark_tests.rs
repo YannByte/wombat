@@ -268,7 +268,20 @@ fn missing_or_future_message_mapping_refuses_append_and_warm_parser_without_muta
             .any(|event| event["payload"]["kind"] == "message")
     );
     events.retain(|_, event| event["payload"]["kind"] != "message");
-    crate::live_index::save_map(&db, &facts_scope, &facts).unwrap();
+    let retained: Vec<Arc<crate::session_events::Event>> = facts["events"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|value| Arc::new(serde_json::from_value(value.clone()).unwrap()))
+        .collect();
+    crate::live_index::save_events(
+        &db,
+        &facts_scope,
+        &retained,
+        true,
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
     // A later visible record cannot fill the old mapping's unobserved history.
     fs::OpenOptions::new().append(true).open(&path).unwrap().write_all(b"{\"type\":\"event_msg\",\"timestamp\":\"2026-10-05T00:00:01Z\",\"payload\":{\"type\":\"agent_message\",\"turn_id\":\"turn\",\"message\":\"PRIVATE_LATER\"}}\n").unwrap();
     for header in [

@@ -34,8 +34,8 @@ fn event_projection_appends_skip_old_membership_and_failed_publication_rolls_bac
             |row| row.get(0),
         )
         .unwrap();
-    // BEFORE INSERT observes even a no-op UPSERT attempt. Reject historical writes.
-    db.execute_batch(&format!("CREATE TRIGGER reject_old_event BEFORE INSERT ON entries WHEN NEW.bucket={bucket} AND EXISTS(SELECT 1 FROM entries WHERE bucket={bucket} AND id=NEW.id) BEGIN SELECT RAISE(ABORT,'historical event membership rewritten'); END;")).unwrap();
+    // Unchanged source links must not be rewritten on append.
+    db.execute_batch(&format!("CREATE TRIGGER reject_old_event BEFORE UPDATE ON event_links WHEN NEW.bucket={bucket} BEGIN SELECT RAISE(ABORT,'historical event membership rewritten'); END;")).unwrap();
     writeln!(
         fs::OpenOptions::new().append(true).open(&path).unwrap(),
         "{}",
@@ -61,7 +61,7 @@ fn event_projection_appends_skip_old_membership_and_failed_publication_rolls_bac
     let saved = crate::live_index::load_map(&db, &scope).unwrap();
     let view_scope = format!("view:{key}");
     let saved_view = crate::live_index::load_map(&db, &view_scope).unwrap();
-    db.execute_batch(&format!("DROP TRIGGER reject_old_event; CREATE TRIGGER reject_new_event BEFORE INSERT ON entries WHEN NEW.bucket={bucket} BEGIN SELECT RAISE(ABORT,'synthetic publication failure'); END;")).unwrap();
+    db.execute_batch(&format!("DROP TRIGGER reject_old_event; CREATE TRIGGER reject_new_event BEFORE INSERT ON event_links WHEN NEW.bucket={bucket} BEGIN SELECT RAISE(ABORT,'synthetic publication failure'); END;")).unwrap();
     writeln!(
         fs::OpenOptions::new().append(true).open(&path).unwrap(),
         "{}",

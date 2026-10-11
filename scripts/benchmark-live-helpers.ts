@@ -150,12 +150,26 @@ export interface IndexPayloadFootprint {
   entries: number;
   storedJsonbPayloadBytes: number;
   expandedJsonBytes: number;
+  storedCompressedPayloadBytes?: number;
+  decodedFrameBytes?: number;
 }
 
 /** Read only the synthetic live index; row payload sizes exclude SQLite page and row overhead. */
 export function liveIndexPayloadFootprint(databaseFile: string): IndexPayloadFootprint[] {
   const database = new DatabaseSync(databaseFile, { readOnly: true });
   try {
+    const schema = Number(database.prepare('PRAGMA user_version').get()?.user_version);
+    if (schema === 5) {
+      return database.prepare(`
+        SELECT CASE WHEN b.scope LIKE 'parser:%:facts' THEN 'parserFacts' ELSE 'projection' END AS scopeKind,
+          b.field, SUM(e.count) AS entries, SUM(length(e.data)) AS compressed, SUM(e.bytes) AS decoded
+        FROM buckets b JOIN event_blocks e ON e.bucket=b.id GROUP BY b.id
+        UNION ALL
+        SELECT 'projection', b.field, (SELECT COUNT(*) FROM fact_rows r WHERE r.bucket=b.id), SUM(length(f.data)), SUM(f.bytes)
+        FROM buckets b JOIN fact_blocks f ON f.bucket=b.id GROUP BY b.id
+        ORDER BY scopeKind, field
+      `).all().map(row => ({scopeKind: row.scopeKind as IndexPayloadFootprint['scopeKind'], field: row.field as IndexPayloadFootprint['field'], entries:Number(row.entries), storedJsonbPayloadBytes:0, expandedJsonBytes:0, storedCompressedPayloadBytes:Number(row.compressed), decodedFrameBytes:Number(row.decoded)}));
+    }
     const rows = database.prepare(`
       SELECT
         CASE WHEN b.scope LIKE 'parser:%:facts' THEN 'parserFacts' ELSE 'projection' END AS scopeKind,
@@ -208,4 +222,11 @@ export function normalizeUsageOracle(result: Record<string, any>): Record<string
   if (result.facets !== undefined) stable.facets = result.facets;
   if (result.distribution !== undefined) stable.distribution = result.distribution;
   return structuredClone(stable);
+}
+
+/** SQLite page ownership includes frame payloads, key indexes, and unused page space. */
+export function liveIndexPages(databaseFile:string) {
+  const db=new DatabaseSync(databaseFile,{readOnly:true});
+  try { return db.prepare('SELECT name, SUM(pgsize) AS bytes, SUM(payload) AS payloadBytes, SUM(unused) AS unusedBytes FROM dbstat GROUP BY name ORDER BY bytes DESC').all().map(row=>({name:String(row.name),bytes:Number(row.bytes),payloadBytes:Number(row.payloadBytes),unusedBytes:Number(row.unusedBytes)})); }
+  finally {db.close();}
 }

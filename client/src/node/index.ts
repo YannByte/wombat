@@ -1,9 +1,7 @@
-import {checkSetup} from './setup.js';
 import { withAutomaticPrices } from './auto-prices.js';
 import { createUsageClient, type UsageClient, type AccountTransport, type HandoffTransport } from '../client.js';
 import { invokeCore, invokeOperation, type CoreProcessOptions } from './core.js';
 import { queryLive } from './live.js';
-import { queryPrices } from './prices.js';
 import { createDirectoryTransport } from './directories.js';
 import type {CodexOptions} from './codex/process.js';
 export {receiveCodexHook} from './collection.js';
@@ -16,10 +14,10 @@ export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
   let account: Promise<AccountTransport> | undefined, handoff: Promise<HandoffTransport> | undefined;
   const client = createUsageClient({
     monitor: (r,q) => r.action==='check' && r.snapshotId.startsWith('live:') ? queryLive({monitor:r},q,options) : invokeOperation('monitor',r,q,options),
-    setup: (r,q) => checkSetup(r,q,options),
+    setup: async (r,q) => (await import('./setup.js')).checkSetup(r,q,options),
     collection: (r, q) => invokeOperation('collection', r, q, {...options,timeoutMs:5000,maxResponseBytes:2*1024*1024}),
     query: (request, queryOptions) => invokeCore(request, queryOptions, options),
-    prices: (request, queryOptions) => queryPrices(request, queryOptions, options),
+    prices: async (request, queryOptions) => (await import('./prices.js')).queryPrices(request, queryOptions, options),
     live: (request, queryOptions) => queryLive(request, queryOptions, options),
     config: (request, queryOptions) => queryLive({ config: request }, queryOptions, options),
     optimize: (request, queryOptions) => queryLive({ optimize: request }, queryOptions, options),

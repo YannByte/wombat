@@ -9,7 +9,13 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileSha256, formatMicros, moneyMicros, option, positiveInteger, run } from './benchmark-common.js';
-import { directoryBytes, isExpectedSyncTimeout, liveIndexPayloadFootprint, normalizeUsageOracle, parseBenchmarkCliResponse, snapshotFootprint, sourceTreeIdentity } from './benchmark-live-helpers.js';
+import { directoryBytes, liveIndexPages, isExpectedSyncTimeout, liveIndexPayloadFootprint, normalizeUsageOracle, parseBenchmarkCliResponse, snapshotFootprint, sourceTreeIdentity } from './benchmark-live-helpers.js';
+
+if (process.argv.includes('--compare-baseline')) {
+  const {writeLiveComparison}=await import('./benchmark-live-report.js');
+  writeLiveComparison();
+  process.exit(process.exitCode ?? 0);
+}
 
 assert(process.platform !== 'win32', 'This benchmark requires POSIX');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -151,10 +157,31 @@ function assertThreadHierarchy(environment: NodeJS.ProcessEnv, expectedTokens: n
   return { pages, elapsedMs };
 }
 
-function indexAndDisk(dataHome: string): { indexDbBytes: number; indexWalBytes: number; indexPayloads: ReturnType<typeof liveIndexPayloadFootprint>; dataDirectoryBytes: number } {
+function readyQueries(environment: NodeJS.ProcessEnv, snapshotId: string, threadId: string, expectedTokens: number, expectedCost: bigint) {
+  const cases = [
+    {name:'daily-utc', args:['usage','--all-time','--timezone','UTC','--group','day']},
+    {name:'monthly-shanghai', args:['usage','--all-time','--timezone','Asia/Shanghai','--group','month']},
+    {name:'filtered-daily-shanghai', args:['usage','--since','2026-09-29','--until','2026-09-30','--timezone','Asia/Shanghai','--group','day']},
+    {name:'ranking', args:['threads','--all-time','--sort','tokens','--limit','200','--timezone','UTC']},
+    {name:'turns', args:['turns','--thread',threadId,'--timezone','UTC']},
+  ];
+  return cases.map(test => {
+    const samples=Array.from({length:10},()=>{
+      const response=invokeCli(environment,[...test.args,'--snapshot',snapshotId,'--json']);
+      assert.equal(response.status,0);
+      if(test.args[0]==='usage')assertUsageHierarchy(response.value,expectedTokens,expectedCost);
+      return {elapsedMs:response.elapsedMs,responseBytes:Buffer.byteLength(JSON.stringify(response.value))};
+    });
+    const sorted=samples.map(sample=>sample.elapsedMs).sort((a,b)=>a-b);
+    const percentile=(p:number)=>sorted[Math.ceil(sorted.length*p)-1];
+    return {name:test.name,firstMs:samples[0].elapsedMs,p50Ms:percentile(0.5),p95Ms:percentile(0.95),p99Ms:percentile(0.99),maxMs:sorted.at(-1),violations:samples.filter(sample=>sample.elapsedMs>100).length,samples};
+  });
+}
+
+function indexAndDisk(dataHome: string): { indexDbBytes: number; indexWalBytes: number; indexPages: ReturnType<typeof liveIndexPages>; indexPayloads: ReturnType<typeof liveIndexPayloadFootprint>; dataDirectoryBytes: number } {
   const indexFile = path.join(dataHome, 'live-v2', 'index.sqlite');
   const size = (file: string) => existsSync(file) ? statSync(file).size : 0;
-  return { indexDbBytes: size(indexFile), indexWalBytes: size(indexFile + '-wal'), indexPayloads: liveIndexPayloadFootprint(indexFile), dataDirectoryBytes: directoryBytes(dataHome) };
+  return { indexDbBytes: size(indexFile), indexWalBytes: size(indexFile + '-wal'), indexPages: liveIndexPages(indexFile), indexPayloads: liveIndexPayloadFootprint(indexFile), dataDirectoryBytes: directoryBytes(dataHome) };
 }
 
 function cpuSeconds(pid: number): number {
@@ -243,6 +270,7 @@ try {
   const appendedUsage = usage(firstService.environment);
   assertUsageHierarchy(appendedUsage.value, totalTokens, totalCost);
   const liveThreads = assertThreadHierarchy(firstService.environment, totalTokens, totalCost);
+  const foreground=readyQueries(firstService.environment,appendedUsage.value.snapshotRef.snapshotId,liveThreads.pages[0].items[0].id,totalTokens,totalCost);
   const statistics=taskStatistics(firstService.environment,appendedUsage.value.snapshotRef.snapshotId,appends);
   const finalOracle = {
     usage: normalizeUsageOracle(appendedUsage.value),
@@ -333,6 +361,7 @@ try {
   const result = {
     benchmark: 'live-index-cold-append-rebuild',
     statistics,
+    foreground: {scope:'complete CLI process startup, endpoint discovery, IPC, validation and JSON output; ready immutable view; first and repeated queries; concurrency 1; OS cache uncontrolled',queries:foreground},
     generatedAt: new Date().toISOString(),
     platform: `${os.type()} ${os.arch()}`,
     nodeVersion: process.version,
@@ -370,8 +399,9 @@ try {
       databaseBytesBeforeIdleExit: liveSpaceBeforeExit.indexDbBytes,
       walBytesBeforeIdleExit: liveSpaceBeforeExit.indexWalBytes,
       dataHomeBytesBeforeIdleExit: liveSpaceBeforeExit.dataDirectoryBytes,
+      pages: liveSpaceBeforeExit.indexPages,
       payloads: liveSpaceBeforeExit.indexPayloads,
-      payloadMeaning: 'Stored JSONB payload bytes belong to parser rows; expanded JSON bytes include projection-referenced payloads. Both are logical row payload measures, not additional disk usage or a row allocation of SQLite pages.',
+      payloadMeaning: 'Schema 4 reports JSONB and expanded references; schema 5 reports each compressed frame once and its decoded frame length, excluding source bucket links. These logical payload measures exclude SQLite pages, row keys, and WAL.',
       peakRssBytes: firstExit.peakRssBytes,
       rssKiBAtEnd: liveFinalRssKiB,
       dataHomeBytesAfterIdleExit: initialDataBytesAfterIdleExit,
@@ -384,6 +414,7 @@ try {
       databaseBytesBeforeIdleExit: rebuildSpaceBeforeExit.indexDbBytes,
       walBytesBeforeIdleExit: rebuildSpaceBeforeExit.indexWalBytes,
       dataHomeBytesBeforeIdleExit: rebuildSpaceBeforeExit.dataDirectoryBytes,
+      pages: rebuildSpaceBeforeExit.indexPages,
       payloads: rebuildSpaceBeforeExit.indexPayloads,
       peakRssBytes: rebuildExit.peakRssBytes,
       rssKiBAtEnd: rebuildFinalRssKiB,
@@ -408,7 +439,12 @@ try {
   console.log(JSON.stringify({ output, build, corpus: result.corpus, expectedTruth: result.expectedTruth, coldInitial: result.coldInitial, append: result.append, fixedSnapshot: result.fixedSnapshot, coldRebuild: result.coldRebuild }));
 } catch(error) {
   const failure={measurements,threads,projects,appends,priceGroups,error:error instanceof Error?error.message:String(error),sourceBytes:directoryBytes(source),dataHomes:services.map(service=>({bytes:existsSync(service.environment.WOMBAT_DATA_HOME!)?directoryBytes(service.environment.WOMBAT_DATA_HOME!):null,stderr:service.stderr}))};
-  mkdirSync(path.dirname(output),{recursive:true});writeFileSync(output+'.failure.json',JSON.stringify(failure,null,2)+'\n');
+  try {
+    mkdirSync(path.dirname(output),{recursive:true});writeFileSync(output+'.failure.json',JSON.stringify(failure,null,2)+'\n');
+  } catch (reportError) {
+    // In particular, a full disk must not mask the original benchmark failure.
+    console.error('Could not persist benchmark failure details:', reportError);
+  }
   throw error;
 } finally {
   const cleanup = await Promise.allSettled(services.map(stopService));

@@ -2,6 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUsageArgs } from '../src/usage-app-cli.js';
 
+test('timezone validation keeps named zones and Intl aliases without rewriting the request', () => {
+  for (const timezone of ['UTC', 'Asia/Shanghai', 'America/New_York', 'US/Pacific', 'utc'])
+    assert.equal(parseUsageArgs(['usage', '--timezone', timezone]).request.scope?.timezone, timezone);
+  assert.throws(() => parseUsageArgs(['usage', '--timezone', 'Not/AZone']));
+});
+
 test('v1 arguments enforce action-specific flags and exact independent filters', () => {
   assert.deepEqual(parseUsageArgs(['usage', '--since', '2026-09-29', '--until', '2026-09-30', '--model', 'gpt-5.4', '--effort', 'high', '--timezone', 'Asia/Shanghai', '--json']).request, { action: 'usage', scope: { since: '2026-09-29', until: '2026-09-30', timezone: 'Asia/Shanghai', model: 'gpt-5.4', reasoningEffort: 'high' } });
   assert.deepEqual(parseUsageArgs(['refresh', '--root', '/tmp/a', '--root=/tmp/b']).request, { action: 'refresh', roots: ['/tmp/a', '/tmp/b'] });

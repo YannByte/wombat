@@ -21,7 +21,7 @@ impl Write for BudgetWriter {
 
 const MAX_ENTRIES: usize = 16;
 const MAX_BYTES: usize = 2 * 1024 * 1024;
-const MAX_ENTRY_BYTES: usize = 256 * 1024;
+const MAX_ENTRY_BYTES: usize = 512 * 1024;
 
 #[derive(Default)]
 pub(crate) struct QueryCache {

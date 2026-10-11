@@ -6,6 +6,8 @@ Status: implemented
 
 The prior compatibility decision is superseded by [current formats before the first release](2026-10-03-current-format-only.en.md).
 
+The physical row/reference layout and page-cache choice below are historical and partially superseded by [bounded compressed facts](2026-10-11-packed-live-index.en.md). Other sharing and transaction rationale remains applicable.
+
 ## Problem
 
 The old index repeated scope text and JSON-encoded field/identity keys for each safe fact. Both parser candidates and committed projections must be restorable, so repeated keys grew with record counts. Whole-field replacement allocated encoded desired keys and copied all old keys. WAL files from initial large transactions could retain their peak size through later small appends.

@@ -1,11 +1,9 @@
 import { configureLanguage } from './locale.js';
 import { t, progressText } from '@wombat/client/locale';
 import { setTimeout as delay } from 'node:timers/promises';
-import { runPricingCli } from './prices-cli.js';
 import packageMetadata from '../package.json' with { type: 'json' };
 import { CoreError, type UsageRequest, type UsageResult } from '@wombat/client';
 import { createNodeClient } from '@wombat/client/node';
-import { renderUsageResult } from './format.js';
 export function usageHelp(): string { return (t("statistics.help") + "\n" + t("monitor.help") + "\n" + t("cli.usage-app-cli.help") + "\n" + t("comparison.help") + "\n" + t("inspection.help") + "\n").replace('  wombat optimize', `${t('cli.update.summary')}\n${t('skill.summary')}\n${t('setup.summaryHelp')}\n${t('collection.summaryHelp')}\n${t('cli.doctor.summary')}\n${t('cli.timing.summary')}\n  wombat optimize`); }
 export interface Invocation {
   request: UsageRequest;
@@ -18,6 +16,7 @@ export interface Invocation {
 }
 const actions = new Set(['refresh', 'usage', 'threads', 'turns', 'steps', 'compare', 'investigate', 'trajectory', 'resources', 'review', 'context', 'statistics']);
 const valued = new Set(['root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'turn', 'group', 'presentation', 'sort', 'search', 'limit', 'offset', 'locate-thread', 'locate-turn', 'locate-operation', 'baseline-since', 'baseline-until', 'dimension', 'other-thread']);
+let knownTimezones: Set<string> | undefined;
 function invalid(message: string): never { throw new CoreError('INVALID_ARGUMENT', message); }
 export function parseUsageArgs(argv: string[]): Invocation {
   let action: UsageRequest['action'] = 'usage';
@@ -102,7 +101,10 @@ export function parseUsageArgs(argv: string[]): Invocation {
   const timezone = values.get('timezone');
   if (timezone) {
     try {
-      new Intl.DateTimeFormat('zh-CN', { timeZone: timezone });
+      // Named zones need no formatter. Keep Intl's existing fallback for aliases
+      // and offset syntax, and let the core validate its own supported zones.
+      if (timezone !== 'UTC' && !(knownTimezones ??= new Set(Intl.supportedValuesOf('timeZone'))).has(timezone))
+        new Intl.DateTimeFormat('zh-CN', { timeZone: timezone });
     }
     catch {
       invalid(t("cli.usage-app-cli.timezone_requires_a_valid_time_zone"));
@@ -221,7 +223,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
     if (argv[0] === 'hook') return await (await import('./collection-cli.js')).runHookCli(argv.slice(1));
     if (argv[0] === 'account') return await (await import('./account-cli.js')).runAccountCli(argv.slice(1));
     if (argv[0] === 'directories') return await (await import('./directories-cli.js')).runDirectoriesCli(argv.slice(1));
-    if (argv[0] === 'prices') return await runPricingCli(argv.slice(1));
+    if (argv[0] === 'prices') return await (await import('./prices-cli.js')).runPricingCli(argv.slice(1));
     if (argv[0] === 'optimize') return await (await import('./config-cli.js')).runConfigCli(argv.slice(1));
     if (argv[0] === 'skill') return (await import('./skill-cli.js')).runSkillCli(argv.slice(1));
     if (argv[0] === 'web') return await (await import('./web-cli.js')).runWebCli(argv.slice(1));
@@ -252,7 +254,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
         const revision = JSON.stringify([result.snapshotRef.snapshotId, result.scope, result.freshness?.status, result.quality]);
         if (!invocation.watch || revision !== lastRevision) {
           if (!invocation.json && result.freshness && !['current', 'fixed'].includes(result.freshness.status)) process.stderr.write(`Wombat · ${result.freshness.status === 'failed' && result.freshness.error ? result.freshness.error : result.freshness.projectLoads?.length ? t('webui.projectsProgress',{ready:result.freshness.projectLoads.filter(p=>p.state==='ready').length,total:result.freshness.projectLoads.length}) : result.freshness.initialScan ? t('webui.initialTasks') : result.freshness.status === 'syncing' ? t("cli.usage-app-cli.syncing_showing_committed_data") : result.freshness.error ?? t("cli.usage-app-cli.showing_cached_data")}\n`);
-          process.stdout.write(invocation.json ? JSON.stringify(result) + '\n' : renderUsageResult(result, process.stdout.columns ?? 120, invocation.request.group ?? undefined) + '\n');
+          process.stdout.write(invocation.json ? JSON.stringify(result) + '\n' : (await import('./format.js')).renderUsageResult(result, process.stdout.columns ?? 120, invocation.request.group ?? undefined) + '\n');
           lastRevision = revision;
         }
         if (!invocation.watch) return resultExitCode(result);

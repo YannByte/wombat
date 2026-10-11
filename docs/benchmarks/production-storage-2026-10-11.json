@@ -1,0 +1,483 @@
+{
+  "formatVersion": 1,
+  "benchmark": "production-live-index-comparison",
+  "generatedAt": "2026-10-11T05:37:47.576Z",
+  "platform": "Darwin arm64",
+  "nodeVersion": "v26.4.0",
+  "corpus": {
+    "initial": {
+      "files": 250,
+      "bytes": 22197420,
+      "sha256": "e6288e2c089e7b385f6a6bd8489bfab089d8bb85c1f33e7d68fc616926314b2e"
+    },
+    "afterAppend": {
+      "files": 250,
+      "bytes": 22198338,
+      "sha256": "dc45da91ae4ee160819b48299596a9899764c057195dcf6ae38cc83abf386247"
+    },
+    "sourceBytesStableDuringSnapshotAndRebuild": true,
+    "appendedSourceReusedForColdRebuild": true,
+    "measurements": 50000,
+    "operations": 50000,
+    "threads": 250,
+    "appends": 3,
+    "priceGroups": 7,
+    "projects": 5
+  },
+  "expectedTruth": {
+    "tokens": 5800324,
+    "costUsd": "14.000780",
+    "appendEach": {
+      "tokens": 110,
+      "costUsd": "0.000265"
+    }
+  },
+  "builds": {
+    "baseline": {
+      "profile": "project-built release core and CLI bundle",
+      "coreSha256": "d8bddf879a8ecadec34a4e62d5dfd1c62ed2299b748643817c37ed3a0c986f4e",
+      "cliSha256": "bc368c16a2cc925a1cbf0337bbe633881f962021d4fd1ae8bcdc2d0042395a35",
+      "sourceRevision": "96f73a567bf4da93b8922560931ce3c06b08be19"
+    },
+    "candidate": {
+      "profile": "project-built release core and CLI bundle",
+      "coreSha256": "176adbbb410010895fdb88c5b380c1b6f1fcb632ef3279dc22a744e1bbe066db",
+      "cliSha256": "bc368c16a2cc925a1cbf0337bbe633881f962021d4fd1ae8bcdc2d0042395a35",
+      "sourceRevision": "96f73a567bf4da93b8922560931ce3c06b08be19"
+    }
+  },
+  "storage": {
+    "basis": "logical bytes of the complete fresh product data directory after service exit; no saved snapshot in this directory; all index tables included",
+    "baselineBytes": 459276288,
+    "candidateBytes": 40067072,
+    "reduction": 11.462686567164178,
+    "tenfoldPassed": true,
+    "baselineDatabaseAndWalBeforeExit": 919291008,
+    "candidateDatabaseAndWalBeforeExit": 80422504,
+    "pages": [
+      {
+        "name": "event_blocks",
+        "bytes": 21516288,
+        "payloadBytes": 19902505,
+        "unusedBytes": 1567484
+      },
+      {
+        "name": "fact_blocks",
+        "bytes": 6713344,
+        "payloadBytes": 5907968,
+        "unusedBytes": 784851
+      },
+      {
+        "name": "fact_rows_block",
+        "bytes": 5038080,
+        "payloadBytes": 4082175,
+        "unusedBytes": 641140
+      },
+      {
+        "name": "fact_rows",
+        "bytes": 4915200,
+        "payloadBytes": 4082175,
+        "unusedBytes": 518620
+      },
+      {
+        "name": "entries",
+        "bytes": 1531904,
+        "payloadBytes": 606076,
+        "unusedBytes": 918250
+      },
+      {
+        "name": "event_targets",
+        "bytes": 204800,
+        "payloadBytes": 170750,
+        "unusedBytes": 28454
+      },
+      {
+        "name": "sqlite_autoindex_event_blocks_1",
+        "bytes": 110592,
+        "payloadBytes": 91872,
+        "unusedBytes": 14650
+      },
+      {
+        "name": "fact_blocks_bucket",
+        "bytes": 16384,
+        "payloadBytes": 6782,
+        "unusedBytes": 7212
+      },
+      {
+        "name": "sqlite_schema",
+        "bytes": 4096,
+        "payloadBytes": 1758,
+        "unusedBytes": 2175
+      },
+      {
+        "name": "sqlite_autoindex_buckets_1",
+        "bytes": 4096,
+        "payloadBytes": 3931,
+        "unusedBytes": 40
+      },
+      {
+        "name": "event_links",
+        "bytes": 4096,
+        "payloadBytes": 3,
+        "unusedBytes": 4081
+      },
+      {
+        "name": "event_heads",
+        "bytes": 4096,
+        "payloadBytes": 9,
+        "unusedBytes": 4075
+      },
+      {
+        "name": "buckets",
+        "bytes": 4096,
+        "payloadBytes": 3893,
+        "unusedBytes": 39
+      }
+    ]
+  },
+  "foreground": {
+    "scope": "complete CLI process startup, endpoint discovery, IPC, validation and JSON output; ready immutable view; first and repeated queries; concurrency 1; OS cache uncontrolled",
+    "queries": [
+      {
+        "name": "daily-utc",
+        "samples": 10,
+        "firstMs": 92.94941599999947,
+        "p50Ms": 67.25820799999929,
+        "p95Ms": 92.94941599999947,
+        "p99Ms": 92.94941599999947,
+        "maxMs": 92.94941599999947,
+        "violations": 0,
+        "responseBytes": 11775
+      },
+      {
+        "name": "monthly-shanghai",
+        "samples": 10,
+        "firstMs": 93.42124999999942,
+        "p50Ms": 68.61474999999882,
+        "p95Ms": 93.42124999999942,
+        "p99Ms": 93.42124999999942,
+        "maxMs": 93.42124999999942,
+        "violations": 0,
+        "responseBytes": 11825
+      },
+      {
+        "name": "filtered-daily-shanghai",
+        "samples": 10,
+        "firstMs": 99.24483299999883,
+        "p50Ms": 68.71249999999964,
+        "p95Ms": 99.24483299999883,
+        "p99Ms": 99.24483299999883,
+        "maxMs": 99.24483299999883,
+        "violations": 0,
+        "responseBytes": 11841
+      },
+      {
+        "name": "ranking",
+        "samples": 10,
+        "firstMs": 95.06070800000089,
+        "p50Ms": 96.06395899999916,
+        "p95Ms": 98.3912079999991,
+        "p99Ms": 98.3912079999991,
+        "maxMs": 98.3912079999991,
+        "violations": 0,
+        "responseBytes": 1124286
+      },
+      {
+        "name": "turns",
+        "samples": 10,
+        "firstMs": 69.05062499999985,
+        "p50Ms": 66.90762499999983,
+        "p95Ms": 71.23174999999901,
+        "p99Ms": 71.23174999999901,
+        "maxMs": 71.23174999999901,
+        "violations": 0,
+        "responseBytes": 10160
+      }
+    ],
+    "within100ms": true
+  },
+  "service": {
+    "baselinePeakRssBytes": 570769408,
+    "candidatePeakRssBytes": 563363840,
+    "baselineRebuildMs": 13741.67,
+    "candidateRebuildMs": 8745.55,
+    "baselineRestore": {
+      "firstProjectMs": 1186.9046670000025,
+      "fullRestoreMs": 4689.95175,
+      "firstProjectRssKiB": 157952,
+      "peakRssBytes": 393576448,
+      "preferredProject": "/synthetic/project-0",
+      "firstProjectStates": [
+        {
+          "project": "/synthetic/project-0",
+          "state": "ready"
+        },
+        {
+          "project": "/synthetic/project-1",
+          "state": "loading"
+        },
+        {
+          "project": "/synthetic/project-2",
+          "state": "pending"
+        },
+        {
+          "project": "/synthetic/project-3",
+          "state": "pending"
+        },
+        {
+          "project": "/synthetic/project-4",
+          "state": "pending"
+        }
+      ],
+      "index": {
+        "indexDbBytes": 458211328,
+        "indexWalBytes": 0,
+        "indexPages": [
+          {
+            "name": "entries",
+            "bytes": 425803776,
+            "payloadBytes": 383462584,
+            "unusedBytes": 39717112
+          },
+          {
+            "name": "event_threads_1",
+            "bytes": 32342016,
+            "payloadBytes": 26901706,
+            "unusedBytes": 4613590
+          },
+          {
+            "name": "sqlite_schema",
+            "bytes": 16384,
+            "payloadBytes": 899,
+            "unusedBytes": 15353
+          },
+          {
+            "name": "sqlite_autoindex_buckets_1",
+            "bytes": 16384,
+            "payloadBytes": 4824,
+            "unusedBytes": 11411
+          },
+          {
+            "name": "event_threads_24",
+            "bytes": 16384,
+            "payloadBytes": 0,
+            "unusedBytes": 16376
+          },
+          {
+            "name": "buckets",
+            "bytes": 16384,
+            "payloadBytes": 4778,
+            "unusedBytes": 11410
+          }
+        ],
+        "indexPayloads": [
+          {
+            "scopeKind": "parserFacts",
+            "field": "events",
+            "entries": 200759,
+            "storedJsonbPayloadBytes": 250946737,
+            "expandedJsonBytes": 278267742
+          },
+          {
+            "scopeKind": "parserFacts",
+            "field": "measurements",
+            "entries": 50003,
+            "storedJsonbPayloadBytes": 52093519,
+            "expandedJsonBytes": 60594029
+          },
+          {
+            "scopeKind": "parserFacts",
+            "field": "operations",
+            "entries": 50000,
+            "storedJsonbPayloadBytes": 28241390,
+            "expandedJsonBytes": 33591390
+          },
+          {
+            "scopeKind": "projection",
+            "field": "events",
+            "entries": 200759,
+            "storedJsonbPayloadBytes": 0,
+            "expandedJsonBytes": 278267742
+          },
+          {
+            "scopeKind": "projection",
+            "field": "measurements",
+            "entries": 50003,
+            "storedJsonbPayloadBytes": 0,
+            "expandedJsonBytes": 53043576
+          },
+          {
+            "scopeKind": "projection",
+            "field": "operations",
+            "entries": 50000,
+            "storedJsonbPayloadBytes": 0,
+            "expandedJsonBytes": 33591390
+          }
+        ],
+        "dataDirectoryBytes": 987006387
+      },
+      "independentProjectTruthMatches": true,
+      "wholeSourceOracleMatches": true
+    },
+    "candidateRestore": {
+      "firstProjectMs": 1675.5833330000023,
+      "fullRestoreMs": 5737.695832999998,
+      "firstProjectRssKiB": 168048,
+      "peakRssBytes": 419364864,
+      "preferredProject": "/synthetic/project-0",
+      "firstProjectStates": [
+        {
+          "project": "/synthetic/project-0",
+          "state": "ready"
+        },
+        {
+          "project": "/synthetic/project-1",
+          "state": "loading"
+        },
+        {
+          "project": "/synthetic/project-2",
+          "state": "pending"
+        },
+        {
+          "project": "/synthetic/project-3",
+          "state": "pending"
+        },
+        {
+          "project": "/synthetic/project-4",
+          "state": "pending"
+        }
+      ],
+      "index": {
+        "indexDbBytes": 40042496,
+        "indexWalBytes": 0,
+        "indexPages": [
+          {
+            "name": "event_blocks",
+            "bytes": 21516288,
+            "payloadBytes": 19906099,
+            "unusedBytes": 1563890
+          },
+          {
+            "name": "fact_blocks",
+            "bytes": 6713344,
+            "payloadBytes": 5908016,
+            "unusedBytes": 784791
+          },
+          {
+            "name": "fact_rows_block",
+            "bytes": 5038080,
+            "payloadBytes": 4082175,
+            "unusedBytes": 641140
+          },
+          {
+            "name": "fact_rows",
+            "bytes": 4886528,
+            "payloadBytes": 4082175,
+            "unusedBytes": 490032
+          },
+          {
+            "name": "entries",
+            "bytes": 1531904,
+            "payloadBytes": 606668,
+            "unusedBytes": 917626
+          },
+          {
+            "name": "event_targets",
+            "bytes": 204800,
+            "payloadBytes": 170750,
+            "unusedBytes": 28454
+          },
+          {
+            "name": "sqlite_autoindex_event_blocks_1",
+            "bytes": 110592,
+            "payloadBytes": 91872,
+            "unusedBytes": 14650
+          },
+          {
+            "name": "fact_blocks_bucket",
+            "bytes": 16384,
+            "payloadBytes": 6782,
+            "unusedBytes": 7212
+          },
+          {
+            "name": "sqlite_schema",
+            "bytes": 4096,
+            "payloadBytes": 1758,
+            "unusedBytes": 2175
+          },
+          {
+            "name": "sqlite_autoindex_buckets_1",
+            "bytes": 4096,
+            "payloadBytes": 3931,
+            "unusedBytes": 40
+          },
+          {
+            "name": "event_links",
+            "bytes": 4096,
+            "payloadBytes": 3,
+            "unusedBytes": 4081
+          },
+          {
+            "name": "event_heads",
+            "bytes": 4096,
+            "payloadBytes": 9,
+            "unusedBytes": 4075
+          },
+          {
+            "name": "buckets",
+            "bytes": 4096,
+            "payloadBytes": 3893,
+            "unusedBytes": 39
+          }
+        ],
+        "indexPayloads": [
+          {
+            "scopeKind": "parserFacts",
+            "field": "events",
+            "entries": 200759,
+            "storedJsonbPayloadBytes": 0,
+            "expandedJsonBytes": 0,
+            "storedCompressedPayloadBytes": 19722099,
+            "decodedFrameBytes": 278469778
+          },
+          {
+            "scopeKind": "projection",
+            "field": "measurements",
+            "entries": 50003,
+            "storedJsonbPayloadBytes": 0,
+            "expandedJsonBytes": 0,
+            "storedCompressedPayloadBytes": 3204474,
+            "decodedFrameBytes": 56544177
+          },
+          {
+            "scopeKind": "projection",
+            "field": "operations",
+            "entries": 50000,
+            "storedJsonbPayloadBytes": 0,
+            "expandedJsonBytes": 0,
+            "storedCompressedPayloadBytes": 2643099,
+            "decodedFrameBytes": 37091781
+          }
+        ],
+        "dataDirectoryBytes": 568837582
+      },
+      "independentProjectTruthMatches": true,
+      "wholeSourceOracleMatches": true
+    }
+  },
+  "consistency": {
+    "initialTruthPassed": true,
+    "eachAppendConserved": true,
+    "usageDailySubtotalsConserved": true,
+    "threadPagesAndAmountsConserved": true,
+    "fixedSnapshotMatches": true,
+    "coldRebuildMatches": true,
+    "oracleMeaning": "Compares output business fields and source occurrence times, including summaries, prices, rows, quality and pagination totals; excludes changing snapshot/freshness/capture headers only."
+  },
+  "limitations": [
+    "Synthetic Rust-parsed corpus on one platform; source logs and user records were not scanned.",
+    "Filesystem caches uncontrolled; no physical-cache-cold or allocated-block claim. Database plus WAL sizes are observations before exit, not sampled transaction maxima.",
+    "Single-reader complete CLI requests, including first queries against a ready view; collection, synchronization, restore and export are measured separately.",
+    "This scoped result does not accept the full 3,000,000-event, concurrency, source-backed-detail, or bounded-residency proposal."
+  ]
+}

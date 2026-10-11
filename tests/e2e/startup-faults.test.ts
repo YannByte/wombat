@@ -35,6 +35,6 @@ test('index initialization faults return actual errors, retain unsupported recor
   // Explicit test fixture reset, never performed by the product.
   await rm(database);await rm(database+'-wal',{force:true});await rm(database+'-shm',{force:true});
   const restored=await client.live!({query:{action:'usage',roots:[root]},mode:'fresh'});assert.equal(restored.freshness.status,'current');assert.equal(restored.result.summary.measurementCount,0);
-  const current=new DatabaseSync(database);assert.equal(current.prepare('PRAGMA user_version').get()!.user_version,4);current.close();
+  const current=new DatabaseSync(database);assert.equal(current.prepare('PRAGMA user_version').get()!.user_version,5);current.close();
  }finally{await host.close();service.kill('SIGTERM');await once(service,'exit').catch(()=>{});for(const[k,v]of Object.entries(previous)){if(v===undefined)delete process.env[k];else process.env[k]=v;}await rm(dir,{recursive:true,force:true});}
 });

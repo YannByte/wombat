@@ -12,7 +12,7 @@ const isCliFile = file => /^wombat(?:-.*)?\.js$/.test(file);
 let preserveStaging = false;
 try {
   const output = path.join(staging, 'next');
-  await build({ absWorkingDir: root, entryPoints: { wombat: 'cli/src/index.ts' }, bundle: true, splitting: true, platform: 'node', format: 'esm', target: 'node22', outdir: output, chunkNames: 'wombat-[name]-[hash]', banner: { js: '#!/usr/bin/env node\nimport {createRequire as wombatCreateRequire} from "node:module"; const require = wombatCreateRequire(import.meta.url);' } });
+  await build({ absWorkingDir: root, entryPoints: { wombat: 'cli/src/index.ts' }, bundle: true, minify: true, splitting: true, platform: 'node', format: 'esm', target: 'node22', outdir: output, chunkNames: 'wombat-[name]-[hash]', banner: { js: '#!/usr/bin/env node\nimport {createRequire as wombatCreateRequire} from "node:module"; const require = wombatCreateRequire(import.meta.url);' } });
   chmodSync(path.join(output, 'wombat.js'), 0o755);
   mkdirSync(backup);
   const previous = readdirSync(dist).filter(isCliFile);

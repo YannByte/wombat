@@ -215,7 +215,7 @@ pub fn serve() -> Result<()> {
                 let configs = Arc::clone(&configs);
                 let jobs = jobs.clone();
                 std::thread::spawn(move || {
-                    let result = (|| -> Result<Value> {
+                    let result = (|| -> Result<Vec<u8>> {
                         stream.set_nonblocking(false)?;
                         stream.set_read_timeout(Some(Duration::from_secs(12)))?;
                         stream.set_write_timeout(Some(Duration::from_secs(12)))?;
@@ -246,7 +246,7 @@ pub fn serve() -> Result<()> {
                                 serde_json::from_value(value).map_err(|_| {
                                     operation_error("INVALID_ARGUMENT", "Invalid monitor request")
                                 })?;
-                            return Ok(serde_json::to_value(query::monitor_query(
+                            return Ok(encode_success(&query::monitor_query(
                                 request.monitor,
                                 &state,
                                 &jobs,
@@ -259,7 +259,7 @@ pub fn serve() -> Result<()> {
                                     operation_error("INVALID_ARGUMENT", "Invalid timing request")
                                 })?;
                             let cancelled = std::sync::atomic::AtomicBool::new(false);
-                            return Ok(serde_json::to_value(timing_query(
+                            return Ok(encode_success(&timing_query(
                                 request.timing,
                                 &state,
                                 &jobs,
@@ -300,7 +300,7 @@ pub fn serve() -> Result<()> {
                             )?;
                             let id = response.read_view.unwrap();
                             let view = configs.lock().unwrap().get(&id)?;
-                            return Ok(serde_json::to_value(crate::handoff::prepare(
+                            return Ok(encode_success(&crate::handoff::prepare(
                                 r.handoff, id, &view,
                             )?)?);
                         }
@@ -330,15 +330,15 @@ pub fn serve() -> Result<()> {
                                     &configs,
                                     &cancelled,
                                 )?;
-                                return Ok(serde_json::to_value(
-                                    crate::optimize::activity::response(result)?,
-                                )?);
+                                return Ok(encode_success(&crate::optimize::activity::response(
+                                    result,
+                                )?)?);
                             }
                             if r.optimize.action == crate::optimize_dto::Action::Capabilities {
                                 let mut response = crate::optimize::capabilities();
                                 response.rule_parameters =
                                     crate::optimize::parameters(r.optimize.rule_overrides)?;
-                                return Ok(serde_json::to_value(response)?);
+                                return Ok(encode_success(&response)?);
                             }
                             let mut cfg = crate::config_dto::Request {
                                 roots: r.optimize.roots.clone(),
@@ -361,14 +361,14 @@ pub fn serve() -> Result<()> {
                             )?;
                             let id = response.read_view.unwrap();
                             let view = configs.lock().unwrap().get(&id)?;
-                            return Ok(serde_json::to_value(crate::optimize::execute(
+                            return Ok(encode_success(&crate::optimize::execute(
                                 r.optimize, id, &view,
                             )?)?);
                         }
                         if value.get("config").is_some() {
                             let request: ConfigMessage = serde_json::from_value(value)
                                 .map_err(|_| operation_error("INVALID_ARGUMENT", "配置参数无效"))?;
-                            return Ok(serde_json::to_value(config_query(
+                            return Ok(encode_success(&config_query(
                                 request.config,
                                 request.native_hooks.as_ref(),
                                 &state,
@@ -378,17 +378,15 @@ pub fn serve() -> Result<()> {
                         }
                         let request: Request = serde_json::from_value(value)
                             .map_err(|_| operation_error("INVALID_ARGUMENT", "实时查询参数无效"))?;
-                        Ok(serde_json::to_value(query(
-                            request, &state, &jobs, &configs,
-                        )?)?)
+                        Ok(encode_success(&query(request, &state, &jobs, &configs)?)?)
                     })();
                     let response = match result {
-                        Ok(value) => json!({"ok":true,"value":value}),
-                        Err(e) => {
-                            json!({"ok":false,"code":e.downcast_ref::<crate::dto::OperationError>().map_or("CORE_ERROR",|e|e.code),"error":format!("{e:#}")})
-                        }
+                        Ok(bytes) => Ok(bytes),
+                        Err(e) => serde_json::to_vec(
+                            &json!({"ok":false,"code":e.downcast_ref::<crate::dto::OperationError>().map_or("CORE_ERROR",|e|e.code),"error":format!("{e:#}")}),
+                        ),
                     };
-                    if let Ok(bytes) = serde_json::to_vec(&response) {
+                    if let Ok(bytes) = response {
                         let _ = stream.write_all(&bytes);
                     }
                     let _ = stream.write_all(b"\n");
@@ -414,6 +412,9 @@ pub fn serve() -> Result<()> {
                 {
                     break;
                 }
+                #[cfg(unix)]
+                wait_for_connection(&listener, 250)?;
+                #[cfg(windows)]
                 std::thread::sleep(Duration::from_millis(25));
             }
             Err(e) => return Err(e.into()),
@@ -472,4 +473,57 @@ mod timing_tests {
             .is_err()
         );
     }
+}
+
+/// Readiness wakes immediately for a request; the timeout only bounds lifecycle checks.
+#[cfg(unix)]
+fn wait_for_connection(
+    listener: &std::os::unix::net::UnixListener,
+    timeout_ms: i32,
+) -> std::io::Result<bool> {
+    use std::os::fd::AsRawFd;
+    let mut descriptor = libc::pollfd {
+        fd: listener.as_raw_fd(),
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: one initialized pollfd stays live for the call, and the borrowed
+    // listener owns its descriptor throughout this bounded wait.
+    let result = unsafe { libc::poll(&mut descriptor, 1, timeout_ms) };
+    if result < 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() == std::io::ErrorKind::Interrupted {
+            return Ok(false);
+        }
+        return Err(error);
+    }
+    if descriptor.revents & (libc::POLLERR | libc::POLLNVAL) != 0 {
+        return Err(std::io::Error::other("local listener readiness failed"));
+    }
+    Ok(descriptor.revents & libc::POLLIN != 0)
+}
+#[cfg(all(test, unix))]
+mod readiness_tests {
+    use super::*;
+    #[test]
+    fn readiness_observes_queued_connection_and_empty_timeout() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("test.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(!wait_for_connection(&listener, 0).unwrap());
+        let _client = std::os::unix::net::UnixStream::connect(&path).unwrap();
+        assert!(wait_for_connection(&listener, 0).unwrap());
+        let _accepted = listener.accept().unwrap();
+        assert!(!wait_for_connection(&listener, 0).unwrap());
+    }
+}
+
+// Encode typed output directly into its protocol envelope. Constructing a JSON
+// value tree first duplicates every ranking field and string on the hot path.
+fn encode_success(value: &impl serde::Serialize) -> serde_json::Result<Vec<u8>> {
+    let mut bytes = br#"{"ok":true,"value":"#.to_vec();
+    serde_json::to_writer(&mut bytes, value)?;
+    bytes.push(b'}');
+    Ok(bytes)
 }

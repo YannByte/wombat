@@ -722,3 +722,15 @@ fn automatic_price_detection_requires_repairable_missing_rates() {
             .any(|s| s.as_ref() == "catalogPriceMissing")
     );
 }
+
+#[test]
+fn prepared_price_cache_overflow_keeps_every_charge_and_checks_uncached_values() {
+    let one = price(&model("gpt-5.3-codex"), &tokens(100_000, 50_000, 0, 10_000));
+    let mut rows = vec![one; 5000];
+    let sum = sum_prices(rows.iter().chain([&rows[0], &rows[4999]])).unwrap();
+    // 5,002 distinct ledger contributions at exactly USD 0.32375 each.
+    assert_eq!(sum.cost.as_deref(), Some("1619.3975"));
+    assert_eq!(sum.components[0].tokens, Some(500_200_000));
+    rows[4999].currency = "invalid".into();
+    assert!(sum_prices(&rows).is_err());
+}

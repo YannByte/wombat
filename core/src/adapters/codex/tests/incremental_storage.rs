@@ -189,7 +189,7 @@ fn missing_source_rebuilds_facts_from_events_without_derived_cache() {
     let fact_scope = format!("parser:{}:%:1:facts", source.id);
     let event_count: i64 = db
         .query_row(
-            "SELECT COUNT(*) FROM entries e JOIN buckets b ON b.id=e.bucket WHERE b.scope LIKE ?1 AND b.field='events'",
+            "SELECT SUM(e.count) FROM event_blocks e JOIN buckets b ON b.id=e.bucket WHERE b.scope LIKE ?1 AND b.field='events'",
             [&fact_scope],
             |row| row.get(0),
         )
@@ -253,9 +253,9 @@ fn missing_source_rebuilds_facts_from_events_without_derived_cache() {
                 |row| row.get(0),
             )
             .unwrap();
-        assert!(
-            count > 0,
-            "the {field} projection must be saved after replay"
+        assert_eq!(
+            count, 0,
+            "the parser must not duplicate canonical {field} after replay"
         );
     }
 }

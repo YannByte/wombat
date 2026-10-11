@@ -4,8 +4,21 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Map, Value};
 use std::{collections::HashSet, path::Path};
 
-const VERSION: i64 = 4;
-const UPSERT: &str = "INSERT INTO entries(bucket,id,payload) VALUES(?1,?2,jsonb(?3)) ON CONFLICT(bucket,id) DO UPDATE SET payload=excluded.payload,source_bucket=NULL,member=NULL WHERE payload IS NOT excluded.payload OR source_bucket IS NOT NULL";
+const VERSION: i64 = 5;
+mod codec;
+mod event_blocks;
+mod packed;
+pub(crate) use event_blocks::{save as save_events, share as share_events};
+pub(crate) use packed::{retain as retain_packed, upsert as put_packed};
+const UPSERT: &str = "INSERT INTO entries(bucket,id,payload) VALUES(?1,?2,jsonb(?3)) ON CONFLICT(bucket,id) DO UPDATE SET payload=excluded.payload WHERE payload IS NOT excluded.payload";
+
+fn require_index(condition: bool, message: &str) -> Result<()> {
+    if condition {
+        Ok(())
+    } else {
+        Err(crate::dto::operation_error("INDEX_UNAVAILABLE", message))
+    }
+}
 
 pub(crate) fn failure_code(error: &anyhow::Error) -> &'static str {
     if let Some(e) = error.downcast_ref::<crate::dto::OperationError>() {
@@ -37,10 +50,9 @@ pub(crate) fn open(path: &Path) -> Result<Connection> {
 fn open_inner(path: &Path) -> Result<Connection> {
     let mut db = Connection::open(path)?;
     db.busy_timeout(std::time::Duration::from_secs(2))?;
-    db.execute_batch("PRAGMA page_size=16384; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA cache_size=-4096; PRAGMA temp_store=FILE; PRAGMA journal_size_limit=8388608; PRAGMA wal_autocheckpoint=512;")?;
+    db.execute_batch("PRAGMA page_size=4096; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192; PRAGMA temp_store=FILE; PRAGMA journal_size_limit=8388608; PRAGMA wal_autocheckpoint=512;")?;
     let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version == VERSION {
-        project_events::prepare_indexes(&db)?;
         return Ok(db);
     }
     if version != 0 {
@@ -54,7 +66,6 @@ fn open_inner(path: &Path) -> Result<Connection> {
     let version: i64 = tx.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version == VERSION {
         tx.commit()?;
-        project_events::prepare_indexes(&db)?;
         return Ok(db);
     }
     if version != 0 {
@@ -71,7 +82,9 @@ fn open_inner(path: &Path) -> Result<Connection> {
         ));
     }
     tx.execute_batch("CREATE TABLE buckets (id INTEGER PRIMARY KEY, scope TEXT NOT NULL, field TEXT NOT NULL, UNIQUE(scope,field));
-        CREATE TABLE entries (bucket INTEGER NOT NULL REFERENCES buckets(id), id TEXT NOT NULL, payload BLOB, source_bucket INTEGER REFERENCES buckets(id), member TEXT, CHECK((payload IS NOT NULL AND source_bucket IS NULL AND member IS NULL) OR (payload IS NULL AND source_bucket IS NOT NULL AND member IS NOT NULL AND member IN ('$', '$.measurement'))), PRIMARY KEY(bucket,id)) WITHOUT ROWID;")?;
+        CREATE TABLE entries (bucket INTEGER NOT NULL REFERENCES buckets(id), id TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(bucket,id)) WITHOUT ROWID;")?;
+    event_blocks::schema(&tx)?;
+    packed::schema(&tx)?;
     tx.pragma_update(None, "user_version", VERSION)?;
     tx.commit()?;
     Ok(db)
@@ -92,9 +105,6 @@ fn bucket(db: &Connection, scope: &str, field: &str) -> Result<i64> {
     let id = db
         .prepare_cached("SELECT id FROM buckets WHERE scope=?1 AND field=?2")?
         .query_row(params![scope, field], |row| row.get(0))?;
-    if field == "events" {
-        project_events::prepare_bucket_index(db, id)?;
-    }
     Ok(id)
 }
 fn write(db: &Connection, bucket: i64, id: &str, payload: &str) -> Result<()> {
@@ -188,13 +198,13 @@ pub(crate) fn load_map(db: &Connection, scope: &str) -> Result<Map<String, Value
 
 /// Metadata-only presence probe; does not deserialize or traverse fact payloads.
 pub(crate) fn has_scope(db: &Connection, scope: &str) -> Result<bool> {
-    Ok(db.prepare_cached("SELECT EXISTS(SELECT 1 FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1)")?
+    Ok(db.prepare_cached("SELECT EXISTS(SELECT 1 FROM buckets b WHERE b.scope=?1 AND (EXISTS(SELECT 1 FROM entries e WHERE e.bucket=b.id) OR EXISTS(SELECT 1 FROM fact_rows r WHERE r.bucket=b.id) OR EXISTS(SELECT 1 FROM event_blocks e WHERE e.bucket=b.id) OR EXISTS(SELECT 1 FROM event_links l WHERE l.bucket=b.id)))")?
         .query_row([scope], |row| row.get(0))?)
 }
 
 /// Read one directly stored scalar header; references are not a supported header shape.
 pub(crate) fn scalar(db: &Connection, scope: &str, field: &str) -> Result<Option<Value>> {
-    let payload: Option<String> = db.prepare_cached("SELECT json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field=?2 AND e.id='' AND e.source_bucket IS NULL")?
+    let payload: Option<String> = db.prepare_cached("SELECT json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field=?2 AND e.id=''")?
         .query_row(rusqlite::params![scope, field], |row| row.get(0)).optional()?;
     payload
         .map(|payload| serde_json::from_str(&payload).map_err(Into::into))
@@ -257,9 +267,9 @@ fn each_row_filtered(
     mut consume: impl FnMut(&str, &str, &str) -> Result<()>,
 ) -> Result<bool> {
     let sql = if skip_events {
-        "SELECT b.field,e.id,CASE WHEN e.source_bucket IS NULL THEN json(e.payload) ELSE json_extract(t.payload,e.member) END FROM buckets b JOIN entries e ON e.bucket=b.id LEFT JOIN entries t ON t.bucket=e.source_bucket AND t.id=e.id WHERE b.scope=?1 AND b.field!='events'"
+        "SELECT b.field,e.id,json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field!='events'"
     } else {
-        "SELECT b.field,e.id,CASE WHEN e.source_bucket IS NULL THEN json(e.payload) ELSE json_extract(t.payload,e.member) END FROM buckets b JOIN entries e ON e.bucket=b.id LEFT JOIN entries t ON t.bucket=e.source_bucket AND t.id=e.id WHERE b.scope=?1"
+        "SELECT b.field,e.id,json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1"
     };
     let mut statement = db.prepare_cached(sql)?;
     let mut rows = statement.query([scope])?;
@@ -271,99 +281,17 @@ fn each_row_filtered(
         let payload = row.get_ref(2)?.as_str()?;
         consume(field, id, payload)?;
     }
+    found |= packed::each(db, scope, &mut consume)?;
+    if !skip_events {
+        found |= event_blocks::each(db, scope, None, |id, payload| {
+            consume("events", id, payload)
+        })?;
+    }
     Ok(found)
 }
 
 mod project_events;
 pub(crate) use project_events::prepare_event_reader;
-
-/// One-hop references; the target must own a payload at creation.
-pub(crate) enum Member {
-    Whole,
-    Measurement,
-}
-pub(crate) struct ReferenceField<'a> {
-    db: &'a Connection,
-    destination: i64,
-    source: i64,
-    member: &'static str,
-}
-impl<'a> ReferenceField<'a> {
-    pub(crate) fn new(
-        db: &'a Connection,
-        scope: &str,
-        field: &str,
-        source: &str,
-        member: Member,
-    ) -> Result<Self> {
-        let source = bucket(db, source, field)?;
-        let destination = bucket(db, scope, field)?;
-        if source == destination {
-            return Err(crate::dto::operation_error(
-                "INDEX_UNAVAILABLE",
-                "索引事实不能引用自身",
-            ));
-        }
-        Ok(Self {
-            db,
-            source,
-            destination,
-            member: match member {
-                Member::Whole => "$",
-                Member::Measurement => "$.measurement",
-            },
-        })
-    }
-    pub(crate) fn reference(&self, id: &str) -> Result<()> {
-        let count = self.db.prepare_cached("INSERT INTO entries(bucket,id,source_bucket,member) SELECT ?1,id,?2,?3 FROM entries WHERE bucket=?2 AND id=?4 AND payload IS NOT NULL ON CONFLICT(bucket,id) DO UPDATE SET payload=NULL,source_bucket=excluded.source_bucket,member=excluded.member WHERE payload IS NOT NULL OR source_bucket IS NOT excluded.source_bucket OR member IS NOT excluded.member")?
-            .execute(params![self.destination,self.source,self.member,id])?;
-        if count == 0 {
-            let exists: bool = self.db.prepare_cached("SELECT EXISTS(SELECT 1 FROM entries WHERE bucket=?1 AND id=?2 AND payload IS NOT NULL)")?.query_row(params![self.source,id], |r| r.get(0))?;
-            if !exists {
-                return Err(crate::dto::operation_error(
-                    "INDEX_UNAVAILABLE",
-                    "索引引用的来源事实不可用",
-                ));
-            }
-        }
-        Ok(())
-    }
-    pub(crate) fn put<T: serde::Serialize>(&self, id: &str, value: &T) -> Result<()> {
-        write(
-            self.db,
-            self.destination,
-            id,
-            &serde_json::to_string(value)?,
-        )
-    }
-}
-
-#[cfg(test)]
-fn reference(
-    db: &Connection,
-    scope: &str,
-    field: &str,
-    id: &str,
-    source: &str,
-    member: Member,
-) -> Result<()> {
-    ReferenceField::new(db, scope, field, source, member)?.reference(id)
-}
-
-pub(crate) fn retain_field<'a>(
-    db: &Connection,
-    scope: &str,
-    field: &str,
-    ids: impl Iterator<Item = &'a str>,
-) -> Result<()> {
-    let bucket = bucket(db, scope, field)?;
-    let mut desired: HashSet<&str> = ids.collect();
-    if desired.is_empty() {
-        write(db, bucket, "", "{}")?;
-        desired.insert("");
-    }
-    prune(db, bucket, &desired)
-}
 
 pub(crate) fn replace_field<'a, T: serde::Serialize + 'a>(
     db: &Connection,
@@ -390,6 +318,7 @@ pub(crate) fn remove(db: &Connection, scope: &str, field: &str, id: &str) -> Res
         .query_row(params![scope, field], |r| r.get(0))
         .optional()?;
     if let Some(bucket) = bucket {
+        packed::remove(db, bucket, id)?;
         db.prepare_cached("DELETE FROM entries WHERE bucket=?1 AND id=?2")?
             .execute(params![bucket, id])?;
     }
@@ -400,89 +329,6 @@ pub(crate) fn remove(db: &Connection, scope: &str, field: &str, id: &str) -> Res
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[test]
-    fn references_preserve_exact_values_transaction_rollback_and_replacement() {
-        let root = tempfile::tempdir().unwrap();
-        let mut db = open(&root.path().join("index.sqlite")).unwrap();
-        let value = json!({"measurement":{"id":"m","total":u64::MAX,"text":"中文"},"direct":true});
-        put(&db, "parser", "measurements", "m", &value).unwrap();
-        reference(
-            &db,
-            "projection",
-            "measurements",
-            "m",
-            "parser",
-            Member::Measurement,
-        )
-        .unwrap();
-        assert_eq!(
-            load_map(&db, "projection").unwrap()["measurements"]["m"],
-            value["measurement"]
-        );
-        assert!(
-            reference(
-                &db,
-                "third",
-                "measurements",
-                "m",
-                "projection",
-                Member::Whole
-            )
-            .is_err()
-        );
-        assert!(reference(&db, "parser", "measurements", "m", "parser", Member::Whole).is_err());
-        {
-            let tx = db.transaction().unwrap();
-            put(
-                &tx,
-                "parser",
-                "measurements",
-                "m",
-                &json!({"measurement":{"total":1}}),
-            )
-            .unwrap();
-            assert_eq!(
-                load_map(&tx, "projection").unwrap()["measurements"]["m"]["total"],
-                1
-            );
-            tx.rollback().unwrap();
-        }
-        assert_eq!(
-            load_map(&db, "projection").unwrap()["measurements"]["m"],
-            value["measurement"]
-        );
-        put(
-            &db,
-            "projection",
-            "measurements",
-            "m",
-            &json!({"derived":true}),
-        )
-        .unwrap();
-        assert_eq!(
-            load_map(&db, "projection").unwrap()["measurements"]["m"],
-            json!({"derived":true})
-        );
-        reference(
-            &db,
-            "projection",
-            "measurements",
-            "m",
-            "parser",
-            Member::Whole,
-        )
-        .unwrap();
-        assert_eq!(
-            load_map(&db, "projection").unwrap()["measurements"]["m"],
-            value
-        );
-        remove(&db, "parser", "measurements", "m").unwrap();
-        assert!(
-            load_map(&db, "projection").is_err(),
-            "missing referenced facts cannot disappear silently"
-        );
-    }
 
     #[test]
     fn current_schema_keeps_exact_values_across_reopen() {
@@ -499,7 +345,7 @@ mod tests {
     }
     #[test]
     fn unsupported_schema_is_rejected_without_mutating_records() {
-        for version in [0, 1, 2, 3, 99] {
+        for version in [0, 1, 2, 3, 4, 99] {
             let root = tempfile::tempdir().unwrap();
             let path = root.path().join("index.sqlite");
             let db = Connection::open(&path).unwrap();
@@ -656,18 +502,6 @@ mod scalar_tests {
             Some(json!(1))
         );
         assert!(load_map(&db, "projection").is_err());
-        put(&db, "source", "mapping", "", &json!({"measurement":2})).unwrap();
-        reference(
-            &db,
-            "reference",
-            "mapping",
-            "",
-            "source",
-            Member::Measurement,
-        )
-        .unwrap();
-        assert!(has_scope(&db, "reference").unwrap());
-        assert_eq!(scalar(&db, "reference", "mapping").unwrap(), None);
     }
 }
 
@@ -695,7 +529,7 @@ pub(crate) fn fact<T: serde::de::DeserializeOwned>(
     field: &str,
     id: &str,
 ) -> Result<Option<T>> {
-    let payload:Option<String>=db.prepare_cached("SELECT json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field=?2 AND e.id=?3 AND e.source_bucket IS NULL AND length(e.payload)<=1048576")?.query_row(params![scope,field,id],|r|r.get(0)).optional()?;
+    let payload:Option<String>=db.prepare_cached("SELECT json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field=?2 AND e.id=?3 AND length(e.payload)<=1048576")?.query_row(params![scope,field,id],|r|r.get(0)).optional()?;
     payload
         .map(|v| serde_json::from_str(&v).map_err(Into::into))
         .transpose()

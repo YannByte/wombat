@@ -24,8 +24,7 @@ impl Default for ComponentTotal {
     }
 }
 impl ComponentTotal {
-    fn add(&mut self, value: &PriceComponent) -> Result<(), String> {
-        let amount = checked_amount(&value.status, value.cost.as_deref(), &value.known_cost)?;
+    fn add(&mut self, value: &PriceComponent, amount: Decimal) -> Result<(), String> {
         self.amount = add_exact(self.amount, amount)?;
         self.count = match (self.count, value.tokens) {
             (Some(left), Some(right)) => Some(left.checked_add(right).ok_or("tokenCountOverflow")?),
@@ -83,28 +82,58 @@ pub fn sum_prices<'a>(
     let mut issues = BTreeSet::new();
     let mut revisions = BTreeSet::new();
     let mut components: [ComponentTotal; 4] = std::array::from_fn(|_| ComponentTotal::default());
+    // Equal immutable prices are shared by live snapshots. Validate and parse
+    // their decimal fields once, but add every charge in the original order.
+    // The bounded cache changes neither rounding nor ledger multiplicity.
+    type Prepared = (Decimal, [(usize, Decimal); 4]);
+    let mut prepared = std::collections::HashMap::<*const PriceResult, Prepared>::new();
     for value in values {
-        if value.currency.as_ref() != "USD" || value.policy.as_ref() != PRICE_POLICY {
+        let pointer = value as *const PriceResult;
+        let cached = prepared.get(&pointer).copied();
+        if cached.is_none()
+            && (value.currency.as_ref() != "USD" || value.policy.as_ref() != PRICE_POLICY)
+        {
             return Err("incompatiblePricePolicy".into());
         }
-        total = add_exact(
-            total,
-            checked_amount(&value.status, value.cost.as_deref(), &value.known_cost)?,
-        )?;
+        let amount = match cached {
+            Some((amount, _)) => amount,
+            None => checked_amount(&value.status, value.cost.as_deref(), &value.known_cost)?,
+        };
+        total = add_exact(total, amount)?;
         complete &= value.status.as_ref() == "priced";
         known |= value.status.as_ref() != "unknown";
-        basis.extend(value.basis.iter().cloned().map(|mut entry| {
-            entry.request_input_tokens = None;
-            entry
-        }));
-        issues.extend(value.issues.iter().cloned());
-        revisions.insert(value.price_revision.clone());
-        for component in &value.components {
-            let index = CATEGORIES
-                .iter()
-                .position(|c| *c == component.category.as_ref())
-                .ok_or("invalidPriceCategory")?;
-            components[index].add(component)?;
+        if cached.is_none() {
+            basis.extend(value.basis.iter().cloned().map(|mut entry| {
+                entry.request_input_tokens = None;
+                entry
+            }));
+            issues.extend(value.issues.iter().cloned());
+            revisions.insert(value.price_revision.clone());
+        }
+        let mut parts = [(0, Decimal::ZERO); 4];
+        for (number, component) in value.components.iter().enumerate() {
+            let (index, amount) = if let Some((_, parts)) = cached {
+                parts[number]
+            } else {
+                (
+                    CATEGORIES
+                        .iter()
+                        .position(|c| *c == component.category.as_ref())
+                        .ok_or("invalidPriceCategory")?,
+                    checked_amount(
+                        &component.status,
+                        component.cost.as_deref(),
+                        &component.known_cost,
+                    )?,
+                )
+            };
+            components[index].add(component, amount)?;
+            if number < parts.len() {
+                parts[number] = (index, amount);
+            }
+        }
+        if cached.is_none() && prepared.len() < 4096 && value.components.len() <= 4 {
+            prepared.insert(pointer, (amount, parts));
         }
     }
     result.components = components

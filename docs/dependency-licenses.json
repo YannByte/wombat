@@ -7,7 +7,7 @@
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
     "pnpm-lock.yaml": "7128a48df418f8e0b6ae85dace5a53b14dad5ee20e5a6e699ceda4f9351fda8d",
-    "core/Cargo.lock": "f7c12ebcc93733a8b5df4910f07ac33660313d6e8d1e599200f7c9f24ee63c55"
+    "core/Cargo.lock": "22ab4b07a784f99fa61a1c3addb9c4bdd41b17f5a473a5860830c0559034079e"
   },
   "node": [
     {
@@ -2485,6 +2485,20 @@
       ]
     },
     {
+      "name": "jobserver",
+      "version": "0.1.35",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE-MIT",
+          "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+        }
+      ]
+    },
+    {
       "name": "js-sys",
       "version": "0.3.106",
       "license": "MIT OR Apache-2.0",
@@ -3979,6 +3993,52 @@
         {
           "name": "LICENSE-MIT",
           "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "zstd-safe",
+      "version": "7.3.0",
+      "license": "BSD-3-Clause",
+      "selectedLicense": "BSD-3-Clause",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "ce4868c8e4ebe47a7d4b3c93dbf6b802033e5ae2fa7638098173f80836daac60"
+        }
+      ]
+    },
+    {
+      "name": "zstd-sys",
+      "version": "2.1.1+zstd.1.5.7",
+      "license": "BSD-3-Clause",
+      "selectedLicense": "BSD-3-Clause",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "ce4868c8e4ebe47a7d4b3c93dbf6b802033e5ae2fa7638098173f80836daac60"
+        },
+        {
+          "name": "LICENSE.BSD-3-Clause",
+          "sha256": "bf7017a73a95ea63bf3716b13ec2bcd79c92942356e3408c6fb66332bad6d977"
+        }
+      ]
+    },
+    {
+      "name": "zstd",
+      "version": "0.13.3",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "129e8edef29e9abcd2ebabe252f4ef1b1289cdca356bf0040284a2fbccfb96c8"
         }
       ]
     }

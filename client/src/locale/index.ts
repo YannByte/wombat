@@ -10,7 +10,7 @@ type Arguments<K extends MessageKey> = [Slots<(typeof zh)[K]>] extends [never]
   ? [] : [params: Record<Slots<(typeof zh)[K]>, string | number>];
 export type Translate = <K extends MessageKey>(key: K, ...args: Arguments<K>) => string;
 const dictionaries = { zh, en };
-const plurals = { zh: new Intl.PluralRules('zh-CN'), en: new Intl.PluralRules('en-US') };
+const plurals: Partial<Record<Locale, Intl.PluralRules>> = {};
 export function matchLocale(value: string | undefined): Locale | undefined {
   const language = value?.trim().toLowerCase().split(/[-_.@]/)[0];
   return language === 'zh' || language === 'en' ? language : undefined;
@@ -54,7 +54,7 @@ export class LocaleRuntime {
     const language = this.snapshot.locale;
     const dictionary: Readonly<Record<string, string>> = dictionaries[language];
     // Full-sentence variants keep interpolation literal and unknown counts distinct.
-    const variant = typeof params?.count === 'number' ? `${key}.${plurals[language].select(params.count)}` : key;
+    const variant = typeof params?.count === 'number' ? `${key}.${(plurals[language] ??= new Intl.PluralRules(language === 'zh' ? 'zh-CN' : 'en-US')).select(params.count)}` : key;
     const template = dictionary[variant] ?? dictionary[key] ?? en[key] ?? key;
     return template.replace(/\{(\w+)\}/g, (match, name: string) => params && Object.hasOwn(params, name) ? String(params[name]) : match);
   };

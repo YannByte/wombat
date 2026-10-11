@@ -119,7 +119,6 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
     let first = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    assert!(first.events.is_none());
     assert_eq!(first.collected.events.len(), 5);
     writeln!(
         fs::OpenOptions::new().append(true).open(&path).unwrap(),
@@ -130,7 +129,12 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
     let next = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    let delta = next.events.unwrap();
+    let delta: Vec<_> = next
+        .collected
+        .events
+        .iter()
+        .filter(|e| e.position().byte_offset >= prefix_bytes)
+        .collect();
     assert_eq!(delta.len(), 4);
     assert!(
         delta
@@ -157,7 +161,6 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
     let verified = incremental::sync_cached(&db, &source, true, &mut cache)
         .unwrap()
         .unwrap();
-    assert!(verified.events.is_none());
     assert_eq!(verified.collected.events, next.collected.events);
     writeln!(
         fs::OpenOptions::new().append(true).open(&path).unwrap(),
@@ -169,7 +172,6 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
         incremental::sync_cached(&db, &source, false, &mut incremental::Cache::default())
             .unwrap()
             .unwrap();
-    assert!(restarted.events.is_none());
     // Source disappearance keeps observations; it is an empty delta, not a deletion.
     // Restart has refreshed parser state, so use another fresh cache to establish it.
     let mut cache = incremental::Cache::default();
@@ -180,13 +182,11 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
     let missing = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    assert!(missing.events.unwrap().is_empty());
     assert_eq!(missing.collected.events, restarted.collected.events);
     write(root.path(), "sessions/events.jsonl", &initial);
     let replacement = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    assert!(replacement.events.is_none());
     assert_eq!(replacement.collected.events.len(), 5);
     assert!(
         replacement.collected.events.iter().all(|e| !first

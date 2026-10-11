@@ -1,7 +1,6 @@
 //! Durable parser checkpoints contain allowlisted facts only, never event bodies.
 use super::*;
 use anyhow::Result;
-mod projection;
 use rusqlite::Connection;
 
 use crate::file_metadata::FileMetadata;
@@ -120,14 +119,6 @@ struct ReusableFacts {
 }
 
 impl Cache {
-    pub(crate) fn projection<'a>(
-        &'a self,
-        db: &'a Connection,
-        source: &SourceInstance,
-        scope: &str,
-    ) -> Result<projection::Projection<'a>> {
-        projection::Projection::new(self, db, source, scope)
-    }
     pub(crate) fn needs_seed(&self) -> bool {
         self.facts.is_none() && self.seed.is_none()
     }
@@ -185,7 +176,7 @@ impl Cache {
     }
 }
 
-fn fact_scope(source: &SourceInstance) -> String {
+pub(crate) fn fact_scope(source: &SourceInstance) -> String {
     format!("parser:{}:{VERSION}:1:facts", source.id)
 }
 
@@ -335,8 +326,6 @@ pub(crate) struct MeasurementDelta {
 }
 pub(crate) struct Synced {
     pub collected: Collected,
-    /// None replaces membership after rebuild/replay; Some writes changed observations only.
-    pub events: Option<Vec<Arc<crate::session_events::Event>>>,
     pub operations: Option<BTreeSet<String>>,
     pub measurements: Option<MeasurementDelta>,
 }
@@ -698,16 +687,8 @@ fn sync_cached_with_context(
             }
         }
     }
-    // Events restore parser truth; refresh disposable projection rows on restart,
-    // including references whose cached payload may have been discarded.
+    // Events restore parser truth; refresh canonical query facts after replay.
     let full = rebuild || previous.is_empty() || restoring;
-    let changed_events = (!full).then(|| {
-        facts
-            .dirty_events
-            .iter()
-            .map(|id| Arc::clone(&facts.events[id]))
-            .collect()
-    });
     let replace_operations = full || !facts.retired_operations.is_empty();
     let changed_operations = if replace_operations || !facts.parents.is_empty() {
         None
@@ -751,59 +732,35 @@ fn sync_cached_with_context(
         }
     }
     crate::operation_association::check(&context.cancelled)?;
-    macro_rules! save {
-        ($field:ident) => {
-            crate::operation_association::check(&context.cancelled)?;
-            crate::live_index::replace_field(
-                db,
-                &fact_scope,
-                stringify!($field),
-                facts.$field.iter().map(|(id, value)| (id.as_str(), value)),
-            )?;
-        };
-    }
     if full {
-        save!(events);
+        crate::live_index::save_events(
+            db,
+            &fact_scope,
+            facts.events.values(),
+            true,
+            &context.cancelled,
+        )?;
     } else {
-        for id in &facts.dirty_events {
-            crate::operation_association::check(&context.cancelled)?;
-            crate::live_index::put(db, &fact_scope, "events", id, &facts.events[id])?;
-        }
+        crate::live_index::save_events(
+            db,
+            &fact_scope,
+            facts.dirty_events.iter().map(|id| &facts.events[id]),
+            false,
+            &context.cancelled,
+        )?;
     }
     facts.dirty_events.clear();
-    save!(title_observations);
-    save!(threads);
-    save!(turns);
-    if full {
-        save!(measurements);
-    } else {
-        for id in &facts.dirty_measurements {
-            crate::operation_association::check(&context.cancelled)?;
-            crate::live_index::put(db, &fact_scope, "measurements", id, &facts.measurements[id])?;
-        }
-    }
-    save!(parents);
-    save!(projects);
-    crate::live_index::put(
+    crate::live_index::replace_field(
         db,
         &fact_scope,
-        "measurement_conflicts",
-        "",
-        &facts.measurement_conflicts,
+        "title_observations",
+        facts
+            .title_observations
+            .iter()
+            .map(|(id, value)| (id.as_str(), value)),
     )?;
-    if replace_operations {
-        save!(operations);
-        save!(aliases);
-    } else {
-        for id in &facts.dirty_operations {
-            crate::operation_association::check(&context.cancelled)?;
-            crate::live_index::put(db, &fact_scope, "operations", id, &facts.operations[id])?;
-        }
-        for id in &facts.dirty_aliases {
-            crate::operation_association::check(&context.cancelled)?;
-            crate::live_index::put(db, &fact_scope, "aliases", id, &facts.aliases[id])?;
-        }
-    }
+    // Parser facts are reconstructed from authoritative observations. Query facts
+    // are stored once in their canonical projection, never copied into this scope.
     let mut metadata = serde_json::json!({
         "watermarkVersion": WATERMARK_FORMAT_VERSION,
         "checkpoints": checkpoints,
@@ -846,7 +803,6 @@ fn sync_cached_with_context(
     cache.projected = Some(result.measurements.clone());
     Ok(Some(Synced {
         collected: result,
-        events: changed_events,
         operations: changed_operations,
         measurements,
     }))

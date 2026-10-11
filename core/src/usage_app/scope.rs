@@ -20,17 +20,34 @@ pub(super) fn timezone(scope: &Scope) -> Result<Tz> {
         .map_err(|_| invalid("无效时区"))
 }
 pub(super) fn local_date(row: &PricedMeasurement, tz: Tz) -> Option<NaiveDate> {
-    let timestamp = row.fact.timestamp.as_ref()?;
-    DateTime::parse_from_rfc3339(timestamp)
-        .ok()
-        .map(|d| d.with_timezone(&tz).date_naive())
-        .or_else(|| {
-            if row.fact.time_precision.as_ref() == "date" {
-                date(timestamp).ok()
-            } else {
-                None
-            }
-        })
+    ObservedTime::parse(row).local_date(tz)
+}
+#[derive(Clone, Copy)]
+pub(super) enum ObservedTime {
+    Instant(DateTime<chrono::FixedOffset>),
+    Date(NaiveDate),
+    Unknown,
+}
+impl ObservedTime {
+    pub(super) fn parse(row: &PricedMeasurement) -> Self {
+        let Some(timestamp) = row.fact.timestamp.as_ref() else {
+            return Self::Unknown;
+        };
+        if let Ok(value) = DateTime::parse_from_rfc3339(timestamp) {
+            Self::Instant(value)
+        } else if row.fact.time_precision.as_ref() == "date" {
+            date(timestamp).map(Self::Date).unwrap_or(Self::Unknown)
+        } else {
+            Self::Unknown
+        }
+    }
+    pub(super) fn local_date(self, tz: Tz) -> Option<NaiveDate> {
+        match self {
+            Self::Instant(value) => Some(value.with_timezone(&tz).date_naive()),
+            Self::Date(value) => Some(value),
+            Self::Unknown => None,
+        }
+    }
 }
 pub(super) fn dimensions(rows: &[&PricedMeasurement]) -> (Vec<String>, Vec<String>) {
     (
@@ -53,6 +70,25 @@ pub(super) fn matches(
     scope: &Scope,
     tz: Tz,
     projects: &BTreeMap<&str, Option<&str>>,
+) -> bool {
+    matches_using_date(row, scope, projects, || local_date(row, tz))
+}
+pub(super) fn matches_view(
+    snapshot: &Snapshot,
+    row: &PricedMeasurement,
+    scope: &Scope,
+    tz: Tz,
+    projects: &BTreeMap<&str, Option<&str>>,
+) -> bool {
+    matches_using_date(row, scope, projects, || {
+        snapshot.summary_index.local_date(row, tz)
+    })
+}
+fn matches_using_date(
+    row: &PricedMeasurement,
+    scope: &Scope,
+    projects: &BTreeMap<&str, Option<&str>>,
+    date: impl FnOnce() -> Option<NaiveDate>,
 ) -> bool {
     let r = &row.fact;
     if scope
@@ -110,7 +146,12 @@ pub(super) fn matches(
     }) {
         return false;
     }
-    let local = local_date(row, tz).map(|d| d.to_string());
+    // Dimension-only filters include dated and undated facts alike. Parsing and
+    // formatting every timestamp here does not affect that selection.
+    if scope.undated != Some(true) && scope.since.is_none() && scope.until.is_none() {
+        return true;
+    }
+    let local = date().map(|d| d.to_string());
     if scope.undated == Some(true) {
         return local.is_none();
     }
@@ -128,18 +169,31 @@ pub(super) fn matches(
     true
 }
 pub(super) fn available(rows: &[&PricedMeasurement], tz: Tz) -> AvailableRange {
-    let dates = rows
-        .iter()
-        .filter_map(|r| local_date(r, tz))
-        .collect::<BTreeSet<_>>();
+    available_dates(rows.iter().filter_map(|r| local_date(r, tz)))
+}
+pub(super) fn available_view(
+    snapshot: &Snapshot,
+    rows: &[&PricedMeasurement],
+    tz: Tz,
+) -> AvailableRange {
+    available_dates(
+        rows.iter()
+            .filter_map(|r| snapshot.summary_index.local_date(r, tz)),
+    )
+}
+fn available_dates(dates: impl Iterator<Item = NaiveDate>) -> AvailableRange {
+    let mut first = None;
+    let mut last = None;
+    for date in dates {
+        first = Some(first.map_or(date, |old: NaiveDate| old.min(date)));
+        last = Some(last.map_or(date, |old: NaiveDate| old.max(date)));
+    }
     AvailableRange {
-        since: dates.first().map(ToString::to_string),
-        until: dates
-            .last()
-            .and_then(|d| d.succ_opt())
-            .map(|d| d.to_string()),
+        since: first.map(|d| d.to_string()),
+        until: last.and_then(|d| d.succ_opt()).map(|d| d.to_string()),
     }
 }
+
 pub(super) fn quality(snapshot: &Snapshot, count: usize) -> Quality {
     let sources = &snapshot.manifest.sources;
     let partial = !snapshot.manifest.issues.is_empty()

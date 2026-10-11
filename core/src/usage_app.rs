@@ -27,7 +27,11 @@ pub(crate) use scope::validate;
 use scope::{
     available, date, dimensions, ensure_ready, invalid, local_date, matches, quality, timezone,
 };
+pub(crate) use summary::SummaryIndex;
 pub use summary::summarize;
+fn summarize_view(snapshot: &Snapshot, rows: &[&PricedMeasurement]) -> Result<UsageSummary> {
+    snapshot.summary_index.summarize(rows)
+}
 use summary::{
     consumption_order, cost_share, known_cost, max_available_tokens, share, unpriced_tokens,
 };
@@ -212,9 +216,9 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
     let range_rows = rows
         .iter()
         .copied()
-        .filter(|r| matches(r, &range_scope, tz, &projects))
+        .filter(|r| scope::matches_view(snapshot, r, &range_scope, tz, &projects))
         .collect::<Vec<_>>();
-    let available_range = available(&range_rows, tz);
+    let available_range = scope::available_view(snapshot, &range_rows, tz);
     // Resolve automatic report ranges here, shared by all entry points.
     if request.action == Action::Usage
         && request.scope.since.is_none()
@@ -258,7 +262,7 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
         .iter()
         .copied()
         .filter(|r| {
-            matches(r, &request.scope, tz, &projects)
+            scope::matches_view(snapshot, r, &request.scope, tz, &projects)
                 && search_ids.as_ref().is_none_or(|ids| {
                     r.fact
                         .thread_id
@@ -267,15 +271,19 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
                 })
         })
         .collect::<Vec<_>>();
-    let mut summary = summarize(&selected)?;
+    let mut summary = summarize_view(snapshot, &selected)?;
     let dimensional = matches!(
         request.presentation,
         Some(Presentation::Projects | Presentation::Models)
     );
     let mut items = match request.action {
-        Action::Usage if dimensional => dimension_items(&selected, &request, &projects, &summary)?,
+        Action::Usage if dimensional => {
+            dimension_items(snapshot, &selected, &request, &projects, &summary)?
+        }
         Action::Usage => usage_items(
+            snapshot,
             &selected,
+            &summary,
             &request.scope,
             request.group.as_ref().unwrap_or(&Group::Day),
             tz,
@@ -450,16 +458,17 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
                 reasoning_efforts,
                 agents: rows
                     .iter()
-                    .map(|r| r.fact.agent_kind.to_string())
+                    .map(|r| r.fact.agent_kind.as_ref())
                     .chain(
                         snapshot
                             .manifest
                             .threads
                             .iter()
-                            .map(|t| t.thread.agent_kind.clone()),
+                            .map(|t| t.thread.agent_kind.as_str()),
                     )
                     .collect::<BTreeSet<_>>()
                     .into_iter()
+                    .map(str::to_owned)
                     .collect(),
             }
         }),

@@ -58,13 +58,17 @@ fn late_bridge_retracts_old_rows_preserves_ids_and_agrees_after_restart() {
         .map(|e| e.id().to_owned())
         .collect();
     let projection_scope = "independent-projection";
-    for row in &first.collected.operations {
-        cache
-            .projection(&db, &source, projection_scope)
-            .unwrap()
-            .operation(row)
-            .unwrap();
-    }
+    crate::live_index::put_packed(
+        &db,
+        projection_scope,
+        "operations",
+        first
+            .collected
+            .operations
+            .iter()
+            .map(|row| (row.id.as_str(), row)),
+    )
+    .unwrap();
     writeln!(
         fs::OpenOptions::new().append(true).open(&path).unwrap(),
         "{}",
@@ -97,14 +101,18 @@ fn late_bridge_retracts_old_rows_preserves_ids_and_agrees_after_restart() {
                 .collect()
         )
     );
-    for row in &second.collected.operations {
-        cache
-            .projection(&tx, &source, projection_scope)
-            .unwrap()
-            .operation(row)
-            .unwrap();
-    }
-    crate::live_index::retain_field(
+    crate::live_index::put_packed(
+        &tx,
+        projection_scope,
+        "operations",
+        second
+            .collected
+            .operations
+            .iter()
+            .map(|row| (row.id.as_str(), row)),
+    )
+    .unwrap();
+    crate::live_index::retain_packed(
         &tx,
         projection_scope,
         "operations",
@@ -114,15 +122,13 @@ fn late_bridge_retracts_old_rows_preserves_ids_and_agrees_after_restart() {
     tx.commit().unwrap();
     let parser_scope = format!("parser:{}:{}:1:facts", source.id, VERSION);
     let parser = crate::live_index::load_map(&db, &parser_scope).unwrap();
-    assert_eq!(parser["operations"].as_object().unwrap().len(), 1);
-    assert!(parser["operations"].get(&retired).is_none());
-    assert_eq!(parser["aliases"].as_object().unwrap().len(), 2);
     assert!(
-        parser["aliases"]
-            .as_object()
-            .unwrap()
-            .values()
-            .all(|v| v.as_str() == Some(&canonical))
+        !parser.contains_key("operations"),
+        "canonical facts have one persistent owner"
+    );
+    assert!(
+        !parser.contains_key("aliases"),
+        "aliases are reconstructed from observations"
     );
     let projected = crate::live_index::load_map(&db, projection_scope).unwrap();
     assert_eq!(projected["operations"].as_object().unwrap().len(), 1);

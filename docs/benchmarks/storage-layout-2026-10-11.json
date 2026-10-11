@@ -1,0 +1,1312 @@
+{
+  "formatVersion": 1,
+  "date": "2026-10-11",
+  "scope": "Preliminary synthetic layout research, not release or product acceptance",
+  "sources": {
+    "benchmark-storage.ts": "2fbfe36f2fc0c9cfe9e8daaf8011950a54428d5f01146e6359c68ea7bb93690f",
+    "benchmark-storage-fixture.ts": "d55e8d28fc9ca779f66a996e776565857d577220fb927e3a204ab3ef153b2b0c",
+    "benchmark-storage-engine.ts": "afeef1eb63cbb71846a0b301c9780225c61b32cf2c53d801c895d630eff2a782",
+    "benchmark-storage-report.ts": "2016cc00f187f7dc18046cbf2c62e302954e46d4d0c835ce27fb42d4bdc35fcb"
+  },
+  "ratios": [
+    {
+      "engine": "sqlite",
+      "baselineBytes": 449675264,
+      "bytes": 25120768,
+      "ratio": 17.900538072721343,
+      "sameOfflineRetention": true
+    },
+    {
+      "engine": "duckdb",
+      "baselineBytes": 449675264,
+      "bytes": 50343936,
+      "ratio": 8.932064111951835,
+      "sameOfflineRetention": true
+    },
+    {
+      "engine": "tiered",
+      "baselineBytes": 449675264,
+      "bytes": 2154496,
+      "ratio": 208.7148288973384,
+      "sameOfflineRetention": false
+    }
+  ],
+  "comparison": [
+    {
+      "engine": "baseline",
+      "spec": {
+        "events": 300000,
+        "tasks": 120,
+        "blockRows": 240,
+        "unique": false
+      },
+      "elapsedMs": 26375.868583000003,
+      "settled": {
+        "bytes": 449675264,
+        "allocated": 449675264
+      },
+      "peakFileBytes": 713630600,
+      "peakRssBytes": 110706688,
+      "oracle": {
+        "events": 300000,
+        "measurements": 20040,
+        "operations": 25080,
+        "tokens": 12999480,
+        "missing": 205,
+        "eventSha256": "55a9c0f7aad9db68b2825e9cb09b634e1a82c8b1cd5f6b385cbb3f1a12a2f31e"
+      },
+      "scope": "Synthetic schema-shaped layout baseline, not a real-core scan or current-release performance claim. Omits small checkpoint/title tables; all compared event and canonical payloads are retained."
+    },
+    {
+      "engine": "sqlite",
+      "spec": {
+        "events": 300000,
+        "tasks": 120,
+        "blockRows": 240,
+        "unique": false
+      },
+      "buildMs": 3298.644,
+      "reopenMs": 0.5593750000002728,
+      "verifyMs": 988.4092499999997,
+      "rollbackMs": 0.11941699999988487,
+      "correctionMs": 0.622957999999926,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.8163750000003347,
+          "p95Ms": 1.0251670000002377,
+          "p99Ms": 3.4647500000000946,
+          "maxMs": 3.4647500000000946,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 2.971791999999823,
+          "p95Ms": 3.4562909999999647,
+          "p99Ms": 3.890875000000051,
+          "maxMs": 3.890875000000051,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 2.9212499999998727,
+          "p95Ms": 3.2351669999998194,
+          "p99Ms": 8.149249999999938,
+          "maxMs": 8.149249999999938,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 1.1033749999996871,
+          "p95Ms": 1.240125000000262,
+          "p99Ms": 1.3558749999997417,
+          "maxMs": 1.3558749999997417,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.03608299999996234,
+          "p95Ms": 0.0762910000003103,
+          "p99Ms": 0.13300000000072032,
+          "maxMs": 0.13300000000072032,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 0.5940829999999551,
+          "p95Ms": 0.7677080000003116,
+          "p99Ms": 1.191250000000764,
+          "maxMs": 1.191250000000764,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 8.60058299999946,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.007582999999613094,
+          "p95Ms": 0.016250000000582077,
+          "p99Ms": 0.1475829999999405,
+          "maxMs": 0.1475829999999405,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.02474999999958527,
+          "p95Ms": 0.04129099999954633,
+          "p99Ms": 0.9927090000001044,
+          "maxMs": 0.9927090000001044,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.024999999999636202,
+          "p95Ms": 0.04020799999943847,
+          "p99Ms": 0.08208399999966787,
+          "maxMs": 0.08208399999966787,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.006667000000561529,
+          "p95Ms": 0.007875000000240107,
+          "p99Ms": 0.014500000000225555,
+          "maxMs": 0.014500000000225555,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": [
+        {
+          "name": "blocks",
+          "bytes": 23113728
+        },
+        {
+          "name": "operations",
+          "bytes": 598016
+        },
+        {
+          "name": "ledger",
+          "bytes": 479232
+        },
+        {
+          "name": "ledger_filter",
+          "bytes": 335872
+        },
+        {
+          "name": "op_task",
+          "bytes": 303104
+        },
+        {
+          "name": "ledger_task",
+          "bytes": 241664
+        },
+        {
+          "name": "block_task",
+          "bytes": 20480
+        },
+        {
+          "name": "sqlite_schema",
+          "bytes": 4096
+        },
+        {
+          "name": "sqlite_autoindex_meta_1",
+          "bytes": 4096
+        },
+        {
+          "name": "meta",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_totals",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_ranking",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_outcomes",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_daily",
+          "bytes": 4096
+        }
+      ],
+      "syntheticSourceBytes": 0,
+      "sourceBacked": false,
+      "settled": {
+        "bytes": 25120768,
+        "allocated": 25120768
+      },
+      "peakFileBytes": 25153536,
+      "peakRssBytes": 248004608,
+      "oracle": {
+        "events": 300000,
+        "measurements": 20040,
+        "operations": 25080,
+        "tokens": 12999480,
+        "missing": 205,
+        "eventSha256": "55a9c0f7aad9db68b2825e9cb09b634e1a82c8b1cd5f6b385cbb3f1a12a2f31e"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": null,
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    },
+    {
+      "engine": "duckdb",
+      "spec": {
+        "events": 300000,
+        "tasks": 120,
+        "blockRows": 240,
+        "unique": false
+      },
+      "buildMs": 3634.306042,
+      "reopenMs": 6.159541999999874,
+      "verifyMs": 1014.7666669999999,
+      "rollbackMs": 3.309291000000485,
+      "correctionMs": 0.5392080000001442,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.23783400000002075,
+          "p95Ms": 0.3470839999999953,
+          "p99Ms": 2.8700840000001335,
+          "maxMs": 2.8700840000001335,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.6645410000000993,
+          "p95Ms": 0.8532089999998789,
+          "p99Ms": 7.789958000000297,
+          "maxMs": 7.789958000000297,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.3524999999999636,
+          "p95Ms": 0.43441699999993943,
+          "p99Ms": 1.82287499999984,
+          "maxMs": 1.82287499999984,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.2235000000000582,
+          "p95Ms": 0.255207999999584,
+          "p99Ms": 0.36733300000014424,
+          "maxMs": 0.36733300000014424,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.3474580000001879,
+          "p95Ms": 1.158542000000125,
+          "p99Ms": 4.076000000000022,
+          "maxMs": 4.076000000000022,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 1.0100840000000062,
+          "p95Ms": 1.3935839999999189,
+          "p99Ms": 2.9551249999999527,
+          "maxMs": 2.9551249999999527,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 3.1015419999998812,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.14687499999990905,
+          "p95Ms": 0.20724999999993088,
+          "p99Ms": 0.24404199999980847,
+          "maxMs": 0.24404199999980847,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.23549999999977445,
+          "p95Ms": 0.358375000000251,
+          "p99Ms": 0.7357920000004015,
+          "maxMs": 0.7357920000004015,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.19866700000011406,
+          "p95Ms": 0.24462499999981446,
+          "p99Ms": 0.3212499999999636,
+          "maxMs": 0.3212499999999636,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.15145799999982046,
+          "p95Ms": 0.19625000000041837,
+          "p99Ms": 0.3445419999998194,
+          "maxMs": 0.3445419999998194,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": null,
+      "syntheticSourceBytes": 0,
+      "sourceBacked": false,
+      "settled": {
+        "bytes": 50343936,
+        "allocated": 50343936
+      },
+      "peakFileBytes": 50343936,
+      "peakRssBytes": 390578176,
+      "oracle": {
+        "events": 300000,
+        "measurements": 20040,
+        "operations": 25080,
+        "tokens": 12999480,
+        "missing": 205,
+        "eventSha256": "55a9c0f7aad9db68b2825e9cb09b634e1a82c8b1cd5f6b385cbb3f1a12a2f31e"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": "1.5.6-r.1",
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    },
+    {
+      "engine": "tiered",
+      "spec": {
+        "events": 300000,
+        "tasks": 120,
+        "blockRows": 240,
+        "unique": false
+      },
+      "buildMs": 2379.331292,
+      "reopenMs": 0.450666000000183,
+      "verifyMs": 894.1539999999995,
+      "rollbackMs": 0.11770900000010442,
+      "correctionMs": 0.3129580000004353,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.8003750000002583,
+          "p95Ms": 0.8577080000000024,
+          "p99Ms": 1.0445839999997588,
+          "maxMs": 1.0445839999997588,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 2.9069589999999152,
+          "p95Ms": 2.9901660000000447,
+          "p99Ms": 3.1644169999999576,
+          "maxMs": 3.1644169999999576,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 2.898624999999811,
+          "p95Ms": 3.2455830000003516,
+          "p99Ms": 3.6157090000001517,
+          "maxMs": 3.6157090000001517,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 1.0888340000001335,
+          "p95Ms": 1.1591659999999138,
+          "p99Ms": 1.3109159999999065,
+          "maxMs": 1.3109159999999065,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.03375000000005457,
+          "p95Ms": 0.07958299999972951,
+          "p99Ms": 0.12945799999988594,
+          "maxMs": 0.12945799999988594,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 0.5300829999996495,
+          "p95Ms": 0.7042919999998958,
+          "p99Ms": 1.446541000000252,
+          "maxMs": 1.446541000000252,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 8.968041000000085,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.006624999999985448,
+          "p95Ms": 0.013667000000168628,
+          "p99Ms": 0.03516600000011749,
+          "maxMs": 0.03516600000011749,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.024707999999918684,
+          "p95Ms": 0.04624999999987267,
+          "p99Ms": 1.6756669999999758,
+          "maxMs": 1.6756669999999758,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.02358300000014424,
+          "p95Ms": 0.02616699999998673,
+          "p99Ms": 0.04133299999966766,
+          "maxMs": 0.04133299999966766,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.00641700000005585,
+          "p95Ms": 0.007082999999965978,
+          "p99Ms": 0.011124999999992724,
+          "maxMs": 0.011124999999992724,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": [
+        {
+          "name": "operations",
+          "bytes": 598016
+        },
+        {
+          "name": "ledger",
+          "bytes": 479232
+        },
+        {
+          "name": "ledger_filter",
+          "bytes": 335872
+        },
+        {
+          "name": "op_task",
+          "bytes": 303104
+        },
+        {
+          "name": "ledger_task",
+          "bytes": 241664
+        },
+        {
+          "name": "blocks",
+          "bytes": 147456
+        },
+        {
+          "name": "block_task",
+          "bytes": 20480
+        },
+        {
+          "name": "sqlite_schema",
+          "bytes": 4096
+        },
+        {
+          "name": "sqlite_autoindex_meta_1",
+          "bytes": 4096
+        },
+        {
+          "name": "meta",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_totals",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_ranking",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_outcomes",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_daily",
+          "bytes": 4096
+        }
+      ],
+      "syntheticSourceBytes": 273663998,
+      "sourceBacked": true,
+      "settled": {
+        "bytes": 2154496,
+        "allocated": 2154496
+      },
+      "peakFileBytes": 2187264,
+      "peakRssBytes": 200851456,
+      "oracle": {
+        "events": 300000,
+        "measurements": 20040,
+        "operations": 25080,
+        "tokens": 12999480,
+        "missing": 205,
+        "eventSha256": "55a9c0f7aad9db68b2825e9cb09b634e1a82c8b1cd5f6b385cbb3f1a12a2f31e"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": null,
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    }
+  ],
+  "scale": [
+    {
+      "engine": "sqlite",
+      "spec": {
+        "events": 3000000,
+        "tasks": 1200,
+        "blockRows": 240,
+        "unique": false
+      },
+      "buildMs": 26349.488208,
+      "reopenMs": 0.47312500000043656,
+      "verifyMs": 9302.622125000002,
+      "rollbackMs": 0.13312500000029104,
+      "correctionMs": 0.6018330000006245,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 8.132583999999042,
+          "p95Ms": 8.35216600000058,
+          "p99Ms": 9.592375000000175,
+          "maxMs": 9.592375000000175,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 32.27320800000234,
+          "p95Ms": 33.73737499999697,
+          "p99Ms": 35.05670800000007,
+          "maxMs": 35.05670800000007,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 34.25666699999783,
+          "p95Ms": 35.514374999998836,
+          "p99Ms": 38.1495419999992,
+          "maxMs": 38.1495419999992,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 11.045916000002762,
+          "p95Ms": 11.242208000003302,
+          "p99Ms": 12.701750000000175,
+          "maxMs": 12.701750000000175,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.2984589999978198,
+          "p95Ms": 0.48845799999980954,
+          "p99Ms": 0.6882919999989099,
+          "maxMs": 0.6882919999989099,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 0.6498329999958514,
+          "p95Ms": 0.7480419999992591,
+          "p99Ms": 9.246707999998762,
+          "maxMs": 9.246707999998762,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 90.36433299999771,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.006583000002137851,
+          "p95Ms": 0.011624999999185093,
+          "p99Ms": 0.04841699999815319,
+          "maxMs": 0.04841699999815319,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.023458000003302004,
+          "p95Ms": 0.028291999995417427,
+          "p99Ms": 0.053749999999126885,
+          "maxMs": 0.053749999999126885,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.06445800000074087,
+          "p95Ms": 0.07483399999910034,
+          "p99Ms": 0.08475000000180444,
+          "maxMs": 0.08475000000180444,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.006499999995867256,
+          "p95Ms": 0.009667000005720183,
+          "p99Ms": 0.02537500000471482,
+          "maxMs": 0.02537500000471482,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": [
+        {
+          "name": "blocks",
+          "bytes": 231084032
+        },
+        {
+          "name": "operations",
+          "bytes": 6275072
+        },
+        {
+          "name": "ledger",
+          "bytes": 4988928
+        },
+        {
+          "name": "ledger_filter",
+          "bytes": 3346432
+        },
+        {
+          "name": "op_task",
+          "bytes": 3239936
+        },
+        {
+          "name": "ledger_task",
+          "bytes": 2592768
+        },
+        {
+          "name": "block_task",
+          "bytes": 159744
+        },
+        {
+          "name": "aggregate_ranking",
+          "bytes": 20480
+        },
+        {
+          "name": "sqlite_schema",
+          "bytes": 4096
+        },
+        {
+          "name": "sqlite_autoindex_meta_1",
+          "bytes": 4096
+        },
+        {
+          "name": "meta",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_totals",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_outcomes",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_daily",
+          "bytes": 4096
+        }
+      ],
+      "syntheticSourceBytes": 0,
+      "sourceBacked": false,
+      "settled": {
+        "bytes": 251731968,
+        "allocated": 251731968
+      },
+      "peakFileBytes": 251764736,
+      "peakRssBytes": 676741120,
+      "oracle": {
+        "events": 3000000,
+        "measurements": 200400,
+        "operations": 250800,
+        "tokens": 129985100,
+        "missing": 2066,
+        "eventSha256": "2dd782d316f8170209d613f651ce60a9b480be43cf828b5e60f0214950654071"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": null,
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    },
+    {
+      "engine": "duckdb",
+      "spec": {
+        "events": 3000000,
+        "tasks": 1200,
+        "blockRows": 240,
+        "unique": false
+      },
+      "buildMs": 62061.953125,
+      "reopenMs": 6.068792000005487,
+      "verifyMs": 11523.577832999996,
+      "rollbackMs": 3.525666999994428,
+      "correctionMs": 0.8404580000060378,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.40345800000068266,
+          "p95Ms": 0.5361249999987194,
+          "p99Ms": 1.9144579999992857,
+          "maxMs": 1.9144579999992857,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 2.0998749999998836,
+          "p95Ms": 2.5599160000056145,
+          "p99Ms": 2.9342499999984284,
+          "maxMs": 2.9342499999984284,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.8164580000011483,
+          "p95Ms": 0.9632920000003651,
+          "p99Ms": 1.876458000006096,
+          "maxMs": 1.876458000006096,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.3830000000016298,
+          "p95Ms": 0.44979199999943376,
+          "p99Ms": 1.944459000005736,
+          "maxMs": 1.944459000005736,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.8042920000007143,
+          "p95Ms": 1.0059169999949518,
+          "p99Ms": 4.2592920000024606,
+          "maxMs": 4.2592920000024606,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 1.1650000000008731,
+          "p95Ms": 1.5024159999957192,
+          "p99Ms": 3.5946249999979045,
+          "maxMs": 3.5946249999979045,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 4.930916999997862,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.13500000000203727,
+          "p95Ms": 0.17991600000095787,
+          "p99Ms": 0.20254099999874597,
+          "maxMs": 0.20254099999874597,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.23200000000360887,
+          "p95Ms": 0.3662079999994603,
+          "p99Ms": 6.886458000000857,
+          "maxMs": 6.886458000000857,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.22687500000029104,
+          "p95Ms": 0.2599169999957667,
+          "p99Ms": 0.30454199999803677,
+          "maxMs": 0.30454199999803677,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.1424170000027516,
+          "p95Ms": 0.17379200000141282,
+          "p99Ms": 0.20437500000116415,
+          "maxMs": 0.20437500000116415,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": null,
+      "syntheticSourceBytes": 0,
+      "sourceBacked": false,
+      "settled": {
+        "bytes": 476852224,
+        "allocated": 476852224
+      },
+      "peakFileBytes": 476852224,
+      "peakRssBytes": 680116224,
+      "oracle": {
+        "events": 3000000,
+        "measurements": 200400,
+        "operations": 250800,
+        "tokens": 129985100,
+        "missing": 2066,
+        "eventSha256": "2dd782d316f8170209d613f651ce60a9b480be43cf828b5e60f0214950654071"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": "1.5.6-r.1",
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    },
+    {
+      "engine": "tiered",
+      "spec": {
+        "events": 3000000,
+        "tasks": 1200,
+        "blockRows": 240,
+        "unique": false
+      },
+      "buildMs": 25078.624166999998,
+      "reopenMs": 0.5857499999983702,
+      "verifyMs": 8907.192875,
+      "rollbackMs": 0.18712500000401633,
+      "correctionMs": 0.46241700000246055,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 8.236250000001746,
+          "p95Ms": 8.4340830000001,
+          "p99Ms": 9.529500000000553,
+          "maxMs": 9.529500000000553,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 32.08758300000045,
+          "p95Ms": 33.068208000000595,
+          "p99Ms": 34.21495800000048,
+          "maxMs": 34.21495800000048,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 34.314291999999114,
+          "p95Ms": 34.72087499999907,
+          "p99Ms": 35.72495799999888,
+          "maxMs": 35.72495799999888,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 11.114334000005329,
+          "p95Ms": 11.367417000001296,
+          "p99Ms": 12.627709000000323,
+          "maxMs": 12.627709000000323,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.30062500000349246,
+          "p95Ms": 0.4712920000019949,
+          "p99Ms": 0.5533329999962007,
+          "maxMs": 0.5533329999962007,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 0.8791249999994761,
+          "p95Ms": 1.2882080000053975,
+          "p99Ms": 2.000792000006186,
+          "maxMs": 2.000792000006186,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 89.76662500000384,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.006916999998793472,
+          "p95Ms": 0.011375000001862645,
+          "p99Ms": 0.056208000001788605,
+          "maxMs": 0.056208000001788605,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.023709000000962988,
+          "p95Ms": 0.02920799999992596,
+          "p99Ms": 0.03920799999468727,
+          "maxMs": 0.03920799999468727,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.0639999999984866,
+          "p95Ms": 0.07041700000263518,
+          "p99Ms": 3.4521249999961583,
+          "maxMs": 3.4521249999961583,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.00637500000448199,
+          "p95Ms": 0.007582999998703599,
+          "p99Ms": 0.013584000000264496,
+          "maxMs": 0.013584000000264496,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": [
+        {
+          "name": "operations",
+          "bytes": 6275072
+        },
+        {
+          "name": "ledger",
+          "bytes": 4988928
+        },
+        {
+          "name": "ledger_filter",
+          "bytes": 3346432
+        },
+        {
+          "name": "op_task",
+          "bytes": 3239936
+        },
+        {
+          "name": "ledger_task",
+          "bytes": 2592768
+        },
+        {
+          "name": "blocks",
+          "bytes": 1462272
+        },
+        {
+          "name": "block_task",
+          "bytes": 159744
+        },
+        {
+          "name": "aggregate_ranking",
+          "bytes": 20480
+        },
+        {
+          "name": "sqlite_schema",
+          "bytes": 4096
+        },
+        {
+          "name": "sqlite_autoindex_meta_1",
+          "bytes": 4096
+        },
+        {
+          "name": "meta",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_totals",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_outcomes",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_daily",
+          "bytes": 4096
+        }
+      ],
+      "syntheticSourceBytes": 2741324140,
+      "sourceBacked": true,
+      "settled": {
+        "bytes": 22110208,
+        "allocated": 22110208
+      },
+      "peakFileBytes": 22142976,
+      "peakRssBytes": 668106752,
+      "oracle": {
+        "events": 3000000,
+        "measurements": 200400,
+        "operations": 250800,
+        "tokens": 129985100,
+        "missing": 2066,
+        "eventSha256": "2dd782d316f8170209d613f651ce60a9b480be43cf828b5e60f0214950654071"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": null,
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    }
+  ],
+  "variation": [
+    {
+      "engine": "baseline",
+      "spec": {
+        "events": 300000,
+        "tasks": 120,
+        "blockRows": 240,
+        "unique": true
+      },
+      "elapsedMs": 28256.839916,
+      "settled": {
+        "bytes": 474660864,
+        "allocated": 474660864
+      },
+      "peakFileBytes": 747837448,
+      "peakRssBytes": 138182656,
+      "oracle": {
+        "events": 300000,
+        "measurements": 20040,
+        "operations": 25080,
+        "tokens": 12999480,
+        "missing": 205,
+        "eventSha256": "f82eabb5e233296fa1b7f336d0c2f7896fa6e8e19e47a25a47cc97f77b9e7682"
+      },
+      "scope": "Synthetic schema-shaped layout baseline, not a real-core scan or current-release performance claim. Omits small checkpoint/title tables; all compared event and canonical payloads are retained."
+    },
+    {
+      "engine": "sqlite",
+      "spec": {
+        "events": 300000,
+        "tasks": 120,
+        "blockRows": 240,
+        "unique": true
+      },
+      "buildMs": 3227.741,
+      "reopenMs": 0.5401669999996557,
+      "verifyMs": 1032.9033749999999,
+      "rollbackMs": 0.1114159999997355,
+      "correctionMs": 0.29629100000056496,
+      "timings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.800083000000086,
+          "p95Ms": 0.8527920000001359,
+          "p99Ms": 1.0522080000000642,
+          "maxMs": 1.0522080000000642,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 3.044167000000016,
+          "p95Ms": 3.6751250000002074,
+          "p99Ms": 4.40795799999978,
+          "maxMs": 4.40795799999978,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 2.850417000000107,
+          "p95Ms": 2.9751250000003893,
+          "p99Ms": 3.1262499999998,
+          "maxMs": 3.1262499999998,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 1.1257500000001528,
+          "p95Ms": 1.1608750000000327,
+          "p99Ms": 1.259375000000091,
+          "maxMs": 1.259375000000091,
+          "over100ms": 0
+        },
+        "filtered": {
+          "samples": 100,
+          "p50Ms": 0.03029199999946286,
+          "p95Ms": 0.04987500000015643,
+          "p99Ms": 0.08712500000001455,
+          "maxMs": 0.08712500000001455,
+          "over100ms": 0
+        },
+        "evidence": {
+          "samples": 100,
+          "p50Ms": 0.6309579999997368,
+          "p95Ms": 0.7501250000000255,
+          "p99Ms": 3.0376249999999345,
+          "maxMs": 3.0376249999999345,
+          "over100ms": 0
+        }
+      },
+      "aggregateBuildMs": 8.307291999999961,
+      "aggregateTimings": {
+        "totals": {
+          "samples": 100,
+          "p50Ms": 0.006667000000106782,
+          "p95Ms": 0.011582999999973254,
+          "p99Ms": 0.020209000000249944,
+          "maxMs": 0.020209000000249944,
+          "over100ms": 0
+        },
+        "daily": {
+          "samples": 100,
+          "p50Ms": 0.025125000000116415,
+          "p95Ms": 0.030041999999866675,
+          "p99Ms": 0.033707999999933236,
+          "maxMs": 0.033707999999933236,
+          "over100ms": 0
+        },
+        "ranking": {
+          "samples": 100,
+          "p50Ms": 0.024042000000008557,
+          "p95Ms": 0.02820800000017698,
+          "p99Ms": 0.03895800000009331,
+          "maxMs": 0.03895800000009331,
+          "over100ms": 0
+        },
+        "outcomes": {
+          "samples": 100,
+          "p50Ms": 0.006499999999959982,
+          "p95Ms": 0.008374999999887223,
+          "p99Ms": 0.018042000000150438,
+          "maxMs": 0.018042000000150438,
+          "over100ms": 0
+        }
+      },
+      "storageObjects": [
+        {
+          "name": "blocks",
+          "bytes": 35897344
+        },
+        {
+          "name": "operations",
+          "bytes": 598016
+        },
+        {
+          "name": "ledger",
+          "bytes": 479232
+        },
+        {
+          "name": "ledger_filter",
+          "bytes": 335872
+        },
+        {
+          "name": "op_task",
+          "bytes": 303104
+        },
+        {
+          "name": "ledger_task",
+          "bytes": 241664
+        },
+        {
+          "name": "block_task",
+          "bytes": 20480
+        },
+        {
+          "name": "sqlite_schema",
+          "bytes": 4096
+        },
+        {
+          "name": "sqlite_autoindex_meta_1",
+          "bytes": 4096
+        },
+        {
+          "name": "meta",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_totals",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_ranking",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_outcomes",
+          "bytes": 4096
+        },
+        {
+          "name": "aggregate_daily",
+          "bytes": 4096
+        }
+      ],
+      "syntheticSourceBytes": 0,
+      "sourceBacked": false,
+      "settled": {
+        "bytes": 37904384,
+        "allocated": 37904384
+      },
+      "peakFileBytes": 37937152,
+      "peakRssBytes": 255934464,
+      "oracle": {
+        "events": 300000,
+        "measurements": 20040,
+        "operations": 25080,
+        "tokens": 12999480,
+        "missing": 205,
+        "eventSha256": "f82eabb5e233296fa1b7f336d0c2f7896fa6e8e19e47a25a47cc97f77b9e7682"
+      },
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpus": 8,
+        "cpuModel": "Apple M1",
+        "memoryBytes": 17179869184,
+        "duckdb": null,
+        "cache": "Database reopened; physical filesystem cache uncontrolled",
+        "concurrency": 1
+      },
+      "scope": "Storage prototype queries plus JS serialization, not CLI/HTTP latency. Full safe events retained and checked; typed columns cover six sampled query families, not all product analyses. Aggregates demonstrate fixed UTC+8 totals/daily/ranking/outcomes reads only; incremental aggregate maintenance is not implemented. Peak RSS includes fixture generation and oracle arrays, not the process tree. File peaks are sampled at transaction/checkpoint boundaries, not continuous temp-space measurements. Source-backed variant uses an immutable synthetic safe-event source, not Codex raw-log parsing: it validates lookup feasibility only, and excludes that explicitly generated input from index bytes. No crash-injection or 24-hour claim."
+    }
+  ],
+  "excludedIncompleteBaseline": {
+    "status": "timeout",
+    "limitMs": 900000,
+    "scope": "Incomplete 3000000-event layout baseline; excluded from reduction ratios.",
+    "committedRows": [
+      {
+        "bucket": 1,
+        "n": 2990000
+      },
+      {
+        "bucket": 2,
+        "n": 199732
+      },
+      {
+        "bucket": 3,
+        "n": 249964
+      },
+      {
+        "bucket": 24,
+        "n": 2990000
+      },
+      {
+        "bucket": 25,
+        "n": 199732
+      },
+      {
+        "bucket": 26,
+        "n": 249964
+      }
+    ],
+    "bytes": 4492902400
+  },
+  "limits": [
+    "All runs use schema-shaped synthetic rows, not the Rust parser or installed product. No private conversations are included.",
+    "Only six sampled queries and four fixed aggregate families are modeled. Missing product fields and all other query families remain unmeasured.",
+    "Tiered data is a lower-bound index experiment against a generated safe-event source, not a Codex raw-log parser. Its generated source bytes are reported separately; it has different offline guarantees.",
+    "Timing includes storage reads and JavaScript serialization only; no CLI startup, IPC, HTTP or concurrency-4 acceptance. OS cache is uncontrolled.",
+    "Aggregates are built and queried before correction probes; incremental aggregate maintenance, accounting reconciliation, durable revision views and crash recovery remain unimplemented.",
+    "RSS includes generator, oracle and verification allocations. File peaks are checkpoint samples, not continuous temporary-space peaks.",
+    "The 3000000-event legacy-layout run timed out. Its incomplete database is excluded from ratios; the complete comparison uses 300000 events."
+  ]
+}

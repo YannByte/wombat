@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::Arc;
 
-fn row(tokens: TokenUsage) -> PricedMeasurement {
+pub(super) fn row(tokens: TokenUsage) -> PricedMeasurement {
     let token_unavailable_reasons = tokens.unavailable_reasons(TokenUnavailableReason::Missing);
     let model = ModelRef {
         raw: Some("gpt-5.4".into()),

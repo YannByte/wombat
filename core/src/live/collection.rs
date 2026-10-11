@@ -257,10 +257,8 @@ pub(super) fn sync(
             }
         };
         if let Some(synced) = synced {
-            let cache = &caches[&source.id];
             let value = synced.collected;
             let scope = format!("projection:{}", source.id);
-            let projection = cache.projection(&tx, source, &scope)?;
             crate::live_index::replace_field(
                 &tx,
                 &scope,
@@ -306,17 +304,23 @@ pub(super) fn sync(
             save!(threads);
             save!(turns);
             if let Some(delta) = synced.measurements {
-                for row in delta.upsert {
-                    projection.measurement(&row)?;
-                }
+                crate::live_index::put_packed(
+                    &tx,
+                    &scope,
+                    "measurements",
+                    delta.upsert.iter().map(|r| (r.id.as_str(), r)),
+                )?;
                 for id in delta.remove {
                     crate::live_index::remove(&tx, &scope, "measurements", &id)?;
                 }
             } else {
-                for row in &value.measurements {
-                    projection.measurement(row)?;
-                }
-                crate::live_index::retain_field(
+                crate::live_index::put_packed(
+                    &tx,
+                    &scope,
+                    "measurements",
+                    value.measurements.iter().map(|r| (r.id.as_str(), r)),
+                )?;
+                crate::live_index::retain_packed(
                     &tx,
                     &scope,
                     "measurements",
@@ -324,38 +328,34 @@ pub(super) fn sync(
                 )?;
             }
             crate::live_index::put(&tx, &scope, "issues", "", &value.issues)?;
-            if let Some(dirty) = synced.operations {
-                for operation in &value.operations {
-                    if dirty.contains(&operation.id) {
-                        projection.operation(operation)?;
-                    }
-                }
-            } else {
-                for row in &value.operations {
-                    projection.operation(row)?;
-                }
-                crate::live_index::retain_field(
+            crate::live_index::put_packed(
+                &tx,
+                &scope,
+                "operations",
+                value
+                    .operations
+                    .iter()
+                    .filter(|r| {
+                        synced
+                            .operations
+                            .as_ref()
+                            .is_none_or(|dirty| dirty.contains(&r.id))
+                    })
+                    .map(|r| (r.id.as_str(), r)),
+            )?;
+            if synced.operations.is_none() {
+                crate::live_index::retain_packed(
                     &tx,
                     &scope,
                     "operations",
                     value.operations.iter().map(|r| r.id.as_str()),
                 )?;
             }
-            if let Some(events) = synced.events {
-                for event in &events {
-                    projection.event(event)?;
-                }
-            } else {
-                for event in &value.events {
-                    projection.event(event)?;
-                }
-                crate::live_index::retain_field(
-                    &tx,
-                    &scope,
-                    "events",
-                    value.events.iter().map(|e| e.id()),
-                )?;
-            }
+            crate::live_index::share_events(
+                &tx,
+                &scope,
+                &adapters::codex::incremental::fact_scope(source),
+            )?;
             updated.insert(source.id.clone(), value);
             crate::live_index::save_map(
                 &tx,

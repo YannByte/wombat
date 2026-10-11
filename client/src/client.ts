@@ -405,15 +405,16 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
     ...(liveTransport
       ? {
           async live(request: LiveRequest, options: QueryOptions = {}): Promise<LiveResult> {
-            const [{ validate: validateLiveRequest }, { validate: validateLiveResult }] =
-              await Promise.all([
-                import('./generated/validate-live-request.js'),
-                import('./generated/validate-live-response.js'),
-              ]);
+            const { validate: validateLiveRequest } = await import('./generated/validate-live-request.js');
             throwIfCancelled(options);
             if (!validateLiveRequest(request))
               throw new CoreError('INVALID_ARGUMENT', '实时查询参数不符合数据协议');
-            const result = await liveTransport(request, options);
+            // Load the response validator while the core handles the validated request.
+            // Response validation remains mandatory before publishing any result.
+            const [result, { validate: validateLiveResult }] = await Promise.all([
+              liveTransport(request, options),
+              import('./generated/validate-live-response.js'),
+            ]);
             throwIfCancelled(options);
             if (
               !validateLiveResult(result) ||

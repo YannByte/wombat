@@ -324,6 +324,11 @@
       "zh": "docs/guides/plugin.md",
       "en": "docs/guides/plugin.en.md",
       "record": "docs/guides/plugin.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.md",
+      "en": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.en.md",
+      "record": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.i18n.json"
     }
   ],
   "legacyUnpaired": [],

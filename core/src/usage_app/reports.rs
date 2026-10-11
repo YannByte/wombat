@@ -34,7 +34,9 @@ pub(super) fn bucket(d: NaiveDate, group: &Group) -> Result<(NaiveDate, NaiveDat
     Ok((start, end))
 }
 pub(super) fn usage_items(
+    snapshot: &Snapshot,
     rows: &[&PricedMeasurement],
+    total: &UsageSummary,
     scope: &Scope,
     group: &Group,
     tz: Tz,
@@ -43,11 +45,21 @@ pub(super) fn usage_items(
     let mut buckets: BTreeMap<Option<(NaiveDate, NaiveDate)>, Vec<&PricedMeasurement>> =
         BTreeMap::new();
     for row in rows {
-        let key = local_date(row, tz).map(|d| bucket(d, group)).transpose()?;
+        let key = snapshot
+            .summary_index
+            .local_date(row, tz)
+            .map(|d| bucket(d, group))
+            .transpose()?;
         buckets.entry(key).or_default().push(row);
     }
     let mut items = vec![];
+    let only_period = buckets.len() == 1;
     for (period, rows) in buckets.into_iter().rev() {
+        let period_usage = if only_period {
+            total.clone()
+        } else {
+            summarize_view(snapshot, &rows)?
+        };
         let mut subset = scope.clone();
         if let Some((start, end)) = period {
             let start = start.to_string();
@@ -83,24 +95,27 @@ pub(super) fn usage_items(
             is_subtotal: true,
             model: None,
             reasoning_effort: None,
-            usage: summarize(&rows)?,
+            usage: period_usage.clone(),
             scope: subset.clone(),
         });
         if !details {
             continue;
         }
-        let mut groups: BTreeMap<(Option<String>, Option<String>), Vec<&PricedMeasurement>> =
+        let mut groups: BTreeMap<(Option<&str>, Option<&str>), Vec<&PricedMeasurement>> =
             BTreeMap::new();
         for row in &rows {
             groups
                 .entry((
-                    row.fact.model.raw.as_deref().map(str::to_owned),
-                    row.fact.reasoning_effort.as_deref().map(str::to_owned),
+                    row.fact.model.raw.as_deref(),
+                    row.fact.reasoning_effort.as_deref(),
                 ))
                 .or_default()
                 .push(row);
         }
+        let only_dimension = groups.len() == 1;
         for ((model, effort), rows) in groups {
+            let model = model.map(str::to_owned);
+            let effort = effort.map(str::to_owned);
             let mut specific = subset.clone();
             specific.model = model.clone();
             specific.model_unknown = model.is_none().then_some(true);
@@ -114,7 +129,11 @@ pub(super) fn usage_items(
                 is_subtotal: false,
                 model,
                 reasoning_effort: effort,
-                usage: summarize(&rows)?,
+                usage: if only_dimension {
+                    period_usage.clone()
+                } else {
+                    summarize_view(snapshot, &rows)?
+                },
                 scope: specific,
             });
         }
@@ -122,6 +141,7 @@ pub(super) fn usage_items(
     Ok(items)
 }
 pub(super) fn dimension_items(
+    snapshot: &Snapshot,
     rows: &[&PricedMeasurement],
     request: &Request,
     projects: &BTreeMap<&str, Option<&str>>,
@@ -145,7 +165,7 @@ pub(super) fn dimension_items(
     }
     let mut items = vec![];
     for (key, rows) in groups {
-        let usage = summarize(&rows)?;
+        let usage = summarize_view(snapshot, &rows)?;
         let mut scope = request.scope.clone();
         if by_project {
             scope.project = key.clone();
