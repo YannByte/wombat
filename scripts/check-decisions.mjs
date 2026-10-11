@@ -18,6 +18,7 @@ function walk(directory) {
     if (entry.isDirectory()) { walk(file); continue; }
     if (!entry.name.endsWith('.md') || entry.name.endsWith('.en.md') || ['README.md', 'AGENTS.md'].includes(entry.name)) continue;
     const relative = path.relative(root, file).split(path.sep).join('/');
+    if (relative === 'docs/decisions/README.zh-CN.md') continue;
     const match = /^docs\/decisions\/(proposed|implemented|rejected)\/(architecture|product|process)\/(\d{4}-\d{2}-\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/.exec(relative);
     if (!match) { errors.push(`${relative}: invalid lifecycle, class, or dated filename`); continue; }
     checked++;

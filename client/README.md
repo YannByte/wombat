@@ -1,22 +1,22 @@
-# 类型化客户端
+# Typed client
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-`@wombat/client` 为 CLI 和 Web 调用方提供同一个 `UsageClient`。Rust 定义业务契约；客户端校验请求和结果。
+`@wombat/client` supplies one `UsageClient` to CLI and Web callers. Rust defines the business contracts; the client validates requests and results.
 
-## 公开入口
+## Public entries
 
-- `@wombat/client` 导出 `createUsageClient`、类型和 `CoreError`。该入口不加载 Node 或终端库。
-- `@wombat/client/node` 导出 `createNodeClient`，用于本机内核进程和共享服务。
-- `@wombat/client/http` 导出 `createHttpClient`，用于本机 Web 宿主。
-- `@wombat/client/locale` 提供展示语言支持。
+- `@wombat/client` exports `createUsageClient`, types, and `CoreError`. This entry loads no Node or terminal libraries.
+- `@wombat/client/node` exports `createNodeClient` for the local core process and shared service.
+- `@wombat/client/http` exports `createHttpClient` for the local Web host.
+- `@wombat/client/locale` supplies presentation language support.
 
-## 限制
+## Limits
 
-客户端只公开生成的操作，不提供任意 Shell 执行或通用文件写入。取消等待不代表写入没有发生。
+The client exposes only generated operations. It provides no arbitrary shell execution or generic file writes. A cancelled wait does not prove that a write did not occur.
 
-## 延伸阅读
+## Read next
 
-- [客户端参考](../docs/reference/client.md)：传输、超时、取消、接入和采集。
-- [公开契约](../docs/development/contracts.md)：生成类型与独立版本。
-- [客户端指令](AGENTS.md)：维护和验证规则。
+- [Client reference](../docs/reference/client.en.md): transports, deadlines, cancellation, setup, and collection.
+- [Public contracts](../docs/development/contracts.en.md): generated types and independent versions.
+- [Client instructions](AGENTS.md): maintenance and verification rules.

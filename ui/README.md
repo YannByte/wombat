@@ -1,25 +1,25 @@
-# Web 前端
+# Web frontend
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-`@wombat/ui` 包含 React、TypeScript 和 Vite 展示代码。`App` 接收注入的 `UsageClient`；浏览器入口连接 HTTP 客户端。
+`@wombat/ui` contains the React, TypeScript, and Vite presentation code. `App` receives an injected `UsageClient`; the browser entry connects the HTTP client.
 
-## 职责
+## Responsibilities
 
-UI 展示用量、任务、耗时、配置、检查结果和账户额度。Rust 提供汇总、分组、价格和业务排序。视图保留未知值和覆盖缺口。
+The UI shows usage, tasks, timing, configuration, checks, and account allowance. Rust supplies totals, grouping, prices, and business sorting. Views preserve unknown values and partial coverage.
 
-## 开发预览
+## Development preview
 
-在仓库根目录运行：
+From the repository root, run:
 
 ```sh
 corepack pnpm --filter @wombat/ui preview
 ```
 
-打开 `http://127.0.0.1:5173/preview.html?page=threads&allTime=1`。预览通过生产组件展示合成数据，不读取来源日志或原生账户。
+Open `http://127.0.0.1:5173/preview.html?page=threads&allTime=1`. The preview uses synthetic data through production components. It reads no source logs or native accounts.
 
-## 延伸阅读
+## Read next
 
-- [Web 指南](../docs/guides/web.md)：产品启动和恢复。
-- [前端开发](../docs/development/frontend.md)：页面、查询生命周期、预览场景和验证限制。
-- [产品语言](../docs/i18n/product.md)：语言与文案归属。
+- [Web guide](../docs/guides/web.en.md): product startup and recovery.
+- [Frontend development](../docs/development/frontend.en.md): pages, query lifecycle, preview scenarios, and verification limits.
+- [Product language](../docs/i18n/product.en.md): locale and copy ownership.

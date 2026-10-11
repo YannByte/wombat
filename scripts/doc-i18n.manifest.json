@@ -11,8 +11,8 @@
       "record": "docs/decisions/implemented/product/2026-09-30-report-ranges.i18n.json"
     },
     {
-      "zh": "docs/decisions/README.md",
-      "en": "docs/decisions/README.en.md",
+      "zh": "docs/decisions/README.zh-CN.md",
+      "en": "docs/decisions/README.md",
       "record": "docs/decisions/README.i18n.json"
     },
     {
@@ -31,28 +31,28 @@
       "record": "docs/i18n/records/README.i18n.json"
     },
     {
-      "zh": "cli/README.md",
-      "en": "cli/README.en.md",
+      "zh": "cli/README.zh-CN.md",
+      "en": "cli/README.md",
       "record": "cli/README.i18n.json"
     },
     {
-      "zh": "client/README.md",
-      "en": "client/README.en.md",
+      "zh": "client/README.zh-CN.md",
+      "en": "client/README.md",
       "record": "client/README.i18n.json"
     },
     {
-      "zh": "core/README.md",
-      "en": "core/README.en.md",
+      "zh": "core/README.zh-CN.md",
+      "en": "core/README.md",
       "record": "core/README.i18n.json"
     },
     {
-      "zh": "docs/README.md",
-      "en": "docs/README.en.md",
+      "zh": "docs/README.zh-CN.md",
+      "en": "docs/README.md",
       "record": "docs/README.i18n.json"
     },
     {
-      "zh": "docs/i18n/README.md",
-      "en": "docs/i18n/README.en.md",
+      "zh": "docs/i18n/README.zh-CN.md",
+      "en": "docs/i18n/README.md",
       "record": "docs/i18n/README.i18n.json"
     },
     {
@@ -126,13 +126,13 @@
       "record": "docs/i18n/records/SECURITY.i18n.json"
     },
     {
-      "zh": "ui/README.md",
-      "en": "ui/README.en.md",
+      "zh": "ui/README.zh-CN.md",
+      "en": "ui/README.md",
       "record": "ui/README.i18n.json"
     },
     {
-      "zh": "web/README.md",
-      "en": "web/README.en.md",
+      "zh": "web/README.zh-CN.md",
+      "en": "web/README.md",
       "record": "web/README.i18n.json"
     },
     {
@@ -266,8 +266,8 @@
       "record": "docs/decisions/implemented/architecture/2026-10-05-analysis-first-events.i18n.json"
     },
     {
-      "zh": "plugin/README.md",
-      "en": "plugin/README.en.md",
+      "zh": "plugin/README.zh-CN.md",
+      "en": "plugin/README.md",
       "record": "plugin/README.i18n.json"
     },
     {

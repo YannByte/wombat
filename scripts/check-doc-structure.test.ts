@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { audienceBoundaryErrors } from './check-doc-structure.ts';
+import { audienceBoundaryErrors, readmePairErrors } from './check-doc-structure.ts';
+
+test('requires English default READMEs without changing other document pairs', () => {
+  assert.deepEqual(readmePairErrors([
+    { en: 'README.md', zh: 'README.zh-CN.md' },
+    { en: 'docs/README.md', zh: 'docs/README.zh-CN.md' },
+    { en: 'docs/guide.en.md', zh: 'docs/guide.md' },
+  ]), []);
+  for (const pair of [
+    { en: 'ui/README.en.md', zh: 'ui/README.md' },
+    { en: 'ui/README.md', zh: 'ui/README.md' },
+    { en: 'ui/README.md', zh: 'web/README.zh-CN.md' },
+  ]) assert.match(readmePairErrors([pair])[0], /use English README.md and Chinese README.zh-CN.md in the same directory/);
+});
 
 test('keeps internal release operations out of user documentation', () => {
   assert.deepEqual(audienceBoundaryErrors({

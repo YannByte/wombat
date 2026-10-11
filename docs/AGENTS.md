@@ -10,7 +10,7 @@ Apply the [one fact, one home rule](../AGENTS.md#standing-constraints) with the 
 |---|---|
 | Standing Agent rules | Root or scoped AGENTS.md, in English |
 | Procedures | Dev: .agents/skills/; user: plugin/skills/; use module contracts |
-| Durable rationale and tradeoffs | [Decisions](decisions/README.en.md); no record for mechanical/local fixes |
+| Durable rationale and tradeoffs | [Decisions](decisions/README.md); no record for mechanical/local fixes |
 | Unfinished requirements and acceptance | Owning proposed decision; no parallel specification or status page |
 | Module relationships and data flow | [Architecture](development/architecture.en.md) |
 | Public entries, behavior, and limitations | Owning module README or technical reference; fields derive from source/generated contracts |

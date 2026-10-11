@@ -1,23 +1,23 @@
-# Wombat 插件源码
+# Wombat plugin source
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-本目录包含用户插件源码。同一个 Skill 支持中文和英文。Codex 管理已安装的插件。
+This directory contains the user plugin source. One Skill serves Chinese and English. Codex manages installed plugins.
 
-## 源码入口
+## Source entries
 
-- `skills/wombat/SKILL.md` 定义用户流程。
-- `hooks/` 包含采集声明。
-- `scripts/` 包含 POSIX 采集桥接脚本。
-- `package.json` 定义插件元数据和所需能力。根清单维护版本号。
+- `skills/wombat/SKILL.md` defines the user workflow.
+- `hooks/` contains collection declarations.
+- `scripts/` contains the POSIX collection bridge.
+- `package.json` defines plugin metadata and required capabilities. The root manifest owns the version.
 
-## 限制
+## Limits
 
-从源码安装本地插件前，先完成构建。插件安装、发现、Hook 信任、事件接收和数据就绪需要分别验证。Windows Hook 采集尚未验证。
+Build the source before local plugin installation. Plugin installation, discovery, Hook trust, event receipt, and data readiness require separate evidence. Windows Hook collection remains unverified.
 
-## 延伸阅读
+## Read next
 
-- [安装指南](../docs/guides/installation.md)：安装或更新运行时和插件。
-- [插件指南](../docs/guides/plugin.md)：调用、采集和移除。
-- [插件开发](../docs/development/plugin.md)：构建资源、本地试用和原生验证。
-- [插件指令](AGENTS.md)：维护规则。
+- [Installation guide](../docs/guides/installation.en.md): install or update the runtime and plugin.
+- [Plugin guide](../docs/guides/plugin.en.md): invocation, collection, and removal.
+- [Plugin development](../docs/development/plugin.en.md): build assets, local trials, and native verification.
+- [Plugin instructions](AGENTS.md): maintenance rules.

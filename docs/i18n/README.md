@@ -1,13 +1,13 @@
-# 双语文档
+# Bilingual documentation
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-Wombat 的公开文档同时维护中文和英文，两种语言具有同等权威。在同一次修改中更新对应段落。
+Wombat maintains public documentation in Chinese and English. Both languages have equal authority. Update the matching passages in the same change.
 
-## 延伸阅读
+## Read next
 
-- [双语维护流程](workflow.md)：文件配对、语言审校、确认记录和检查。
-- [术语表](terminology.md)：项目共用术语。
-- [产品语言](product.md)：界面文案与语言归属。
+- [Bilingual workflow](workflow.en.md): file pairs, language review, confirmation records, and checks.
+- [Terminology](terminology.md): shared project terms.
+- [Product language](product.en.md): interface copy and locale ownership.
 
-英文技术文档使用 ASD-STE100。中文采用清晰写作原则，并保留中文语法习惯。配对检查不能证明翻译质量或 STE 合规。
+Use ASD-STE100 for English technical prose. Apply clear writing principles to Chinese while preserving Chinese grammar. Pairing checks do not prove translation quality or STE compliance.

@@ -49,6 +49,17 @@ export function audienceBoundaryErrors(files: Record<string, string>): string[] 
   return errors;
 }
 
+/** Keep every directory's default README in English, with a separate Chinese entry. */
+export function readmePairErrors(pairs: Array<{ zh: string; en: string }>): string[] {
+  return pairs.flatMap(({ zh, en }) => {
+    if (![zh, en].some(file => /^README(?:\.[^/]+)?\.md$/.test(path.posix.basename(file)))) return [];
+    return path.posix.basename(en) === 'README.md'
+      && path.posix.basename(zh) === 'README.zh-CN.md'
+      && path.posix.dirname(en) === path.posix.dirname(zh)
+      ? [] : [`${en} / ${zh}: use English README.md and Chinese README.zh-CN.md in the same directory`];
+  });
+}
+
 function main(): void {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const manifest = JSON.parse(readFileSync(path.join(root, 'scripts/doc-i18n.manifest.json'), 'utf8')) as {
@@ -61,6 +72,7 @@ function main(): void {
   ]);
   const sources = Object.fromEntries([...files].map(file => [file, readFileSync(path.join(root, file), 'utf8')]));
   const errors = [
+    ...readmePairErrors(manifest.pairs),
     ...Object.entries(sources).flatMap(([file, source]) => structureErrors(file, source)),
     ...audienceBoundaryErrors(sources),
   ];

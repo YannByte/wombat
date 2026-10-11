@@ -35,4 +35,4 @@ Select checks by scope; reuse unaffected passing results. Runtime requirements: 
 - Dependency changes: run `licenses:generate` and `licenses:check`. Before publication run `repo:check`, `public:check`, and `github:pack`; checks do not replace review or platform acceptance.
 - Root package.json alone owns the version. Authorized releases use `corepack pnpm release:publish`.
 
-Report scope, checks, limits, and commands. Record [decisions](docs/decisions/README.en.md) for lasting rationale absent from code, tests, and docs; mechanical/local edits need none.
+Report scope, checks, limits, and commands. Record [decisions](docs/decisions/README.md) for lasting rationale absent from code, tests, and docs; mechanical/local edits need none.

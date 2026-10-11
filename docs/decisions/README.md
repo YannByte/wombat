@@ -1,17 +1,17 @@
-# 决策记录
+# Decision notes
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-本目录保存长期有效的理由、实际考虑过的替代方案和后果。当前行为由技术参考和模块指南说明。
+This directory records lasting rationale, considered alternatives, and consequences. Current behavior belongs in technical references and module guides.
 
-## 查找决策
+## Find a decision
 
-- [proposed/](proposed/) 包含尚未完成或部分实现的提案。
-- [implemented/](implemented/) 包含已交付的决策。
-- 被拒绝的提案在理由仍有参考价值时保留于 `rejected/`。
+- [proposed/](proposed/) contains unfinished or partly implemented proposals.
+- [implemented/](implemented/) contains delivered decisions.
+- Rejected proposals use `rejected/` when their rationale remains useful.
 
-目录表示决策状态。部分交付不代表提案已经完成。
+Directories show decision status. Partial delivery does not complete a proposal.
 
-## 维护决策
+## Maintain a decision
 
-新增、移动或合并记录前，阅读[决策维护](../development/decision-maintenance.md)。保留独有理由和尚未解决的验证缺口。
+Read [decision maintenance](../development/decision-maintenance.en.md) before adding, moving, or consolidating notes. Preserve unique rationale and unresolved verification gaps.

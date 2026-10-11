@@ -1,19 +1,19 @@
-# 本机 Web 宿主
+# Local Web host
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-`@wombat/web` 将经过认证的本机 HTTP 请求传递给 `UsageClient`。CLI 提供 Node 客户端，管理宿主的启动和关闭。
+`@wombat/web` connects authenticated local HTTP requests to `UsageClient`. The CLI supplies a Node client and manages host startup and shutdown.
 
-## 公开入口
+## Public entry
 
-`startWebHost(options)` 返回浏览器地址、origin、异步 `close()` 和受限的 `openView(request)`。
+`startWebHost(options)` returns the browser URL, origin, asynchronous `close()`, and restricted `openView(request)`.
 
-## 限制
+## Limits
 
-宿主只监听回环地址，不支持远程或托管部署。请求必须通过认证，且来源范围必须获得授权。服务重启后，需要使用新的浏览器链接。
+The host listens on loopback only. It does not support remote or hosted deployment. Requests require authentication and authorized source scope. A restart requires a new browser link.
 
-## 延伸阅读
+## Read next
 
-- [Web 指南](../docs/guides/web.md)：打开页面与读取失败后的恢复。
-- [Web 宿主参考](../docs/reference/web-host.md)：认证、授权、请求限制和取消。
-- [架构](../docs/development/architecture.md)：模块边界。
+- [Web guide](../docs/guides/web.en.md): opening pages and recovering failed reads.
+- [Web host reference](../docs/reference/web-host.en.md): authentication, grants, request limits, and cancellation.
+- [Architecture](../docs/development/architecture.en.md): module boundaries.

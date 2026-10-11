@@ -1,21 +1,21 @@
-# CLI 入口
+# CLI entry
 
-中文 | [English](README.en.md)
+English | [中文](README.zh-CN.md)
 
-`@wombat/cli` 读取参数，输出文本或 JSON 结果。CLI 通过类型化查询连接本机内核，并按请求启动 Web。
+`@wombat/cli` reads arguments and writes text or JSON results. It connects typed queries to the local core and starts Web on request.
 
-## 公开入口
+## Public entries
 
-- 包导出参数解析和 `runUsageCli`；`./format` 导出文本格式化功能。
-- `api` 列出本机方法和 Schema；`call` 从 stdin 读取一个有大小限制的 JSON 请求。
-- `web` 启动本机 Web 宿主。不指定子命令时，CLI 输出用量文本。
+- The package exports argument parsing and `runUsageCli`. `./format` exports text formatting.
+- `api` lists local methods and schemas. `call` reads one bounded JSON request from stdin.
+- `web` starts the local Web host. With no subcommand, the CLI prints usage text.
 
-## 限制
+## Limits
 
-JSON 结果写入 stdout，进度写入 stderr。用户决定与检查结果分别保留。未知存储格式需要按明确的恢复流程处理；不要删除原数据。
+JSON results use stdout; progress uses stderr. User decisions remain separate from check results. Unknown storage formats require explicit recovery; do not delete the original data.
 
-## 延伸阅读
+## Read next
 
-- [CLI 指南](../docs/guides/cli.md)：命令、筛选、预算和错误。
-- [CLI 参考](../docs/reference/cli.md)：发现原则、退出码、耗时和格式恢复。
-- [CLI 指令](AGENTS.md)：维护和验证规则。
+- [CLI guide](../docs/guides/cli.en.md): commands, filters, budgets, and errors.
+- [CLI reference](../docs/reference/cli.en.md): discovery principles, exit codes, timing, and format recovery.
+- [CLI instructions](AGENTS.md): maintenance and verification rules.
