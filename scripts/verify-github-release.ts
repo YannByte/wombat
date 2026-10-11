@@ -1,7 +1,7 @@
 /** Extract and exercise the exact GitHub Release archive for the current platform. */
 import assert from 'node:assert/strict';
 import {spawn, spawnSync, type ChildProcess} from 'node:child_process';
-import {appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {once} from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +16,7 @@ import {repositorySlug} from './release-policy.ts';
 import {toolCommand} from './run-tool.ts';
 import {previousReleaseTag, readPublishedReleaseTags} from './release-history.ts';
 import {updateInstalled} from '../cli/src/update-cli.ts';
+import {prepareFirstInstall} from './first-install-state.ts';
 
 const {values} = parseArgs({args: process.argv.slice(2).filter(arg => arg !== '--'), options: {set: {type: 'string'}}});
 assert(values.set, '--set is required');
@@ -86,25 +87,45 @@ const stopService = async () => {
   await within(exited, 10_000, 'Installed shared service shutdown');
 };
 try {
+  stage('first-install preparation');
+  const prefix = path.join(scratch, 'first-install-prefix');
+  const dataHome = path.join(scratch, 'data');
+  const preparation = prepareFirstInstall(scratch, [prefix, dataHome]);
   stage('archive identity and extraction');
   const releaseDirectory = path.dirname(setFile);
   const unpackedAt = performance.now();
   const unpack = spawnSync(...toolCommand('tar', ['-xzf', asset.archive, '-C', scratch]), {cwd: releaseDirectory, encoding: 'utf8', timeout: 120_000});
   assert.ifError(unpack.error); assert.equal(unpack.status, 0, unpack.stderr);
   const installMs = Math.round(performance.now() - unpackedAt);
-  const installed = path.join(scratch, 'wombat');
+  const unpacked = path.join(scratch, 'wombat');
+  const release = JSON.parse(readFileSync(path.join(unpacked, 'release.json'), 'utf8'));
+  assert.deepEqual({version: release.version, source: release.source, sourceSha256: release.sourceSha256, target: release.target, runtime: release.runtime},
+    {version: set.version, source: set.source, sourceSha256: set.sourceSha256, target, runtime: {name: 'node', version: releaseNodeVersion}});
+  stage('candidate first installation');
+  const installAt = performance.now();
+  const firstInstall = process.platform === 'win32'
+    ? spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('scripts/install/install.ps1'),
+      '-Version', set.version, '-Prefix', prefix, '-BaseUrl', pathToFileURL(releaseDirectory).href, '-NoModifyPath'],
+      {encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true})
+    : spawnSync('sh', [path.resolve('scripts/install/install.sh'), '--version', set.version, '--prefix', prefix,
+      '--base-url', pathToFileURL(releaseDirectory).href, '--no-modify-path'],
+      {encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024});
+  assert.ifError(firstInstall.error); assert.equal(firstInstall.status, 0, firstInstall.stderr + firstInstall.stdout);
+  const firstInstallMs = Math.round(performance.now() - installAt);
+  const managedRoot = path.join(prefix, 'lib', 'wombat');
+  const currentId = readFileSync(path.join(managedRoot, 'current.txt'), 'utf8').trim();
+  assert.deepEqual(readdirSync(path.join(managedRoot, 'versions')), [currentId], 'First install contains historical versions');
+  const installed = path.join(managedRoot, 'versions', currentId);
+  assert.deepEqual(JSON.parse(readFileSync(path.join(installed, 'release.json'), 'utf8')), release);
   const cli = path.join(installed, 'lib', 'wombat.js');
   const core = path.join(installed, 'lib', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
   const runtime = path.join(installed, 'runtime', nodeRuntimeBinary(target));
-  const launcher = path.join(installed, 'bin', process.platform === 'win32' ? 'wombat.cmd' : 'wombat');
+  const launcher = path.join(prefix, 'bin', process.platform === 'win32' ? 'wombat.cmd' : 'wombat');
   assert(existsSync(cli)); assert(existsSync(core)); assert(existsSync(runtime)); assert(existsSync(launcher));
-  const release = JSON.parse(readFileSync(path.join(installed, 'release.json'), 'utf8'));
-  assert.deepEqual({version: release.version, source: release.source, sourceSha256: release.sourceSha256, target: release.target, runtime: release.runtime},
-    {version: set.version, source: set.source, sourceSha256: set.sourceSha256, target, runtime: {name: 'node', version: releaseNodeVersion}});
 
   stage('offline doctor and product queries');
   const env: NodeJS.ProcessEnv = {
-    ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: path.join(scratch, 'data'),
+    ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: dataHome,
     CODEX_HOME: path.join(scratch, 'source'), NO_COLOR: '1', PATH: '',
   };
   delete env.WOMBAT_CORE_BIN; delete env.NODE_OPTIONS; delete env.NODE_PATH;
@@ -115,8 +136,13 @@ try {
   };
   const query = (args: string[], status = 0) => JSON.parse(run(runtime, [cli, ...args, '--json'], status));
   assert.equal(query(['--version']).version, set.version);
-  const doctor = query(['doctor'], 2);
+  const emptyPathDoctor = query(['doctor'], 1);
+  assert.equal(emptyPathDoctor.checks.find((check: {id: string}) => check.id === 'path')?.status, 'fail');
+  assert.equal(emptyPathDoctor.scannedSources, false); assert.equal(emptyPathDoctor.networkUsed, false);
+  const doctor = JSON.parse(run(runtime, [cli, 'doctor', '--json'], 2, {...env, PATH: path.join(prefix, 'bin')}));
   assert.equal(doctor.action, 'doctor'); assert.equal(doctor.scannedSources, false); assert.equal(doctor.networkUsed, false);
+  assert.equal(doctor.checks.find((check: {id: string}) => check.id === 'installation')?.status, 'pass');
+  assert.equal(doctor.checks.find((check: {id: string}) => check.id === 'path')?.status, 'pass');
   assert.equal(doctor.checks.find((check: {id: string}) => check.id === 'core')?.status, 'pass');
   service = spawn(core, ['--serve-usage'], {env, windowsHide: true, stdio: 'ignore'});
   await once(service, 'spawn');
@@ -160,8 +186,8 @@ try {
     180_000, 'Managed installation upgrade');
   assert.deepEqual({currentVersion: updated.currentVersion, availableVersion: updated.availableVersion, updateAvailable: updated.updateAvailable, updated: updated.updated},
     {currentVersion: previousTag.slice(1), availableVersion: set.version, updateAvailable: true, updated: true});
-  const currentId = readFileSync(path.join(upgradeRoot, 'current.txt'), 'utf8').trim();
-  assert.notEqual(currentId, previousId); assert(existsSync(path.join(upgradeRoot, 'versions', previousId)));
+  const upgradedId = readFileSync(path.join(upgradeRoot, 'current.txt'), 'utf8').trim();
+  assert.notEqual(upgradedId, previousId); assert(existsSync(path.join(upgradeRoot, 'versions', previousId)));
   const upgradedLauncher = path.join(upgradePrefix, 'bin', process.platform === 'win32' ? 'wombat.cmd' : 'wombat');
   if (process.platform === 'win32') {
     const command = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');
@@ -174,7 +200,7 @@ try {
     {...env, WOMBAT_WEB_TEST_ENTRY: cli, WOMBAT_WEB_TEST_CORE: core, WOMBAT_WEB_TEST_NODE: runtime});
   console.log(JSON.stringify({version: set.version, source: set.source, target, runtime: run(runtime, ['--version']).trim(),
     archive: asset.archive, archiveBytes: asset.bytes, installedBytes: inventory(installed).reduce((total, file) => total + file.size, 0),
-    extractMs: installMs, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, web: true}));
+    extractMs: installMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, web: true}));
 } finally {
   await stopService();
   rmSync(scratch, {recursive: true, force: true, maxRetries: 20, retryDelay: 500});

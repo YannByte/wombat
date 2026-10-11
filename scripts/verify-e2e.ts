@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkBuild } from './build-identity.ts';
 import { runBoundedCommand, type BoundedCommandResult } from './verify-e2e-helpers.ts';
 import { toolCommand } from './run-tool.ts';
+import {prepareFirstInstall} from './first-install-state.ts';
 import {
   acceptanceInputIdentity, assertExternalOutputDir, currentArtifactIdentity, currentSourceIdentity, externalFileIdentity, externalPackageIdentity,
   isWithin, parseVerifyArgs, plannedStages, reusableStage, runFingerprint, type Scope,
@@ -52,6 +53,7 @@ interface Report {
   parameters: { playwrightModule?: string; browserExecutable?: string };
   effectiveArtifacts: { cliEntry: string; coreBinary: string };
   browserInputs?: Awaited<ReturnType<typeof browserArtifact>>;
+  preparation?: ReturnType<typeof prepareFirstInstall>;
   stages: StageResult[];
   failure?: { stage: string; message: string };
   boundaries: string[];
@@ -179,8 +181,11 @@ async function main(): Promise<number> {
     effectiveArtifacts: { cliEntry: path.join(root, 'dist/wombat.js'), coreBinary: path.join(root, 'dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core') },
     stages: [], boundaries: ['Integration and E2E suites use isolated source and data homes plus synthetic fixtures; this runner does not inspect real Agent logs.', 'Browser acceptance uses the existing synthetic event-upgrade verifier; no screenshots are produced.', 'A passing run covers only the selected scope and current platform; it does not replace human review of claims, privacy, or untested platforms.'] };
   const sandbox = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'wombat-verify-e2e-')));
-  mkdirSync(path.join(sandbox, 'source'), { recursive: true }); mkdirSync(path.join(sandbox, 'data'), { recursive: true });
   cleanupSandbox = () => rmSync(sandbox, { recursive: true, force: true });
+  const preparation = prepareFirstInstall(sandbox, [path.join(sandbox, 'data')]);
+  report.preparation = preparation;
+  progress({event: 'first-install-prepared', ...preparation});
+  mkdirSync(path.join(sandbox, 'source'), { recursive: true }); mkdirSync(path.join(sandbox, 'data'), { recursive: true });
   const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: path.join(sandbox, 'source'), WOMBAT_DATA_HOME: path.join(sandbox, 'data'), WOMBAT_AUTO_PRICES: '0',
     WOMBAT_CORE_BIN: path.join(root, 'dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), WOMBAT_CLI_ENTRY: path.join(root, 'dist', 'wombat.js') };
   delete env.WOMBAT_CODEX_BIN;
