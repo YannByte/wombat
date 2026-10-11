@@ -310,9 +310,15 @@ async function comparisons(page:Page,fixture:Fixture,language:Language,width:num
  await activate(compare.getByRole('button',{name:label('comparison.submit'),exact:true}));await compare.locator('tbody tr').first().waitFor();
  await text(compare,'-165 Token');const family=compare.getByRole('checkbox',{name:label('comparison.family')});await family.focus();await family.press('Space');
  await text(compare,'-220 Token');await text(compare,t('comparison.members',{count:2}));await overflow(page);
- if(width<=760)await activate(page.getByRole('button',{name:label('task.backToList'),exact:true}));
+ await settled(page);
+ if(width<=760){
+  await activate(page.getByRole('button',{name:label('task.backToList'),exact:true}));
+  await page.waitForFunction(()=>!new URL(location.href).searchParams.has('thread'));
+  await page.locator('.thread-list').waitFor();await settled(page);
+ }
  const changes=page.locator('.thread-list details').filter({hasText:label('comparison.refresh')}).first();
- await activate(changes.locator('summary'));await text(changes,label('comparison.refreshNote'));await text(changes,'+110 Token');
+ if(await changes.getAttribute('open')==null)await activate(changes.locator('summary'));
+ await text(changes,label('comparison.refreshNote'));await text(changes,'+110 Token');
 }
 
 async function setupJourney(page:Page,fixture:Fixture,language:Language,width:number,source:string) {

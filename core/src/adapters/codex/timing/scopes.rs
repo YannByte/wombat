@@ -57,8 +57,8 @@ impl Facts {
             Some(value.id.clone()),
             None,
             SafePayload::Thread {
-                value: Box::new(value),
-                project_path: cwd.map(str::to_owned),
+                value: Box::new(value.into_shared()),
+                project_path: cwd.map(Into::into),
                 evidence: evidence.clone(),
             },
             Vec::new(),
@@ -96,7 +96,7 @@ impl Facts {
             Some(thread.into()),
             Some(id.clone()),
             SafePayload::Turn {
-                value: Box::new(value),
+                value: Box::new(value.into_shared()),
                 evidence: evidence.clone(),
             },
             Vec::new(),

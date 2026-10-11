@@ -29,22 +29,25 @@ fn token_analysis(rows: &[&PricedMeasurement]) -> Result<TokenAnalysis> {
         indeterminate_records: 0,
     });
     let mut fields = fields;
-    for field in TokenField::ALL {
-        let aggregate = fields.get_mut(field);
-        let mut subtotal = 0_u64;
-        for row in rows {
+    for row in rows {
+        for field in TokenField::ALL {
+            let aggregate = fields.get_mut(field);
             let value = row.fact.tokens.get(field);
             let reason = *row.fact.token_unavailable_reasons.get(field);
             match (value, reason) {
                 (Some(value), None) => {
                     aggregate.covered_records =
                         checked_record_increment(aggregate.covered_records)?;
-                    subtotal = subtotal
-                        .checked_add(value)
-                        .filter(|sum| *sum <= MAX_SAFE_INTEGER)
-                        .ok_or_else(|| {
-                            operation_error("RESOURCE_LIMIT", "Token小计超出安全整数范围")
-                        })?;
+                    aggregate.observed_subtotal = Some(
+                        aggregate
+                            .observed_subtotal
+                            .unwrap_or(0)
+                            .checked_add(value)
+                            .filter(|sum| *sum <= MAX_SAFE_INTEGER)
+                            .ok_or_else(|| {
+                                operation_error("RESOURCE_LIMIT", "Token小计超出安全整数范围")
+                            })?,
+                    );
                 }
                 (None, Some(TokenUnavailableReason::Missing)) => {
                     aggregate.missing_records =
@@ -70,7 +73,6 @@ fn token_analysis(rows: &[&PricedMeasurement]) -> Result<TokenAnalysis> {
                 }
             }
         }
-        aggregate.observed_subtotal = (aggregate.covered_records > 0).then_some(subtotal);
     }
     Ok(TokenAnalysis {
         method_version: TokenAnalysis::METHOD_VERSION,
@@ -93,6 +95,7 @@ pub(super) fn complete_total(rows: &[&PricedMeasurement]) -> Result<Option<u64>>
 }
 mod aggregates;
 mod total;
+pub(crate) use aggregates::Group as Aggregate;
 pub(crate) use aggregates::SummaryIndex;
 use total::TotalParts;
 fn analyzed_total(rows: &[&PricedMeasurement]) -> Result<AnalyzedTokenTotal> {
@@ -107,8 +110,17 @@ fn checked_record_increment(value: u64) -> Result<u64> {
 
 pub fn summarize(rows: &[&PricedMeasurement]) -> Result<UsageSummary> {
     let token_analysis = token_analysis(rows)?;
-    let input_total = checked_sum(rows, total_input)?;
-    let cache_read = checked_sum(rows, |t| t.cache_read)?;
+    let mut tokens = TokenUsage::default();
+    for field in TokenField::ALL {
+        let aggregate = token_analysis.fields.get(field);
+        tokens.set(
+            field,
+            (aggregate.covered_records as usize == rows.len())
+                .then_some(aggregate.observed_subtotal.unwrap_or(0)),
+        );
+    }
+    let input_total = tokens.raw_input;
+    let cache_read = tokens.cache_read;
     // Validate stored parts even for a single row; preserve its request-specific basis.
     let price = crate::pricing::sum_prices(rows.iter().map(|r| r.price.as_ref()))
         .map_err(|e| operation_error("PRICING_ERROR", e))?;
@@ -120,15 +132,7 @@ pub fn summarize(rows: &[&PricedMeasurement]) -> Result<UsageSummary> {
             .then(|| share(cache_read, input_total))
             .flatten(),
         unpriced_tokens: unpriced_tokens(rows)?,
-        tokens: TokenUsage {
-            input: checked_sum(rows, |t| t.input)?,
-            cache_read: checked_sum(rows, |t| t.cache_read)?,
-            cache_create: checked_sum(rows, |t| t.cache_create)?,
-            output: checked_sum(rows, |t| t.output)?,
-            reasoning: checked_sum(rows, |t| t.reasoning)?,
-            total: checked_sum(rows, |t| t.total)?,
-            raw_input: checked_sum(rows, |t| t.raw_input)?,
-        },
+        tokens,
         token_analysis,
         price: if rows.len() == 1 {
             rows[0].price.as_ref().clone()

@@ -186,7 +186,7 @@ fn session_and_publication_changes_preserve_identity_and_exact_cost() {
         ],
         "two",
     );
-    let change = publication_change(&a, &b).unwrap();
+    let change = publication_change(&a, &b, None).unwrap();
     assert_eq!(
         (
             change.measurements_added,

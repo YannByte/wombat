@@ -212,6 +212,56 @@ impl Snapshot {
         meter: &mut Meter<'_>,
     ) -> Result<CanonicalTurnFacts> {
         meter.check()?;
+        if self.has_stored_ledger() {
+            let mut out = Vec::new();
+            self.visit_ledger_groups(
+                chrono_tz::UTC,
+                Some(target.thread),
+                Some(target.turn),
+                |group, read| {
+                    meter.facts(group.selected_slots(Some(target.turn)).len())?;
+                    meter.check()?;
+                    for row in read()? {
+                        serde_json::to_writer(Writer(meter), &row)
+                            .map_err(|e| failure(meter, e))?;
+                        if !exact(&row.fact, target) {
+                            return Err(corrupt("轮次计量归属不匹配"));
+                        }
+                        out.push(row);
+                    }
+                    Ok(())
+                },
+            )?;
+            let data = self
+                .memory_turns
+                .as_ref()
+                .and_then(|t| t.get(&(target.thread.into(), target.turn.into())))
+                .ok_or_else(|| corrupt("轮次计量索引缺失"))?;
+            meter.facts(data.cold_operations.len() + data.operations.len())?;
+            let operations =
+                self.turn_operations_budgeted(target.thread, target.turn, data, |bytes| {
+                    meter.bytes(bytes)
+                })?;
+            // Match the complete turn envelope, operation output and trailing
+            // newline charged by the in-memory/file paths, in addition to frames.
+            meter.bytes(
+                (b"{\"measurements\":[".len()
+                    + b"],\"operations\":".len()
+                    + b"}\n".len()
+                    + out.len().saturating_sub(1)) as u64,
+            )?;
+            serde_json::to_writer(Writer(meter), &operations).map_err(|e| failure(meter, e))?;
+            for operation in &operations {
+                meter.work(1)?;
+                if !exact_operation(operation, target) {
+                    return Err(corrupt("轮次操作归属不匹配"));
+                }
+            }
+            return Ok(CanonicalTurnFacts {
+                measurements: out,
+                operations,
+            });
+        }
         if let Some(turns) = &self.memory_turns {
             let data = turns
                 .get(&(target.thread.into(), target.turn.into()))
@@ -223,15 +273,20 @@ impl Snapshot {
             meter.facts(
                 data.measurements
                     .len()
-                    .checked_add(data.operations.len())
+                    .checked_add(data.operations.len() + data.cold_operations.len())
                     .ok_or_else(|| corrupt("轮次记录数量溢出"))?,
             )?;
+            // Charge counts before decoding cold frames; target output remains bounded.
+            let operation_rows =
+                self.turn_operations_budgeted(target.thread, target.turn, data, |bytes| {
+                    meter.bytes(bytes)
+                })?;
             let value = LiveTurn {
                 measurements: LiveRows {
                     indices: &data.measurements,
                     rows,
                 },
-                operations: &data.operations,
+                operations: &operation_rows,
             };
             serde_json::to_writer(Writer(meter), &value).map_err(|e| failure(meter, e))?;
             meter.bytes(1)?; // Persisted slices include one trailing newline.
@@ -246,8 +301,8 @@ impl Snapshot {
                 }
                 out.push(row.as_ref().clone());
             }
-            let mut operations = Vec::with_capacity(data.operations.len());
-            for operation in &data.operations {
+            let mut operations = Vec::with_capacity(operation_rows.len());
+            for operation in &operation_rows {
                 meter.work(1)?;
                 if !exact_operation(operation, target) {
                     return Err(corrupt("轮次操作归属不匹配"));

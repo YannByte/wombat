@@ -62,7 +62,7 @@ pub struct Manifest {
     pub issues: Vec<Issue>,
     pub ledger: FileRef,
     pub events: EventIndex,
-    pub threads: Vec<ThreadEntry>,
+    pub threads: Vec<Arc<ThreadEntry>>,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,21 +70,24 @@ pub struct TurnData {
     pub measurements: Vec<PricedMeasurement>,
     pub operations: Vec<Operation>,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct MemoryTurn {
     measurements: Vec<usize>,
     operations: Vec<Arc<Operation>>,
+    cold_operations: Vec<crate::live_index::FactLocation>,
 }
 pub struct Snapshot {
-    pub(crate) summary_index: crate::usage_app::SummaryIndex,
+    pub(crate) summary_index: Arc<crate::usage_app::SummaryIndex>,
     pub(crate) publication_change: Option<crate::usage_app_dto::PublicationChange>,
     pub(crate) project_loads: Vec<crate::live::ProjectLoad>,
     pub(crate) timing_cache: Mutex<crate::timing::cache::Cache>,
     pub(crate) query_cache: Mutex<crate::query_cache::QueryCache>,
-    live_rows: Option<Vec<Arc<PricedMeasurement>>>,
-    project_rows: Option<BTreeMap<Option<String>, Vec<usize>>>,
+    pub(crate) query_work: Arc<Mutex<()>>,
+    live_rows: Option<Arc<Vec<Arc<PricedMeasurement>>>>,
+    project_rows: Option<Arc<BTreeMap<Option<String>, Vec<usize>>>>,
     live_events: Option<events::EventBuckets>,
-    memory_turns: Option<BTreeMap<(String, String), MemoryTurn>>,
+    cold_events: Option<Arc<cold_events::ColdEvents>>,
+    memory_turns: Option<Arc<BTreeMap<(String, String), MemoryTurn>>>,
     pub manifest: Manifest,
     directory: PathBuf,
 }
@@ -113,6 +116,11 @@ fn validate_title_observations<'a>(
     Ok(())
 }
 
+mod cold_events;
+pub(crate) mod ledger_projection;
+pub(crate) use ledger_projection::{
+    schema as ledger_projection_schema, update as update_ledger_projection,
+};
 mod events;
 pub use events::{
     EventChunk, EventCursor, EventIndex, EventPage, EventPartition, EventReadBudget, EventTarget,
@@ -134,12 +142,20 @@ mod use_metadata;
 pub use use_metadata::UnassignedUseRecords;
 #[cfg(test)]
 mod watermark_tests;
+pub(crate) use cold_events::{
+    load_index as load_cold_event_index, save_index as save_cold_event_index,
+};
 pub use files::{RefreshLock, load, save};
 use files::{bounded_read, corrupt, file_ref, product_home, safe_file, save_with_prices};
 #[cfg(test)]
 use files::{load_at, private_dir, save_at};
 pub(crate) use memory::memory;
-pub(crate) use memory::memory_project_batch;
+pub(crate) use memory::memory_cold_operations;
 
 #[cfg(test)]
 mod observation_tests;
+
+pub(crate) use cold_events::build_from_sources as cold_event_index_from_sources;
+
+mod cold_operations;
+pub(crate) use cold_operations::{ColdOperations, load_operations as load_cold_operations};

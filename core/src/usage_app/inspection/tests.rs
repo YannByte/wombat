@@ -365,7 +365,9 @@ fn event_budget_is_shared_across_reads_and_rejects_before_decoding() {
         1
     );
     // A subsequent read exceeds the aggregate budget even if its payload cannot decode.
-    s.manifest.events.partitions[0].chunks[0].file.sha256 = "invalid".into();
+    Arc::make_mut(&mut s.manifest.events.partitions[0]).chunks[0]
+        .file
+        .sha256 = "invalid".into();
     let error = thread_events(&s, &thread, &mut work).err().unwrap();
     assert_eq!(
         error

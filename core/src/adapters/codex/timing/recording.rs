@@ -121,8 +121,13 @@ pub(in crate::adapters::codex) fn record(
         .and_then(|id| {
             facts
                 .retained_collection_times
-                .remove(&id)
-                .or_else(|| facts.events.get(&id).map(|e| e.collected_at().to_owned()))
+                .remove(id.as_str())
+                .or_else(|| {
+                    facts
+                        .events
+                        .get(id.as_str())
+                        .map(|e| e.collected_at().to_owned())
+                })
         })
         .unwrap_or_else(|| context.collected_at.clone());
     match Event::new_at(
@@ -137,9 +142,18 @@ pub(in crate::adapters::codex) fn record(
         Ok(mut event) => {
             facts.event_strings.share(&mut event);
             crate::adapters::codex::event_projection::apply(facts, &event, report);
-            let id = event.id().to_owned();
-            facts.dirty_events.insert(id.clone());
-            facts.events.insert(id, Arc::new(event));
+            let id = event.shared_id();
+            if !facts.full_event_write && !facts.streaming {
+                facts.dirty_events.insert(id.clone());
+            }
+            let event = Arc::new(event);
+            if facts.streaming {
+                // Canonical facts are applied now; associations read only affected
+                // archive scopes after these bounded batches have been flushed.
+                facts.pending_events.push(event);
+            } else {
+                facts.events.insert(id, event);
+            }
         }
         Err(_) => issue(
             report,

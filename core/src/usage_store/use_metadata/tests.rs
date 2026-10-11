@@ -190,8 +190,9 @@ fn typed_memory_metadata_unknown_version_does_not_become_zero() {
         None,
     )
     .unwrap();
-    snapshot.manifest.threads[0].unassigned_uses.method_version =
-        crate::usage_observations::METHOD_VERSION + 1;
+    Arc::make_mut(&mut snapshot.manifest.threads[0])
+        .unassigned_uses
+        .method_version = crate::usage_observations::METHOD_VERSION + 1;
     assert_eq!(
         code(
             snapshot

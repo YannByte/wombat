@@ -204,7 +204,7 @@ fn page_order_and_cursors_are_bound_to_target_fixed_view_and_index() {
         .next_cursor
         .unwrap();
     let mut changed = load_at(root.path(), Some(&disk.manifest.snapshot_ref.snapshot_id)).unwrap();
-    changed.manifest.events.partitions[0].sha256 = "altered".into();
+    Arc::make_mut(&mut changed.manifest.events.partitions[0]).sha256 = "altered".into();
     assert!(
         changed
             .event_page(&target, 1, Some(&cursor), budget(), &active())
@@ -336,7 +336,7 @@ fn budgets_reject_before_read_and_cancellation_never_returns_partial_events() {
     );
     let mut too_large =
         load_at(root.path(), Some(&disk.manifest.snapshot_ref.snapshot_id)).unwrap();
-    too_large.manifest.events.partitions[0].count = MAX_TARGET_EVENTS + 1;
+    Arc::make_mut(&mut too_large.manifest.events.partitions[0]).count = MAX_TARGET_EVENTS + 1;
     assert!(
         too_large
             .events_for_target(
@@ -475,7 +475,7 @@ fn hashes_versions_duplicate_positions_and_index_corruption_fail_closed() {
     index.partitions.push(index.partitions[0].clone());
     assert!(super::events::validate_index(&index).is_err());
     let mut index = snapshot.manifest.events.clone();
-    index.partitions[0].count += 1;
+    Arc::make_mut(&mut index.partitions[0]).count += 1;
     assert!(super::events::validate_index(&index).is_err());
 }
 fn live_result(root: &Path, facts: Collected) -> Result<Snapshot> {
@@ -488,7 +488,7 @@ fn live_result(root: &Path, facts: Collected) -> Result<Snapshot> {
 }
 
 fn rewrite_block(snapshot: &mut Snapshot, block: serde_json::Value) {
-    let chunk = &mut snapshot.manifest.events.partitions[0].chunks[0];
+    let chunk = &mut Arc::make_mut(&mut snapshot.manifest.events.partitions[0]).chunks[0];
     let bytes = serde_json::to_vec(&block).unwrap();
     fs::write(snapshot.directory.join(&chunk.file.file), &bytes).unwrap();
     chunk.bytes = bytes.len() as u64;
@@ -569,7 +569,7 @@ fn index_rejects_cross_chunk_duplicates_even_when_its_digest_is_updated() {
     .unwrap();
     for mutation in 0..5 {
         let mut index = snapshot.manifest.events.clone();
-        let partition = &mut index.partitions[0];
+        let partition = Arc::make_mut(&mut index.partitions[0]);
         match mutation {
             0 => partition.chunks[1].first = partition.chunks[0].last.clone(),
             1 => partition.chunks[1].offset = 0,
@@ -724,7 +724,9 @@ fn invalid_targets_and_unsafe_event_paths_are_rejected() {
             );
         }
     }
-    disk.manifest.events.partitions[0].chunks[0].file.file = "../outside.json".into();
+    Arc::make_mut(&mut disk.manifest.events.partitions[0]).chunks[0]
+        .file
+        .file = "../outside.json".into();
     assert!(
         disk.events_for_target(&EventTarget::turn("a", "turn"), budget(), &active())
             .unwrap_err()

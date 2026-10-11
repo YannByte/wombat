@@ -15,11 +15,13 @@ mod comparison;
 mod conversations;
 mod inspection;
 pub(crate) use comparison::publication_change;
+mod query_work;
 #[cfg(test)]
 mod report_tests;
 mod reports;
-mod scope;
+pub(crate) mod scope;
 pub(crate) mod statistics;
+mod stored;
 mod summary;
 use conversations::{step_items, thread_items, turn_items};
 use reports::{default_report_start, dimension_items, usage_items};
@@ -27,6 +29,7 @@ pub(crate) use scope::validate;
 use scope::{
     available, date, dimensions, ensure_ready, invalid, local_date, matches, quality, timezone,
 };
+pub(crate) use summary::Aggregate;
 pub(crate) use summary::SummaryIndex;
 pub use summary::summarize;
 fn summarize_view(snapshot: &Snapshot, rows: &[&PricedMeasurement]) -> Result<UsageSummary> {
@@ -130,6 +133,18 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
     {
         return Ok(result);
     }
+    // Duplicate misses on one immutable view share the completed result. Cache
+    // hits above remain available while a different request is being reduced.
+    let _work = snapshot
+        .query_work
+        .lock()
+        .map_err(|_| operation_error("RESOURCE_LIMIT", "Query worker unavailable"))?;
+    if let Some(key) = &key
+        && let Some(result) = snapshot.query_cache.lock().unwrap().get(key)
+    {
+        return Ok(result);
+    }
+    let _permit = query_work::acquire();
     let compact = request.compact == Some(true);
     let mut result = execute_uncached(request, snapshot)?;
     if compact {
@@ -158,14 +173,17 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
     if inspection::is_action(&request.action) {
         return inspection::execute(request, snapshot);
     }
-    let tz = timezone(&request.scope)?;
-    request.scope.timezone = Some(tz.to_string());
     if let Some(id) = &request.thread_id {
         if request.scope.thread_id.as_ref().is_some_and(|s| s != id) {
             return Err(invalid("对话筛选身份冲突"));
         }
         request.scope.thread_id = Some(id.clone());
     }
+    if snapshot.has_stored_ledger() && matches!(request.action, Action::Usage | Action::Threads) {
+        return stored::execute(request, snapshot);
+    }
+    let tz = timezone(&request.scope)?;
+    request.scope.timezone = Some(tz.to_string());
     // Detail queries read only the requested thread/turn shard.
     let live_rows = if matches!(request.action, Action::Usage | Action::Threads) {
         snapshot.live_scope_ledger(&request.scope)
@@ -179,6 +197,10 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
     };
     let owned_rows = if live_rows.is_some() {
         vec![]
+    } else if snapshot.has_stored_ledger()
+        && matches!(request.action, Action::Turns | Action::Steps)
+    {
+        snapshot.stored_measurements(request.thread_id.as_deref(), request.turn_id.as_deref())?
     } else if matches!(request.action, Action::Turns | Action::Steps)
         && snapshot.manifest.schema_version == 3
     {
@@ -276,7 +298,7 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
         request.presentation,
         Some(Presentation::Projects | Presentation::Models)
     );
-    let mut items = match request.action {
+    let items = match request.action {
         Action::Usage if dimensional => {
             dimension_items(snapshot, &selected, &request, &projects, &summary)?
         }
@@ -319,6 +341,72 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
         | Action::Context
         | Action::Statistics => unreachable!(),
     };
+    let facets = (request.action == Action::Usage).then(|| {
+        let (models, reasoning_efforts) = dimensions(&rows);
+        Facets {
+            discovered_thread_count: Some(snapshot.manifest.threads.len()),
+            directories: projects
+                .values()
+                .filter_map(|p| p.map(str::to_owned))
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            has_unassigned: snapshot
+                .manifest
+                .threads
+                .iter()
+                .any(|t| t.thread.project.is_none())
+                || rows.iter().any(|r| {
+                    r.fact
+                        .thread_id
+                        .as_deref()
+                        .and_then(|id| projects.get(id))
+                        .copied()
+                        .flatten()
+                        .is_none()
+                }),
+            models,
+            reasoning_efforts,
+            agents: rows
+                .iter()
+                .map(|r| r.fact.agent_kind.as_ref())
+                .chain(
+                    snapshot
+                        .manifest
+                        .threads
+                        .iter()
+                        .map(|t| t.thread.agent_kind.as_str()),
+                )
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+        }
+    });
+    finish_response(
+        request,
+        snapshot,
+        summary,
+        available_range,
+        items,
+        facets,
+        selected.len(),
+    )
+}
+
+pub(super) fn finish_response(
+    request: Request,
+    snapshot: &Snapshot,
+    summary: UsageSummary,
+    available_range: AvailableRange,
+    mut items: Vec<Item>,
+    facets: Option<Facets>,
+    count: usize,
+) -> Result<Response> {
+    let dimensional = matches!(
+        request.presentation,
+        Some(Presentation::Projects | Presentation::Models)
+    );
     let limit = request.limit.unwrap_or(50);
     let located_turn = request.locate_turn_id.as_ref().and_then(|id| {
         items
@@ -366,7 +454,7 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
             .filter_map(|g| known_cost(group_usage(g)))
             .max();
         let mut stats = Distribution {
-            unpriced_tokens: unpriced_tokens(&selected)?,
+            unpriced_tokens: summary.unpriced_tokens,
             max_tokens,
             token_basis: TokenBasis::AnalyzedTotals,
             max_cost: max_cost.map(|v| v.to_string()),
@@ -430,48 +518,7 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
         statistics: None,
         inspection: None,
         comparison: None,
-        facets: (request.action == Action::Usage).then(|| {
-            let (models, reasoning_efforts) = dimensions(&rows);
-            Facets {
-                discovered_thread_count: Some(snapshot.manifest.threads.len()),
-                directories: projects
-                    .values()
-                    .filter_map(|p| p.map(str::to_owned))
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect(),
-                has_unassigned: snapshot
-                    .manifest
-                    .threads
-                    .iter()
-                    .any(|t| t.thread.project.is_none())
-                    || rows.iter().any(|r| {
-                        r.fact
-                            .thread_id
-                            .as_deref()
-                            .and_then(|id| projects.get(id))
-                            .copied()
-                            .flatten()
-                            .is_none()
-                    }),
-                models,
-                reasoning_efforts,
-                agents: rows
-                    .iter()
-                    .map(|r| r.fact.agent_kind.as_ref())
-                    .chain(
-                        snapshot
-                            .manifest
-                            .threads
-                            .iter()
-                            .map(|t| t.thread.agent_kind.as_str()),
-                    )
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .map(str::to_owned)
-                    .collect(),
-            }
-        }),
+        facets,
         distribution,
         price_update: None,
         freshness: None,
@@ -488,6 +535,10 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
             total,
             next_offset: (next < total).then_some(next),
         },
-        quality: quality(snapshot, selected.len()),
+        quality: if request.compact == Some(true) {
+            compact::quality(snapshot, count)
+        } else {
+            quality(snapshot, count)
+        },
     })
 }

@@ -78,7 +78,7 @@ flowchart LR
   T --> V[Snapshot / Manifest]
   P --> V
   O --> V
-  E --> V
+  E -->|Evidence locators| V
   V --> Q[Usage / Timing / Evidence queries]
 ```
 
@@ -100,7 +100,7 @@ Handoff selection binds the read view, decision revision, and target content ver
 
 ### Persistence boundaries and current model limits
 
-Snapshot publication and incremental indexing commit facts before exposing new results. Failure preserves previously committed data; rebuildable indexes and durable user decisions have separate lifetimes. The [core reference](../reference/core.en.md) owns storage, service lifecycle, and failure details. [Contracts](contracts.en.md) owns generated fields and version semantics; [privacy](../reference/privacy.en.md) owns data retention and networking limits.
+Source transactions own recovery and association state. Query views share immutable facts, summaries, and version-bound locators; compressed observations support replay and evidence reads. Indexes and user decisions have separate storage. The [core reference](../reference/core.en.md) owns storage and resource limits; [contracts](contracts.en.md) owns generated fields and versions, and [privacy](../reference/privacy.en.md) owns retention and networking limits.
 
 Parent relationships use events and a shared relationship index. Lifecycle uses phases and shared association. Neither has a unified public entity. A project is an evidenced directory attribution. Resource targets remain mainly attached to operations. `Collected` is a fact collection; `Snapshot` is a read view. Types with the same name must be read in their module context. A new entity needs an explicit query consumer.
 

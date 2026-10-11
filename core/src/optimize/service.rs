@@ -220,7 +220,8 @@ fn execute_at_inner(
     let end = offset.saturating_add(limit).min(total);
     tx.commit()?;
     let capabilities = observed_capabilities(view);
-    let follow_ups = super::follow_up::observe(&suggestions, view, r.source_instance_id.as_deref());
+    let follow_ups =
+        super::follow_up::observe(&suggestions, view, r.source_instance_id.as_deref())?;
     let mut issues = view.issues.clone();
     issues.extend(
         [

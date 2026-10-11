@@ -4,12 +4,30 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Map, Value};
 use std::{collections::HashSet, path::Path};
 
-const VERSION: i64 = 5;
+const VERSION: i64 = 8;
 mod codec;
 mod event_blocks;
 mod packed;
+#[cfg(test)]
+pub(crate) use event_blocks::decoded_event_count;
+pub(crate) use event_blocks::each_group as each_event_group;
+pub(crate) use event_blocks::{read_cold_chunk, validate_cold_source};
 pub(crate) use event_blocks::{save as save_events, share as share_events};
+pub(crate) use packed::measurement_block;
 pub(crate) use packed::{retain as retain_packed, upsert as put_packed};
+pub(crate) fn encode_projection<T: serde::Serialize>(
+    value: &T,
+) -> Result<(Vec<u8>, usize, String)> {
+    codec::Encoder::default().encode(value)
+}
+pub(crate) fn decode_projection<T: serde::de::DeserializeOwned>(
+    data: &[u8],
+    bytes: i64,
+    digest: &str,
+    codec: i64,
+) -> Result<T> {
+    codec::decode(data, bytes, digest, codec)
+}
 const UPSERT: &str = "INSERT INTO entries(bucket,id,payload) VALUES(?1,?2,jsonb(?3)) ON CONFLICT(bucket,id) DO UPDATE SET payload=excluded.payload WHERE payload IS NOT excluded.payload";
 
 fn require_index(condition: bool, message: &str) -> Result<()> {
@@ -85,6 +103,7 @@ fn open_inner(path: &Path) -> Result<Connection> {
         CREATE TABLE entries (bucket INTEGER NOT NULL REFERENCES buckets(id), id TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(bucket,id)) WITHOUT ROWID;")?;
     event_blocks::schema(&tx)?;
     packed::schema(&tx)?;
+    crate::usage_store::ledger_projection_schema(&tx)?;
     tx.pragma_update(None, "user_version", VERSION)?;
     tx.commit()?;
     Ok(db)
@@ -226,26 +245,42 @@ pub(crate) fn put<T: serde::Serialize>(
     )
 }
 
-pub(crate) fn each(
+/// Decode and validate observations once, preserving their typed ownership.
+pub(crate) fn each_event(
+    db: &Connection,
+    scope: &str,
+    consume: impl FnMut(std::sync::Arc<crate::session_events::Event>) -> Result<()>,
+) -> Result<bool> {
+    event_blocks::each_typed(db, scope, None, consume)
+}
+
+/// Stream lightweight projection facts without expanding the event ledger.
+pub(crate) fn each_metadata(
     db: &Connection,
     scope: &str,
     mut consume: impl FnMut(&str, &str, &str) -> Result<()>,
 ) -> Result<bool> {
-    each_row(db, scope, |field, id, payload| {
+    let missing:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM buckets b JOIN fact_rows r ON r.bucket=b.id LEFT JOIN fact_blocks f ON f.id=r.block AND f.bucket=b.id WHERE b.scope=?1 AND f.id IS NULL)",[scope],|r|r.get(0))?;
+    require_index(!missing, "missing fact block")?;
+    let mut statement=db.prepare_cached("SELECT b.field,e.id,json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field NOT IN ('events','measurements','operations')")?;
+    let mut rows = statement.query([scope])?;
+    let mut found = false;
+    while let Some(row) = rows.next()? {
+        found = true;
+        let id = row.get_ref(1)?.as_str()?;
+        let payload = row.get_ref(2)?.as_str()?;
         if !(id.is_empty() && payload == "{}") {
-            consume(field, id, payload)?;
+            consume(row.get_ref(0)?.as_str()?, id, payload)?;
         }
-        Ok(())
-    })
+    }
+    Ok(found)
 }
-
-/// Stream lightweight projection facts without expanding the event ledger.
 pub(crate) fn each_without_events(
     db: &Connection,
     scope: &str,
     mut consume: impl FnMut(&str, &str, &str) -> Result<()>,
 ) -> Result<bool> {
-    each_row_filtered(db, scope, true, |field, id, payload| {
+    each_row_filtered(db, scope, true, false, |field, id, payload| {
         if !(id.is_empty() && payload == "{}") {
             consume(field, id, payload)?;
         }
@@ -258,12 +293,13 @@ fn each_row(
     scope: &str,
     consume: impl FnMut(&str, &str, &str) -> Result<()>,
 ) -> Result<bool> {
-    each_row_filtered(db, scope, false, consume)
+    each_row_filtered(db, scope, false, false, consume)
 }
 fn each_row_filtered(
     db: &Connection,
     scope: &str,
     skip_events: bool,
+    skip_operations: bool,
     mut consume: impl FnMut(&str, &str, &str) -> Result<()>,
 ) -> Result<bool> {
     let sql = if skip_events {
@@ -281,7 +317,7 @@ fn each_row_filtered(
         let payload = row.get_ref(2)?.as_str()?;
         consume(field, id, payload)?;
     }
-    found |= packed::each(db, scope, &mut consume)?;
+    found |= packed::each_filtered(db, scope, skip_operations, &mut consume)?;
     if !skip_events {
         found |= event_blocks::each(db, scope, None, |id, payload| {
             consume("events", id, payload)
@@ -289,9 +325,6 @@ fn each_row_filtered(
     }
     Ok(found)
 }
-
-mod project_events;
-pub(crate) use project_events::prepare_event_reader;
 
 pub(crate) fn replace_field<'a, T: serde::Serialize + 'a>(
     db: &Connection,
@@ -345,7 +378,7 @@ mod tests {
     }
     #[test]
     fn unsupported_schema_is_rejected_without_mutating_records() {
-        for version in [0, 1, 2, 3, 4, 99] {
+        for version in [0, 1, 2, 3, 4, 5, 6, 7, 99] {
             let root = tempfile::tempdir().unwrap();
             let path = root.path().join("index.sqlite");
             let db = Connection::open(&path).unwrap();
@@ -441,7 +474,7 @@ mod tests {
         assert_eq!(load_map(&db, "s").unwrap()["facts"], json!({}));
         let mut seen = 0;
         assert!(
-            each(&db, "s", |_, _, _| {
+            each_without_events(&db, "s", |_, _, _| {
                 seen += 1;
                 Ok(())
             })
@@ -533,4 +566,23 @@ pub(crate) fn fact<T: serde::de::DeserializeOwned>(
     payload
         .map(|v| serde_json::from_str(&v).map_err(Into::into))
         .transpose()
+}
+
+pub(crate) use event_blocks::{
+    begin_changes as begin_event_changes, changed_targets as changed_event_targets, cold_blocks,
+};
+
+pub(crate) use packed::{FactLocation, each_located, read_operations};
+
+pub(crate) fn each_without_details(
+    db: &Connection,
+    scope: &str,
+    mut consume: impl FnMut(&str, &str, &str) -> Result<()>,
+) -> Result<bool> {
+    each_row_filtered(db, scope, true, true, |field, id, payload| {
+        if !(id.is_empty() && payload == "{}") {
+            consume(field, id, payload)?;
+        }
+        Ok(())
+    })
 }

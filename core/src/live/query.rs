@@ -71,10 +71,8 @@ pub(super) fn query(
         let saved = snapshot.export_live()?;
         // The exporter has checked the price catalog and saved these same facts.
         // Do not reread the ledger or construct period rows only to discard them.
-        let rows = snapshot
-            .live_ledger()
-            .ok_or_else(|| operation_error("INVALID_FACTS", "保存视图缺少实时计量"))?;
-        crate::usage_app::refresh_response(&saved, &rows)?
+        let rows = snapshot.ledger()?;
+        crate::usage_app::refresh_response(&saved, &rows.iter().collect::<Vec<_>>())?
     } else {
         crate::usage_app::execute_snapshot(query, &snapshot)?
     };

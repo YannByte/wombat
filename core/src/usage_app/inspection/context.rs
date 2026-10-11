@@ -107,7 +107,7 @@ pub(super) fn records(
         out.push(ContextInventoryRecord {
             id: event.id().to_owned(),
             kind,
-            timestamp: event.time().timestamp.clone(),
+            timestamp: event.time().timestamp.as_deref().map(str::to_owned),
             record_kind,
             phase,
             presence,

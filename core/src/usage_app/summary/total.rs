@@ -1,7 +1,7 @@
 //! Keep both native and alternative cohorts until the final selected scope is known.
 use super::*;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub(super) struct TotalParts {
     recorded_sum: u128,
     calculated_sum: u128,

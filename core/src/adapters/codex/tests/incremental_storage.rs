@@ -303,7 +303,14 @@ fn persisted_events_reject_other_source_without_projection_fallback() {
         },
     )
     .unwrap();
-    crate::live_index::put(&db, &scope, "events", foreign.id(), &foreign).unwrap();
+    crate::live_index::save_events(
+        &db,
+        &scope,
+        &[Arc::new(foreign)],
+        false,
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
     let error = incremental::sync(&db, &source, true)
         .expect_err("foreign events must fail even with valid cached projections");
     assert!(

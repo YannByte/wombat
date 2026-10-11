@@ -57,14 +57,14 @@ fn collected_time_survives_append_restart_verify_and_rollback_without_filling_ev
         .unwrap();
     drop(db);
     db = crate::live_index::open(&index.path().join("index.sqlite")).unwrap();
-    db.execute_batch("CREATE TEMP TABLE observation_rewrites(id TEXT); CREATE TEMP TRIGGER observe_event_update AFTER UPDATE ON event_blocks BEGIN INSERT INTO observation_rewrites VALUES(new.origin); END; CREATE TEMP TRIGGER observe_event_delete AFTER DELETE ON event_blocks BEGIN INSERT INTO observation_rewrites VALUES(old.origin); END;").unwrap();
+    db.execute_batch("CREATE TEMP TABLE observation_rewrites(id TEXT); CREATE TEMP TRIGGER observe_event_insert AFTER INSERT ON event_blocks BEGIN INSERT INTO observation_rewrites VALUES(new.origin); END; CREATE TEMP TRIGGER observe_event_update AFTER UPDATE ON event_blocks BEGIN INSERT INTO observation_rewrites VALUES(new.origin); END; CREATE TEMP TRIGGER observe_event_delete AFTER DELETE ON event_blocks BEGIN INSERT INTO observation_rewrites VALUES(old.origin); END;").unwrap();
     let appended = sync(&mut db, &source, false);
     assert!(
         db.query_row("SELECT count(*) FROM observation_rewrites", [], |r| r
             .get::<_, i64>(0))
             .unwrap()
             > 0,
-        "append rewrites the bounded tail window"
+        "append persists changed evidence blocks"
     );
     db.execute("DELETE FROM observation_rewrites", []).unwrap();
     assert!(appended.events.len() > first.events.len());

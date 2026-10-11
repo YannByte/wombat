@@ -6,30 +6,43 @@ pub(crate) fn memory(
     prices: crate::pricing_sync::Response,
     prior: Option<&Snapshot>,
 ) -> Result<Snapshot> {
-    memory_inner(collected, id, prices, prior, None)
+    memory_inner(collected, id, prices, prior, None, None)
 }
-pub(crate) fn memory_project_batch(
-    mut collected: Collected,
+pub(crate) fn memory_cold_operations(
+    collected: Collected,
     id: String,
     prices: crate::pricing_sync::Response,
-    prior: Option<&Snapshot>,
+    events: EventIndex,
+    operations: ColdOperations,
 ) -> Result<Snapshot> {
-    let events = super::events::merge_memory_events(std::mem::take(&mut collected.events), prior)?;
-    memory_inner(collected, id, prices, prior, Some(events))
+    anyhow::ensure!(
+        collected.events.is_empty() && collected.operations.is_empty(),
+        "cold view must not retain detail payloads"
+    );
+    memory_inner(
+        collected,
+        id,
+        prices,
+        None,
+        Some((events, None)),
+        Some(operations),
+    )
 }
 fn memory_inner(
     collected: Collected,
     id: String,
     prices: crate::pricing_sync::Response,
     prior: Option<&Snapshot>,
-    prepared_events: Option<(EventIndex, super::events::EventBuckets)>,
+    prepared_events: Option<(EventIndex, Option<super::events::EventBuckets>)>,
+    cold_operations: Option<ColdOperations>,
 ) -> Result<Snapshot> {
     validate_watermarks(&collected.watermarks)?;
     validate_title_observations(&collected.title_observations, &collected.threads)?;
     let mut pool = super::price_pool::PricePool::new(&prices);
     let reusable = prior
         .filter(|s| s.manifest.price_catalog_hash == prices.catalog_hash)
-        .and_then(|s| s.live_rows.as_ref());
+        .and_then(|s| s.live_rows.as_ref())
+        .map(|r| r.as_slice());
     let mut facts = collected.measurements;
     facts.sort_unstable_by(|a, b| a.id.cmp(&b.id));
     let mut previous = reusable.into_iter().flatten().peekable();
@@ -103,9 +116,17 @@ fn memory_inner(
         }
     }
     crate::usage_app::summarize(&rows.iter().map(Arc::as_ref).collect::<Vec<_>>())?;
-    let summary_index =
-        crate::usage_app::SummaryIndex::build(&rows.iter().map(Arc::as_ref).collect::<Vec<_>>())?;
+    let summary_index = crate::usage_app::SummaryIndex::build_reusing(
+        &rows.iter().map(Arc::as_ref).collect::<Vec<_>>(),
+        prior.map(|s| s.summary_index.as_ref()),
+    )?;
     let mut unassigned_uses = BTreeMap::<String, UnassignedUseRecords>::new();
+    if let Some(operations) = cold_operations {
+        unassigned_uses = operations.unassigned;
+        for (key, locations) in operations.turns {
+            memory_turns.entry(key).or_default().cold_operations = locations;
+        }
+    }
     for op in collected.operations {
         if op.turn_id.as_deref().is_none_or(|id| id.is_empty()) {
             unassigned_uses
@@ -149,12 +170,12 @@ fn memory_inner(
         .into_iter()
         .map(|thread| {
             let turns = by_thread.remove(&thread.id).unwrap_or_default();
-            ThreadEntry {
+            Arc::new(ThreadEntry {
                 unassigned_uses: unassigned_uses.remove(&thread.id).unwrap_or_default(),
                 thread,
                 turns,
                 file: file_ref("live", &[]),
-            }
+            })
         })
         .collect();
     if !by_thread.is_empty() {
@@ -162,7 +183,10 @@ fn memory_inner(
     }
     let (events, live_events) = match prepared_events {
         Some(events) => events,
-        None => super::events::reuse_memory_events(collected.events, prior)?,
+        None => {
+            let (index, buckets) = super::events::reuse_memory_events(collected.events, prior)?;
+            (index, Some(buckets))
+        }
     };
     let observation_versions = crate::observation_versions::SnapshotObservationVersions::current();
     let manifest = Manifest {
@@ -183,16 +207,18 @@ fn memory_inner(
         threads,
     };
     Ok(Snapshot {
-        summary_index,
+        summary_index: Arc::new(summary_index),
         publication_change: None,
         project_loads: vec![],
-        project_rows: Some(project_rows),
+        project_rows: Some(Arc::new(project_rows)),
         timing_cache: Mutex::default(),
         query_cache: Mutex::default(),
+        query_work: Arc::default(),
         manifest,
         directory: PathBuf::new(),
-        live_rows: Some(rows),
-        live_events: Some(live_events),
-        memory_turns: Some(memory_turns),
+        live_rows: Some(Arc::new(rows)),
+        live_events,
+        cold_events: None,
+        memory_turns: Some(Arc::new(memory_turns)),
     })
 }

@@ -145,8 +145,8 @@ export function snapshotFootprint(directory: string): SnapshotFootprint {
 }
 
 export interface IndexPayloadFootprint {
-  scopeKind: 'parserFacts' | 'projection';
-  field: 'events' | 'operations' | 'measurements';
+  scopeKind: 'parserFacts' | 'projection' | 'queryEvidence';
+  field: 'events' | 'operations' | 'measurements' | 'partitions';
   entries: number;
   storedJsonbPayloadBytes: number;
   expandedJsonBytes: number;
@@ -159,13 +159,13 @@ export function liveIndexPayloadFootprint(databaseFile: string): IndexPayloadFoo
   const database = new DatabaseSync(databaseFile, { readOnly: true });
   try {
     const schema = Number(database.prepare('PRAGMA user_version').get()?.user_version);
-    if (schema === 5) {
+    if (schema === 5 || schema === 6 || schema === 7 || schema === 8) {
       return database.prepare(`
         SELECT CASE WHEN b.scope LIKE 'parser:%:facts' THEN 'parserFacts' ELSE 'projection' END AS scopeKind,
           b.field, SUM(e.count) AS entries, SUM(length(e.data)) AS compressed, SUM(e.bytes) AS decoded
         FROM buckets b JOIN event_blocks e ON e.bucket=b.id GROUP BY b.id
         UNION ALL
-        SELECT 'projection', b.field, (SELECT COUNT(*) FROM fact_rows r WHERE r.bucket=b.id), SUM(length(f.data)), SUM(f.bytes)
+        SELECT CASE WHEN b.scope LIKE 'view:%:evidence' THEN 'queryEvidence' ELSE 'projection' END, b.field, (SELECT COUNT(*) FROM fact_rows r WHERE r.bucket=b.id), SUM(length(f.data)), SUM(f.bytes)
         FROM buckets b JOIN fact_blocks f ON f.bucket=b.id GROUP BY b.id
         ORDER BY scopeKind, field
       `).all().map(row => ({scopeKind: row.scopeKind as IndexPayloadFootprint['scopeKind'], field: row.field as IndexPayloadFootprint['field'], entries:Number(row.entries), storedJsonbPayloadBytes:0, expandedJsonBytes:0, storedCompressedPayloadBytes:Number(row.compressed), decodedFrameBytes:Number(row.decoded)}));

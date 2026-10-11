@@ -174,12 +174,12 @@ pub(super) fn save_with_prices(
             );
         }
         crate::storage::write_unpublished(&directory.join(&filename), &bytes)?;
-        threads.push(ThreadEntry {
+        threads.push(Arc::new(ThreadEntry {
             unassigned_uses: unassigned_uses.remove(&thread.id).unwrap_or_default(),
             thread,
             file: file_ref(&filename, &bytes),
             turns: index,
-        });
+        }));
     }
     if !by_thread.is_empty() {
         return Err(operation_error("INVALID_FACTS", "存在没有对话元数据的记录"));
@@ -221,11 +221,13 @@ pub(super) fn save_with_prices(
         project_rows: None,
         timing_cache: Mutex::default(),
         query_cache: Mutex::default(),
+        query_work: Arc::default(),
         manifest,
         directory: final_dir,
         memory_turns: None,
         live_rows: None,
         live_events: None,
+        cold_events: None,
     })
 }
 pub(super) fn bounded_read(path: &Path) -> Result<Vec<u8>> {
@@ -342,10 +344,12 @@ pub(super) fn load_at(root: &Path, id: Option<&str>) -> Result<Snapshot> {
         project_rows: None,
         timing_cache: Mutex::default(),
         query_cache: Mutex::default(),
+        query_work: Arc::default(),
         manifest,
         directory,
         memory_turns: None,
         live_rows: None,
         live_events: None,
+        cold_events: None,
     })
 }

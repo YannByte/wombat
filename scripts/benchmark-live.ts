@@ -401,7 +401,7 @@ try {
       dataHomeBytesBeforeIdleExit: liveSpaceBeforeExit.dataDirectoryBytes,
       pages: liveSpaceBeforeExit.indexPages,
       payloads: liveSpaceBeforeExit.indexPayloads,
-      payloadMeaning: 'Schema 4 reports JSONB and expanded references; schema 5 reports each compressed frame once and its decoded frame length, excluding source bucket links. These logical payload measures exclude SQLite pages, row keys, and WAL.',
+      payloadMeaning: 'Schema 4 reports JSONB and expanded references; schemas 5 through 8 report each compressed frame once and its decoded frame length, excluding source bucket links. Schemas 6 through 8 also report persisted query-evidence metadata; aggregate tables are included in page and total-footprint measures. These logical payload measures exclude SQLite pages, row keys, and WAL.',
       peakRssBytes: firstExit.peakRssBytes,
       rssKiBAtEnd: liveFinalRssKiB,
       dataHomeBytesAfterIdleExit: initialDataBytesAfterIdleExit,

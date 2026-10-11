@@ -1,6 +1,6 @@
 use super::*;
 fn fixture() -> Collected {
-    let thread = Thread {
+    let thread: Thread = Thread {
         id: "thread-a".into(),
         agent_kind: "test".into(),
         source_instance_id: "source-a".into(),

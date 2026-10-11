@@ -42,7 +42,11 @@ impl State {
 }
 
 pub(super) fn timestamp(text: Option<&str>) -> Option<String> {
-    crate::session_events::Time::from_source(text).0.timestamp
+    crate::session_events::Time::from_source(text)
+        .0
+        .timestamp
+        .as_deref()
+        .map(str::to_owned)
 }
 pub(super) fn precision(text: Option<&str>) -> String {
     let fraction = text
@@ -79,9 +83,32 @@ pub(super) fn read_file_from(
     context: &RunContext,
     facts: &mut Facts,
     report: &mut SourceReport,
-    mut checkpoint: Option<&mut incremental::Checkpoint>,
+    checkpoint: Option<&mut incremental::Checkpoint>,
     capture: Option<&FileMetadata>,
 ) {
+    let _ = read_file_flushing(
+        path,
+        source,
+        context,
+        facts,
+        report,
+        checkpoint,
+        capture,
+        |_, _| Ok(()),
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn read_file_flushing(
+    path: &Path,
+    source: &SourceInstance,
+    context: &RunContext,
+    facts: &mut Facts,
+    report: &mut SourceReport,
+    mut checkpoint: Option<&mut incremental::Checkpoint>,
+    capture: Option<&FileMetadata>,
+    mut flush: impl FnMut(&mut Facts, bool) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
     let evidence_path: Arc<str> = path.to_string_lossy().as_ref().into();
     let file_id = crate::hash(evidence_path.as_bytes());
     let first_issue = report.issues.len();
@@ -114,7 +141,7 @@ pub(super) fn read_file_from(
                     line: 0,
                 }),
             );
-            return;
+            return Ok(());
         }
     };
     let opened = FileMetadata::from_file(&file).ok();
@@ -124,7 +151,7 @@ pub(super) fn read_file_from(
             .is_none_or(|current| !incremental::contains_capture(expected, current))
     }) {
         issue(report, "sourceChanged", "日志在读取期间被替换或截断", None);
-        return;
+        return Ok(());
     }
     let before = capture.cloned().or(opened);
     let length = before.as_ref().map_or(0, |m| m.len());
@@ -134,13 +161,13 @@ pub(super) fn read_file_from(
         issue(report, "resourceLimit", "日志文件超出剩余读取范围", None);
         watermark.issue_codes = vec![WatermarkIssue::ResourceLimit];
         facts.watermarks.insert(file_id.clone(), watermark);
-        return;
+        return Ok(());
     }
     // Freeze this read to the observed prefix; later appends belong to the next refresh.
     let offset = checkpoint.as_ref().map_or(0, |c| c.offset);
     if file.seek(SeekFrom::Start(offset)).is_err() {
         issue(report, "sourceUnreadable", "无法定位日志增量", None);
-        return;
+        return Ok(());
     }
     let mut reader = BufReader::new(file.take(length.saturating_sub(offset)));
     let event_source: Arc<str> = source.id.as_str().into();
@@ -156,6 +183,7 @@ pub(super) fn read_file_from(
     let mut pending_tail = false;
     let mut valid_records = 0;
     loop {
+        flush(facts, false)?;
         if context.is_cancelled() {
             report.status = "cancelled".into();
             break;
@@ -391,6 +419,8 @@ pub(super) fn read_file_from(
         checkpoint.line = line_number;
         checkpoint.state = state;
     }
+    flush(facts, true)?;
+    Ok(())
 }
 
 pub(super) fn file_changed(a: &FileMetadata, b: &FileMetadata) -> bool {

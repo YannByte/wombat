@@ -66,7 +66,7 @@ pub(super) fn observe(
     suggestions: &[Suggestion],
     view: &View,
     source: Option<&str>,
-) -> Vec<FollowUpObservation> {
+) -> anyhow::Result<Vec<FollowUpObservation>> {
     let mut out = vec![];
     let mut files = BTreeMap::<(String, String), Vec<usize>>::new();
     let mut servers = BTreeMap::<(String, String), Vec<usize>>::new();
@@ -182,10 +182,10 @@ pub(super) fn observe(
         }
     }
     let Some(snapshot) = &view.snapshot else {
-        return out;
+        return Ok(out);
     };
     if files.is_empty() && servers.is_empty() {
-        return out;
+        return Ok(out);
     }
     // Current declarations outside the suggestion page also constrain ownership.
     let mut file_items = BTreeMap::<(String, String), Vec<&Item>>::new();
@@ -217,8 +217,9 @@ pub(super) fn observe(
         .map(|_| Projection::default())
         .collect::<Vec<_>>();
     let mut latest = vec![None; out.len()];
+    let operations = snapshot.operation_facts()?;
     let conflicts = usage_observations::target_conflicts(
-        || snapshot.operation_facts().map(AsRef::as_ref),
+        || operations.iter().map(AsRef::as_ref),
         |op| {
             threads
                 .get(op.thread_id.as_ref())
@@ -256,7 +257,7 @@ pub(super) fn observe(
     );
     let mut seen = BTreeSet::new();
     let mut seen_gaps = BTreeSet::new();
-    for operation in snapshot.operation_facts() {
+    for operation in &operations {
         let Some(thread) = threads.get(operation.thread_id.as_ref()) else {
             continue;
         };
@@ -482,7 +483,7 @@ pub(super) fn observe(
             }
         }
     }
-    out
+    Ok(out)
 }
 fn compare_usage(
     suggestion: &Suggestion,

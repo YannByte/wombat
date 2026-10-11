@@ -85,6 +85,7 @@ pub(crate) struct ResolvedPhase<'a> {
 }
 pub(crate) struct ResolvedGroup<'a> {
     pub id: String,
+    pub anchor: &'a Event,
     pub scope: Scope<'a>,
     pub aliases: Vec<Alias<'a>>,
     pub operation_events: Vec<&'a Event>,
@@ -189,6 +190,17 @@ fn observation(event: &Event) -> Option<Observation<'_>> {
         outcome: terminal,
     })
 }
+pub(crate) fn is_input(event: &Event) -> bool {
+    matches!(
+        event.payload(),
+        Payload::Operation { .. }
+            | Payload::Item { .. }
+            | Payload::Lifecycle {
+                lifecycle: LifecycleKind::Compaction,
+                ..
+            }
+    )
+}
 pub(crate) fn check(cancelled: &AtomicBool) -> Result<()> {
     if cancelled.load(Ordering::Relaxed) {
         return Err(crate::dto::operation_error("CANCELLED", "操作已取消"));
@@ -221,7 +233,7 @@ fn row(event: &Event) -> (Scope<'_>, &str, &str, u64) {
         position.byte_offset,
     )
 }
-fn fallback_id(scope: Scope<'_>, position: &Position) -> String {
+pub(crate) fn fallback_id(scope: Scope<'_>, position: &Position) -> String {
     crate::hash(
         serde_json::to_vec(&(
             "operation-association",
@@ -294,20 +306,16 @@ impl<'a> Resolver<'a> {
             self.observations.push(observation);
         }
     }
-    pub(crate) fn finish(mut self, cancelled: &AtomicBool) -> Result<Resolution<'a>> {
-        check(cancelled)?;
-        // Sorting/deduplication are cooperative: check on either side, not in comparisons.
-        // Multiple references to one safe event do not become additional observations.
-        self.observations
-            .sort_unstable_by(|a, b| anchor(a.event).cmp(&anchor(b.event)));
-        check(cancelled)?;
-        self.observations
-            .dedup_by(|a, b| a.event.id() == b.event.id());
-        check(cancelled)?;
-        let mut aliases =
-            BTreeMap::<(Scope<'a>, Alias<'a>), BTreeSet<(Scope<'a>, Alias<'a>)>>::new();
+    pub(crate) fn finish(self, cancelled: &AtomicBool) -> Result<Resolution<'a>> {
+        self.finish_inner(cancelled, true)
+    }
+    fn scope_groups(
+        observations: Vec<Observation<'a>>,
+        cancelled: &AtomicBool,
+    ) -> Result<Vec<(&'a Event, Vec<Observation<'a>>)>> {
+        let mut aliases = BTreeMap::<(Scope<'a>, Alias<'a>), Vec<(Scope<'a>, Alias<'a>)>>::new();
         let mut operation_rows = BTreeMap::new();
-        for observed in &self.observations {
+        for observed in &observations {
             check(cancelled)?;
             let scope = Scope::event(observed.event);
             let keys: Vec<_> = observed
@@ -332,7 +340,7 @@ impl<'a> Resolver<'a> {
         }
         // The native Item format does not distinguish item-ID from call-only fallback.
         // Only the same physical row with a matching native kind can bridge it.
-        for observed in &self.observations {
+        for observed in &observations {
             check(cancelled)?;
             let kind = match observed.kind {
                 ObservationKind::Item(ItemKind::Mcp) => BridgeKind::Mcp,
@@ -351,10 +359,20 @@ impl<'a> Resolver<'a> {
                     if operation.1.raw() != alias.raw() {
                         continue;
                     }
-                    aliases.entry(native).or_default().insert(*operation);
-                    aliases.entry(*operation).or_default().insert(native);
+                    aliases.entry(native).or_default().push(*operation);
+                    aliases.entry(*operation).or_default().push(native);
                 }
             }
+        }
+        // Alias degree is normally one or two. One tree allocation per small
+        // neighbor set otherwise dominates large source passes. Collect edges in
+        // compact vectors and sort/deduplicate once, retaining O(E log E) work.
+        drop(operation_rows);
+        for neighbors in aliases.values_mut() {
+            check(cancelled)?;
+            neighbors.sort_unstable();
+            neighbors.dedup();
+            neighbors.shrink_to_fit();
         }
         let mut identities = BTreeMap::new();
         for first in aliases.keys().copied() {
@@ -376,9 +394,10 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
+        drop(aliases);
         // Anonymous source records retain physical groups without claiming a canonical use.
         let mut groups = BTreeMap::<GroupKey<'a>, Vec<Observation<'a>>>::new();
-        for observed in self.observations {
+        for observed in observations {
             check(cancelled)?;
             let scope = Scope::event(observed.event);
             let key = observed
@@ -389,6 +408,7 @@ impl<'a> Resolver<'a> {
                 });
             groups.entry(key).or_default().push(observed);
         }
+        drop(identities);
         // Compute the preferred anchor once in a checked pass. Operation anchors
         // take priority over earlier native-only observations.
         let mut ordered = Vec::new();
@@ -403,6 +423,37 @@ impl<'a> Resolver<'a> {
                 }
             }
             ordered.push((first, group));
+        }
+        Ok(ordered)
+    }
+    fn finish_inner(mut self, cancelled: &AtomicBool, phases: bool) -> Result<Resolution<'a>> {
+        check(cancelled)?;
+        // Sorting/deduplication are cooperative: check on either side, not in comparisons.
+        // Multiple references to one safe event do not become additional observations.
+        self.observations.sort_unstable_by_key(|observed| {
+            (Scope::event(observed.event), anchor(observed.event))
+        });
+        check(cancelled)?;
+        self.observations
+            .dedup_by(|a, b| a.event.id() == b.event.id());
+        check(cancelled)?;
+        // Aliases can never connect different source/thread/turn scopes. Release
+        // each scope's graph before building the next, while retaining the final
+        // global anchor order for ID collision handling and phase output.
+        let mut pending = self.observations.into_iter().peekable();
+        let mut ordered = Vec::new();
+        while let Some(first) = pending.next() {
+            check(cancelled)?;
+            let scope = Scope::event(first.event);
+            let mut observations = vec![first];
+            while pending
+                .peek()
+                .is_some_and(|next| Scope::event(next.event) == scope)
+            {
+                check(cancelled)?;
+                observations.push(pending.next().expect("peeked observation"));
+            }
+            ordered.extend(Self::scope_groups(observations, cancelled)?);
         }
         check(cancelled)?;
         ordered.sort_unstable_by(|a, b| anchor(a.0).cmp(&anchor(b.0)));
@@ -461,21 +512,23 @@ impl<'a> Resolver<'a> {
             }
             target_conflict |= servers.len() > 1 || tools.len() > 1 || kinds.len() > 1;
             outcome_conflict |= terminal.state() == lifecycle::TerminalState::Conflicting;
-            let shared_identity: Arc<str> = Arc::from(id.as_str());
-            for phase in observed {
-                check(cancelled)?;
-                resolution.phases.push(ResolvedPhase {
-                    event: phase.event,
-                    identity: (!phase.aliases.is_empty()).then(|| Arc::clone(&shared_identity)),
-                    kind: phase.kind,
-                    phase: phase.phase,
-                    native_start: phase.native_start,
-                    native_end: phase.native_end,
-                    identity_conflict: phase.event.gaps().contains(&Gap::ConflictingIdentity),
-                    target_conflict,
-                    outcome_conflict,
-                    terminal_outcome: phase.outcome,
-                });
+            if phases {
+                let shared_identity: Arc<str> = Arc::from(id.as_str());
+                for phase in observed {
+                    check(cancelled)?;
+                    resolution.phases.push(ResolvedPhase {
+                        event: phase.event,
+                        identity: (!phase.aliases.is_empty()).then(|| Arc::clone(&shared_identity)),
+                        kind: phase.kind,
+                        phase: phase.phase,
+                        native_start: phase.native_start,
+                        native_end: phase.native_end,
+                        identity_conflict: phase.event.gaps().contains(&Gap::ConflictingIdentity),
+                        target_conflict,
+                        outcome_conflict,
+                        terminal_outcome: phase.outcome,
+                    });
+                }
             }
             let mut retained_aliases = Vec::new();
             for alias in group_aliases {
@@ -484,6 +537,7 @@ impl<'a> Resolver<'a> {
             }
             resolution.groups.push(ResolvedGroup {
                 id,
+                anchor: first,
                 scope,
                 aliases: retained_aliases,
                 operation_events,
@@ -510,6 +564,19 @@ pub(crate) fn resolve<'a>(
         resolver.observe(event);
     }
     resolver.finish(cancelled)
+}
+
+/// Accounting consumes groups only; avoid retaining a second phase projection.
+pub(crate) fn resolve_groups<'a>(
+    events: impl IntoIterator<Item = &'a Event>,
+    cancelled: &AtomicBool,
+) -> Result<Vec<ResolvedGroup<'a>>> {
+    let mut resolver = Resolver::new();
+    for event in events {
+        check(cancelled)?;
+        resolver.observe(event);
+    }
+    Ok(resolver.finish_inner(cancelled, false)?.groups)
 }
 
 #[cfg(test)]

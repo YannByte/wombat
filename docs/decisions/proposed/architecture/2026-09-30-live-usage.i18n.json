@@ -13,6 +13,10 @@
       "zh": "ca258a5d37ffa6a0ba7c117647724fda51cdfe6385c17e4b18e9127ab0445f72",
       "en": "986dd8097aac4d3d9e25cf3e2cef01c77daedde5ce18afa375f7c433f9d8bc72"
     },
+    "/proposal-persistent-live-index-views-and-scale-targets/proposal/computational-model": {
+      "zh": "4b1ecdbbd24852da9f50e838c28a79610f17746795ce32d4bd05ab5ef88769ca",
+      "en": "4f4dea5083bc68aa0e3c473213e7535acb03726096c9b65bf41777e1de601bf6"
+    },
     "/proposal-persistent-live-index-views-and-scale-targets/proposal/business-value-and-retention": {
       "zh": "35007a758f3480d3cf6ad1ed19356509379f5c622b4eb06f9e95ee7c6f7b7fc4",
       "en": "7d3ec58bb720cf7af080e2436c6acac42773d1538b39c7aa72d2de40be83ba18"
@@ -41,9 +45,21 @@
       "zh": "d6c92d8023a0038f47422a5ef091a967e2805a14c5da6411dd7996909a3bf209",
       "en": "f0e480bbd999df0b73d9f5e958b1965fcbdcbb711103a1b5182f19340aabf0a6"
     },
+    "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/remove-work-before-changing-algorithms": {
+      "zh": "b503d48c962781cd3c62021afcc8acf546b1bcdbebd95880e4ccd4c0298974af",
+      "en": "51e5c17f20e0cca0195fb1c74de6ca2913204b132f8a1bdac36d27ed43337068"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/research-and-algorithm-fit": {
+      "zh": "4c5b16c462167cc3e4dc15082a53d613eaa84e946dcfd477adf1c0b57b216e17",
+      "en": "c6b2f1f659cf34773ad7c867c6ec998c6f17349dce2bdcb5d49d0f00ac3e42be"
+    },
+    "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/bounded-computation-experiment": {
+      "zh": "b4b7be7bff79571718f0a642fc901cdfe48d9d5bb397d36ae6490bd6fb82f412",
+      "en": "feb22b60c9f12f5d326cc7bb870afdc3ee050dc08101cd0aae48330e71a5cefd"
+    },
     "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/preliminary-technical-validation": {
-      "zh": "42ffda65554af01c447e38fc2b5f50e0f590a53cddf94470080a02f9da3ceb31",
-      "en": "70b62a463d876a9ed9012804ea1d3be59c95d9d7c5fc6596c46bf448ce8c2a50"
+      "zh": "56d3544c633e702cdb3e79677d8b4af4783598565c04949b7d59c41ade9d8a3a",
+      "en": "a761243a9e69e9f8aee83d6f4d28a9d81b050cbb17d4c36d5f7a2d454d12df8f"
     },
     "/proposal-persistent-live-index-views-and-scale-targets/alternatives-considered/delivery-sequence": {
       "zh": "72053eb82b4e48629eea83255b74d4e7aae8b4788db00a13d0bb99d5d87e0f67",

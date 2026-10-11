@@ -107,6 +107,7 @@ checksum = "ddcec3d12c579d40898fe0a9a358a803c23e9c52ca3c425707f81c9436211837"
 dependencies = [
  "funty",
  "radium",
+ "serde",
  "tap",
  "wyz",
 ]
@@ -1407,6 +1408,7 @@ name = "wombat-core"
 version = "0.3.1"
 dependencies = [
  "anyhow",
+ "bitvec",
  "chrono",
  "chrono-tz",
  "dunce",

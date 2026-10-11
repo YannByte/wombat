@@ -115,30 +115,62 @@ pub struct SourceReport {
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Thread {
-    pub id: String,
-    pub agent_kind: String,
-    pub source_instance_id: String,
-    pub upstream_id: String,
-    pub title: Option<String>,
-    pub project: Option<String>,
-    pub started_at: Option<String>,
-    pub last_activity_at: Option<String>,
+#[schemars(rename = "Thread")]
+pub struct Thread<T = String> {
+    pub id: T,
+    pub agent_kind: T,
+    pub source_instance_id: T,
+    pub upstream_id: T,
+    pub title: Option<T>,
+    pub project: Option<T>,
+    pub started_at: Option<T>,
+    pub last_activity_at: Option<T>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Turn {
-    pub id: String,
-    pub thread_id: String,
-    pub upstream_id: String,
+#[schemars(rename = "Turn")]
+pub struct Turn<T = String> {
+    pub id: T,
+    pub thread_id: T,
+    pub upstream_id: T,
     pub ordinal: u64,
-    pub started_at: Option<String>,
-    pub ended_at: Option<String>,
+    pub started_at: Option<T>,
+    pub ended_at: Option<T>,
     /// Last observed event; never inferred from turn ordinal.
-    pub last_activity_at: Option<String>,
+    pub last_activity_at: Option<T>,
     /// running, completed, interrupted, failed, unknown
-    pub status: String,
+    pub status: T,
+}
+
+// Source events use shared immutable text; public canonical facts keep owned text.
+impl Thread {
+    pub(crate) fn into_shared(self) -> Thread<Arc<str>> {
+        Thread {
+            id: self.id.into(),
+            agent_kind: self.agent_kind.into(),
+            source_instance_id: self.source_instance_id.into(),
+            upstream_id: self.upstream_id.into(),
+            title: self.title.map(Into::into),
+            project: self.project.map(Into::into),
+            started_at: self.started_at.map(Into::into),
+            last_activity_at: self.last_activity_at.map(Into::into),
+        }
+    }
+}
+impl Turn {
+    pub(crate) fn into_shared(self) -> Turn<Arc<str>> {
+        Turn {
+            id: self.id.into(),
+            thread_id: self.thread_id.into(),
+            upstream_id: self.upstream_id.into(),
+            ordinal: self.ordinal,
+            started_at: self.started_at.map(Into::into),
+            ended_at: self.ended_at.map(Into::into),
+            last_activity_at: self.last_activity_at.map(Into::into),
+            status: self.status.into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

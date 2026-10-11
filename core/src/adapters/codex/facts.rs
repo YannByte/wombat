@@ -1,5 +1,6 @@
 //! Physical and native identities, thread/turn facts and operation attribution.
 use super::*;
+mod association;
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
 pub(super) struct Facts {
@@ -17,14 +18,22 @@ pub(super) struct Facts {
     pub(super) title_observations:
         BTreeMap<String, crate::session_events::title_observations::TitleObservation>,
     #[serde(skip)]
-    pub(super) retained_collection_times: BTreeMap<String, String>,
-    pub(super) events: BTreeMap<String, Arc<crate::session_events::Event>>,
+    pub(super) retained_collection_times: BTreeMap<Arc<str>, String>,
     #[serde(skip)]
-    pub(super) dirty_events: BTreeSet<String>,
+    pub(super) streaming: bool,
+    #[serde(skip)]
+    pub(super) pending_events: Vec<Arc<crate::session_events::Event>>,
+    pub(super) events: BTreeMap<Arc<str>, Arc<crate::session_events::Event>>,
+    #[serde(skip)]
+    pub(super) dirty_events: BTreeSet<Arc<str>>,
+    #[serde(skip)]
+    pub(super) full_event_write: bool,
     #[serde(skip)]
     pub(super) dirty_operations: BTreeSet<String>,
     #[serde(skip)]
     pub(super) operations_pending: bool,
+    #[serde(skip)]
+    pub(super) association_groups: Option<BTreeMap<String, Vec<association::Prepared>>>,
     #[serde(skip)]
     pub(super) retired_operations: BTreeSet<String>,
     #[serde(skip)]
@@ -51,7 +60,6 @@ impl Facts {
     pub(super) fn fork_derived(&self, include_facts: bool) -> Self {
         Self {
             watermarks: self.watermarks.clone(),
-            events: self.events.clone(),
             title_observations: self.title_observations.clone(),
             threads: self.threads.clone(),
             turns: self.turns.clone(),
@@ -162,12 +170,8 @@ impl Facts {
         self.strings.operation(&mut operation);
         timing::operation(self, &operation, report);
     }
-    pub(super) fn project_operation(&mut self, operation: Operation, _report: &mut SourceReport) {
-        self.observe_operation(&operation);
-        self.operations_pending = true;
-    }
-    /// Rebuild the affected source's association once; retain unchanged allocations
-    /// and emit ordinary append deltas. Retired identities require atomic replacement.
+    /// Full replay uses the same canonical component reduction as scoped archive
+    /// reads. Retired identities require atomic replacement.
     pub(super) fn resolve_operations(
         &mut self,
         report: &mut SourceReport,
@@ -178,124 +182,30 @@ impl Facts {
         if !self.operations_pending {
             return Ok(());
         }
-        let resolution = crate::operation_association::resolve(
+        let prepared = Self::prepare_associations(
             self.events.values().map(AsRef::as_ref),
+            &mut self.strings,
+            report,
             cancelled,
         )?;
-        let mut operations = BTreeMap::new();
-        let mut aliases = HashMap::new();
-        let mut operation_aliases = BTreeMap::new();
-        for group in resolution.groups {
-            crate::operation_association::check(cancelled)?;
-            let mut observed = group.operation_events.into_iter();
-            let Some(first) = observed.next() else {
-                continue;
-            };
-            let crate::session_events::Payload::Operation { value, .. } = first.payload() else {
-                unreachable!()
-            };
-            let mut operation = value.as_ref().clone();
-            operation.id.clone_from(&group.id);
-            for event in observed {
-                crate::operation_association::check(cancelled)?;
-                let crate::session_events::Payload::Operation { value, .. } = event.payload()
-                else {
-                    unreachable!()
-                };
-                let mut incoming = value.as_ref().clone();
-                operations::merge_metadata(&mut operation, &mut incoming, report);
-                for evidence in incoming.evidence {
-                    check(cancelled)?;
-                    operation.evidence.push(evidence);
-                }
-            }
-            // Identity/phase association owns these contradictions. A missing field
-            // does not contradict a recorded target; merged metadata cannot refill it.
-            if group.target_conflict {
-                operation.kind = "mcpConflict".into();
-                operation.server = None;
-                operation.tool = None;
-                issue(
-                    report,
-                    "operationIdentityConflict",
-                    "同一 MCP 调用的来源身份冲突",
-                    operation.evidence.first().cloned(),
-                );
-            }
-            if group.outcome_conflict {
-                operation.outcome_conflict = true;
-                operation.exit_code = None;
-            }
-            crate::operation_association::check(cancelled)?;
-            operation
-                .evidence
-                .sort_unstable_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
-            check(cancelled)?;
-            operation.evidence.dedup();
-            check(cancelled)?;
-            self.strings.operation(&mut operation);
-            let retained = self
-                .operations
-                .get(&group.id)
-                .filter(|old| old.as_ref() == &operation)
-                .cloned();
-            let row = if let Some(retained) = retained {
-                retained
-            } else {
-                self.dirty_operations.insert(group.id.clone());
-                Arc::new(operation)
-            };
-            operations.insert(group.id.clone(), row);
-            let mut owned_aliases = Vec::new();
-            for alias in group.aliases {
-                crate::operation_association::check(cancelled)?;
-                owned_aliases.push(alias.owned());
-                let (namespace, native) = match alias {
-                    crate::operation_association::Alias::Call(value) => ("call", value),
-                    crate::operation_association::Alias::Item(value) => ("item", value),
-                };
-                let key = stable_id(&[
-                    group.scope.source,
-                    group.scope.thread.unwrap_or(""),
-                    group.scope.turn.unwrap_or(""),
-                    namespace,
-                    native,
-                ]);
-                if self.aliases.get(&key) != Some(&group.id) {
-                    self.dirty_aliases.insert(key.clone());
-                }
-                aliases.insert(key, group.id.clone());
-            }
-            operation_aliases.insert(group.id.clone(), Arc::from(owned_aliases));
-        }
-        for id in self.operations.keys() {
-            check(cancelled)?;
-            if !operations.contains_key(id) {
-                self.retired_operations.insert(id.clone());
-            }
-        }
-        for id in std::mem::take(&mut self.dirty_operations) {
-            check(cancelled)?;
-            if operations.contains_key(&id) {
-                self.dirty_operations.insert(id);
-            }
-        }
-        check(cancelled)?;
-        self.operations = operations;
-        self.aliases = aliases;
-        self.operation_aliases = operation_aliases;
-        self.operations_pending = false;
-        Ok(())
+        self.association_groups = Some(BTreeMap::from([(String::new(), prepared)]));
+        self.publish_associations(report, cancelled)
     }
     pub(super) fn observe_operation(&mut self, operation: &Operation) {
-        if let Some(turn) = operation
-            .turn_id
-            .as_ref()
-            .and_then(|id| self.turns.get_mut(id.as_ref()))
-            && let Some(time) = &operation.timestamp
-            && turn.last_activity_at.as_ref().is_none_or(|old| old < time)
+        self.observe_operation_activity(
+            operation.turn_id.as_deref(),
+            operation.timestamp.as_deref(),
+        );
+    }
+    pub(super) fn observe_operation_activity(&mut self, turn: Option<&str>, time: Option<&str>) {
+        if let Some(turn) = turn.and_then(|id| self.turns.get_mut(id))
+            && let Some(time) = time
+            && turn
+                .last_activity_at
+                .as_deref()
+                .is_none_or(|old| old < time)
         {
-            turn.last_activity_at = Some(time.clone());
+            turn.last_activity_at = Some(time.to_owned());
         }
     }
 }

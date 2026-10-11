@@ -71,7 +71,7 @@ pub struct EventPartition {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EventIndex {
     pub version: u32,
-    pub partitions: Vec<EventPartition>,
+    pub partitions: Vec<Arc<EventPartition>>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -137,7 +137,7 @@ pub(super) fn validate(events: &[Arc<Event>]) -> Result<()> {
     }
     Ok(())
 }
-fn group(events: Vec<Arc<Event>>) -> Result<EventBuckets> {
+pub(super) fn group(events: Vec<Arc<Event>>) -> Result<EventBuckets> {
     validate(&events)?;
     let mut buckets: BTreeMap<EventTarget, Vec<Arc<Event>>> = BTreeMap::new();
     for event in events {
@@ -155,37 +155,6 @@ fn group(events: Vec<Arc<Event>>) -> Result<EventBuckets> {
         .into_iter()
         .map(|(target, events)| (target, Arc::new(events)))
         .collect())
-}
-pub(super) fn merge_memory_events(
-    events: Vec<Arc<Event>>,
-    prior: Option<&Snapshot>,
-) -> Result<(EventIndex, EventBuckets)> {
-    let (new_index, new_buckets) = build_events(events, None, None)?;
-    let Some(prior) = prior else {
-        return Ok((new_index, new_buckets));
-    };
-    let mut buckets = prior
-        .live_events
-        .as_ref()
-        .ok_or_else(|| corrupt("实时事件分区缺失"))?
-        .clone();
-    for (target, events) in new_buckets {
-        if buckets.insert(target, events).is_some() {
-            return Err(corrupt("项目批次事件归属重叠"));
-        }
-    }
-    let mut partitions = prior.manifest.events.partitions.clone();
-    partitions.extend(new_index.partitions);
-    partitions.sort_unstable_by(|a, b| a.target.cmp(&b.target));
-    for (number, partition) in partitions.iter_mut().enumerate() {
-        rename_partition(partition, number)?;
-    }
-    let index = EventIndex {
-        version: EVENT_INDEX_VERSION,
-        partitions,
-    };
-    validate_index(&index)?;
-    Ok((index, buckets))
 }
 fn rename_partition(partition: &mut EventPartition, number: usize) -> Result<()> {
     let mut renamed = false;
@@ -208,18 +177,34 @@ pub(super) fn reuse_memory_events(
 pub(super) fn save_events(directory: &Path, events: Vec<Arc<Event>>) -> Result<EventIndex> {
     Ok(build_events(events, Some(directory), None)?.0)
 }
-fn block_size<T: Serialize>(value: &T, cancelled: &AtomicBool) -> Result<u64> {
+fn encode_bounded<T: Serialize>(value: &T, cancelled: &AtomicBool) -> Result<Vec<u8>> {
     let mut writer = BudgetWriter {
         bytes: 0,
         max_bytes: MAX_EVENT_CHUNK_BYTES,
         cancelled,
-        output: None,
+        output: Some(Vec::new()),
         hash: None,
     };
-    serde_json::to_writer(&mut writer, value)
-        .map_err(|_| operation_error("RESOURCE_LIMIT", "单条事件及其块元数据超过4 MiB"))?;
-    Ok(writer.bytes)
+    // Buffer serde's small writes, retaining the same hard output limit.
+    {
+        use std::io::Write;
+        let mut buffered = std::io::BufWriter::with_capacity(8192, &mut writer);
+        serde_json::to_writer(&mut buffered, value)
+            .map_err(|_| operation_error("RESOURCE_LIMIT", "单条事件及其块元数据超过4 MiB"))?;
+        buffered
+            .flush()
+            .map_err(|_| operation_error("RESOURCE_LIMIT", "单条事件及其块元数据超过4 MiB"))?;
+    }
+    Ok(writer.output.expect("bounded encoding retains its bytes"))
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EncodedBlock<'a> {
+    version: u32,
+    target: &'a EventTarget,
+    events: &'a [Box<serde_json::value::RawValue>],
+}
+
 fn build_events(
     events: Vec<Arc<Event>>,
     directory: Option<&Path>,
@@ -241,28 +226,33 @@ fn build_events(
             let mut partition = partition.clone();
             rename_partition(&mut partition, number)?;
             *events = Arc::clone(previous);
-            partitions.push(partition);
+            partitions.push(Arc::new(partition));
             continue;
         }
-        let overhead = block_size(
+        let overhead = encode_bounded(
             &EventBlock {
                 version: EVENT_INDEX_VERSION,
                 target: target.clone(),
                 events: vec![],
             },
             &cancelled,
-        )?;
+        )?
+        .len() as u64;
         let mut chunks = Vec::new();
         let mut start = 0usize;
-        let mut pending_size = None;
+        let mut pending = None;
         while start < events.len() {
             let mut end = start;
             let mut size = overhead;
+            let mut encoded = Vec::new();
             while end < events.len() && end - start < MAX_EVENT_PAGE_ROWS {
-                let event_size = match pending_size.take() {
-                    Some(size) => size,
-                    None => block_size(&events[end], &cancelled)?,
+                let raw = match pending.take() {
+                    Some(raw) => raw,
+                    None => serde_json::value::RawValue::from_string(String::from_utf8(
+                        encode_bounded(&events[end], &cancelled)?,
+                    )?)?,
                 };
+                let event_size = raw.get().len() as u64;
                 if overhead
                     .checked_add(event_size)
                     .is_none_or(|n| n > MAX_EVENT_CHUNK_BYTES)
@@ -274,43 +264,31 @@ fn build_events(
                 }
                 let next_size = size + event_size + u64::from(end != start);
                 if next_size > MAX_EVENT_CHUNK_BYTES {
-                    pending_size = Some(event_size);
+                    pending = Some(raw);
                     break;
                 }
                 size = next_size;
+                encoded.push(raw);
                 end += 1;
             }
-            let block = EventBlock {
-                version: EVENT_INDEX_VERSION,
-                target: target.clone(),
-                events: events[start..end].to_vec(),
-            };
-            let mut writer = BudgetWriter {
-                bytes: 0,
-                max_bytes: MAX_EVENT_CHUNK_BYTES,
-                cancelled: &cancelled,
-                output: directory.map(|_| Vec::new()),
-                hash: Some(Sha256::new()),
-            };
-            {
-                use std::io::Write;
-                let mut buffered = std::io::BufWriter::with_capacity(64 * 1024, &mut writer);
-                serde_json::to_writer(&mut buffered, &block)
-                    .map_err(|_| operation_error("RESOURCE_LIMIT", "事件块超过4 MiB"))?;
-                buffered
-                    .flush()
-                    .map_err(|_| operation_error("RESOURCE_LIMIT", "事件块超过4 MiB"))?;
-            }
+            let bytes = encode_bounded(
+                &EncodedBlock {
+                    version: EVENT_INDEX_VERSION,
+                    target,
+                    events: &encoded,
+                },
+                &cancelled,
+            )?;
             let name = format!("events-{number}-{}.json", chunks.len());
-            let sha256 = format!("{:x}", writer.hash.unwrap().finalize());
-            if let (Some(directory), Some(bytes)) = (directory, writer.output) {
+            let sha256 = crate::hash(&bytes);
+            if let Some(directory) = directory {
                 crate::storage::write_unpublished(&directory.join(&name), &bytes)?;
             }
             chunks.push(EventChunk {
                 offset: start,
                 file: FileRef { file: name, sha256 },
                 count: end - start,
-                bytes: writer.bytes,
+                bytes: bytes.len() as u64,
                 first: events[start].position().clone(),
                 last: events[end - 1].position().clone(),
             });
@@ -324,7 +302,7 @@ fn build_events(
             native_boundary: super::native_boundary::build(target, events)?,
         };
         partition.sha256 = partition_hash(&partition)?;
-        partitions.push(partition);
+        partitions.push(Arc::new(partition));
     }
     let index = EventIndex {
         version: EVENT_INDEX_VERSION,
@@ -343,7 +321,7 @@ impl std::io::Write for HashWriter {
         Ok(())
     }
 }
-fn partition_hash(partition: &EventPartition) -> Result<String> {
+pub(super) fn partition_hash(partition: &EventPartition) -> Result<String> {
     let mut writer = HashWriter(Sha256::new());
     serde_json::to_writer(
         &mut writer,
@@ -549,7 +527,7 @@ impl Snapshot {
             .partitions
             .binary_search_by(|p| p.target.cmp(target))
             .ok()
-            .map(|i| &self.manifest.events.partitions[i]))
+            .map(|i| self.manifest.events.partitions[i].as_ref()))
     }
     /// Returns the entire exact attribution bucket or an error, never a truncated success.
     /// Metadata checks reject oversized targets before opening an event block.
@@ -712,32 +690,47 @@ impl Snapshot {
                 .checked_add(chunk.count)
                 .ok_or_else(|| corrupt("事件数量溢出"))?;
             if start < offset + length && end > offset {
-                // Check the actual filesystem length before allocation, not just manifest claims.
-                let path = safe_file(&self.directory, &chunk.file.file)?;
-                let file =
-                    fs::File::open(path).map_err(|e| corrupt(format!("事件块无法读取：{e}")))?;
-                let size = file.metadata()?.len();
-                if size != chunk.bytes {
-                    return Err(corrupt("事件分片校验失败：长度不匹配"));
-                }
-                read_bytes = read_bytes.checked_add(size).ok_or_else(resource_limit)?;
-                if size > MAX_EVENT_CHUNK_BYTES || read_bytes > max_bytes {
-                    return Err(resource_limit());
-                }
-                let mut bytes = Vec::with_capacity(size as usize);
-                file.take(size + 1).read_to_end(&mut bytes)?;
-                if bytes.len() as u64 != size || crate::hash(&bytes) != chunk.file.sha256 {
-                    return Err(corrupt("事件分片校验失败"));
-                }
-                check_cancel(cancelled)?;
-                check_block_versions(&bytes)?;
-                let block: EventBlock = serde_json::from_slice(&bytes).map_err(|e| {
-                    if e.to_string().contains("unsupported event version") {
-                        operation_error("UNSUPPORTED_VERSION", "不支持此事件版本")
-                    } else {
-                        corrupt(format!("事件块无效：{e}"))
+                let block = if let Some(cold) = &self.cold_events {
+                    read_bytes = read_bytes
+                        .checked_add(chunk.bytes)
+                        .ok_or_else(resource_limit)?;
+                    if read_bytes > max_bytes {
+                        return Err(resource_limit());
                     }
-                })?;
+                    EventBlock {
+                        version: EVENT_INDEX_VERSION,
+                        target: partition.target.clone(),
+                        events: cold.read(chunk)?,
+                    }
+                } else {
+                    // Check the actual filesystem length before allocation, not just manifest claims.
+                    let path = safe_file(&self.directory, &chunk.file.file)?;
+                    let file = fs::File::open(path)
+                        .map_err(|e| corrupt(format!("事件块无法读取：{e}")))?;
+                    let size = file.metadata()?.len();
+                    if size != chunk.bytes {
+                        return Err(corrupt("事件分片校验失败：长度不匹配"));
+                    }
+                    read_bytes = read_bytes.checked_add(size).ok_or_else(resource_limit)?;
+                    if size > MAX_EVENT_CHUNK_BYTES || read_bytes > max_bytes {
+                        return Err(resource_limit());
+                    }
+                    let mut bytes = Vec::with_capacity(size as usize);
+                    file.take(size + 1).read_to_end(&mut bytes)?;
+                    if bytes.len() as u64 != size || crate::hash(&bytes) != chunk.file.sha256 {
+                        return Err(corrupt("事件分片校验失败"));
+                    }
+                    check_cancel(cancelled)?;
+                    check_block_versions(&bytes)?;
+                    let block: EventBlock = serde_json::from_slice(&bytes).map_err(|e| {
+                        if e.to_string().contains("unsupported event version") {
+                            operation_error("UNSUPPORTED_VERSION", "不支持此事件版本")
+                        } else {
+                            corrupt(format!("事件块无效：{e}"))
+                        }
+                    })?;
+                    block
+                };
                 if block.version != EVENT_INDEX_VERSION {
                     return Err(operation_error("UNSUPPORTED_VERSION", "不支持此事件块版本"));
                 }
@@ -794,5 +787,57 @@ impl Snapshot {
         }
         validate(&events).map_err(|_| corrupt("事件身份重复"))?;
         Ok(events)
+    }
+}
+
+#[cfg(test)]
+mod encoding_tests {
+    use super::*;
+
+    #[test]
+    fn preencoded_chunks_keep_exact_wire_bytes_and_digest() {
+        let events = (0..201)
+            .map(|offset| {
+                Arc::new(
+                    Event::new_at(
+                        Position {
+                            source_instance_id: "源".into(),
+                            file_id: "file".into(),
+                            generation: "g".into(),
+                            byte_offset: offset,
+                            ordinal: 0,
+                        },
+                        Some("会话\"\\".into()),
+                        None,
+                        crate::session_events::Time::from_source(None).0,
+                        vec![],
+                        crate::session_events::Payload::ContextWindow {
+                            model: Some("模型😀\n".into()),
+                            tokens: u64::MAX,
+                        },
+                        "2026-10-11T00:00:00Z".into(),
+                    )
+                    .unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let directory = tempfile::tempdir().unwrap();
+        let index = save_events(directory.path(), events.clone()).unwrap();
+        let partition = &index.partitions[0];
+        assert_eq!(partition.chunks.len(), 2);
+        for chunk in &partition.chunks {
+            let expected = serde_json::to_vec(&EventBlock {
+                version: EVENT_INDEX_VERSION,
+                target: partition.target.clone(),
+                events: events[chunk.offset..chunk.offset + chunk.count].to_vec(),
+            })
+            .unwrap();
+            assert_eq!(chunk.bytes, expected.len() as u64);
+            assert_eq!(chunk.file.sha256, crate::hash(&expected));
+            assert_eq!(
+                fs::read(directory.path().join(&chunk.file.file)).unwrap(),
+                expected
+            );
+        }
     }
 }

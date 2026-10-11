@@ -116,7 +116,7 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
         .remove(0);
     let db = crate::live_index::open(&index.path().join("index.sqlite")).unwrap();
     let mut cache = incremental::Cache::default();
-    let first = incremental::sync_cached(&db, &source, false, &mut cache)
+    let first = cached_events(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
     assert_eq!(first.collected.events.len(), 5);
@@ -126,7 +126,7 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
         event("task_complete", "a")
     )
     .unwrap();
-    let next = incremental::sync_cached(&db, &source, false, &mut cache)
+    let next = cached_events(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
     let delta: Vec<_> = next
@@ -154,11 +154,11 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
         );
     }
     assert!(
-        incremental::sync_cached(&db, &source, false, &mut cache)
+        cached_events(&db, &source, false, &mut cache)
             .unwrap()
             .is_none()
     );
-    let verified = incremental::sync_cached(&db, &source, true, &mut cache)
+    let verified = cached_events(&db, &source, true, &mut cache)
         .unwrap()
         .unwrap();
     assert_eq!(verified.collected.events, next.collected.events);
@@ -168,23 +168,22 @@ fn event_projection_delta_keeps_occurrences_and_replaces_membership_only_on_repl
         event("task_started", "b")
     )
     .unwrap();
-    let restarted =
-        incremental::sync_cached(&db, &source, false, &mut incremental::Cache::default())
-            .unwrap()
-            .unwrap();
+    let restarted = cached_events(&db, &source, false, &mut incremental::Cache::default())
+        .unwrap()
+        .unwrap();
     // Source disappearance keeps observations; it is an empty delta, not a deletion.
     // Restart has refreshed parser state, so use another fresh cache to establish it.
     let mut cache = incremental::Cache::default();
-    incremental::sync_cached(&db, &source, true, &mut cache)
+    cached_events(&db, &source, true, &mut cache)
         .unwrap()
         .unwrap();
     fs::remove_file(&path).unwrap();
-    let missing = incremental::sync_cached(&db, &source, false, &mut cache)
+    let missing = cached_events(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
     assert_eq!(missing.collected.events, restarted.collected.events);
     write(root.path(), "sessions/events.jsonl", &initial);
-    let replacement = incremental::sync_cached(&db, &source, false, &mut cache)
+    let replacement = cached_events(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
     assert_eq!(replacement.collected.events.len(), 5);
@@ -340,4 +339,15 @@ fn partial_tail_and_rollback_never_publish_half_an_event_generation() {
     tx.commit().unwrap();
     let tx = db.transaction().unwrap();
     assert!(incremental::sync(&tx, &source, false).unwrap().is_none());
+}
+
+fn cached_events(
+    db: &rusqlite::Connection,
+    source: &SourceInstance,
+    verify: bool,
+    cache: &mut incremental::Cache,
+) -> anyhow::Result<Option<incremental::Synced>> {
+    incremental::sync_cached(db, source, verify, cache)?
+        .map(|v| incremental::expand_test_events(db, source, v))
+        .transpose()
 }

@@ -10,13 +10,24 @@ pub(super) fn source_key(roots: &[String]) -> String {
     ids.sort();
     crate::hash(ids.join(":"))
 }
+#[cfg(test)]
 pub(super) fn load_collected(db: &rusqlite::Connection, key: &str) -> Result<Option<Collected>> {
-    load_collected_inner(db, key, false)
+    load_collected_inner(db, key, false, false)
 }
 fn load_collected_inner(
     db: &rusqlite::Connection,
     key: &str,
     skip_events: bool,
+    skip_operations: bool,
+) -> Result<Option<Collected>> {
+    load_collected_except(db, key, skip_events, skip_operations, false)
+}
+fn load_collected_except(
+    db: &rusqlite::Connection,
+    key: &str,
+    skip_events: bool,
+    skip_operations: bool,
+    skip_measurements: bool,
 ) -> Result<Option<Collected>> {
     validate_message_mapping(db, key)?;
     let mut value = Collected::default();
@@ -55,6 +66,7 @@ fn load_collected_inner(
             "turns" => {
                 rows!(turns);
             }
+            "measurements" if skip_measurements => {}
             "measurements" => {
                 rows!(measurements);
                 if let Some(row) = value.measurements.last_mut() {
@@ -63,6 +75,7 @@ fn load_collected_inner(
                     strings.measurement(row);
                 }
             }
+            "operations" if skip_operations => {}
             "operations" => {
                 rows!(operations);
                 if let Some(row) = value.operations.last_mut() {
@@ -83,9 +96,6 @@ fn load_collected_inner(
                     "projection title scope mismatch"
                 );
             }
-            "events" => {
-                rows!(events);
-            }
             "issues" => {
                 value.issues = serde_json::from_str(payload)?;
             }
@@ -94,11 +104,25 @@ fn load_collected_inner(
         Ok(())
     };
     let scope = format!("projection:{key}");
-    let found = if skip_events {
-        crate::live_index::each_without_events(db, &scope, consume)?
+    let mut found = if skip_measurements {
+        crate::live_index::each_metadata(db, &scope, consume)?
+    } else if skip_operations {
+        crate::live_index::each_without_details(db, &scope, consume)?
     } else {
-        crate::live_index::each(db, &scope, consume)?
+        crate::live_index::each_without_events(db, &scope, consume)?
     };
+    if !skip_events {
+        let mut strings = crate::session_events::EventStrings::default();
+        found |= crate::live_index::each_event(db, &scope, |mut event| {
+            anyhow::ensure!(
+                event.position().source_instance_id.as_ref() == key,
+                "projection event source identity mismatch"
+            );
+            strings.share(Arc::make_mut(&mut event));
+            value.events.push(event);
+            Ok(())
+        })?;
+    }
     if found {
         if watermark_version != Some(WATERMARK_FORMAT_VERSION) {
             return Err(operation_error(
@@ -157,6 +181,7 @@ pub(super) fn sync(
         ));
     }
     let mut tx = db.transaction()?;
+    crate::live_index::begin_event_changes(&tx)?;
     let mut failures = BTreeMap::<String, SourceReport>::new();
     let mut failure_watermarks = BTreeMap::<String, Vec<SourceWatermark>>::new();
     let mut changed = false;
@@ -170,11 +195,25 @@ pub(super) fn sync(
         if cache.needs_seed()
             && let Some(prior) = prior_view
         {
+            let source_threads: std::collections::HashSet<_> = prior
+                .manifest
+                .threads
+                .iter()
+                .filter(|t| t.thread.source_instance_id == source.id)
+                .map(|t| t.thread.id.as_str())
+                .collect();
             cache.seed(
-                prior.measurement_facts().cloned().collect(),
-                prior.operation_facts().cloned().collect(),
+                prior
+                    .measurement_facts()
+                    .filter(|r| r.source_instance_id.as_ref() == source.id)
+                    .cloned()
+                    .collect(),
+                prior
+                    .resident_operation_facts()
+                    .filter(|r| source_threads.contains(r.thread_id.as_ref()))
+                    .cloned()
+                    .collect(),
             );
-            cache.seed_events(prior.events()?);
         }
 
         let mut source_tx = tx.savepoint()?;
@@ -229,7 +268,7 @@ pub(super) fn sync(
                 // Source savepoint was rolled back: only previous committed file
                 // positions may be retained. This attempt has no captured length.
                 let at = chrono::Utc::now().to_rfc3339();
-                let watermarks = load_collected(&tx, &source.id)?
+                let watermarks = load_collected_inner(&tx, &source.id, true, false)?
                     .map(|v| v.watermarks)
                     .or_else(|| {
                         prior_view.map(|v| {
@@ -379,6 +418,7 @@ pub(super) fn sync(
     }
     let prices = crate::pricing_sync::current()?;
     let prior = crate::live_index::load_map(&tx, &format!("view:{key}"))?;
+    let reprice = prior.get("prices").and_then(Value::as_str) != Some(&prices.catalog_hash);
     changed |= prior.get("failures").unwrap_or(&json!({})) != &serde_json::to_value(&failures)?;
     changed |= prior.get("epochs") != Some(&serde_json::to_value(&epochs)?);
     changed |= prior.get("prices").and_then(Value::as_str) != Some(&prices.catalog_hash);
@@ -386,14 +426,19 @@ pub(super) fn sync(
         tx.commit()?;
         return Ok(None);
     }
+    for source in &discovered.sources {
+        crate::usage_store::update_ledger_projection(&tx, &source.id, &prices, reprice)?;
+    }
+    tx.execute("DELETE FROM changed_fact_blocks", [])?;
     let mut collected = Collected {
         issues: discovered.issues,
         ..Collected::default()
     };
+    let changed_sources: std::collections::BTreeSet<_> = updated.keys().cloned().collect();
     for source in &discovered.sources {
         let mut value = match updated.remove(&source.id) {
             Some(value) => value,
-            None => load_collected(&tx, &source.id)?.unwrap_or_default(),
+            None => load_collected_inner(&tx, &source.id, true, false)?.unwrap_or_default(),
         };
         if let Some(failure) = failures.get(&source.id) {
             value.sources = vec![failure.clone()];
@@ -426,19 +471,58 @@ pub(super) fn sync(
             "没有可读取的来源，保留已提交数据",
         ));
     }
+    collected.events.clear();
     let id = format!("live:{key}:{}", uuid::Uuid::new_v4());
-    let mut snapshot =
-        crate::usage_store::memory(collected, id.clone(), prices.clone(), prior_view)?;
+    let previous_events = match prior_view {
+        Some(view) => Some(view.manifest.events.clone()),
+        None => crate::usage_store::load_cold_event_index(&tx, key)?,
+    };
+    let events = if changed_sources.is_empty() {
+        previous_events
+            .clone()
+            .ok_or_else(|| operation_error("INDEX_UNAVAILABLE", "已提交冷证据索引缺失"))?
+    } else {
+        crate::usage_store::cold_event_index_from_sources(
+            &tx,
+            &collected.sources,
+            previous_events.as_ref(),
+        )?
+    };
+    if !changed_sources.is_empty() {
+        crate::usage_store::save_cold_event_index(&tx, key, &events, previous_events.as_ref())?;
+    }
+    // Committed views own metadata and locators, not a second priced ledger.
+    // Parser candidates remain source state; share exact canonical Arcs before
+    // dropping the collection wrapper rather than repricing the whole history.
+    collected
+        .measurements
+        .sort_unstable_by(|a, b| a.id.cmp(&b.id));
+    for source in &discovered.sources {
+        if let Some(cache) = caches.get_mut(&source.id) {
+            cache.share_measurements(collected.measurements.iter());
+        }
+    }
+    let mut operations =
+        crate::usage_store::load_cold_operations(&tx, &collected.sources, &collected.threads)?;
+    operations.include_measurement_turns(&collected.measurements);
+    let summary = crate::usage_store::ledger_projection::summary(&tx, &collected.sources)?;
+    collected.measurements.clear();
+    collected.operations.clear();
+    let mut snapshot = crate::usage_store::memory_cold_operations(
+        collected,
+        id.clone(),
+        prices.clone(),
+        events,
+        operations,
+    )?;
     if let Some(prior) =
         prior_view.filter(|prior| !super::preview::is_initial(prior) && !restoring_projects(prior))
     {
-        snapshot.publication_change = Some(crate::usage_app::publication_change(prior, &snapshot)?);
-    }
-    let snapshot = Arc::new(snapshot);
-    for source in &discovered.sources {
-        if let Some(cache) = caches.get_mut(&source.id) {
-            cache.share_measurements(snapshot.measurement_facts());
-        }
+        snapshot.publication_change = Some(crate::usage_app::publication_change(
+            prior,
+            &snapshot,
+            Some((&tx, &summary)),
+        )?);
     }
     crate::live_index::save_map(
         &tx,
@@ -448,7 +532,8 @@ pub(super) fn sync(
             .unwrap(),
     )?;
     tx.commit()?;
-    Ok(Some(snapshot))
+    snapshot.capture_cold_events(db, key, prices)?;
+    Ok(Some(Arc::new(snapshot)))
 }
 #[cfg(test)]
 pub(super) fn restore(

@@ -91,44 +91,71 @@ fn matches_using_date(
     date: impl FnOnce() -> Option<NaiveDate>,
 ) -> bool {
     let r = &row.fact;
+    matches_fields(
+        Fields {
+            agent: &r.agent_kind,
+            source: &r.source_instance_id,
+            thread: r.thread_id.as_deref(),
+            turn: r.turn_id.as_deref(),
+            model: r.model.raw.as_deref(),
+            effort: r.reasoning_effort.as_deref(),
+        },
+        scope,
+        projects,
+        date,
+    )
+}
+pub(crate) struct Fields<'a> {
+    pub agent: &'a str,
+    pub source: &'a str,
+    pub thread: Option<&'a str>,
+    pub turn: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub effort: Option<&'a str>,
+}
+pub(crate) fn matches_fields(
+    r: Fields<'_>,
+    scope: &Scope,
+    projects: &BTreeMap<&str, Option<&str>>,
+    date: impl FnOnce() -> Option<NaiveDate>,
+) -> bool {
     if scope
         .turn_id
         .as_ref()
-        .is_some_and(|id| r.turn_id.as_deref() != Some(id.as_str()))
+        .is_some_and(|id| r.turn != Some(id.as_str()))
     {
         return false;
     }
     if scope
         .agent_kind
         .as_ref()
-        .is_some_and(|v| v.as_str() != r.agent_kind.as_ref())
+        .is_some_and(|v| v.as_str() != r.agent)
         || scope
             .source_instance_id
             .as_ref()
-            .is_some_and(|v| v.as_str() != r.source_instance_id.as_ref())
+            .is_some_and(|v| v.as_str() != r.source)
         || scope
             .thread_id
             .as_ref()
-            .is_some_and(|v| r.thread_id.as_deref() != Some(v.as_str()))
+            .is_some_and(|v| r.thread != Some(v.as_str()))
         || scope
             .model
             .as_ref()
-            .is_some_and(|v| r.model.raw.as_deref() != Some(v.as_str()))
+            .is_some_and(|v| r.model != Some(v.as_str()))
         || scope
             .reasoning_effort
             .as_ref()
-            .is_some_and(|v| r.reasoning_effort.as_deref() != Some(v.as_str()))
+            .is_some_and(|v| r.effort != Some(v.as_str()))
     {
         return false;
     }
-    if scope.model_unknown == Some(true) && r.model.raw.is_some()
-        || scope.effort_unknown == Some(true) && r.reasoning_effort.is_some()
+    if scope.model_unknown == Some(true) && r.model.is_some()
+        || scope.effort_unknown == Some(true) && r.effort.is_some()
     {
         return false;
     }
     if scope.project_unknown == Some(true)
-        && r.thread_id
-            .as_deref()
+        && r.thread
             .and_then(|id| projects.get(id))
             .copied()
             .flatten()
@@ -137,12 +164,7 @@ fn matches_using_date(
         return false;
     }
     if scope.project.as_ref().is_some_and(|v| {
-        r.thread_id
-            .as_deref()
-            .and_then(|id| projects.get(id))
-            .copied()
-            .flatten()
-            != Some(v.as_str())
+        r.thread.and_then(|id| projects.get(id)).copied().flatten() != Some(v.as_str())
     }) {
         return false;
     }
@@ -194,7 +216,7 @@ fn available_dates(dates: impl Iterator<Item = NaiveDate>) -> AvailableRange {
     }
 }
 
-pub(super) fn quality(snapshot: &Snapshot, count: usize) -> Quality {
+pub(super) fn quality_status(snapshot: &Snapshot, count: usize) -> Quality {
     let sources = &snapshot.manifest.sources;
     let partial = !snapshot.manifest.issues.is_empty()
         || sources
@@ -209,10 +231,16 @@ pub(super) fn quality(snapshot: &Snapshot, count: usize) -> Quality {
             "complete"
         }
         .into(),
-        issues: snapshot.manifest.issues.clone(),
-        sources: sources.clone(),
+        issues: vec![],
+        sources: vec![],
         detail_summary: None,
     }
+}
+pub(super) fn quality(snapshot: &Snapshot, count: usize) -> Quality {
+    let mut result = quality_status(snapshot, count);
+    result.issues = snapshot.manifest.issues.clone();
+    result.sources = snapshot.manifest.sources.clone();
+    result
 }
 pub(crate) fn validate(request: &Request) -> Result<()> {
     timezone(&request.scope)?;

@@ -263,3 +263,106 @@ fn independent_collection_time_is_required_and_does_not_change_identity_or_sourc
     stored["version"] = serde_json::json!(1);
     assert!(serde_json::from_value::<Event>(stored).is_err());
 }
+
+#[test]
+fn adjacent_sharing_survives_pool_exhaustion_without_changing_wire_values() {
+    let mut pool = EventStrings::default();
+    let mut prior = event();
+    for n in 0..5000 {
+        let mut current = event();
+        current.0.thread_id = Some(format!("thread-{n}").into());
+        current.0.turn_id = Some(format!("turn-{n}").into());
+        pool.share(&mut current);
+        prior = current;
+    }
+    // Deserialize to ensure the incoming allocations are independent.
+    let expected = serde_json::to_vec(&prior).unwrap();
+    let mut next: Event = serde_json::from_slice(&expected).unwrap();
+    pool.share(&mut next);
+    assert_eq!(serde_json::to_vec(&next).unwrap(), expected);
+    for (a, b) in [
+        (
+            prior.0.thread_id.as_ref().unwrap(),
+            next.0.thread_id.as_ref().unwrap(),
+        ),
+        (
+            prior.0.turn_id.as_ref().unwrap(),
+            next.0.turn_id.as_ref().unwrap(),
+        ),
+        (&prior.0.collected_at, &next.0.collected_at),
+        (
+            prior.0.time.timestamp.as_ref().unwrap(),
+            next.0.time.timestamp.as_ref().unwrap(),
+        ),
+    ] {
+        assert!(Arc::ptr_eq(a, b));
+    }
+    assert!(Arc::ptr_eq(&next.shared_id(), &next.0.id));
+    let mut oversized: Arc<str> = "大".repeat(1024).into();
+    pool.collected.share(&mut oversized);
+    assert!(pool.collected.0.as_ref().unwrap().len() <= 1024);
+    assert_eq!(oversized.as_ref(), "大".repeat(1024));
+}
+
+#[test]
+fn scope_payload_sharing_preserves_canonical_wire_format_and_revisions() {
+    let owned = Thread {
+        id: "thread".to_owned(),
+        agent_kind: "codex".into(),
+        source_instance_id: "source".into(),
+        upstream_id: "native".into(),
+        title: Some("标题😀".into()),
+        project: Some("/synthetic/project".into()),
+        started_at: Some("2026-10-11T00:00:00.000000000Z".into()),
+        last_activity_at: Some("2026-10-11T00:00:00.000000000Z".into()),
+    };
+    let expected = serde_json::to_vec(&owned).unwrap();
+    let shared = owned.into_shared();
+    assert_eq!(serde_json::to_vec(&shared).unwrap(), expected);
+    let mut event = Event::new_at(
+        position(),
+        Some("thread".into()),
+        None,
+        Time::from_source(Some("2026-10-11T00:00:00Z")).0,
+        vec![],
+        Payload::Thread {
+            value: Box::new(shared),
+            project_path: Some("/synthetic/project".into()),
+            evidence: EvidenceRef {
+                file: "synthetic/file".into(),
+                line: 1,
+            },
+        },
+        "2026-10-11T00:00:01Z".into(),
+    )
+    .unwrap();
+    let expected = serde_json::to_vec(&event).unwrap();
+    let mut pool = EventStrings::default();
+    pool.share(&mut event);
+    let prior = event.clone();
+    let mut later: Event = serde_json::from_slice(&expected).unwrap();
+    pool.share(&mut later);
+    if let (Payload::Thread { value: a, .. }, Payload::Thread { value: b, .. }) =
+        (&event.0.payload, &mut later.0.payload)
+    {
+        assert!(Arc::ptr_eq(&a.id, &b.id));
+        assert!(Arc::ptr_eq(
+            a.project.as_ref().unwrap(),
+            b.project.as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            a.started_at.as_ref().unwrap(),
+            event.0.time.timestamp.as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            a.started_at.as_ref().unwrap(),
+            a.last_activity_at.as_ref().unwrap()
+        ));
+        b.title = Some("changed".into());
+    } else {
+        panic!("expected thread payload");
+    }
+    assert_eq!(serde_json::to_vec(&event).unwrap(), expected);
+    assert_eq!(serde_json::to_vec(&prior).unwrap(), expected);
+    assert_ne!(serde_json::to_vec(&later).unwrap(), expected);
+}

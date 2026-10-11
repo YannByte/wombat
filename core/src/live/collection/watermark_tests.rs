@@ -123,7 +123,8 @@ fn failed_source_retains_command_metadata_in_new_view_and_restored_projection() 
     let initial = sync(&mut db, &key, &roots, false, None, &mut caches)
         .unwrap()
         .unwrap();
-    let before = initial.operation_facts().next().unwrap();
+    let before_operations = initial.operation_facts().unwrap();
+    let before = &before_operations[0];
     assert_eq!(before.status.as_ref(), "failed");
     assert!(
         matches!(&before.work.as_ref().unwrap().data,adapters::contract::WorkData::Command{parsed_commands:Some(paths),..} if paths.len()==2)
@@ -140,8 +141,18 @@ fn failed_source_retains_command_metadata_in_new_view_and_restored_projection() 
         .unwrap()
         .unwrap();
     let restored = restore(&db, &key, &roots).unwrap().unwrap();
-    assert_eq!(next.operation_facts().collect::<Vec<_>>(), vec![before]);
-    assert_eq!(restored.operation_facts().collect::<Vec<_>>(), vec![before]);
+    assert_eq!(
+        next.operation_facts().unwrap().iter().collect::<Vec<_>>(),
+        vec![before]
+    );
+    assert_eq!(
+        restored
+            .operation_facts()
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>(),
+        vec![before]
+    );
     let saved: String = db
         .query_row("SELECT group_concat(json(payload)) FROM entries", [], |r| {
             r.get(0)
@@ -249,13 +260,24 @@ fn mixed_failure_observations_belong_to_new_view_and_survive_restore() {
         next.manifest.snapshot_ref.snapshot_id
     );
     let restored = restore(&db, &key, &roots).unwrap().unwrap();
-    let before = initial.operation_facts().next().unwrap();
+    let before_operations = initial.operation_facts().unwrap();
+    let before = &before_operations[0];
     assert_eq!(before.status.as_ref(), "failed");
     assert!(
         matches!(&before.work.as_ref().unwrap().data, adapters::contract::WorkData::FileChange { changes: Some(paths) } if paths.len() == 2)
     );
-    assert_eq!(next.operation_facts().collect::<Vec<_>>(), vec![before]);
-    assert_eq!(restored.operation_facts().collect::<Vec<_>>(), vec![before]);
+    assert_eq!(
+        next.operation_facts().unwrap().iter().collect::<Vec<_>>(),
+        vec![before]
+    );
+    assert_eq!(
+        restored
+            .operation_facts()
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>(),
+        vec![before]
+    );
     assert_eq!(restored.manifest.watermarks, next.manifest.watermarks);
     assert_eq!(
         serde_json::to_value(&restored.manifest.snapshot_ref).unwrap(),

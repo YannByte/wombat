@@ -8,34 +8,71 @@ pub(super) fn apply(result: &mut Response) {
     if quality.detail_summary.is_some() {
         return;
     }
-    let mut issue_counts = BTreeMap::new();
-    for issue in &quality.issues {
-        *issue_counts.entry(issue.code.clone()).or_default() += 1;
-    }
-    let mut source_status_counts = BTreeMap::new();
-    for source in &quality.sources {
-        *source_status_counts
-            .entry(source.status.clone())
-            .or_default() += 1;
-    }
-    let source_issue_count: usize = quality.sources.iter().map(|s| s.issues.len()).sum();
-    let mut summary = QualityDetailSummary {
-        issue_count: quality.issues.len(),
-        source_count: quality.sources.len(),
-        issue_counts,
-        source_status_counts,
-        omitted_issues: quality.issues.len().saturating_sub(EXAMPLES),
-        omitted_sources: quality.sources.len().saturating_sub(EXAMPLES),
-        omitted_source_issues: 0,
-    };
+    let summary = summarize(&quality.issues, &quality.sources);
     quality.issues.truncate(EXAMPLES);
     quality.sources.truncate(EXAMPLES);
     for source in &mut quality.sources {
         source.issues.truncate(EXAMPLES);
     }
-    let retained_source_issues: usize = quality.sources.iter().map(|s| s.issues.len()).sum();
-    summary.omitted_source_issues = source_issue_count - retained_source_issues;
     quality.detail_summary = Some(summary);
+}
+
+pub(super) fn quality(snapshot: &Snapshot, count: usize) -> Quality {
+    let mut value = scope::quality_status(snapshot, count);
+    value.detail_summary = Some(summarize(
+        &snapshot.manifest.issues,
+        &snapshot.manifest.sources,
+    ));
+    value.issues = snapshot
+        .manifest
+        .issues
+        .iter()
+        .take(EXAMPLES)
+        .cloned()
+        .collect();
+    value.sources = snapshot
+        .manifest
+        .sources
+        .iter()
+        .take(EXAMPLES)
+        .map(|source| SourceReport {
+            source: source.source.clone(),
+            adapter_version: source.adapter_version.clone(),
+            source_versions: source.source_versions.clone(),
+            capabilities: source.capabilities.clone(),
+            status: source.status.clone(),
+            files_read: source.files_read,
+            bytes_read: source.bytes_read,
+            issues: source.issues.iter().take(EXAMPLES).cloned().collect(),
+        })
+        .collect();
+    value
+}
+fn summarize(issues: &[Issue], sources: &[SourceReport]) -> QualityDetailSummary {
+    let mut issue_counts = BTreeMap::new();
+    for issue in issues {
+        *issue_counts.entry(issue.code.clone()).or_default() += 1;
+    }
+    let mut source_status_counts = BTreeMap::new();
+    for source in sources {
+        *source_status_counts
+            .entry(source.status.clone())
+            .or_default() += 1;
+    }
+    let retained: usize = sources
+        .iter()
+        .take(EXAMPLES)
+        .map(|s| s.issues.len().min(EXAMPLES))
+        .sum();
+    QualityDetailSummary {
+        issue_count: issues.len(),
+        source_count: sources.len(),
+        issue_counts,
+        source_status_counts,
+        omitted_issues: issues.len().saturating_sub(EXAMPLES),
+        omitted_sources: sources.len().saturating_sub(EXAMPLES),
+        omitted_source_issues: sources.iter().map(|s| s.issues.len()).sum::<usize>() - retained,
+    }
 }
 
 #[cfg(test)]

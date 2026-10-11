@@ -7,7 +7,7 @@
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
     "pnpm-lock.yaml": "7128a48df418f8e0b6ae85dace5a53b14dad5ee20e5a6e699ceda4f9351fda8d",
-    "core/Cargo.lock": "22ab4b07a784f99fa61a1c3addb9c4bdd41b17f5a473a5860830c0559034079e"
+    "core/Cargo.lock": "89e58afd6dda5bf43cd0badbe491df73bbf1f063e0c7dfc7fcd571f9c281b57a"
   },
   "node": [
     {
@@ -1790,7 +1790,7 @@
       "license": "MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE.txt",
@@ -2262,7 +2262,7 @@
       "license": "MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE.txt",
@@ -2870,7 +2870,7 @@
       "license": "MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE.txt",
@@ -3426,7 +3426,7 @@
       "license": "MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE.txt",
@@ -3938,7 +3938,7 @@
       "license": "MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE.txt",
@@ -4053,14 +4053,6 @@
       "noticeVerified": true
     },
     {
-      "name": "bitvec",
-      "version": "1.1.1",
-      "declaredLicense": "MIT",
-      "repository": "https://github.com/bitvecto-rs/bitvec",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
       "name": "borsh",
       "version": "1.8.1",
       "declaredLicense": "MIT OR Apache-2.0",
@@ -4097,14 +4089,6 @@
       "version": "0.2.2",
       "declaredLicense": "MIT",
       "repository": "https://github.com/katharostech/cfg_aliases",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
-      "name": "funty",
-      "version": "2.0.0",
-      "declaredLicense": "MIT",
-      "repository": "https://github.com/myrrlyn/funty",
       "status": "locked_optional_not_enabled",
       "noticeVerified": true
     },
@@ -4153,14 +4137,6 @@
       "version": "0.1.4",
       "declaredLicense": "MIT",
       "repository": "https://github.com/djkoloski/ptr_meta",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
-      "name": "radium",
-      "version": "0.7.0",
-      "declaredLicense": "MIT",
-      "repository": "https://github.com/bitvecto-rs/radium",
       "status": "locked_optional_not_enabled",
       "noticeVerified": true
     },
@@ -4225,22 +4201,6 @@
       "version": "1.0.109",
       "declaredLicense": "MIT OR Apache-2.0",
       "repository": "https://github.com/dtolnay/syn",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
-      "name": "tap",
-      "version": "1.0.1",
-      "declaredLicense": "MIT",
-      "repository": "https://github.com/myrrlyn/tap",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
-      "name": "wyz",
-      "version": "0.5.1",
-      "declaredLicense": "MIT",
-      "repository": "https://github.com/myrrlyn/wyz",
       "status": "locked_optional_not_enabled",
       "noticeVerified": true
     },

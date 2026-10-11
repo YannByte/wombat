@@ -27,23 +27,82 @@ fn load(db: &Connection, block: i64) -> Result<Rows> {
         row.get(3)?,
     )
 }
-fn store(db: &Connection, bucket: i64, block: Option<i64>, rows: &Rows) -> Result<i64> {
-    let (data, size, digest) = codec::encode(rows)?;
+fn store(
+    db: &Connection,
+    bucket: i64,
+    block: Option<i64>,
+    rows: &Rows,
+    encoder: &mut codec::Encoder,
+) -> Result<i64> {
+    let (data, size, digest) = encoder.encode(rows)?;
     if let Some(block) = block {
-        db.prepare_cached(
-            "UPDATE fact_blocks SET data=?1,bytes=?2,digest=?3 WHERE id=?4 AND digest!=?3",
-        )?
-        .execute(params![data, size as i64, digest, block])?;
+        let changed = db
+            .prepare_cached(
+                "UPDATE fact_blocks SET data=?1,bytes=?2,digest=?3 WHERE id=?4 AND digest!=?3",
+            )?
+            .execute(params![data, size as i64, digest, block])?;
+        if changed > 0 {
+            changed_block(db, bucket, block)?;
+        }
         Ok(block)
     } else {
         db.prepare_cached(
             "INSERT INTO fact_blocks(bucket,codec,bytes,digest,data) VALUES(?1,?2,?3,?4,?5)",
         )?
         .execute(params![bucket, codec::VERSION, size as i64, digest, data])?;
-        Ok(db.last_insert_rowid())
+        let block = db.last_insert_rowid();
+        changed_block(db, bucket, block)?;
+        Ok(block)
     }
 }
-fn publish(db: &Connection, bucket: i64, block: Option<i64>, rows: &Rows) -> Result<()> {
+fn changed_block(db: &Connection, bucket: i64, block: i64) -> Result<()> {
+    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS changed_fact_blocks(bucket INTEGER,block INTEGER,PRIMARY KEY(bucket,block)) WITHOUT ROWID;")?;
+    db.execute(
+        "INSERT OR IGNORE INTO changed_fact_blocks VALUES(?1,?2)",
+        params![bucket, block],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn measurement_block(
+    db: &Connection,
+    block: i64,
+) -> Result<Vec<(usize, crate::adapters::contract::Measurement)>> {
+    let rows = load(db, block)?;
+    require_index(rows.len() <= ROWS, "measurement frame slot limit exceeded")?;
+    let mut query=db.prepare_cached("SELECT CASE WHEN typeof(r.id)='blob' THEN lower(hex(r.id)) ELSE r.id END,r.slot FROM fact_rows r JOIN buckets b ON b.id=r.bucket WHERE r.block=?1 AND b.field='measurements' ORDER BY r.slot")?;
+    let mut cursor = query.query([block])?;
+    let mut found = 0;
+    while let Some(row) = cursor.next()? {
+        let id: String = row.get(0)?;
+        let slot: i64 = row.get(1)?;
+        require_index(slot >= 0, "negative measurement slot")?;
+        ensure_slot(&rows, slot as usize, &id)?;
+        found += 1;
+    }
+    require_index(
+        found == rows.iter().flatten().count(),
+        "measurement frame membership mismatch",
+    )?;
+    rows.into_iter()
+        .enumerate()
+        .filter_map(|(slot, row)| {
+            row.map(|(id, payload)| {
+                let value: crate::adapters::contract::Measurement =
+                    serde_json::from_str(payload.get())?;
+                require_index(value.id == id, "measurement block identity mismatch")?;
+                Ok((slot, value))
+            })
+        })
+        .collect()
+}
+fn publish(
+    db: &Connection,
+    bucket: i64,
+    block: Option<i64>,
+    rows: &Rows,
+    encoder: &mut codec::Encoder,
+) -> Result<()> {
     // Corrections may enlarge an existing row. Split after its staged block has
     // been fully updated, so a valid correction cannot overflow an old frame.
     let mut start = 0;
@@ -59,14 +118,20 @@ fn publish(db: &Connection, bucket: i64, block: Option<i64>, rows: &Rows) -> Res
             bytes += size;
             end += 1;
         }
-        publish_frame(db, bucket, active, &rows[start..end].to_vec())?;
+        publish_frame(db, bucket, active, &rows[start..end].to_vec(), encoder)?;
         active = None;
         start = end;
     }
     Ok(())
 }
-fn publish_frame(db: &Connection, bucket: i64, block: Option<i64>, rows: &Rows) -> Result<i64> {
-    let block = store(db, bucket, block, rows)?;
+fn publish_frame(
+    db: &Connection,
+    bucket: i64,
+    block: Option<i64>,
+    rows: &Rows,
+    encoder: &mut codec::Encoder,
+) -> Result<i64> {
+    let block = store(db, bucket, block, rows, encoder)?;
     let mut insert=db.prepare_cached("INSERT INTO fact_rows(bucket,id,block,slot) VALUES(?1,CASE WHEN length(?2)=64 AND ?2 NOT GLOB '*[^0-9a-f]*' THEN unhex(?2) ELSE ?2 END,?3,?4) ON CONFLICT(bucket,id) DO UPDATE SET block=excluded.block,slot=excluded.slot")?;
     for (slot, row) in rows.iter().enumerate() {
         if let Some((id, _)) = row {
@@ -91,12 +156,20 @@ pub(crate) fn upsert<'a, T: serde::Serialize + 'a>(
         stage.execute(params![bucket, id, serde_json::to_string(value)?])?;
     }
     drop(stage);
-    let mut query=db.prepare_cached("SELECT id,payload,block,slot FROM pending_facts WHERE bucket=?1 ORDER BY block,json_extract(payload,'$.threadId'),id")?;
-    let mut cursor = query.query([bucket])?;
+    // Physical locality is an optimization only: exact filters still use facts.
+    // Keep revisions together, then cluster new measurements by report keys.
+    let measurements: bool = db.query_row(
+        "SELECT field='measurements' FROM buckets WHERE id=?1",
+        [bucket],
+        |r| r.get(0),
+    )?;
+    let mut query=db.prepare_cached("SELECT id,payload,block,slot FROM pending_facts WHERE bucket=?1 ORDER BY block,json_extract(payload,'$.threadId'),CASE WHEN ?2 THEN json_extract(payload,'$.model.raw') END,CASE WHEN ?2 THEN json_extract(payload,'$.reasoningEffort') END,CASE WHEN ?2 THEN substr(json_extract(payload,'$.timestamp'),1,13) END,id")?;
+    let mut cursor = query.query(params![bucket, measurements])?;
     let mut active = None;
     let mut data = Rows::new();
     let mut bytes = 0;
     let mut started = false;
+    let mut encoder = codec::Encoder::default();
     while let Some(row) = cursor.next()? {
         let id: String = row.get(0)?;
         let payload: String = row.get(1)?;
@@ -104,7 +177,7 @@ pub(crate) fn upsert<'a, T: serde::Serialize + 'a>(
         if let Some(block) = block {
             if active != Some(block) {
                 if !data.is_empty() {
-                    publish(db, bucket, active, &data)?;
+                    publish(db, bucket, active, &data, &mut encoder)?;
                 }
                 active = Some(block);
                 data = load(db, block)?;
@@ -134,7 +207,7 @@ pub(crate) fn upsert<'a, T: serde::Serialize + 'a>(
             }
             if data.len() >= ROWS || bytes + payload.len() + id.len() + 16 > codec::TARGET {
                 if !data.is_empty() {
-                    publish(db, bucket, active, &data)?;
+                    publish(db, bucket, active, &data, &mut encoder)?;
                 }
                 data.clear();
                 active = None;
@@ -145,7 +218,7 @@ pub(crate) fn upsert<'a, T: serde::Serialize + 'a>(
         }
     }
     if !data.is_empty() {
-        publish(db, bucket, active, &data)?;
+        publish(db, bucket, active, &data, &mut encoder)?;
     }
     drop(cursor);
     drop(query);
@@ -160,17 +233,49 @@ fn ensure_slot(rows: &Rows, slot: usize, id: &str) -> Result<()> {
         "fact block identity mismatch",
     )
 }
-pub(super) fn each(
+pub(super) fn each_filtered(
     db: &Connection,
     scope: &str,
+    skip_operations: bool,
     mut consume: impl FnMut(&str, &str, &str) -> Result<()>,
+) -> Result<bool> {
+    each_located_inner(db, scope, None, skip_operations, |field, id, payload, _| {
+        consume(field, id, payload)
+    })
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct FactLocation {
+    pub block: i64,
+    pub slot: usize,
+    pub id: String,
+}
+pub(crate) fn each_located(
+    db: &Connection,
+    scope: &str,
+    selected: Option<&str>,
+    consume: impl FnMut(&str, &str, &str, FactSlot) -> Result<()>,
+) -> Result<bool> {
+    each_located_inner(db, scope, selected, false, consume)
+}
+#[derive(Clone, Copy)]
+pub(crate) struct FactSlot {
+    pub block: i64,
+    pub slot: usize,
+}
+fn each_located_inner(
+    db: &Connection,
+    scope: &str,
+    selected: Option<&str>,
+    skip_operations: bool,
+    mut consume: impl FnMut(&str, &str, &str, FactSlot) -> Result<()>,
 ) -> Result<bool> {
     // Never join a compressed BLOB onto every row before sorting: that would
     // materialize the same frame up to 128 times in SQLite temporary storage.
     let missing: bool=db.query_row("SELECT EXISTS(SELECT 1 FROM buckets b JOIN fact_rows r ON r.bucket=b.id LEFT JOIN fact_blocks f ON f.id=r.block AND f.bucket=b.id WHERE b.scope=?1 AND f.id IS NULL)",[scope],|r|r.get(0))?;
     require_index(!missing, "missing fact block")?;
-    let mut query=db.prepare_cached("SELECT b.field,f.id,f.bucket,f.data,f.bytes,f.digest,f.codec FROM buckets b JOIN fact_blocks f ON f.bucket=b.id WHERE b.scope=?1")?;
-    let mut cursor = query.query([scope])?;
+    let mut query=db.prepare_cached("SELECT b.field,f.id,f.bucket,f.data,f.bytes,f.digest,f.codec FROM buckets b JOIN fact_blocks f ON f.bucket=b.id WHERE b.scope=?1 AND (?2 IS NULL OR b.field=?2) AND (?3=0 OR b.field!='operations')")?;
+    let mut cursor = query.query(params![scope, selected, skip_operations])?;
     let mut found = false;
     while let Some(row) = cursor.next()? {
         let field = row.get_ref(0)?.as_str()?;
@@ -191,7 +296,12 @@ pub(super) fn each(
             let id = member.get_ref(0)?.as_str()?;
             let slot = member.get::<_, u32>(1)? as usize;
             ensure_slot(&data, slot, id)?;
-            consume(field, id, data[slot].as_ref().unwrap().1.get())?;
+            consume(
+                field,
+                id,
+                data[slot].as_ref().unwrap().1.get(),
+                FactSlot { block, slot },
+            )?;
             found = true;
             count += 1;
         }
@@ -221,7 +331,13 @@ pub(super) fn remove(db: &Connection, bucket: i64, id: &str) -> Result<()> {
         if rows.iter().all(Option::is_none) {
             db.execute("DELETE FROM fact_blocks WHERE id=?1", [block])?;
         } else {
-            store(db, bucket, Some(block), &rows)?;
+            store(
+                db,
+                bucket,
+                Some(block),
+                &rows,
+                &mut codec::Encoder::default(),
+            )?;
         }
     }
     Ok(())
@@ -252,6 +368,7 @@ pub(crate) fn retain<'a>(
         )?;
         grouped.entry(block).or_default().push((id, slot));
     }
+    let mut encoder = codec::Encoder::default();
     for (block, items) in grouped {
         let mut rows = load(db, block)?;
         for (id, slot) in items {
@@ -265,16 +382,87 @@ pub(crate) fn retain<'a>(
         if rows.iter().all(Option::is_none) {
             db.execute("DELETE FROM fact_blocks WHERE id=?1", [block])?;
         } else {
-            store(db, bucket, Some(block), &rows)?;
+            store(db, bucket, Some(block), &rows, &mut encoder)?;
         }
     }
     Ok(())
+}
+
+/// Decode each touched frame once per request; no unbounded process cache.
+pub(crate) fn read_operations(
+    db: &Connection,
+    locations: &[FactLocation],
+    mut charge: impl FnMut(u64) -> Result<()>,
+) -> Result<Vec<std::sync::Arc<crate::adapters::contract::Operation>>> {
+    let mut grouped = BTreeMap::<i64, Vec<(usize, &FactLocation)>>::new();
+    for (index, location) in locations.iter().enumerate() {
+        grouped
+            .entry(location.block)
+            .or_default()
+            .push((index, location));
+    }
+    let mut out = vec![None; locations.len()];
+    for (block, locations) in grouped {
+        let bytes: i64 =
+            db.query_row("SELECT bytes FROM fact_blocks WHERE id=?1", [block], |r| {
+                r.get(0)
+            })?;
+        require_index(bytes > 0, "invalid cold operation block size")?;
+        charge(bytes as u64)?;
+        let data = load(db, block)?;
+        for (index, location) in locations {
+            ensure_slot(&data, location.slot, &location.id)?;
+            let value: crate::adapters::contract::Operation =
+                serde_json::from_str(data[location.slot].as_ref().unwrap().1.get())?;
+            require_index(value.id == location.id, "cold operation identity mismatch")?;
+            out[index] = Some(std::sync::Arc::new(value));
+        }
+    }
+    out.into_iter()
+        .map(|v| {
+            v.ok_or_else(|| {
+                crate::dto::operation_error("INDEX_UNAVAILABLE", "missing cold operation")
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn cold_operation_budget_stops_before_decoding_a_corrupt_frame() {
+        let root = tempfile::tempdir().unwrap();
+        let db = open(&root.path().join("index.sqlite")).unwrap();
+        upsert(
+            &db,
+            "scope",
+            "operations",
+            [("operation", &json!({"id":"operation"}))],
+        )
+        .unwrap();
+        let mut locations = Vec::new();
+        each_located(&db, "scope", Some("operations"), |_, id, _, location| {
+            locations.push(FactLocation {
+                block: location.block,
+                slot: location.slot,
+                id: id.to_owned(),
+            });
+            Ok(())
+        })
+        .unwrap();
+        db.execute("UPDATE fact_blocks SET data=x'00'", []).unwrap();
+        let error = read_operations(&db, &locations, |_| {
+            Err(crate::dto::operation_error(
+                "RESOURCE_LIMIT",
+                "test byte budget",
+            ))
+        })
+        .unwrap_err();
+        assert_eq!(failure_code(&error), "RESOURCE_LIMIT");
+        assert!(read_operations(&db, &locations, |_| Ok(())).is_err());
+    }
     #[test]
     fn enlarged_corrections_split_frames_and_binary_keys_preserve_identity() {
         let root = tempfile::tempdir().unwrap();

@@ -437,7 +437,7 @@ fn cancelled_fork_operation_reduction_preserves_existing_canonical_rows() {
     facts.events = collected
         .events
         .iter()
-        .map(|e| (e.id().to_owned(), e.clone()))
+        .map(|e| (e.shared_id(), e.clone()))
         .collect();
     facts
         .resolve_operations(&mut report, &std::sync::atomic::AtomicBool::new(false))

@@ -179,6 +179,56 @@ fn source_scope_and_unknown_turn_are_not_guessed_from_alias_text() {
     );
 }
 #[test]
+fn partitioned_scopes_preserve_global_anchor_order_and_seed_collisions() {
+    let mut events = Vec::new();
+    for (row, turn) in [(1, "z"), (2, "a"), (3, "z"), (4, "a")] {
+        let original = operation(row, Some("call"), Some("item"), "shared-seed");
+        let Payload::Operation { value, phase } = original.payload().clone() else {
+            unreachable!()
+        };
+        let mut value = value.as_ref().clone();
+        value.turn_id = Some(turn.into());
+        events.push(
+            Event::new_at(
+                original.position().clone(),
+                Some("thread".into()),
+                Some(turn.into()),
+                Time::from_source(None).0,
+                vec![],
+                Payload::Operation {
+                    value: Arc::new(value),
+                    phase,
+                },
+                "2026-10-05T00:00:00Z".into(),
+            )
+            .unwrap(),
+        );
+    }
+    let expected_second = fallback_id(Scope::event(&events[1]), events[1].position());
+    events.reverse();
+    events.push(events[0].clone());
+    let result = resolved(&events);
+    assert_eq!(result.groups.len(), 2);
+    assert_eq!(result.groups[0].id, "shared-seed");
+    assert_eq!(result.groups[0].scope.turn, Some("z"));
+    assert_eq!(result.groups[1].id, expected_second);
+    assert_eq!(result.groups[1].scope.turn, Some("a"));
+    assert_eq!(
+        result
+            .phases
+            .iter()
+            .map(|p| p.event.position().byte_offset)
+            .collect::<Vec<_>>(),
+        [1, 3, 2, 4]
+    );
+    let groups = resolve_groups(&events, &AtomicBool::new(false)).unwrap();
+    for (group, full) in groups.iter().zip(&result.groups) {
+        assert_eq!(group.id, full.id);
+        assert_eq!(group.aliases, full.aliases);
+        assert_eq!(group.operation_events, full.operation_events);
+    }
+}
+#[test]
 fn duplicate_observations_do_not_duplicate_phases() {
     let a = operation(1, Some("call"), Some("item"), "seed");
     let events = [a.clone(), a];
@@ -445,4 +495,41 @@ fn native_command_completion_is_closure_without_success_claim() {
         lifecycle::TerminalState::Unobserved
     );
     assert!(endpoints.groups[0].terminal_evidence_ids.is_empty());
+}
+
+#[test]
+fn repeated_high_degree_bridges_keep_exact_groups_without_phase_projection() {
+    let mut events = Vec::new();
+    for n in 0..1500 {
+        let alias = format!("item-{n}");
+        let seed = format!("seed-{n}");
+        events.push(operation(n * 2, Some("root-call"), Some(&alias), &seed));
+        events.push(operation(n * 2 + 1, Some("root-call"), Some(&alias), &seed));
+    }
+    events.reverse();
+    let full = resolved(&events);
+    let groups = resolve_groups(&events, &AtomicBool::new(false)).unwrap();
+    assert_eq!(groups.len(), 1);
+    let group = &groups[0];
+    assert_eq!(group.id, "seed-0");
+    assert_eq!(group.operation_events.len(), 3000);
+    assert_eq!(group.aliases.len(), 1501);
+    assert!(!group.target_conflict && !group.outcome_conflict);
+    assert_eq!(full.phases.len(), 3000);
+    assert_eq!(group.id, full.groups[0].id);
+    assert_eq!(group.scope, full.groups[0].scope);
+    assert_eq!(group.aliases, full.groups[0].aliases);
+    assert_eq!(
+        group
+            .operation_events
+            .iter()
+            .map(|e| e.id())
+            .collect::<Vec<_>>(),
+        full.groups[0]
+            .operation_events
+            .iter()
+            .map(|e| e.id())
+            .collect::<Vec<_>>()
+    );
+    assert!(resolve_groups(&events, &AtomicBool::new(true)).is_err());
 }

@@ -28,7 +28,8 @@ pub(super) fn project_history(
             .iter()
             .map(|(id, t)| (*id, t.project.as_deref()))
             .collect::<BTreeMap<_, _>>();
-        let ledger = snapshot.live_ledger().unwrap_or_default();
+        let owned_ledger = snapshot.ledger()?;
+        let ledger = owned_ledger.iter().collect::<Vec<_>>();
         let mut turns = BTreeMap::<(&str, &str), Vec<usize>>::new();
         for (n, row) in ledger.iter().enumerate() {
             if let (Some(t), Some(u)) = (&row.fact.thread_id, &row.fact.turn_id) {
@@ -52,7 +53,8 @@ pub(super) fn project_history(
                 }
             }
         }
-        observe_available_skills(snapshot, scope, &threads, &paths, items);
+        let operations = snapshot.operation_facts()?;
+        observe_available_skills(&operations, scope, &threads, &paths, items);
         let mut item_rows = vec![BTreeSet::<usize>::new(); items.len()];
         let mut item_turns = vec![BTreeSet::<String>::new(); items.len()];
         let mut item_tasks = vec![BTreeSet::<String>::new(); items.len()];
@@ -63,7 +65,7 @@ pub(super) fn project_history(
         let mut unassigned_skill_sources = BTreeSet::<String>::new();
         let mut unassigned_rule_sources = BTreeSet::<String>::new();
         let conflicts = usage_observations::target_conflicts(
-            || snapshot.operation_facts().map(AsRef::as_ref),
+            || operations.iter().map(AsRef::as_ref),
             |op| {
                 threads
                     .get(op.thread_id.as_ref())
@@ -99,7 +101,7 @@ pub(super) fn project_history(
             },
         );
         let mut seen = BTreeSet::new();
-        for op in snapshot.operation_facts() {
+        for op in operations.iter() {
             let Some(thread) = threads.get(op.thread_id.as_ref()) else {
                 continue;
             };
@@ -582,7 +584,7 @@ pub(super) fn project_history(
 }
 
 fn observe_available_skills(
-    snapshot: &Snapshot,
+    operations: &[std::sync::Arc<crate::adapters::contract::Operation>],
     scope: &Scope,
     threads: &BTreeMap<&str, &crate::adapters::contract::Thread>,
     paths: &BTreeMap<(String, String), Vec<usize>>,
@@ -591,7 +593,7 @@ fn observe_available_skills(
     // Availability is a current host observation, independent of the history date window.
     // Use only the newest catalog in the selected project for each source.
     let mut latest_catalogs = BTreeMap::<String, ((Option<String>, u64, String), String)>::new();
-    for op in snapshot.operation_facts() {
+    for op in operations.iter() {
         if op.kind.as_ref() != "skillCatalog" {
             continue;
         }
@@ -620,7 +622,7 @@ fn observe_available_skills(
             })
             .or_insert((order, occurrence));
     }
-    for op in snapshot.operation_facts() {
+    for op in operations.iter() {
         if op.kind.as_ref() != "skillAvailable" {
             continue;
         }

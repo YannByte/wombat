@@ -403,17 +403,68 @@ pub(super) fn execute(request: Request, snapshot: &Snapshot) -> Result<Response>
     })
 }
 
-pub(crate) fn publication_change(before: &Snapshot, after: &Snapshot) -> Result<PublicationChange> {
-    let a = before.ledger()?;
-    let b = after.ledger()?;
-    let old: BTreeMap<_, _> = a
-        .iter()
-        .map(|r| (r.fact.id.as_str(), r.fact.as_ref()))
-        .collect();
-    let new: BTreeMap<_, _> = b
-        .iter()
-        .map(|r| (r.fact.id.as_str(), r.fact.as_ref()))
-        .collect();
+pub(crate) fn publication_change(
+    before: &Snapshot,
+    after: &Snapshot,
+    db: Option<(&rusqlite::Connection, &UsageSummary)>,
+) -> Result<PublicationChange> {
+    let counts = db
+        .map(|(db, _)| before.measurement_changes(db, &after.manifest.sources))
+        .transpose()?
+        .flatten();
+    let collect =
+        |snapshot: &Snapshot| -> Result<(BTreeMap<String, String>, Result<UsageSummary>)> {
+            let mut identities = BTreeMap::new();
+            let mut total = Aggregate::new(&[])?;
+            let mut failed = None;
+            if snapshot.has_stored_ledger() {
+                snapshot.visit_ledger_groups(chrono_tz::UTC, None, None, |group, read| {
+                    if failed.is_none()
+                        && let Err(error) = total.combine(&group.aggregate)
+                    {
+                        failed = Some(error);
+                    }
+                    if counts.is_none() {
+                        for row in read()? {
+                            identities.insert(
+                                row.fact.id.clone(),
+                                crate::hash(serde_json::to_vec(&row.fact)?),
+                            );
+                        }
+                    }
+                    Ok(())
+                })?;
+            } else {
+                let rows = snapshot.ledger()?;
+                for row in &rows {
+                    if counts.is_none() {
+                        identities.insert(
+                            row.fact.id.clone(),
+                            crate::hash(serde_json::to_vec(&row.fact)?),
+                        );
+                    }
+                }
+                failed = summarize(&rows.iter().collect::<Vec<_>>())
+                    .map(|usage| total.usage = usage)
+                    .err();
+            }
+            Ok((identities, failed.map_or_else(|| Ok(total.usage), Err)))
+        };
+    let (old, left) = collect(before)?;
+    let (new, right) = match db {
+        Some((db, summary)) => (
+            if counts.is_none() {
+                crate::usage_store::ledger_projection::identity_digests(
+                    db,
+                    &after.manifest.sources,
+                )?
+            } else {
+                BTreeMap::new()
+            },
+            Ok(summary.clone()),
+        ),
+        None => collect(after)?,
+    };
     let threads: BTreeSet<_> = before
         .manifest
         .threads
@@ -434,9 +485,7 @@ pub(crate) fn publication_change(before: &Snapshot, after: &Snapshot) -> Result<
     let old_turns = turns(before);
     let new_turns = turns(after);
     let coverage = |s: &Snapshot| serde_json::json!({"sources":s.manifest.sources.iter().map(|r|(&r.source.id,&r.status,r.issues.iter().map(|i|&i.code).collect::<BTreeSet<_>>())).collect::<Vec<_>>(),"watermarks":s.manifest.watermarks.iter().map(|w|(&w.file_id,&w.state,&w.issue_codes)).collect::<Vec<_>>()});
-    let aggregate_delta = match summarize(&a.iter().collect::<Vec<_>>())
-        .and_then(|left| summarize(&b.iter().collect::<Vec<_>>()).map(|right| delta(&left, &right)))
-    {
+    let aggregate_delta = match left.and_then(|left| right.map(|right| delta(&left, &right))) {
         Ok(value) => value,
         Err(error)
             if error
@@ -455,12 +504,22 @@ pub(crate) fn publication_change(before: &Snapshot, after: &Snapshot) -> Result<
         method_version: 1,
         baseline: before.manifest.snapshot_ref.clone(),
         current: after.manifest.snapshot_ref.clone(),
-        measurements_added: new.keys().filter(|id| !old.contains_key(**id)).count(),
-        measurements_removed: old.keys().filter(|id| !new.contains_key(**id)).count(),
-        measurements_changed: new
-            .iter()
-            .filter(|(id, row)| old.get(**id).is_some_and(|prior| *prior != **row))
-            .count(),
+        measurements_added: counts.map_or_else(
+            || new.keys().filter(|id| !old.contains_key(*id)).count(),
+            |c| c.0,
+        ),
+        measurements_removed: counts.map_or_else(
+            || old.keys().filter(|id| !new.contains_key(*id)).count(),
+            |c| c.1,
+        ),
+        measurements_changed: counts.map_or_else(
+            || {
+                new.iter()
+                    .filter(|(id, row)| old.get(*id).is_some_and(|prior| prior != *row))
+                    .count()
+            },
+            |c| c.2,
+        ),
         threads_added: after
             .manifest
             .threads

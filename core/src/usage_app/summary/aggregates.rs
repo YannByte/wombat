@@ -8,13 +8,14 @@ const MAX_GROUPS: usize = 4096;
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MIN_GROUP: usize = 16;
 
-struct Group {
-    usage: UsageSummary,
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct Group {
+    pub(crate) usage: UsageSummary,
     total: TotalParts,
     input_consistent: bool,
 }
 impl Group {
-    fn new(rows: &[&PricedMeasurement]) -> Result<Self> {
+    pub(crate) fn new(rows: &[&PricedMeasurement]) -> Result<Self> {
         Ok(Self {
             usage: summarize(rows)?,
             total: TotalParts::from_rows(rows)?,
@@ -23,6 +24,13 @@ impl Group {
                 .all(|row| input_categories_consistent(&row.fact.tokens)),
         })
     }
+    pub(crate) fn combine(&mut self, other: &Self) -> Result<()> {
+        let usage = merge(&[self, other])?;
+        self.total.merge(&other.total);
+        self.input_consistent &= other.input_consistent;
+        self.usage = usage;
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -30,22 +38,32 @@ pub(crate) struct SummaryIndex {
     // Addresses are identity keys only, never dereferenced. The owning immutable
     // snapshot keeps every indexed Arc alive and never mutates its price or fact.
     members: HashMap<usize, Member>,
-    groups: Vec<Group>,
-    threads: HashMap<String, crate::usage_app::conversations::ThreadSummary>,
+    groups: Vec<std::sync::Arc<Group>>,
+    threads: HashMap<String, std::sync::Arc<crate::usage_app::conversations::ThreadSummary>>,
 }
+#[derive(Clone, Copy)]
 struct Member {
     group: Option<usize>,
     time: crate::usage_app::scope::ObservedTime,
 }
 impl SummaryIndex {
+    #[cfg(test)]
     pub(crate) fn build(rows: &[&PricedMeasurement]) -> Result<Self> {
+        Self::build_reusing(rows, None)
+    }
+    pub(crate) fn build_reusing(rows: &[&PricedMeasurement], prior: Option<&Self>) -> Result<Self> {
         let mut index = Self::default();
         if rows.len() > MAX_ROWS {
             return Ok(index);
         }
         let mut groups = HashMap::<_, Vec<&PricedMeasurement>>::new();
         for &row in rows {
-            let time = crate::usage_app::scope::ObservedTime::parse(row);
+            let time = prior
+                .and_then(|p| p.members.get(&(row as *const PricedMeasurement as usize)))
+                .map_or_else(
+                    || crate::usage_app::scope::ObservedTime::parse(row),
+                    |m| m.time,
+                );
             index.members.insert(
                 row as *const PricedMeasurement as usize,
                 Member { group: None, time },
@@ -72,7 +90,24 @@ impl SummaryIndex {
         });
         let mut bytes = 0;
         for rows in groups {
-            let group = Group::new(&rows)?;
+            let reused = prior.and_then(|p| {
+                let id = p
+                    .members
+                    .get(&(rows[0] as *const PricedMeasurement as usize))?
+                    .group?;
+                let group = &p.groups[id];
+                (group.usage.measurement_count == rows.len()
+                    && rows.iter().all(|row| {
+                        p.members
+                            .get(&(*row as *const PricedMeasurement as usize))
+                            .is_some_and(|m| m.group == Some(id))
+                    }))
+                .then(|| std::sync::Arc::clone(group))
+            });
+            let group = match reused {
+                Some(group) => group,
+                None => std::sync::Arc::new(Group::new(&rows)?),
+            };
             let size = serde_json::to_vec(&group.usage)?.len();
             if bytes + size > MAX_BYTES {
                 continue;
@@ -98,7 +133,21 @@ impl SummaryIndex {
             if rows.len() < MIN_GROUP {
                 continue;
             }
-            let summary = crate::usage_app::conversations::prepare_thread(&rows)?;
+            let reused = prior.and_then(|p| {
+                p.threads.get(id).filter(|summary| {
+                    summary.usage.measurement_count == rows.len()
+                        && rows.iter().all(|row| {
+                            p.members
+                                .contains_key(&(*row as *const PricedMeasurement as usize))
+                        })
+                })
+            });
+            let summary = match reused {
+                Some(summary) => std::sync::Arc::clone(summary),
+                None => {
+                    std::sync::Arc::new(crate::usage_app::conversations::prepare_thread(&rows)?)
+                }
+            };
             let size = serde_json::to_vec(&summary)?.len() + id.len();
             if bytes + size > MAX_BYTES {
                 continue;
@@ -112,7 +161,7 @@ impl SummaryIndex {
         &self,
         id: &str,
     ) -> Option<&crate::usage_app::conversations::ThreadSummary> {
-        self.threads.get(id)
+        self.threads.get(id).map(std::sync::Arc::as_ref)
     }
     pub(crate) fn local_date(&self, row: &PricedMeasurement, tz: Tz) -> Option<NaiveDate> {
         self.members
@@ -143,7 +192,7 @@ impl SummaryIndex {
             .groups
             .iter()
             .enumerate()
-            .filter_map(|(id, group)| complete(id).then_some(group))
+            .filter_map(|(id, group)| complete(id).then_some(group.as_ref()))
             .collect::<Vec<_>>();
         if selected.is_empty() {
             return summarize(rows);
@@ -211,6 +260,15 @@ fn merge(groups: &[&Group]) -> Result<UsageSummary> {
     result.token_analysis.total_analysis = Some(total.finish());
     result.price = crate::pricing::sum_prices(groups.iter().map(|g| &g.usage.price))
         .map_err(|e| operation_error("PRICING_ERROR", e))?;
+    if result.measurement_count == 1 {
+        result.price = groups
+            .iter()
+            .find(|g| g.usage.measurement_count == 1)
+            .unwrap()
+            .usage
+            .price
+            .clone();
+    }
     Ok(result)
 }
 
@@ -253,6 +311,31 @@ mod tests {
             serde_json::to_value(summarize(rows).unwrap()).unwrap()
         );
     }
+    #[test]
+    fn persisted_fold_crosses_old_row_limit_without_retaining_rows() {
+        let mut total = Group::new(&[]).unwrap();
+        let values = fixture(128);
+        let part = Group::new(&values.iter().collect::<Vec<_>>()).unwrap();
+        for _ in 0..2048 {
+            total.combine(&part).unwrap();
+        }
+        let one = Group::new(&[&values[0]]).unwrap();
+        total.combine(&one).unwrap();
+        let count = 262145;
+        assert_eq!(total.usage.measurement_count, count);
+        assert_eq!(total.usage.complete_token_total(), Some(count as u64 * 110));
+        assert_eq!(total.usage.tokens.input, Some(count as u64 * 70));
+        let mut serialized: Group =
+            serde_json::from_slice(&serde_json::to_vec(&part).unwrap()).unwrap();
+        serialized.combine(&one).unwrap();
+        let mut direct = values.iter().collect::<Vec<_>>();
+        direct.push(&values[0]);
+        assert_eq!(
+            serde_json::to_value(serialized.usage).unwrap(),
+            serde_json::to_value(summarize(&direct).unwrap()).unwrap()
+        );
+    }
+
     #[test]
     fn exact_groups_partial_filters_duplicates_and_revision_changes() {
         let mut values = fixture(160);
@@ -434,7 +517,7 @@ mod tests {
             .map(|q| crate::usage_app::execute_uncached(q.clone(), &snapshot).unwrap())
             .collect::<Vec<_>>();
         assert_eq!(expected[0].summary.complete_token_total(), Some(17_600));
-        snapshot.summary_index = SummaryIndex::default();
+        snapshot.summary_index = Arc::new(SummaryIndex::default());
         for (request, accelerated) in queries.into_iter().zip(expected) {
             let direct = crate::usage_app::execute_uncached(request, &snapshot).unwrap();
             assert_eq!(
@@ -442,5 +525,57 @@ mod tests {
                 serde_json::to_value(direct).unwrap()
             );
         }
+    }
+
+    #[test]
+    fn unchanged_groups_reuse_summaries_but_changed_rows_and_prices_do_not() {
+        let values = fixture(160);
+        let rows: Vec<_> = values.iter().collect();
+        let prior = SummaryIndex::build(&rows).unwrap();
+        let unchanged = SummaryIndex::build_reusing(&rows, Some(&prior)).unwrap();
+        assert!(
+            prior
+                .groups
+                .iter()
+                .zip(&unchanged.groups)
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+        );
+        assert!(Arc::ptr_eq(
+            &prior.threads["task-0"],
+            &unchanged.threads["task-0"]
+        ));
+        let mut corrected = values[0].clone();
+        Arc::make_mut(&mut corrected.fact).tokens.total = Some(210);
+        Arc::make_mut(&mut corrected.fact)
+            .token_unavailable_reasons
+            .total = None;
+        let mut next = rows.clone();
+        next[0] = &corrected;
+        let updated = SummaryIndex::build_reusing(&next, Some(&prior)).unwrap();
+        equal(&updated, &next);
+        assert!(!Arc::ptr_eq(
+            &prior.threads["task-0"],
+            &updated.threads["task-0"]
+        ));
+        assert!(Arc::ptr_eq(
+            &prior.threads["task-1"],
+            &updated.threads["task-1"]
+        ));
+        let repriced: Vec<_> = values
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.price = Arc::new(crate::pricing::price(&row.fact.model, &row.fact.tokens));
+                row
+            })
+            .collect();
+        let repriced_rows: Vec<_> = repriced.iter().collect();
+        let repriced_index = SummaryIndex::build_reusing(&repriced_rows, Some(&prior)).unwrap();
+        equal(&repriced_index, &repriced_rows);
+        assert!(!Arc::ptr_eq(
+            &prior.threads["task-0"],
+            &repriced_index.threads["task-0"]
+        ));
+        equal(&prior, &rows);
     }
 }

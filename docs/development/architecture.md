@@ -78,7 +78,7 @@ flowchart LR
   T --> V[Snapshot / Manifest]
   P --> V
   O --> V
-  E --> V
+  E -->|Evidence locators| V
   V --> Q[Usage / Timing / Evidence queries]
 ```
 
@@ -100,7 +100,7 @@ flowchart LR
 
 ### 持久化边界与当前表达限制
 
-快照发布与增量索引先提交事实，再公开新结果；失败保留已提交数据。可重建索引与持久用户决定分别管理生命周期。[内核参考](../reference/core.md)维护存储、服务生命周期和故障细节；[契约](contracts.md)维护生成字段与版本语义，[隐私说明](../reference/privacy.md)维护数据保留与联网边界。
+来源事务负责恢复与关联；查询视图共享不可变事实、汇总及版本定位，压缩观察供重放与证据读取。索引与用户决定分开存储。[内核参考](../reference/core.md)维护存储与资源限制；[契约](contracts.md)维护字段与版本，[隐私](../reference/privacy.md)维护保留与联网边界。
 
 父子关系由事件与共享关系索引表达，生命周期由阶段和共享关联表达；尚无统一公开实体。项目是有证据的目录归属；资源目标主要附着于操作。`Collected` 是事实集合，`Snapshot` 是读视图；同名类型需结合模块理解。新增实体需有明确查询消费者。
 

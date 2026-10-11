@@ -410,7 +410,7 @@ mod reading;
 mod titles;
 use events::process;
 use facts::{Candidate, Facts, merge_optional};
-use reading::{State, file_changed, precision, read_file, read_file_from, timestamp};
+use reading::{State, file_changed, precision, read_file, read_file_flushing, timestamp};
 use titles::read_titles;
 pub(super) fn safe_text(text: &str) -> String {
     let mut result = String::new();
@@ -457,3 +457,6 @@ fn reported_cost(raw: Option<&serde_json::value::RawValue>) -> Option<String> {
     (value.len() < 128 && serde_json::from_str::<serde_json::Number>(&value).is_ok())
         .then_some(value)
 }
+
+#[cfg(test)]
+use reading::read_file_from;

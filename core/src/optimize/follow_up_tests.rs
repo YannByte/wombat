@@ -1,5 +1,5 @@
 //! Independent canonical-operation fixtures; no adapter parsing or service execution.
-use super::follow_up::observe;
+use super::follow_up::observe as observe_checked;
 use crate::{
     adapters::contract::{Collected, Operation, Thread},
     config::View,
@@ -760,4 +760,12 @@ fn elapsed_comparison_keeps_exact_bounds_sources_projects_and_unassigned_usage()
     let c = result[0].usage_comparison.as_ref().unwrap();
     assert_eq!(c.current.unassigned_usage.complete_token_total(), Some(5));
     assert_eq!(c.current_usage.complete_token_total(), Some(1204));
+}
+
+fn observe(
+    suggestions: &[Suggestion],
+    view: &View,
+    source: Option<&str>,
+) -> Vec<crate::optimize_dto::FollowUpObservation> {
+    observe_checked(suggestions, view, source).unwrap()
 }

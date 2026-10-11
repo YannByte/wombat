@@ -350,7 +350,7 @@ fn current_hash_corruption_and_unknown_event_version_propagate() {
 }
 
 fn replace_slice(snapshot: &mut Snapshot, bytes: &[u8]) {
-    let thread = &mut snapshot.manifest.threads[0];
+    let thread = Arc::make_mut(&mut snapshot.manifest.threads[0]);
     fs::write(snapshot.directory.join(&thread.file.file), bytes).unwrap();
     let entry = thread.turns.get_mut("turn").unwrap();
     entry.slice.offset = 0;
@@ -675,9 +675,7 @@ fn operation_thread_and_turn_are_validated_in_both_read_modes() {
             "turn" => invalid.turn_id = Some("foreign-turn".into()),
             _ => invalid.turn_id = None,
         }
-        memory
-            .memory_turns
-            .as_mut()
+        Arc::get_mut(memory.memory_turns.as_mut().unwrap())
             .unwrap()
             .get_mut(&("thread".into(), "turn".into()))
             .unwrap()
@@ -811,9 +809,7 @@ fn canonical_turn_reads_ignore_unrelated_turn_and_ledger_damage() {
         b"invalid ledger",
     )
     .unwrap();
-    memory
-        .memory_turns
-        .as_mut()
+    Arc::get_mut(memory.memory_turns.as_mut().unwrap())
         .unwrap()
         .get_mut(&("thread".into(), "other-turn".into()))
         .unwrap()

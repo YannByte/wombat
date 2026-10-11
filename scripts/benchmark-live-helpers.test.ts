@@ -213,18 +213,21 @@ test('compressed index report counts physical frames once and preserves fact cou
   const root=mkdtempSync(path.join(os.tmpdir(),'wombat-packed-footprint-'));
   const file=path.join(root,'index.sqlite');const db=new DatabaseSync(file);
   try {
-    db.exec(`PRAGMA user_version=5;
+    db.exec(`PRAGMA user_version=6;
       CREATE TABLE buckets(id INTEGER PRIMARY KEY,scope TEXT,field TEXT);
       CREATE TABLE event_blocks(bucket INTEGER,count INTEGER,data BLOB,bytes INTEGER);
       CREATE TABLE fact_blocks(bucket INTEGER,data BLOB,bytes INTEGER);
       CREATE TABLE fact_rows(bucket INTEGER);
-      INSERT INTO buckets VALUES(1,'parser:synthetic:1:facts','events'),(2,'projection:synthetic','events'),(3,'projection:synthetic','measurements');
+      INSERT INTO buckets VALUES(1,'parser:synthetic:1:facts','events'),(2,'projection:synthetic','events'),(3,'projection:synthetic','measurements'),(4,'view:synthetic:evidence','partitions');
       INSERT INTO event_blocks VALUES(1,200,zeroblob(20),2000);
       INSERT INTO fact_blocks VALUES(3,zeroblob(10),1000);
-      INSERT INTO fact_rows VALUES(3),(3);`);
+      INSERT INTO fact_rows VALUES(3),(3);
+      INSERT INTO fact_blocks VALUES(4,zeroblob(12),1200);
+      INSERT INTO fact_rows VALUES(4);`);
     assert.deepEqual(liveIndexPayloadFootprint(file),[
       {scopeKind:'parserFacts',field:'events',entries:200,storedJsonbPayloadBytes:0,expandedJsonBytes:0,storedCompressedPayloadBytes:20,decodedFrameBytes:2000},
       {scopeKind:'projection',field:'measurements',entries:2,storedJsonbPayloadBytes:0,expandedJsonBytes:0,storedCompressedPayloadBytes:10,decodedFrameBytes:1000},
+      {scopeKind:'queryEvidence',field:'partitions',entries:1,storedJsonbPayloadBytes:0,expandedJsonBytes:0,storedCompressedPayloadBytes:12,decodedFrameBytes:1200},
     ]);
   } finally {db.close();rmSync(root,{recursive:true,force:true});}
 });

@@ -47,7 +47,7 @@ pub enum Precision {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Time {
-    pub timestamp: Option<String>,
+    pub timestamp: Option<Arc<str>>,
     pub precision: Precision,
 }
 impl Time {
@@ -79,7 +79,8 @@ impl Time {
                 timestamp: Some(
                     parsed
                         .to_utc()
-                        .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                        .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
+                        .into(),
                 ),
                 precision,
             },
@@ -223,12 +224,12 @@ pub enum Payload {
         evidence: EvidenceRef,
     },
     Thread {
-        value: Box<Thread>,
-        project_path: Option<String>,
+        value: Box<Thread<Arc<str>>>,
+        project_path: Option<Arc<str>>,
         evidence: EvidenceRef,
     },
     Turn {
-        value: Box<Turn>,
+        value: Box<Turn<Arc<str>>>,
         evidence: EvidenceRef,
     },
     /// Preserve source accounting inputs before cross-file deduplication and reconciliation.
@@ -282,7 +283,7 @@ pub enum Payload {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StoredEvent {
     version: u32,
-    id: String,
+    id: Arc<str>,
     position: Position,
     thread_id: Option<Arc<str>>,
     turn_id: Option<Arc<str>>,
@@ -300,7 +301,16 @@ pub struct Event(StoredEvent);
 pub(crate) struct EventStrings {
     domains: crate::shared_text::SharedText,
     scopes: crate::shared_text::SharedText,
-    times: crate::shared_text::SharedText,
+    // Adjacent observations commonly repeat row time and scope. Keep one value
+    // per field after the bounded general pools fill, without growing a cache.
+    thread: RecentText,
+    turn: RecentText,
+    collected: RecentText,
+    timestamp: RecentText,
+    thread_fields: [RecentText; 6],
+    turn_fields: [RecentText; 4],
+    paths: crate::shared_text::SharedText,
+    facts: crate::adapters::shared_strings::FactStrings,
 }
 impl EventStrings {
     pub(crate) fn share(&mut self, event: &mut Event) {
@@ -311,13 +321,119 @@ impl EventStrings {
         ] {
             self.domains.share(value);
         }
-        for value in [&mut event.0.thread_id, &mut event.0.turn_id]
-            .into_iter()
-            .flatten()
-        {
-            self.scopes.share(value);
+        for (value, recent) in [
+            (&mut event.0.thread_id, &mut self.thread),
+            (&mut event.0.turn_id, &mut self.turn),
+        ] {
+            if let Some(value) = value {
+                self.scopes.share(value);
+                recent.share(value);
+            }
         }
-        self.times.share(&mut event.0.collected_at);
+        self.collected.share(&mut event.0.collected_at);
+        if let Some(value) = &mut event.0.time.timestamp {
+            self.timestamp.share(value);
+        }
+        match &mut event.0.payload {
+            Payload::Thread {
+                value,
+                project_path,
+                evidence,
+            } => {
+                for (field, recent) in [
+                    Some(&mut value.id),
+                    Some(&mut value.agent_kind),
+                    Some(&mut value.source_instance_id),
+                    Some(&mut value.upstream_id),
+                    value.title.as_mut(),
+                    value.project.as_mut(),
+                ]
+                .into_iter()
+                .zip(&mut self.thread_fields)
+                {
+                    if let Some(field) = field {
+                        self.scopes.share(field);
+                        recent.share(field);
+                    }
+                }
+                value.id = Arc::clone(event.0.thread_id.as_ref().expect("validated thread scope"));
+                value.source_instance_id = Arc::clone(&event.0.position.source_instance_id);
+                if let (Some(path), Some(project)) = (project_path, &value.project)
+                    && path == project
+                {
+                    *path = Arc::clone(project);
+                }
+                for time in [&mut value.started_at, &mut value.last_activity_at]
+                    .into_iter()
+                    .flatten()
+                {
+                    self.timestamp.share(time);
+                }
+                self.paths.share(&mut evidence.file);
+            }
+            Payload::Turn { value, evidence } => {
+                for (field, recent) in [
+                    &mut value.id,
+                    &mut value.thread_id,
+                    &mut value.upstream_id,
+                    &mut value.status,
+                ]
+                .into_iter()
+                .zip(&mut self.turn_fields)
+                {
+                    self.scopes.share(field);
+                    recent.share(field);
+                }
+                value.id = Arc::clone(event.0.turn_id.as_ref().expect("validated turn scope"));
+                value.thread_id =
+                    Arc::clone(event.0.thread_id.as_ref().expect("validated thread scope"));
+                for time in [
+                    &mut value.started_at,
+                    &mut value.ended_at,
+                    &mut value.last_activity_at,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    self.timestamp.share(time);
+                }
+                self.paths.share(&mut evidence.file);
+            }
+            Payload::Ancestry { evidence, .. } => self.paths.share(&mut evidence.file),
+            Payload::Measurement { value, .. } => {
+                if let Some(value) = Arc::get_mut(value) {
+                    self.facts.measurement(value);
+                    for evidence in &mut value.evidence {
+                        self.paths.share(&mut evidence.file);
+                    }
+                }
+            }
+            Payload::Operation { value, .. } => {
+                if let Some(value) = Arc::get_mut(value) {
+                    self.facts.operation(value);
+                    for evidence in &mut value.evidence {
+                        self.paths.share(&mut evidence.file);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+#[derive(Default)]
+struct RecentText(Option<Arc<str>>);
+impl RecentText {
+    fn share(&mut self, value: &mut Arc<str>) {
+        if value.len() > 1024 {
+            return;
+        }
+        if let Some(previous) = &self.0
+            && previous.as_ref() == value.as_ref()
+        {
+            *value = Arc::clone(previous);
+        } else {
+            self.0 = Some(Arc::clone(value));
+        }
     }
 }
 impl Serialize for Event {
@@ -355,9 +471,9 @@ impl Event {
         collected_at: String,
     ) -> Result<Self> {
         let id = position.event_id()?;
-        Self::try_from(StoredEvent {
+        Self::validate_fields(StoredEvent {
             version: EVENT_VERSION,
-            id,
+            id: id.into(),
             position,
             thread_id: thread_id.map(Into::into),
             turn_id: turn_id.map(Into::into),
@@ -369,6 +485,9 @@ impl Event {
     }
     pub fn id(&self) -> &str {
         &self.0.id
+    }
+    pub(crate) fn shared_id(&self) -> Arc<str> {
+        Arc::clone(&self.0.id)
     }
     pub fn position(&self) -> &Position {
         &self.0.position
@@ -385,6 +504,9 @@ impl Event {
     pub fn thread_id(&self) -> Option<&str> {
         self.0.thread_id.as_deref()
     }
+    pub(crate) fn shared_target(&self) -> (Option<Arc<str>>, Option<Arc<str>>) {
+        (self.0.thread_id.clone(), self.0.turn_id.clone())
+    }
     pub fn turn_id(&self) -> Option<&str> {
         self.0.turn_id.as_deref()
     }
@@ -397,12 +519,19 @@ impl TryFrom<StoredEvent> for Event {
     fn try_from(value: StoredEvent) -> Result<Self> {
         ensure!(value.version == EVENT_VERSION, "unsupported event version");
         ensure!(
+            value.id.as_ref() == value.position.event_id()?,
+            "event identity mismatch"
+        );
+        Self::validate_fields(value)
+    }
+}
+impl Event {
+    // Constructors compute the identity once; persisted envelopes verify it before
+    // entering the same semantic validation path.
+    fn validate_fields(value: StoredEvent) -> Result<Self> {
+        ensure!(
             chrono::DateTime::parse_from_rfc3339(&value.collected_at).is_ok(),
             "invalid event collection time"
-        );
-        ensure!(
-            value.id == value.position.event_id()?,
-            "event identity mismatch"
         );
         ensure!(
             value.turn_id.is_none() || value.thread_id.is_some(),
@@ -421,14 +550,14 @@ impl TryFrom<StoredEvent> for Event {
                 "invalid ancestry identity"
             ),
             Payload::Thread { value: fact, .. } => ensure!(
-                thread == Some(fact.id.as_str())
+                thread == Some(fact.id.as_ref())
                     && turn.is_none()
-                    && fact.source_instance_id.as_str()
+                    && fact.source_instance_id.as_ref()
                         == value.position.source_instance_id.as_ref(),
                 "thread event scope mismatch"
             ),
             Payload::Turn { value: fact, .. } => ensure!(
-                thread == Some(fact.thread_id.as_str()) && turn == Some(fact.id.as_str()),
+                thread == Some(fact.thread_id.as_ref()) && turn == Some(fact.id.as_ref()),
                 "turn event scope mismatch"
             ),
             Payload::Measurement {

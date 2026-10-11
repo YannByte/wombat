@@ -5,6 +5,9 @@ use rusqlite::Connection;
 
 use crate::file_metadata::FileMetadata;
 use std::time::UNIX_EPOCH;
+mod reduction;
+#[cfg(test)]
+mod reduction_tests;
 
 /// Required message mapping: version 2 retains boundaries for damaged nested items.
 pub(crate) const MESSAGE_OBSERVATION_VERSION: u32 = 2;
@@ -113,7 +116,6 @@ pub(crate) struct Cache {
 }
 
 struct ReusableFacts {
-    events: Vec<Arc<crate::session_events::Event>>,
     measurements: Vec<Arc<Measurement>>,
     operations: Vec<Arc<Operation>>,
 }
@@ -129,16 +131,9 @@ impl Cache {
     ) {
         operations.sort_unstable_by(|a, b| a.id.cmp(&b.id));
         self.seed = Some(ReusableFacts {
-            events: vec![],
             measurements,
             operations,
         });
-    }
-    pub(crate) fn seed_events(&mut self, mut events: Vec<Arc<crate::session_events::Event>>) {
-        if let Some(seed) = &mut self.seed {
-            events.sort_unstable_by(|a, b| a.id().cmp(b.id()));
-            seed.events = events;
-        }
     }
     pub(crate) fn share_measurements<'a>(
         &mut self,
@@ -186,7 +181,24 @@ pub(crate) fn sync(
     source: &SourceInstance,
     verify: bool,
 ) -> Result<Option<Collected>> {
-    Ok(sync_cached(db, source, verify, &mut Cache::default())?.map(|value| value.collected))
+    sync_cached(db, source, verify, &mut Cache::default())?
+        .map(|value| expand_test_events(db, source, value).map(|v| v.collected))
+        .transpose()
+}
+
+#[cfg(test)]
+pub(crate) fn expand_test_events(
+    db: &Connection,
+    source: &SourceInstance,
+    mut value: Synced,
+) -> Result<Synced> {
+    let mut events = BTreeMap::new();
+    crate::live_index::each_event(db, &fact_scope(source), |e| {
+        events.insert(e.shared_id(), e);
+        Ok(())
+    })?;
+    value.collected.events = events.into_values().collect();
+    Ok(value)
 }
 
 fn load_facts(
@@ -195,11 +207,12 @@ fn load_facts(
     reuse: Option<&ReusableFacts>,
     report: &SourceReport,
     cancelled: &std::sync::atomic::AtomicBool,
+    retain_all: bool,
 ) -> Result<Facts> {
     let mut events = BTreeMap::new();
     let mut event_strings = crate::session_events::EventStrings::default();
     let mut title_observations = BTreeMap::new();
-    crate::live_index::each(db, scope, |field, id, payload| {
+    crate::live_index::each_without_events(db, scope, |field, id, payload| {
         crate::operation_association::check(cancelled)?;
         if field == "title_observations" {
             let observation: crate::session_events::title_observations::TitleObservation =
@@ -210,23 +223,6 @@ fn load_facts(
                 "stored title scope mismatch"
             );
             title_observations.insert(id.into(), observation);
-        } else if field == "events" {
-            let mut event: crate::session_events::Event = serde_json::from_str(payload)?;
-            event_strings.share(&mut event);
-            let event = if let Some(rows) = reuse.map(|r| &r.events)
-                && let Ok(index) = rows.binary_search_by(|r| r.id().cmp(id))
-                && rows[index].as_ref() == &event
-            {
-                Arc::clone(&rows[index])
-            } else {
-                Arc::new(event)
-            };
-            anyhow::ensure!(event.id() == id, "stored event identity mismatch");
-            anyhow::ensure!(
-                event.position().source_instance_id.as_ref() == report.source.id,
-                "stored event source identity mismatch"
-            );
-            events.insert(id.into(), event);
         } else {
             anyhow::ensure!(
                 matches!(
@@ -245,7 +241,23 @@ fn load_facts(
         }
         Ok(())
     })?;
-    let mut facts = replay_events(events, report, cancelled)?;
+    if retain_all {
+        crate::live_index::each_event(db, scope, |mut event| {
+            crate::operation_association::check(cancelled)?;
+            event_strings.share(Arc::make_mut(&mut event));
+            anyhow::ensure!(
+                event.position().source_instance_id.as_ref() == report.source.id,
+                "stored event source identity mismatch"
+            );
+            events.insert(event.shared_id(), event);
+            Ok(())
+        })?;
+    }
+    let mut facts = if retain_all {
+        replay_events(events, report, cancelled)?
+    } else {
+        reduction::load_streamed(db, scope, report, cancelled)?
+    };
     facts.title_observations = title_observations;
     for observation in facts.title_observations.values() {
         crate::operation_association::check(cancelled)?;
@@ -292,7 +304,7 @@ fn load_facts(
 }
 
 fn replay_events(
-    events: BTreeMap<String, Arc<crate::session_events::Event>>,
+    events: BTreeMap<Arc<str>, Arc<crate::session_events::Event>>,
     report: &SourceReport,
     cancelled: &std::sync::atomic::AtomicBool,
 ) -> Result<Facts> {
@@ -542,6 +554,7 @@ fn sync_cached_with_context(
             cache.seed.as_ref(),
             &report,
             &context.cancelled,
+            rebuild,
         )?,
     };
     cache.seed = None;
@@ -568,6 +581,9 @@ fn sync_cached_with_context(
                 .map(|generation| (path.clone(), generation))
         })
         .collect();
+    if rebuild && facts.streaming {
+        facts = load_facts(db, &fact_scope, None, &report, &context.cancelled, true)?;
+    }
     if rebuild {
         // Cross-file ownership and late direct measurements require source-wide
         // reconciliation. Retain facts evidenced solely by now-missing files.
@@ -594,6 +610,13 @@ fn sync_cached_with_context(
             .iter()
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
+    }
+    // Full writes already visit every event. Building a second ordered identity
+    // set adds no information and needlessly grows with the entire archive.
+    facts.full_event_write = rebuild || previous.is_empty() || restoring;
+    if previous.is_empty() {
+        facts.streaming = true;
+        crate::live_index::save_events(db, &fact_scope, [], true, &context.cancelled)?;
     }
     for path in dirty {
         let checkpoint = checkpoints.entry(path.clone()).or_default();
@@ -622,7 +645,7 @@ fn sync_cached_with_context(
         };
         checkpoint.issues.clear();
         let first = report.issues.len();
-        read_file_from(
+        read_file_flushing(
             Path::new(&path),
             source,
             context,
@@ -630,7 +653,20 @@ fn sync_cached_with_context(
             &mut report,
             Some(checkpoint),
             Some(&before),
-        );
+            |facts, file_complete| {
+                if facts.streaming && (facts.pending_events.len() >= 1024 || file_complete) {
+                    crate::live_index::save_events(
+                        db,
+                        &fact_scope,
+                        &facts.pending_events,
+                        false,
+                        &context.cancelled,
+                    )?;
+                    facts.pending_events.clear();
+                }
+                Ok(())
+            },
+        )?;
         let after = FileMetadata::read(&path)?;
         if !contains_capture(&before, &after)
             || report.issues[first..].iter().any(|i| {
@@ -662,7 +698,7 @@ fn sync_cached_with_context(
         watermark.validate()?;
         checkpoint.watermark = Some(watermark);
     }
-    if rebuild {
+    if rebuild && !facts.streaming {
         // Missing files were retained before existing files were parsed. Restore
         // their combined source order before publishing or saving projections.
         // Checkpoints already own diagnostics; replay must not append them again.
@@ -674,7 +710,11 @@ fn sync_cached_with_context(
         )?;
         facts.title_observations = title_observations;
     }
-    facts.resolve_operations(&mut report, &context.cancelled)?;
+    if facts.streaming {
+        reduction::resolve_streamed(db, &fact_scope, &mut facts, &mut report, &context.cancelled)?;
+    } else {
+        facts.resolve_operations(&mut report, &context.cancelled)?;
+    }
     read_titles(root, &mut facts, &mut report);
     titles::apply_titles(&mut facts);
     for cp in checkpoints.values() {
@@ -721,6 +761,12 @@ fn sync_cached_with_context(
     titles::apply_titles(&mut derived);
     crate::operation_association::check(&context.cancelled)?;
     emit_facts(derived, &mut result, &context.cancelled)?;
+    if !facts.streaming {
+        for event in facts.events.values() {
+            crate::operation_association::check(&context.cancelled)?;
+            result.events.push(Arc::clone(event));
+        }
+    }
     if direct_only {
         for candidate in facts.measurements.values() {
             crate::operation_association::check(&context.cancelled)?;
@@ -732,7 +778,16 @@ fn sync_cached_with_context(
         }
     }
     crate::operation_association::check(&context.cancelled)?;
-    if full {
+    if facts.streaming {
+        crate::live_index::save_events(
+            db,
+            &fact_scope,
+            &facts.pending_events,
+            false,
+            &context.cancelled,
+        )?;
+        facts.pending_events.clear();
+    } else if full {
         crate::live_index::save_events(
             db,
             &fact_scope,
@@ -776,6 +831,13 @@ fn sync_cached_with_context(
     facts.retired_operations.clear();
     facts.dirty_aliases.clear();
     crate::operation_association::check(&context.cancelled)?;
+    // Verification may temporarily own all observations. Ordinary appends use
+    // canonical components and affected archive scopes; evidence stays durable.
+    facts.events.clear();
+    if !facts.streaming {
+        facts.association_groups = None;
+    }
+    facts.streaming = true;
     cache.facts = Some(facts);
     if !root.exists() && checkpoints.is_empty() {
         report.status = "notFound".into();
@@ -1092,3 +1154,6 @@ mod sharing_tests {
         empty.share_measurements(rows.iter());
     }
 }
+
+#[cfg(test)]
+mod streaming_tests;

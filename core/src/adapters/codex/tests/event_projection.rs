@@ -32,7 +32,7 @@ pub(super) fn replay(collected: &Collected) -> (Collected, SourceReport) {
     facts.events = collected
         .events
         .iter()
-        .map(|event| (event.id().to_owned(), event.clone()))
+        .map(|event| (event.shared_id(), event.clone()))
         .collect();
     let mut replayed = Collected::default();
     emit_facts(

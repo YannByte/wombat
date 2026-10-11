@@ -5,7 +5,7 @@ use crate::{
         contract::{DiscoveryRequest, RunContext},
     },
     config_dto::{UseBasisStatus, UseCoverage, UseSourceCompleteness, UseWindow},
-    optimize::{detection::detect, follow_up::observe},
+    optimize::{detection::detect, follow_up::observe as observe_checked},
 };
 use serde_json::json;
 use std::{fs, sync::Arc};
@@ -273,4 +273,12 @@ fn mcp_follow_up_requires_unambiguous_ownership_across_the_whole_inventory() {
             .iter()
             .all(|o| o.observed_records == Some(1))
     );
+}
+
+fn observe(
+    suggestions: &[Suggestion],
+    view: &View,
+    source: Option<&str>,
+) -> Vec<crate::optimize_dto::FollowUpObservation> {
+    observe_checked(suggestions, view, source).unwrap()
 }

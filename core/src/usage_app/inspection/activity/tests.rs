@@ -232,7 +232,7 @@ fn unreliable_identity_conflicts_and_expected_exit_codes_do_not_create_failures(
     op.matching.as_mut().unwrap().receiver_owner = Some("foreign".into());
     assert!(key(thread, &op).is_none());
     op.matching.as_mut().unwrap().receiver_owner = Some("a".into());
-    let mut foreign_project = thread.clone();
+    let mut foreign_project = thread.as_ref().clone();
     foreign_project.thread.project = Some("/other".into());
     assert_ne!(key(thread, &op), key(&foreign_project, &op));
     foreign_project.thread.project = None;
