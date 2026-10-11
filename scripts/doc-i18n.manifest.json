@@ -231,11 +231,6 @@
       "record": "docs/decisions/proposed/product/2026-10-02-progressive-initialization.i18n.json"
     },
     {
-      "zh": "docs/project/event-upgrade.md",
-      "en": "docs/project/event-upgrade.en.md",
-      "record": "docs/project/event-upgrade.i18n.json"
-    },
-    {
       "zh": "docs/decisions/implemented/architecture/2026-10-04-codex-task-timing.md",
       "en": "docs/decisions/implemented/architecture/2026-10-04-codex-task-timing.en.md",
       "record": "docs/decisions/implemented/architecture/2026-10-04-codex-task-timing.i18n.json"

@@ -17,7 +17,7 @@ A single JSON document containing all history makes small detail queries read la
 - Use immutable generations: a small manifest, compact measurement ledger, conversation JSONL shards, and turn offsets/hashes. Usage reads the ledger, turns read the target conversation, and steps read and verify only the relevant fragment.
 - Refresh holds a process file lock. It writes all files and hashes in a private temporary generation, commits the manifest, then atomically updates latest. Cancellation, failure, and limit violations do not publish partial snapshots; when all sources are unreadable, old latest remains intact.
 - Queries fix snapshotId, filter, sort, and aggregate the full scope before pagination. Share denominators are not computed from returned pages. Facts without a turn association remain unassigned records.
-- The product is unreleased and supports only the current snapshot format. Original logs and recovery materials are outside index cleanup scope.
+- Support only the current snapshot format. Original logs and recovery materials are outside index cleanup scope.
 - Store only allowlisted metadata, excluding messages, model bodies, full command arguments, and tool output. Source files are bounded for each read; reading multiple files is not a source-level atomic transaction.
 
 ## Alternatives considered
