@@ -310,7 +310,7 @@ async function comparisons(page:Page,fixture:Fixture,language:Language,width:num
  await activate(compare.getByRole('button',{name:label('comparison.submit'),exact:true}));await compare.locator('tbody tr').first().waitFor();
  await text(compare,'-165 Token');const family=compare.getByRole('checkbox',{name:label('comparison.family')});await family.focus();await family.press('Space');
  await text(compare,'-220 Token');await text(compare,t('comparison.members',{count:2}));await overflow(page);
- if(width<900)await activate(page.getByRole('button',{name:label('task.backToList'),exact:true}));
+ if(width<=760)await activate(page.getByRole('button',{name:label('task.backToList'),exact:true}));
  const changes=page.locator('.thread-list details').filter({hasText:label('comparison.refresh')}).first();
  await activate(changes.locator('summary'));await text(changes,label('comparison.refreshNote'));await text(changes,'+110 Token');
 }

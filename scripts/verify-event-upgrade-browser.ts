@@ -82,9 +82,9 @@ try {
   stage = 'browser-startup';
   server = await api.chromium.launchServer({ headless: true, executablePath: config.executable, timeout: 15_000 });
   browser = await api.chromium.connect(server.wsEndpoint(), { timeout: 10_000 });
-  for (const language of ['zh', 'en'] as const) for (const width of [390, 1440]) {
+  for (const language of ['zh', 'en'] as const) for (const width of [320, 390, 768, 1440]) {
     stage = `production-${language}-${width}`; await journey('production', language, width);
-    stage = `preview-${language}-${width}`; await journey('preview', language, width);
+    if (width !== 320) { stage = `preview-${language}-${width}`; await journey('preview', language, width); }
   }
   for (const language of ['zh', 'en'] as const) { stage = `preview-${language}-320`; await minimumWidth(language); }
   stage = 'final-build-identity'; checkBuild(repo); assert.equal(sourceIdentity(repo), fingerprint);

@@ -4,7 +4,8 @@
 
 .task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 12px 0; }
 
-@media(max-width:760px){.topbar{height:auto;min-height:64px;padding-top:10px;padding-bottom:10px;gap:8px;flex-wrap:wrap}.scope-heading{min-width:0}.scope-heading>span{display:none}.top-actions{margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:2px}.top-actions .quiet{padding:7px 8px}}
+.topbar{height:auto;min-height:72px;padding-top:10px;padding-bottom:10px;gap:8px;flex-wrap:wrap}.scope-heading{min-width:0}.top-actions{max-width:100%;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:760px){.topbar{min-height:64px}.scope-heading>span{display:none}.top-actions{gap:2px}.top-actions .quiet{padding:7px 8px}}
 
 @media(max-width:760px){.mobile-scope select{min-width:0}}
 
