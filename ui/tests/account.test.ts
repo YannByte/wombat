@@ -65,11 +65,13 @@ test('account summary exposes one current window without inventing unknown or ex
   assert.equal(summarizeAllowance(data).kind, 'unknown', 'a model-labeled non-Codex bucket cannot replace the Codex allowance');
 });
 
-test('account-wide card and compact entry use localized, responsive summary copy', () => {
+test('account-wide card and compact entry use localized, responsive summary copy', (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-04T00:00:00Z') });
   const saved = locale.getSnapshot().locale;
   const current = { ...data, windows: [{ ...data.windows[0], bucketId: 'codex', durationMinutes: 10_080, usedPercent: 72, resetsAt: '2026-10-11T00:00:00Z' }] };
   const state = { data: current, busy: false, refresh() {} };
   try { for (const language of ['zh', 'en'] as const) {
+    context.mock.timers.setTime(Date.parse('2026-10-04T00:00:00Z'));
     locale.setLocale(language);
     const card = renderToStaticMarkup(createElement(AccountSummaryCard, { state, timezone: 'UTC', open() {} }));
     const compact = renderToStaticMarkup(createElement(AccountCompactButton, { state, open() {} }));
@@ -81,6 +83,12 @@ test('account-wide card and compact entry use localized, responsive summary copy
     assert.match(card, /<meter/);
     assert.match(compact, language === 'en' ? /Codex allowance · 28%/ : /Codex 额度 · 28%/);
     assert.equal(allowanceDuration(60), language === 'en' ? '1-hour allowance' : '1 小时额度');
+    context.mock.timers.setTime(Date.parse(current.windows[0].resetsAt));
+    const expiredCard = renderToStaticMarkup(createElement(AccountSummaryCard, { state, timezone: 'UTC', open() {} }));
+    const expiredCompact = renderToStaticMarkup(createElement(AccountCompactButton, { state, open() {} }));
+    assert.doesNotMatch(expiredCard, /<meter|28%/);
+    assert.doesNotMatch(expiredCompact, /28%/);
+    assert.match(expiredCard, language === 'en' ? /Awaiting update/ : /待更新/);
   } } finally { locale.setLocale(saved); }
 });
 
