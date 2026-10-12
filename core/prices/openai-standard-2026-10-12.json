@@ -1,6 +1,6 @@
 {
-  "revision": "openai-standard-2026-09-30.2",
-  "verifiedAt": "2026-09-30",
+  "revision": "openai-standard-2026-10-12.1",
+  "verifiedAt": "2026-10-12",
   "policy": "official-standard-api-equivalent-v1",
   "currency": "USD",
   "models": [
@@ -52,6 +52,13 @@
       "source": "https://developers.openai.com/api/docs/models/gpt-6-sol",
       "rates": { "input": "2", "cacheRead": "0.2", "cacheCreate": "2.5", "output": "10" },
       "longContext": { "inputAbove": 272000, "rates": { "input": "4", "cacheRead": "0.4", "cacheCreate": "5", "output": "15" } }
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "aliases": [],
+      "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+      "rates": { "input": "2", "cacheRead": "0.1", "cacheCreate": "2.5", "output": "10" },
+      "longContext": { "inputAbove": 272000, "rates": { "input": "4", "cacheRead": "0.2", "cacheCreate": "5", "output": "15" } }
     },
     {
       "id": "gpt-6-astra",

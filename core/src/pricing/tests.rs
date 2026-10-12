@@ -41,6 +41,7 @@ fn current_codex_models_use_verified_standard_and_long_context_rates() {
         ("gpt-5.6-sol", "0.87", "2.58"),
         ("gpt-5.6-terra", "0.475", "1.35"),
         ("gpt-6-sol", "0.435", "1.29"),
+        ("gpt-6.1-sol", "0.43", "1.28"),
         ("gpt-6-astra", "2.175", "6.45"),
     ];
     for (name, expected_short, expected_long) in cases {
@@ -53,7 +54,7 @@ fn current_codex_models_use_verified_standard_and_long_context_rates() {
             long.components[0].rate_per_million.as_deref(),
             Some(match name {
                 "gpt-5.6-sol" => "8",
-                "gpt-5.6-terra" | "gpt-6-sol" => "4",
+                "gpt-5.6-terra" | "gpt-6-sol" | "gpt-6.1-sol" => "4",
                 _ => "20",
             }),
             "{name}"
@@ -72,6 +73,34 @@ fn long_context_boundary_is_strict_and_applies_to_entire_request() {
     assert_eq!(over.cost.as_deref(), Some("1.360005"));
     assert_eq!(over.basis[0].condition.as_ref(), "longContext");
     assert_eq!(over.basis[0].request_input_tokens, Some(272_001));
+}
+
+#[test]
+fn sol_61_uses_its_own_cache_rate_and_keeps_unknown_conditions_unknown() {
+    let at = price(&model("gpt-6.1-sol"), &tokens(222_000, 50_000, 0, 10_000));
+    assert_eq!(at.cost.as_deref(), Some("0.549"));
+    assert_eq!(at.basis[0].condition.as_ref(), "standard");
+    assert_eq!(at.basis[0].match_method.as_ref(), "exact");
+    let over = price(&model("gpt-6.1-sol"), &tokens(222_001, 50_000, 0, 10_000));
+    assert_eq!(over.cost.as_deref(), Some("1.048004"));
+    assert_eq!(over.basis[0].condition.as_ref(), "longContext");
+    let mut unknown_length = tokens(100, 20, 0, 10);
+    unknown_length.raw_input = None;
+    let unknown = price(&model("gpt-6.1-sol"), &unknown_length);
+    assert_eq!(unknown.cost, None);
+    assert!(
+        unknown
+            .issues
+            .iter()
+            .any(|i| i.as_ref() == "requestContextUnknown")
+    );
+    for name in [
+        "gpt-6.1-sol-2026-09-29",
+        "openai/gpt-6.1-sol",
+        "gpt-6.1-sol-preview",
+    ] {
+        assert_eq!(price(&model(name), &tokens(100, 20, 0, 10)).cost, None);
+    }
 }
 
 #[test]

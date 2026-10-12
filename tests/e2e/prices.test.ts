@@ -7,6 +7,37 @@ import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const entry = path.resolve(process.env.WOMBAT_CLI_ENTRY ?? 'dist/wombat.js');
+test('first offline scan prices Sol 6.1 at request boundaries without a download', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wombat-sol61-prices-'));
+  try {
+    const source = path.join(root, 'source');
+    await mkdir(path.join(source, 'sessions'), { recursive: true });
+    const rows = [
+      { type: 'session_meta', payload: { id: 'sol61-price-case' } },
+      { type: 'turn_context', payload: { turn_id: 'turn', model: 'gpt-6.1-sol' } },
+      ...[272000, 272001].map((input, index) => ({ type: 'event_msg', payload: {
+        type: 'token_usage_record', thread_id: 'sol61-price-case', turn_id: 'turn', response_id: `response-${index}`,
+        usage: { input_tokens: input, cached_input_tokens: 50000, cache_write_input_tokens: 0,
+          output_tokens: 10000, reasoning_output_tokens: 1000, total_tokens: input + 10000 },
+      } })),
+    ].map(row => ({ timestamp: '2026-10-12T00:00:00Z', ...row }));
+    await writeFile(path.join(source, 'sessions', 'source.jsonl'), rows.map(row => JSON.stringify(row)).join('\n') + '\n');
+    const env = { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: path.join(root, 'data'),
+      CODEX_HOME: source, WOMBAT_CORE_BIN: '', NODE_OPTIONS: '' };
+    const result = spawnSync(process.execPath, [entry, 'refresh', '--root', source, '--json'],
+      { env, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const value = JSON.parse(result.stdout);
+    assert.equal(value.summary.tokens.total, 564001);
+    assert.equal(value.summary.unpricedTokens, 0);
+    assert.equal(value.summary.price.status, 'priced');
+    // 222000*2/M + 50000*.1/M + 10000*10/M, plus the entire long request.
+    assert.equal(value.summary.price.cost, '1.597004');
+    assert.equal(value.summary.price.basis[0].originalModel, 'gpt-6.1-sol');
+    await assert.rejects(readFile(path.join(root, 'data', 'prices', 'active.json')), { code: 'ENOENT' });
+  } finally { await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
+});
 test('built CLI price update changes new snapshots only, is idempotent, and failures retain prices', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wombat-price-e2e-'));
   try {
@@ -42,7 +73,7 @@ test('built CLI price update changes new snapshots only, is idempotent, and fail
     const updated = run(['prices', 'update']);
     assert.equal(updated.status, 0, updated.stderr);
     assert.equal(updated.value.updated, true);
-    assert.equal(updated.value.catalog.models.length, 9);
+    assert.equal(updated.value.catalog.models.length, 10);
     assert.equal(updated.value.catalog.models.find((m: { id: string }) => m.id === 'synthetic-new').rates.input, '1.23');
     assert.match(updated.stderr, /校验并保存/);
     assert.equal(run(['prices', 'update']).value.updated, false);

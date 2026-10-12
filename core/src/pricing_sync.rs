@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn official_tables_select_standard_rates_and_preserve_unknowns() {
         let catalog = parse(SAMPLE, "2026-09-30T00:00:00Z").unwrap();
-        assert_eq!(catalog.models.len(), 9);
+        assert_eq!(catalog.models.len(), 10);
         let m = ModelRef {
             raw: Some("gpt-6-sol".into()),
             ..Default::default()
@@ -432,6 +432,22 @@ mod tests {
             .unwrap();
         assert!(mini.rates.cache_create.is_none());
         assert_eq!(mini.aliases, ["gpt-5.4-mini-2026-03-17"]);
+        let sol = catalog
+            .models
+            .iter()
+            .find(|m| m.id == "gpt-6.1-sol")
+            .unwrap();
+        assert_eq!(sol.rates.cache_read.as_deref(), Some("0.1"));
+        assert_eq!(
+            sol.long_context
+                .as_ref()
+                .unwrap()
+                .rates
+                .cache_read
+                .as_deref(),
+            Some("0.2")
+        );
+        assert!(sol.aliases.is_empty());
         assert!(
             !catalog
                 .models
@@ -450,6 +466,7 @@ mod tests {
             SAMPLE.replace("$1.23", "$1000001"),
             SAMPLE.replace("$1.23", "Free"),
             SAMPLE.replace("gpt-6-sol |", "new-id |"),
+            SAMPLE.replace("gpt-6.1-sol |", "new-sol |"),
             SAMPLE.replace("synthetic-new |", "gpt-6-sol |"),
             SAMPLE.replace("$4 | $0.4 | $0.5 | $15", "- | $0.4 | $0.5 | $15"),
             SAMPLE.replace(

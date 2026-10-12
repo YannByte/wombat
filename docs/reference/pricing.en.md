@@ -6,7 +6,7 @@ The Rust core converts tokens using bundled or updated official-standard API rat
 
 ## Catalog and sources
 
-Bundled revision: `openai-standard-2026-09-30.2`; policy: `official-standard-api-equivalent-v1`; checked on 2026-09-30. The [separate catalog](../../core/prices/openai-standard-2026-09-30.json) includes official links per entry. Snapshots retain the revision and SHA-256. Queries use saved component amounts rather than recalculating with new rates.
+Bundled revision: `openai-standard-2026-10-12.1`; policy: `official-standard-api-equivalent-v1`; updated on 2026-10-12 to add GPT-6.1 Sol. Other models retain their previously verified rates. The [separate catalog](../../core/prices/openai-standard-2026-10-12.json) includes official links per entry. Snapshots retain the revision and SHA-256. Queries use saved component amounts rather than recalculating with new rates.
 
 Units are USD per million tokens.
 
@@ -19,9 +19,10 @@ Units are USD per million tokens.
 | gpt-5.6-sol | 4 | 0.4 | 5 | 20 | [Model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol) |
 | gpt-5.6-terra | 2 | 0.2 | 2.5 | 12 | [Model page](https://developers.openai.com/api/docs/models/gpt-5.6-terra) |
 | gpt-6-sol | 2 | 0.2 | 2.5 | 10 | [Model page](https://developers.openai.com/api/docs/models/gpt-6-sol) |
+| gpt-6.1-sol | 2 | 0.1 | 2.5 | 10 | [Model page](https://developers.openai.com/api/docs/models/gpt-6.1-sol) |
 | gpt-6-astra | 10 | 1 | 12.5 | 50 | [Model page](https://developers.openai.com/api/docs/models/gpt-6-astra) |
 
-For GPT-5.4, GPT-5.5, GPT-5.6 Sol/Terra, and GPT-6 Sol/Astra, request input above 272,000 tokens applies 2× input/cache-read and 1.5× output rates to the entire request. Where cache-creation prices exist, that rate also doubles. The threshold includes cached input; exactly 272,000 uses standard rates. Price each request before aggregation; neither daily/turn totals nor only the excess above the threshold determine the tier. Cumulative differences without a known request input size cannot use these conditional rates.
+For GPT-5.4, GPT-5.5, GPT-5.6 Sol/Terra, GPT-6 Sol/Astra, and GPT-6.1 Sol, request input above 272,000 tokens applies 2× input/cache-read and 1.5× output rates to the entire request. Where cache-creation prices exist, that rate also doubles. The threshold includes cached input; exactly 272,000 uses standard rates. Price each request before aggregation; neither daily/turn totals nor only the excess above the threshold determine the tier. Cumulative differences without a known request input size cannot use these conditional rates.
 
 Explicit aliases are only the officially listed `gpt-5.4-2026-03-05`, `gpt-5.4-mini-2026-03-17`, and `gpt-5.5-2026-04-23`. There are no wildcard dates, substring matches, automatic third-party prefix removal, or similar-name guesses. Exact official names may map to this policy; an explicitly different model provider or API provider keeps cost unknown. Original names and matching basis are retained separately.
 

@@ -11,8 +11,8 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-const CATALOG_JSON: &str = include_str!("../prices/openai-standard-2026-09-30.json");
-pub const PRICE_REVISION: &str = "openai-standard-2026-09-30.2";
+const CATALOG_JSON: &str = include_str!("../prices/openai-standard-2026-10-12.json");
+pub const PRICE_REVISION: &str = "openai-standard-2026-10-12.1";
 pub const PRICE_POLICY: &str = "official-standard-api-equivalent-v1";
 const CATEGORIES: [&str; 4] = ["input", "cacheRead", "cacheCreate", "output"];
 
