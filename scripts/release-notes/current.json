@@ -1,19 +1,20 @@
 {
-  "summary": "This maintenance release improves Codex plugin compatibility, configuration evidence, cancellation, and update reliability.",
+  "summary": "This maintenance release reduces derived-index storage and cached-view memory while preserving exact accounting and historical evidence.",
   "highlights": [
-    "Use compatible local Codex versions through native plugin discovery and validated Hook registration, without a fixed version allowlist.",
-    "Follow configuration changes with content-version evidence. Replayed native AGENTS.md loads count once per document, while different documents remain distinct.",
-    "Read queries return CANCELLED when cancellation arrives before the result is delivered. Confirmed preference, directory authorization, price-update, and handoff-send results remain available.",
-    "Token budget watch reloads configuration and resumes checks after a concurrent monitor change; invalid arguments still return errors.",
-    "Update downloads enforce metadata and archive size limits while streaming, including responses without a reliable Content-Length header. Failed downloads retain the active installation.",
-    "Find the installation command and a copyable first question earlier in the README. See task timing, project statistics, budget monitoring, and recurring operations across tasks in one project."
+    "Read usage summaries and task rankings from exact persisted aggregates. Historical measurements and operation details load on demand; the recent 30-day aggregate cache has a byte limit even during heavy usage.",
+    "Keep historical accounting and supported evidence available after source logs disappear. Fixed views retain their own committed facts and prices, including late results and corrections.",
+    "Reduce repeated parsing, encoding, and association work during rebuilding and appends. Cached restoration shares task and turn metadata instead of retaining another complete ledger.",
+    "Bound concurrent query reductions and spill larger working sets to private temporary storage. Resource limits return explicit errors rather than silently truncated totals.",
+    "A fixed synthetic fixture measured more than tenfold complete-index reduction against the original uncompressed layout. This is fixture-specific evidence, not a guarantee for every source corpus."
   ],
   "knownLimitations": [
     "Codex is the only production data source in this release; support for other agents is planned.",
     "API costs are estimates. Unpriced or partial data stays explicit and is separate from subscription allowance.",
-    "Older snapshot or index formats can be rejected without migration. Preserve the original data directory and its user decisions. A different WOMBAT_DATA_HOME creates an isolated store; it does not repair the old store or transfer its decisions.",
+    "The derived-index format changes in this release. Older indexes can return INDEX_UNSUPPORTED_VERSION and are preserved without migration or automatic deletion. Follow the documented format recovery and preserve user decisions. A different WOMBAT_DATA_HOME creates an isolated store; it does not repair the old store or transfer its decisions.",
     "Timing describes recorded activity and can be partial or provisional. It does not establish why work was slow, code quality, token savings, or model performance.",
     "A sharing summary removes direct identifiers but does not guarantee anonymity. Preview it before sharing.",
-    "Large first reads can still take time. Native Codex plugin discovery and Hook registration require a compatible local Codex. Windows Hook collection remains unverified."
+    "First rebuilding and ordinary source catch-up can still use substantial memory and temporary disk space. The aggregate cache limit is not a process-memory ceiling, and full replay or large detail requests remain expensive. Persisting aggregates also adds write work.",
+    "Complete requests on the measured real corpus still exceeded 100 ms. Repeated compact requests can be faster, but the strict latency target remains unfinished.",
+    "Native Codex plugin discovery and Hook registration require a compatible local Codex. Windows Hook collection remains unverified."
   ]
 }

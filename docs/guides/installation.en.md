@@ -2,7 +2,7 @@
 
 [中文](installation.md) | English
 
-Wombat `v0.3.1` supports macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Installation includes everything needed to run Wombat. No development tools or API key are required.
+Wombat `v0.3.2` supports macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Installation includes everything needed to run Wombat. No development tools or API key are required.
 
 ## Install the runtime and plugin
 
