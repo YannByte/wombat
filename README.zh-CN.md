@@ -15,7 +15,7 @@ Wombat 分析本机 Codex 记录，找出推高 Token 用量的任务，查看�
 
 ## 开始使用
 
-**正式版：[`v0.3.2`](https://github.com/YannByte/wombat/releases/tag/v0.3.2)。**
+**正式版：[`v0.3.3`](https://github.com/YannByte/wombat/releases/tag/v0.3.3)。**
 
 本机分析无需 API Key 或开发工具。使用插件前，先安装兼容的本机 Codex。
 
