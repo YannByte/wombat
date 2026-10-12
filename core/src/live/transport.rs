@@ -453,28 +453,6 @@ fn restore_into(
     )
 }
 
-#[cfg(test)]
-mod timing_tests {
-    use super::*;
-
-    #[test]
-    fn timing_envelope_rejects_other_product_inputs_and_hooks() {
-        let request = json!({"action":"capabilities"});
-        assert!(serde_json::from_value::<TimingMessage>(json!({"timing":request})).is_ok());
-        for field in ["query", "config", "optimize", "nativeHooks", "handoff"] {
-            let mut value = json!({"timing":request});
-            value[field] = json!({});
-            assert!(serde_json::from_value::<TimingMessage>(value).is_err());
-        }
-        assert!(
-            serde_json::from_value::<TimingMessage>(json!({
-                "timing":{"action":"capabilities","verify":true}
-            }))
-            .is_err()
-        );
-    }
-}
-
 /// Readiness wakes immediately for a request; the timeout only bounds lifecycle checks.
 #[cfg(unix)]
 fn wait_for_connection(
@@ -502,6 +480,38 @@ fn wait_for_connection(
     }
     Ok(descriptor.revents & libc::POLLIN != 0)
 }
+
+// Encode typed output directly into its protocol envelope. Constructing a JSON
+// value tree first duplicates every ranking field and string on the hot path.
+fn encode_success(value: &impl serde::Serialize) -> serde_json::Result<Vec<u8>> {
+    let mut bytes = br#"{"ok":true,"value":"#.to_vec();
+    serde_json::to_writer(&mut bytes, value)?;
+    bytes.push(b'}');
+    Ok(bytes)
+}
+
+#[cfg(test)]
+mod timing_tests {
+    use super::*;
+
+    #[test]
+    fn timing_envelope_rejects_other_product_inputs_and_hooks() {
+        let request = json!({"action":"capabilities"});
+        assert!(serde_json::from_value::<TimingMessage>(json!({"timing":request})).is_ok());
+        for field in ["query", "config", "optimize", "nativeHooks", "handoff"] {
+            let mut value = json!({"timing":request});
+            value[field] = json!({});
+            assert!(serde_json::from_value::<TimingMessage>(value).is_err());
+        }
+        assert!(
+            serde_json::from_value::<TimingMessage>(json!({
+                "timing":{"action":"capabilities","verify":true}
+            }))
+            .is_err()
+        );
+    }
+}
+
 #[cfg(all(test, unix))]
 mod readiness_tests {
     use super::*;
@@ -517,13 +527,4 @@ mod readiness_tests {
         let _accepted = listener.accept().unwrap();
         assert!(!wait_for_connection(&listener, 0).unwrap());
     }
-}
-
-// Encode typed output directly into its protocol envelope. Constructing a JSON
-// value tree first duplicates every ranking field and string on the hot path.
-fn encode_success(value: &impl serde::Serialize) -> serde_json::Result<Vec<u8>> {
-    let mut bytes = br#"{"ok":true,"value":"#.to_vec();
-    serde_json::to_writer(&mut bytes, value)?;
-    bytes.push(b'}');
-    Ok(bytes)
 }
