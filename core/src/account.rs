@@ -122,12 +122,18 @@ pub(crate) fn normalize(c: Capture) -> Result<Response> {
         allowance: section(
             "unavailable",
             None,
-            c.rates_error.as_deref().or(Some("ALLOWANCE_UNAVAILABLE")),
+            c.rates_error
+                .as_deref()
+                .or(c.account_error.as_deref())
+                .or(Some("ALLOWANCE_UNAVAILABLE")),
         ),
         activity: section(
             "unavailable",
             None,
-            c.activity_error.as_deref().or(Some("ACTIVITY_UNAVAILABLE")),
+            c.activity_error
+                .as_deref()
+                .or(c.account_error.as_deref())
+                .or(Some("ACTIVITY_UNAVAILABLE")),
         ),
         identity: None,
         windows: vec![],

@@ -23,6 +23,8 @@ The Node client and local service use protocol 2 with a separate endpoint and se
 
 Read operations reject late transport results with `CANCELLED` when their signal has been cancelled. When a transport returns a completed preference write, directory authorization change, price update, or handoff send result, the client retains that result even if cancellation arrived late. A cancelled wait does not prove that a write did not occur.
 
+Local socket and native process access failures return `LOCAL_ACCESS_DENIED` when an OS denial is observed. Native diagnostic text and paths are not returned. Account section errors preserve this cause when the connection cannot be established; missing values remain unknown. The caller can request narrow access and retry the same read, but the transport does not grant permission or automatically resend writes.
+
 ## HTTP Transport
 
 `@wombat/client/http` exports `createHttpClient({ origin, token })`, implementing the same `UsageClient`, validating results and preserving progress, cancellation, and errors. The browser sends narrow operations to the local host rather than accessing the core directly.

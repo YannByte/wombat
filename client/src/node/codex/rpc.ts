@@ -5,6 +5,7 @@ import packageMetadata from '../../../package.json' with { type: 'json' };
 import { CoreError } from '../../errors.js';
 import type { QueryOptions } from '../../client.js';
 import { spawnCodex, stopCodex, type CodexOptions } from './process.js';
+import { NativeDiagnostics } from '../local-access.js';
 
 type Method =
   | 'skills/list'
@@ -28,6 +29,8 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
   if (query.signal?.aborted) throw new CoreError('CANCELLED', 'Cancelled');
   const child = spawnCodex(managed ? ['app-server', 'proxy'] : ['app-server'], options);
   const pending = new Map<number, Pending>();
+  const diagnostics = new NativeDiagnostics();
+  let terminalError: Error | undefined;
   let sequence = 0,
     bytes = 0,
     closed = false;
@@ -42,6 +45,7 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
   const fail = (error: Error) => {
     if (closed) return;
     closed = true;
+    terminalError = error;
     for (const w of pending.values()) {
       clearTimeout(w.timer);
       w.reject(error);
@@ -52,7 +56,8 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
     cleanup();
   };
   const abort = () => fail(new CoreError('CANCELLED', 'Cancelled'));
-  const close = () => fail(new CoreError('CODEX_DISCONNECTED', 'Codex disconnected'));
+  const disconnected = () => terminalError ?? diagnostics.error('CODEX_DISCONNECTED', 'Codex disconnected');
+  const close = () => fail(disconnected());
   const cleanup = () => {
     query.signal?.removeEventListener('abort', abort);
     process.off('SIGINT', abort);
@@ -84,7 +89,7 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
     clearTimeout(w.timer);
     if ('error' in message)
       w.reject(new CoreError('CODEX_REQUEST_REJECTED', 'Codex rejected the request'));
-    else if ('result' in message) w.resolve(message.result);
+    else if ('result' in message) { diagnostics.clear(); w.resolve(message.result); }
     else w.reject(new CoreError('NATIVE_PROTOCOL_ERROR', 'Invalid native response'));
   };
   const count = (chunk: Buffer | string) => {
@@ -95,10 +100,11 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
     }
     return true;
   };
-  child.stderr.on('data', count);
-  child.stdin.on('error', close);
-  child.stdout.on('error', close);
-  child.on('error', () => fail(new CoreError('CODEX_UNAVAILABLE', 'Codex unavailable')));
+  child.stderr.on('data', (chunk: Buffer) => { if (count(chunk)) diagnostics.write(chunk); });
+  const streamError = (error: Error) => { diagnostics.observe(error); close(); };
+  child.stdin.on('error', streamError);
+  child.stdout.on('error', streamError);
+  child.on('error', (error) => { diagnostics.observe(error); fail(diagnostics.error('CODEX_UNAVAILABLE', 'Codex unavailable')); });
   child.on('close', close);
   let text = '';
   const decoder = new StringDecoder('utf8');
@@ -107,7 +113,7 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
       const raw = data.toString();
       if (count(raw)) receive(raw);
     });
-    socket.on('error', close);
+    socket.on('error', streamError);
     socket.on('close', close);
   } else
     child.stdout.on('data', (chunk: Buffer) => {
@@ -121,7 +127,7 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
       }
     });
   const send = (value: unknown) => {
-    if (closed) throw new CoreError('CODEX_DISCONNECTED', 'Codex disconnected');
+    if (closed) throw disconnected();
     const json = JSON.stringify(value);
     if (Buffer.byteLength(json) > MAX_BYTES)
       throw new CoreError('OUTPUT_LIMIT', 'Native request too large');
@@ -131,7 +137,7 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
   const request = (method: string, params: unknown) =>
     new Promise<unknown>((resolve, reject) => {
       if (closed) {
-        reject(new CoreError('CODEX_DISCONNECTED', 'Codex disconnected'));
+        reject(disconnected());
         return;
       }
       const id = ++sequence,
@@ -165,11 +171,11 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
         });
         socket.once('error', () => {
           clearTimeout(timer);
-          reject(new CoreError('CODEX_UNAVAILABLE', 'Codex unavailable'));
+          reject(terminalError ?? diagnostics.error('CODEX_UNAVAILABLE', 'Codex unavailable'));
         });
         socket.once('close', () => {
           clearTimeout(timer);
-          reject(new CoreError('CODEX_DISCONNECTED', 'Codex disconnected'));
+          reject(disconnected());
         });
       });
     await request('initialize', {

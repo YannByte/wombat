@@ -87,6 +87,20 @@ fn failed_sections_never_become_zero_or_success() {
     );
     assert!(out.windows.is_empty() && out.summary.is_none());
 }
+
+#[test]
+fn connection_denial_is_visible_in_each_unavailable_section() {
+    let mut c = capture(None, None);
+    c.before = None;
+    c.after = None;
+    c.account_error = Some("LOCAL_ACCESS_DENIED".into());
+    let out = normalize(c).unwrap();
+    for section in [&out.account, &out.allowance, &out.activity] {
+        assert_eq!(section.status, "unavailable");
+        assert_eq!(section.error_code.as_deref(), Some("LOCAL_ACCESS_DENIED"));
+    }
+    assert!(out.identity.is_none() && out.windows.is_empty() && out.summary.is_none());
+}
 #[test]
 fn malformed_account_and_invalid_percentages_are_visible() {
     let mut c = capture(None, None);

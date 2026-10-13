@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { CoreError } from '../errors.js';
 import type { ConfigRequest, OptimizeRequest, LiveRequest, QueryOptions,HandoffRequest,TimingRequest,MonitorRequest } from '../client.js';
 import { binaryPath, decode, invokeOperation, type CoreProcessOptions } from './core.js';
+import { isLocalAccessDenied, localAccessError } from './local-access.js';
 
 type ProductRequest = {monitor:MonitorRequest} | { timing: TimingRequest } | LiveRequest | { config: ConfigRequest } | { optimize: OptimizeRequest } | {handoff:HandoffRequest};
 type NativeRequest = ProductRequest & { nativeHooks?: Awaited<ReturnType<typeof captureHooks>> };
@@ -25,7 +26,7 @@ function exchange(socket: string, request: NativeRequest, options: QueryOptions,
     options.signal?.addEventListener('abort', abort, { once: true });
     if (options.signal?.aborted) { abort(); return; }
     client.on('connect', () => client.write(JSON.stringify(request) + '\n'));
-    client.on('error', finish);
+    client.on('error', (error) => finish(isLocalAccessDenied(error) ? localAccessError() : error));
     client.on('data', (chunk: Buffer) => {
       bytes += chunk.length;
       if (bytes > (config.maxResponseBytes ?? 256_000_000)) { finish(new CoreError('OUTPUT_LIMIT', '实时用量响应超过上限')); return; }

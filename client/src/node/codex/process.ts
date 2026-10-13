@@ -1,6 +1,7 @@
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
 import {CoreError} from '../../errors.js';
 import type {QueryOptions} from '../../client.js';
+import {NativeDiagnostics} from '../local-access.js';
 
 export interface CodexOptions { codexBinaryPath?: string; codexTimeoutMs?: number; codexHome?: string }
 export function spawnCodex(args: string[], options: CodexOptions): ChildProcessWithoutNullStreams {
@@ -20,7 +21,7 @@ export function stopCodex(child: ChildProcessWithoutNullStreams): void {
 export async function runCodex(args: string[], query: QueryOptions, config: CodexOptions): Promise<string> {
   if(query.signal?.aborted)throw new CoreError('CANCELLED','Cancelled');
   return new Promise((resolve,reject)=>{
-    const child=spawnCodex(args,config);let output='',size=0,failure:Error|undefined,done=false;
+    const child=spawnCodex(args,config);const diagnostics=new NativeDiagnostics();let output='',size=0,failure:Error|undefined,done=false;
     const abort=()=>{failure=new CoreError('CANCELLED','Cancelled');stopCodex(child);};
     const stop=()=>{stopCodex(child);};
     const timer=setTimeout(()=>{failure=new CoreError('CODEX_TIMEOUT','Codex request timed out');stopCodex(child);},config.codexTimeoutMs??20_000);
@@ -28,9 +29,9 @@ export async function runCodex(args: string[], query: QueryOptions, config: Code
     process.once('SIGINT',abort);process.once('SIGTERM',abort);process.once('exit',stop);
     const finish=(error?:Error)=>{if(done)return;done=true;clearTimeout(timer);query.signal?.removeEventListener('abort',abort);process.off('SIGINT',abort);process.off('SIGTERM',abort);process.off('exit',stop);error?reject(error):resolve(output);};
     child.stdout.on('data',(chunk:Buffer)=>{size+=chunk.length;if(size>1024*1024){failure=new CoreError('OUTPUT_LIMIT','Codex response too large');stopCodex(child);}else output+=chunk.toString('utf8');});
-    child.stderr.on('data',(chunk:Buffer)=>{size+=chunk.length;if(size>1024*1024){failure=new CoreError('OUTPUT_LIMIT','Codex response too large');stopCodex(child);}});
-    child.on('error',()=>finish(new CoreError('CODEX_UNAVAILABLE','Codex unavailable')));
-    child.on('close',code=>finish(failure??(code===0?undefined:new CoreError('CODEX_UNAVAILABLE','Codex command failed'))));
+    child.stderr.on('data',(chunk:Buffer)=>{size+=chunk.length;if(size>1024*1024){failure=new CoreError('OUTPUT_LIMIT','Codex response too large');stopCodex(child);}else diagnostics.write(chunk);});
+    child.on('error',error=>{diagnostics.observe(error);finish(diagnostics.error('CODEX_UNAVAILABLE','Codex unavailable'));});
+    child.on('close',code=>finish(failure??(code===0?undefined:diagnostics.error('CODEX_UNAVAILABLE','Codex command failed'))));
     child.stdin.end();
     if(query.signal?.aborted)abort();
   });

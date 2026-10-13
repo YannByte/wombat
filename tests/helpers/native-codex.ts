@@ -40,6 +40,7 @@ export async function nativeCodexFixture(dir: string) {
   await writeFile(mode,JSON.stringify({kind:'blocked'}));await writeFile(calls,'');await writeFile(lifecycle,'');
   await writeFile(binary,`const {readFileSync,appendFileSync,writeFileSync}=require('node:fs');
 const mode=JSON.parse(readFileSync(${JSON.stringify(mode)},'utf8'));let accountReads=0,hookReads=0;
+if(mode.permissionDenied&&!process.argv.includes('--version')){process.stderr.write('Error: listen EPERM: operation not permitted SYNTHETIC_PRIVATE_NATIVE_PATH\\n');process.exit(1);}
 const identity=require('node:crypto').randomUUID();
 // A peer can disconnect while cleanup stops this fixture; it does not invalidate other probes.
 const monitor=require('node:net').createServer(socket=>{socket.on('error',()=>{});socket.end(identity);});

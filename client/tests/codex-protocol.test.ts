@@ -4,7 +4,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { connectCodex } from '../src/node/codex/rpc.js';
-import { nativeVersion } from '../src/node/codex/process.js';
+import { nativeVersion, runCodex } from '../src/node/codex/process.js';
+import { NativeDiagnostics, isLocalAccessDenied } from '../src/node/local-access.js';
 import packageMetadata from '../package.json' with { type: 'json' };
 
 test('native version preserves prerelease and build identity without accepting damaged output', async () => {
@@ -102,4 +103,35 @@ test('malformed native responses and disconnects never look like acceptance', as
       );
     });
   }
+});
+
+test('local access denials have a recoverable code without leaking native diagnostics', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'wombat-native-denied-'));
+  const binary = path.join(dir, 'codex.cjs');
+  try {
+    await writeFile(binary, String.raw`process.stderr.write('Error: listen EP');setTimeout(()=>{process.stderr.write('ERM: operation not permitted PRIVATE_SYNTHETIC_PATH\n');process.exit(1);},20);`);
+    for (const run of [
+      () => connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
+      () => runCodex(['--version'], {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
+    ]) await assert.rejects(run(), error => {
+      assert.equal((error as { code: string }).code, 'LOCAL_ACCESS_DENIED');
+      assert.ok(!String(error).includes('PRIVATE_SYNTHETIC_PATH'));
+      return true;
+    });
+    await writeFile(binary, `process.stderr.write('Synthetic private output mentions EPERM and permission denied');process.exit(1);`);
+    await assert.rejects(connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }), {code:'CODEX_DISCONNECTED'});
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('diagnostics preserve bounded lines and distinguish recovered warnings from host denials', () => {
+  assert.equal(isLocalAccessDenied({code:'EACCES'}), true);
+  assert.equal(isLocalAccessDenied({code:'EPERM'}), true);
+  assert.equal(isLocalAccessDenied({code:'ECONNREFUSED'}), false);
+  const diagnostics = new NativeDiagnostics();
+  diagnostics.write(Buffer.from('x'.repeat(100_000)+'Error: listen EPERM: operation not permitted\n'));
+  assert.equal(diagnostics.error('CODEX_DISCONNECTED','Disconnected').code,'CODEX_DISCONNECTED');
+  diagnostics.write(Buffer.from('Error: failed to bind Unix socket: Permission denied (os error 13)\n'));
+  assert.equal(diagnostics.error('CODEX_DISCONNECTED','Disconnected').code,'LOCAL_ACCESS_DENIED');
+  diagnostics.clear();
+  assert.equal(diagnostics.error('CODEX_DISCONNECTED','Disconnected').code,'CODEX_DISCONNECTED');
 });
