@@ -61,6 +61,18 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
     assert.equal(result.summary.currentItems,4,'missing paths are disclosed without being counted as present configuration');
     assert.equal(result.items.find(i=>i.path===path.join(root,'AGENTS.md'))!.measurementStatus,'missing');
     const item = result.items.find(i => i.name === 'review')!;
+    const combined = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'call'], { env: process.env, input: JSON.stringify({ method: 'config', params: { action: 'list', roots: [root], projectRoots: [project], snapshotId: usage.result.snapshotRef.snapshotId, scope, kinds: ['rule','skill','mcp','hook'], limit: 20 } }), encoding: 'utf8', timeout: 10000 });
+    assert.ok([0,2].includes(combined.status!), combined.stderr+combined.stdout);
+    const inventory = JSON.parse(combined.stdout);
+    assert.deepEqual(inventory.items.map((i: {id:string})=>i.id).sort(), result.items.map(i=>i.id).sort(), 'One multi-kind view preserves the complete requested inventory');
+    const webInventory = await browser.config!({action:'list',readView:result.readView,kinds:['rule','skill','mcp','hook'],scope});
+    assert.deepEqual(webInventory.items.map(i=>i.id).sort(),inventory.items.map((i:{id:string})=>i.id).sort());
+    const nodeRetained = await client.config!({action:'list',readView:inventory.readView,roots:[root],projectRoots:[project],kind:'skill',scope});
+    assert.equal(nodeRetained.readView,inventory.readView);
+    const retained = await browser.config!({action:'list',readView:webInventory.readView,kind:'skill',scope});
+    assert.equal(retained.readView,webInventory.readView);
+    assert.ok(retained.items.every(i=>i.kind==='skill'));
+    await assert.rejects(browser.config!({action:'list',readView:webInventory.readView,snapshotId:usage.result.snapshotRef.snapshotId,scope}), {code:'INVALID_ARGUMENT'});
     const failedItem = result.items.find(i => i.name === 'failed')!;
     assert.equal(failedItem.counts.failed, 1);
     assert.equal(failedItem.observation, 'used', 'a dispatched read is a use even when its outcome is failed');
