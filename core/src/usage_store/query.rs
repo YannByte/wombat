@@ -193,6 +193,35 @@ impl Snapshot {
         validate_measurements(&rows)?;
         Ok(rows)
     }
+    /// Inspection already owns its scoped ledger. Read operation facts without
+    /// selecting and cloning that turn's measurements a second time.
+    pub(crate) fn operations_for_turn(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+    ) -> Result<Vec<Arc<Operation>>> {
+        let thread = self
+            .manifest
+            .threads
+            .iter()
+            .find(|t| t.thread.id == thread_id)
+            .ok_or_else(|| operation_error("NOT_FOUND", "未找到对话"))?;
+        if !thread.turns.contains_key(turn_id) {
+            return Err(operation_error("NOT_FOUND", "未找到轮次"));
+        }
+        if let Some(turns) = &self.memory_turns {
+            let data = turns
+                .get(&(thread_id.into(), turn_id.into()))
+                .ok_or_else(|| operation_error("NOT_FOUND", "未找到轮次"))?;
+            return self.turn_operations(thread_id, turn_id, data);
+        }
+        Ok(self
+            .turn(thread_id, turn_id)?
+            .operations
+            .into_iter()
+            .map(Arc::new)
+            .collect())
+    }
     pub fn turn(&self, thread_id: &str, turn_id: &str) -> Result<TurnData> {
         if self.has_stored_ledger() {
             let data = self

@@ -407,8 +407,7 @@ fn review_comparison_reconciles_and_invalid_queries_fail_closed() {
     }
 }
 
-#[test]
-fn resources_keep_project_identity_unknown_duration_and_unverified_changes() {
+fn resource_facts() -> Collected {
     let base = snapshot(
         &[
             ("1", "a", "2026-09-02T00:00:00Z", 1),
@@ -478,6 +477,12 @@ fn resources_keep_project_identity_unknown_duration_and_unverified_changes() {
             evidence: vec![],
         }));
     }
+    collected
+}
+
+#[test]
+fn resources_keep_project_identity_unknown_duration_and_unverified_changes() {
+    let collected = resource_facts();
     let root = tempfile::tempdir().unwrap();
     let s = crate::usage_store::memory(
         collected,
@@ -527,6 +532,69 @@ fn resources_keep_project_identity_unknown_duration_and_unverified_changes() {
         filtered
             .limitations
             .contains(&InspectionLimit::OperationModelAssociation)
+    );
+}
+
+#[test]
+fn resources_do_not_read_unrelated_event_history_or_widen_inspection_budgets() {
+    let mut collected = resource_facts();
+    for offset in 0..=MAX_WORK {
+        collected.events.push(Arc::new(
+            Event::new(
+                Position {
+                    source_instance_id: "synthetic".into(),
+                    file_id: "history".into(),
+                    generation: "one".into(),
+                    byte_offset: offset as u64,
+                    ordinal: 0,
+                },
+                Some("a".into()),
+                None,
+                Time::from_source(Some("2026-09-02T00:00:00Z")).0,
+                vec![],
+                Payload::Lifecycle {
+                    lifecycle: LifecycleKind::Compaction,
+                    phase: crate::session_events::Phase::Unknown,
+                    native_id: None,
+                    duration_ms: None,
+                    first_token_ms: None,
+                },
+            )
+            .unwrap(),
+        ));
+    }
+    let root = tempfile::tempdir().unwrap();
+    let s = crate::usage_store::memory(
+        collected,
+        "live:synthetic:resource-history".into(),
+        crate::pricing_sync::current_at(root.path()).unwrap(),
+        None,
+    )
+    .unwrap();
+    let result = execute(
+        request(serde_json::json!({"action":"resources","scope":{"allTime":true}})),
+        &s,
+    )
+    .unwrap();
+    assert_eq!(result.summary.complete_token_total(), Some(2));
+    let inspection = result.inspection.unwrap();
+    assert_eq!(inspection.resource_count, 2);
+    assert_eq!(inspection.resources[0].operations, 6);
+    assert_eq!(inspection.resources[0].failed_operations, 2);
+    assert_eq!(inspection.resources[0].known_duration_ms, Some(200));
+    assert_eq!(inspection.resources[1].known_duration_ms, None);
+    let error = execute(
+        request(serde_json::json!({"action":"investigate","scope":{"allTime":true}})),
+        &s,
+    )
+    .err()
+    .unwrap();
+    assert_eq!(
+        error
+            .downcast_ref::<crate::dto::OperationError>()
+            .unwrap()
+            .code,
+        "RESOURCE_LIMIT"
     );
 }
 #[test]

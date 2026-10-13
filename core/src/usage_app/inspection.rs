@@ -767,12 +767,12 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                 ops.extend(read.operations.iter().map(|op| op.as_ref().clone()));
             } else {
                 for turn in thread.turns.keys() {
-                    let data = snapshot.turn(&t.id, turn)?;
-                    operation_work += data.operations.len();
+                    let operations = snapshot.operations_for_turn(&t.id, turn)?;
+                    operation_work += operations.len();
                     if operation_work > MAX_WORK {
                         return Err(limit());
                     }
-                    ops.extend(data.operations);
+                    ops.extend(operations.iter().map(|op| op.as_ref().clone()));
                 }
             }
             // Canonical operation identities are retained once, including unassigned turns.
@@ -799,9 +799,10 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                 }
             }
         }
-        let events = if opportunities.is_some()
-            || request.action == Action::Trajectory
-            || !matching.is_empty()
+        let events = if request.action != Action::Resources
+            && (opportunities.is_some()
+                || request.action == Action::Trajectory
+                || !matching.is_empty())
         {
             if let Some(read) = selected_turn.take() {
                 let mut events: Vec<_> = read.events.into_iter().chain(read.controls).collect();
