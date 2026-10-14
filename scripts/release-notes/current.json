@@ -1,15 +1,17 @@
 {
-  "summary": "This maintenance release improves focused Codex Skill answers, keeps follow-ups on the selected evidence, and clarifies local access failures.",
+  "summary": "This release adds bounded access to recorded Codex activity and original conversation evidence for daily work reports and follow-up questions.",
   "highlights": [
-    "Ask focused questions about usage, estimated costs, turn durations, task distributions, budgets, and account allowance. The Skill selects the relevant workflow and keeps simple answers concise.",
-    "Continue with the selected task and saved view when changing dates or projects. Authorized configuration edits preserve existing navigation and keep user decisions separate from recheck results.",
-    "Get an explicit local-access error and recovery guidance when process or service permissions block a query. Usable results remain available when another section fails.",
-    "Avoid redundant ledger and event reads during usage investigations. Configuration follow-ups also reuse their selected read view instead of repeating discovery and scans."
+    "Find recorded activity by date, project, task or turn, including observations without Token usage records. Keep recorded activity separate from verified completed work.",
+    "Locate user and assistant messages, or inspect messages around a recorded tool operation. Read selected original text in bounded batches with context and continuation; conversation bodies stay out of the index.",
+    "Search literal text within selected tasks or projects and continue unfinished scans. Compare fixed views to identify new files, appended observations and changed source generations.",
+    "Use the same generated conversation contract through the Agent CLI and authorized Web API. The Codex Skill combines activity and selected text with usage facts to support daily work reports."
   ],
   "knownLimitations": [
     "Codex is the only production data source in this release; support for other agents is planned.",
+    "Original-text access supports selected message mappings and text parts. Unknown mappings, non-text content and delta-stream assembly remain explicit gaps; there is no new transcript panel in the Web dashboard.",
+    "Conversation reads verify selected source text blocks and reject changed, replaced, missing or unavailable sources. A successful snippet does not prove that the complete source file is unchanged. Changes require a valid fixed baseline and do not establish additional work or savings.",
     "API costs are estimates. Unpriced or partial data stays explicit and is separate from subscription allowance.",
-    "Older unsupported indexes can return INDEX_UNSUPPORTED_VERSION and are preserved without migration or automatic deletion. Follow the documented format recovery and preserve user decisions. A different WOMBAT_DATA_HOME creates an isolated store; it does not repair the old store or transfer its decisions.",
+    "This release changes derived event, message-observation and source-watermark formats. Older indexes require a rebuild and are preserved without migration or automatic deletion. Follow the documented format recovery and preserve user decisions. A different WOMBAT_DATA_HOME creates an isolated store; it does not repair the old store or transfer its decisions.",
     "Timing describes recorded activity and can be partial or provisional. It does not establish why work was slow, code quality, token savings, or model performance.",
     "A sharing summary removes direct identifiers but does not guarantee anonymity. Preview it before sharing.",
     "First rebuilding and ordinary source catch-up can still use substantial memory and temporary disk space. The aggregate cache limit is not a process-memory ceiling, and full replay or large detail requests remain expensive. Persisting aggregates also adds write work.",

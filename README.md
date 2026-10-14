@@ -15,7 +15,7 @@ Use the Codex plugin to ask questions. Open the local Web dashboard for charts a
 
 ## Get started
 
-**Stable: [`v0.3.4`](https://github.com/YannByte/wombat/releases/tag/v0.3.4).**
+**Stable: [`v0.3.5`](https://github.com/YannByte/wombat/releases/tag/v0.3.5).**
 
 Local analysis needs no API key or development tools. Install a compatible local Codex before using the plugin.
 
@@ -46,6 +46,7 @@ If plugin installation fails, Wombat remains installed. Follow the [installation
 ## Main uses
 
 - Compare task usage and period growth. Inspect the tasks and turns behind changes.
+- Find recorded activity and earlier messages. Let Codex read selected original text for daily work reports and follow-up questions.
 - Inspect recorded durations, activity intervals, overlaps, and coverage gaps.
 - Find repeated operations across tasks for Codex to assess as possible scripts or Skills.
 - Check project instructions and extensions. Review locations, evidence, and suggested actions.

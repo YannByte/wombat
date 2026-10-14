@@ -15,7 +15,7 @@ Wombat 分析本机 Codex 记录，找出推高 Token 用量的任务，查看�
 
 ## 开始使用
 
-**正式版：[`v0.3.4`](https://github.com/YannByte/wombat/releases/tag/v0.3.4)。**
+**正式版：[`v0.3.5`](https://github.com/YannByte/wombat/releases/tag/v0.3.5)。**
 
 本机分析无需 API Key 或开发工具。使用插件前，先安装兼容的本机 Codex。
 
@@ -46,6 +46,7 @@ Windows PowerShell：
 ## 主要用途
 
 - 比较任务用量和周期增长，查看变化涉及的任务与轮次。
+- 查找已记录的活动和历史消息，让 Codex 按需读取原文，用于每日工作报告和后续追问。
 - 查看已记录的时长、活动区间、重叠和覆盖缺口。
 - 找出跨任务的重复操作，供 Codex 判断是否适合整理为脚本或 Skill。
 - 检查项目指令与扩展，审阅具体位置、依据和建议操作。

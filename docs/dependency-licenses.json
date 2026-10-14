@@ -7,7 +7,7 @@
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
     "pnpm-lock.yaml": "7128a48df418f8e0b6ae85dace5a53b14dad5ee20e5a6e699ceda4f9351fda8d",
-    "core/Cargo.lock": "802df5b2f4e603a88f2fd616f910177d4f0249073939a996d756a3c98ed90530"
+    "core/Cargo.lock": "14ed998c1edfb6fd40113007c3e89e4e29a72f1e925aa6e1e9f1351decbaca5c"
   },
   "node": [
     {
