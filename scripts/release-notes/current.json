@@ -1,9 +1,10 @@
 {
-  "summary": "This maintenance release adds verified GPT-6.1 Sol prices so first installations and offline queries can calculate its standard API-equivalent costs.",
+  "summary": "This maintenance release improves focused Codex Skill answers, keeps follow-ups on the selected evidence, and clarifies local access failures.",
   "highlights": [
-    "Calculate GPT-6.1 Sol input, cache-read, cache-write, and output costs using its own verified prices, including whole-request rates above the 272K input boundary.",
-    "Use the bundled prices without a network download. Ordinary live queries retain automatic official-price updates when eligible rates are missing; offline and fixed-snapshot queries remain offline.",
-    "Keep previously saved snapshot prices unchanged. Unknown request lengths, unverified model names, and unsupported providers remain explicit rather than borrowing another model's prices."
+    "Ask focused questions about usage, estimated costs, turn durations, task distributions, budgets, and account allowance. The Skill selects the relevant workflow and keeps simple answers concise.",
+    "Continue with the selected task and saved view when changing dates or projects. Authorized configuration edits preserve existing navigation and keep user decisions separate from recheck results.",
+    "Get an explicit local-access error and recovery guidance when process or service permissions block a query. Usable results remain available when another section fails.",
+    "Avoid redundant ledger and event reads during usage investigations. Configuration follow-ups also reuse their selected read view instead of repeating discovery and scans."
   ],
   "knownLimitations": [
     "Codex is the only production data source in this release; support for other agents is planned.",
