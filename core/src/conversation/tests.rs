@@ -137,7 +137,9 @@ fn reads_fail_on_replacement_rewrite_truncation_and_missing_source() {
     let r = read_request(&snapshot, locate(&snapshot), 8192);
     let before = fs::metadata(&path).unwrap().modified().unwrap();
     fs::write(&path, rows("CHANGED_SYNTHETIC")).unwrap();
-    fs::File::open(&path)
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&path)
         .unwrap()
         .set_times(fs::FileTimes::new().set_modified(before))
         .unwrap();
