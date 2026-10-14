@@ -1,7 +1,8 @@
 use super::*;
 fn watermark() -> SourceWatermark {
     SourceWatermark {
-        format_version: 1,
+        original_source: None,
+        format_version: crate::adapters::contract::WATERMARK_FORMAT_VERSION,
         source_instance_id: "synthetic".into(),
         file_id: "file".into(),
         generation: Some("generation".into()),
@@ -72,7 +73,7 @@ fn future_watermark_header_precedes_future_shape_rejection() {
     .unwrap();
     let path = snapshot.directory.join("manifest.json");
     let mut raw: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-    raw["watermarks"][0]["formatVersion"] = serde_json::json!(2);
+    raw["watermarks"][0]["formatVersion"] = serde_json::json!(WATERMARK_FORMAT_VERSION + 1);
     raw["watermarks"][0]["futureField"] = serde_json::json!(true);
     fs::write(&path, serde_json::to_vec(&raw).unwrap()).unwrap();
     let error = load_at(
@@ -88,7 +89,7 @@ fn future_watermark_header_precedes_future_shape_rejection() {
             .code,
         "UNSUPPORTED_VERSION"
     );
-    raw["watermarks"][0]["formatVersion"] = serde_json::json!(1);
+    raw["watermarks"][0]["formatVersion"] = serde_json::json!(WATERMARK_FORMAT_VERSION);
     fs::write(path, serde_json::to_vec(&raw).unwrap()).unwrap();
     let error = load_at(
         root.path(),

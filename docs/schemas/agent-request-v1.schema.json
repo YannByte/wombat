@@ -3,6 +3,24 @@
   "title": "Request",
   "oneOf": [
     {
+      "description": "Discover activity, locate messages, search selected conversations or explicitly read bounded original text.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "conversation"
+        },
+        "params": {
+          "$ref": "#/definitions/Request"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
       "description": "Query current usage and synchronize sources as requested. Params wrap query, mode and verify.",
       "type": "object",
       "properties": {
@@ -11,7 +29,7 @@
           "const": "usage"
         },
         "params": {
-          "$ref": "#/definitions/Request"
+          "$ref": "#/definitions/Request2"
         }
       },
       "required": [
@@ -29,7 +47,7 @@
           "const": "snapshot"
         },
         "params": {
-          "$ref": "#/definitions/Request2"
+          "$ref": "#/definitions/Request3"
         }
       },
       "required": [
@@ -47,7 +65,7 @@
           "const": "config"
         },
         "params": {
-          "$ref": "#/definitions/Request3"
+          "$ref": "#/definitions/Request4"
         }
       },
       "required": [
@@ -65,7 +83,7 @@
           "const": "optimize"
         },
         "params": {
-          "$ref": "#/definitions/Request4"
+          "$ref": "#/definitions/Request5"
         }
       },
       "required": [
@@ -83,7 +101,7 @@
           "const": "timing"
         },
         "params": {
-          "$ref": "#/definitions/Request5"
+          "$ref": "#/definitions/Request6"
         }
       },
       "required": [
@@ -101,7 +119,7 @@
           "const": "setup"
         },
         "params": {
-          "$ref": "#/definitions/Request6"
+          "$ref": "#/definitions/Request7"
         }
       },
       "required": [
@@ -119,7 +137,7 @@
           "const": "account"
         },
         "params": {
-          "$ref": "#/definitions/Request7"
+          "$ref": "#/definitions/Request8"
         }
       },
       "required": [
@@ -137,7 +155,7 @@
           "const": "directories"
         },
         "params": {
-          "$ref": "#/definitions/Request8"
+          "$ref": "#/definitions/Request9"
         }
       },
       "required": [
@@ -155,7 +173,7 @@
           "const": "preferences"
         },
         "params": {
-          "$ref": "#/definitions/Request9"
+          "$ref": "#/definitions/Request10"
         }
       },
       "required": [
@@ -173,7 +191,7 @@
           "const": "prices"
         },
         "params": {
-          "$ref": "#/definitions/Request10"
+          "$ref": "#/definitions/Request11"
         }
       },
       "required": [
@@ -191,7 +209,7 @@
           "const": "collection"
         },
         "params": {
-          "$ref": "#/definitions/Request11"
+          "$ref": "#/definitions/Request12"
         }
       },
       "required": [
@@ -209,7 +227,7 @@
           "const": "handoff"
         },
         "params": {
-          "$ref": "#/definitions/Request12"
+          "$ref": "#/definitions/Request13"
         }
       },
       "required": [
@@ -227,7 +245,7 @@
           "const": "monitor"
         },
         "params": {
-          "$ref": "#/definitions/Request13"
+          "$ref": "#/definitions/Request14"
         }
       },
       "required": [
@@ -241,8 +259,303 @@
     "Request": {
       "type": "object",
       "properties": {
+        "action": {
+          "$ref": "#/definitions/Action"
+        },
+        "snapshotId": {
+          "type": "string"
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "selection": {
+          "default": {
+            "since": null,
+            "until": null,
+            "timezone": null,
+            "includeUndated": false,
+            "sources": [],
+            "projects": [],
+            "threads": [],
+            "turns": [],
+            "origins": [],
+            "phases": [],
+            "recordKinds": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Selection"
+            }
+          ]
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "query": {
-          "$ref": "#/definitions/Request2"
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baselineSnapshotId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReadTarget"
+          },
+          "default": []
+        },
+        "maxScanBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "radius": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "snapshotId"
+      ]
+    },
+    "Action": {
+      "type": "string",
+      "enum": [
+        "activity",
+        "locate",
+        "read",
+        "search",
+        "changes"
+      ]
+    },
+    "Selection": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "includeUndated": {
+          "type": "boolean",
+          "default": false
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "threads": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageOrigin"
+          },
+          "default": []
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentPhase"
+          },
+          "default": []
+        },
+        "recordKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageRecordKind"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessageOrigin": {
+      "description": "Source-backed provenance only; an unclassified user record is not authorization.",
+      "type": "string",
+      "enum": [
+        "assistant_visible",
+        "user_input",
+        "user_unclassified",
+        "injected_context",
+        "reasoning",
+        "inter_agent",
+        "inherited",
+        "compaction",
+        "unknown"
+      ]
+    },
+    "ContentPhase": {
+      "type": "string",
+      "enum": [
+        "commentary",
+        "final_answer",
+        "unknown"
+      ]
+    },
+    "MessageRecordKind": {
+      "type": "string",
+      "enum": [
+        "legacy_snapshot",
+        "response_snapshot",
+        "native_snapshot",
+        "delta",
+        "unknown"
+      ]
+    },
+    "ReadTarget": {
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "before": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "maximum": 9007199254740991
+        },
+        "after": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidence"
+      ]
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "turnId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eventOffset": {
+          "description": "Exact position in the fixed target partition, not a raw file offset.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "sourceInstanceId",
+        "eventOffset"
+      ]
+    },
+    "Request2": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "$ref": "#/definitions/Request3"
         },
         "mode": {
           "default": "auto",
@@ -262,7 +575,7 @@
         "query"
       ]
     },
-    "Request2": {
+    "Request3": {
       "type": "object",
       "properties": {
         "comparison": {
@@ -276,7 +589,7 @@
           ]
         },
         "action": {
-          "$ref": "#/definitions/Action"
+          "$ref": "#/definitions/Action2"
         },
         "snapshotId": {
           "type": [
@@ -481,7 +794,7 @@
         "thread"
       ]
     },
-    "Action": {
+    "Action2": {
       "type": "string",
       "enum": [
         "refresh",
@@ -630,14 +943,14 @@
         "cached"
       ]
     },
-    "Request3": {
+    "Request4": {
       "type": "object",
       "properties": {
         "action": {
           "default": "list",
           "allOf": [
             {
-              "$ref": "#/definitions/Action2"
+              "$ref": "#/definitions/Action3"
             }
           ]
         },
@@ -756,7 +1069,7 @@
       },
       "additionalProperties": false
     },
-    "Action2": {
+    "Action3": {
       "type": "string",
       "enum": [
         "list",
@@ -849,14 +1162,14 @@
         "recent"
       ]
     },
-    "Request4": {
+    "Request5": {
       "type": "object",
       "properties": {
         "action": {
           "default": "list",
           "allOf": [
             {
-              "$ref": "#/definitions/Action3"
+              "$ref": "#/definitions/Action4"
             }
           ]
         },
@@ -981,7 +1294,7 @@
       },
       "additionalProperties": false
     },
-    "Action3": {
+    "Action4": {
       "type": "string",
       "enum": [
         "list",
@@ -1068,7 +1381,7 @@
         "turnId"
       ]
     },
-    "Request5": {
+    "Request6": {
       "oneOf": [
         {
           "type": "object",
@@ -1287,7 +1600,7 @@
         "use_records"
       ]
     },
-    "Request6": {
+    "Request7": {
       "type": "object",
       "properties": {
         "project": {
@@ -1308,21 +1621,21 @@
       },
       "additionalProperties": false
     },
-    "Request7": {
+    "Request8": {
       "type": "object",
       "properties": {
         "action": {
           "default": "read",
           "allOf": [
             {
-              "$ref": "#/definitions/Action4"
+              "$ref": "#/definitions/Action5"
             }
           ]
         }
       },
       "additionalProperties": false
     },
-    "Action4": {
+    "Action5": {
       "type": "string",
       "enum": [
         "read",
@@ -1330,14 +1643,14 @@
         "history"
       ]
     },
-    "Request8": {
+    "Request9": {
       "type": "object",
       "properties": {
         "action": {
           "default": "list",
           "allOf": [
             {
-              "$ref": "#/definitions/Action5"
+              "$ref": "#/definitions/Action6"
             }
           ]
         },
@@ -1372,7 +1685,7 @@
       },
       "additionalProperties": false
     },
-    "Action5": {
+    "Action6": {
       "type": "string",
       "enum": [
         "list",
@@ -1389,11 +1702,11 @@
         "project"
       ]
     },
-    "Request9": {
+    "Request10": {
       "type": "object",
       "properties": {
         "action": {
-          "$ref": "#/definitions/Action6"
+          "$ref": "#/definitions/Action7"
         },
         "language": {
           "anyOf": [
@@ -1411,7 +1724,7 @@
         "action"
       ]
     },
-    "Action6": {
+    "Action7": {
       "type": "string",
       "enum": [
         "get",
@@ -1425,11 +1738,11 @@
         "en"
       ]
     },
-    "Request10": {
+    "Request11": {
       "type": "object",
       "properties": {
         "action": {
-          "$ref": "#/definitions/Action7"
+          "$ref": "#/definitions/Action8"
         }
       },
       "additionalProperties": false,
@@ -1437,7 +1750,7 @@
         "action"
       ]
     },
-    "Action7": {
+    "Action8": {
       "type": "string",
       "enum": [
         "status",
@@ -1445,14 +1758,14 @@
         "auto_update"
       ]
     },
-    "Request11": {
+    "Request12": {
       "type": "object",
       "properties": {
         "action": {
           "default": "status",
           "allOf": [
             {
-              "$ref": "#/definitions/Action8"
+              "$ref": "#/definitions/Action9"
             }
           ]
         },
@@ -1506,7 +1819,7 @@
       },
       "additionalProperties": false
     },
-    "Action8": {
+    "Action9": {
       "type": "string",
       "enum": [
         "status",
@@ -1523,14 +1836,14 @@
         "hooks"
       ]
     },
-    "Request12": {
+    "Request13": {
       "type": "object",
       "properties": {
         "action": {
           "default": "preview",
           "allOf": [
             {
-              "$ref": "#/definitions/Action9"
+              "$ref": "#/definitions/Action10"
             }
           ]
         },
@@ -1619,20 +1932,20 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/Selection"
+            "$ref": "#/definitions/Selection2"
           }
         }
       },
       "additionalProperties": false
     },
-    "Action9": {
+    "Action10": {
       "type": "string",
       "enum": [
         "preview",
         "send"
       ]
     },
-    "Selection": {
+    "Selection2": {
       "type": "object",
       "properties": {
         "projectId": {
@@ -1648,7 +1961,7 @@
         "path"
       ]
     },
-    "Request13": {
+    "Request14": {
       "oneOf": [
         {
           "type": "object",

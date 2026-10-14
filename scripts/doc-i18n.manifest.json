@@ -271,6 +271,11 @@
       "record": "docs/decisions/proposed/product/2026-10-04-codex-skill.i18n.json"
     },
     {
+      "zh": "docs/decisions/proposed/product/2026-10-14-conversation-access.md",
+      "en": "docs/decisions/proposed/product/2026-10-14-conversation-access.en.md",
+      "record": "docs/decisions/proposed/product/2026-10-14-conversation-access.i18n.json"
+    },
+    {
       "zh": "docs/decisions/implemented/product/2026-10-09-task-statistics-monitoring.md",
       "en": "docs/decisions/implemented/product/2026-10-09-task-statistics-monitoring.en.md",
       "record": "docs/decisions/implemented/product/2026-10-09-task-statistics-monitoring.i18n.json"

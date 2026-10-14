@@ -125,6 +125,48 @@ fn select_with_retained(
     })
 }
 
+pub(super) fn conversation_query(
+    request: crate::conversation_dto::Request,
+    shared: &Shared,
+    jobs: &mpsc::SyncSender<Job>,
+    configs: &Mutex<crate::config::Store>,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> Result<crate::conversation_dto::Response> {
+    crate::conversation::validate(&request)?;
+    let selector = selection::ReadViewSelector::new(
+        request.roots.clone(),
+        Some(request.snapshot_id.clone()),
+        Mode::Cached,
+        false,
+        false,
+    )?;
+    let (snapshot, freshness) = select_with_retained(&selector, shared, jobs, configs, cancelled)?;
+    let baseline = request
+        .baseline_snapshot_id
+        .as_ref()
+        .map(|id| {
+            let selector = selection::ReadViewSelector::new(
+                request.roots.clone(),
+                Some(id.clone()),
+                Mode::Cached,
+                false,
+                false,
+            )?;
+            select_with_retained(&selector, shared, jobs, configs, cancelled).map(|(s, _)| s)
+        })
+        .transpose()?;
+    let mut result =
+        crate::conversation::query(&snapshot, baseline.as_deref(), &request, cancelled)?;
+    result.freshness = Some(freshness);
+    if serde_json::to_vec(&result)?.len() > 1024 * 1024 {
+        return Err(operation_error(
+            "RESOURCE_LIMIT",
+            "Conversation response exceeds budget",
+        ));
+    }
+    Ok(result)
+}
+
 pub(super) fn config_query(
     request: crate::config_dto::Request,
     native: Option<&crate::config::hooks::Capture>,

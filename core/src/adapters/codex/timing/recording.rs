@@ -9,6 +9,8 @@ pub(in crate::adapters::codex) struct Context {
     gaps: Vec<Gap>,
     phase: Phase,
     pub(super) history_origin: Option<crate::session_events::MessageOrigin>,
+    pub(super) source_row: Option<(usize, usize)>,
+    pub(super) original_content: Option<crate::conversation_source::OriginalContent>,
 }
 impl Context {
     pub(in crate::adapters::codex) fn locally_owned(&self) -> bool {
@@ -48,7 +50,13 @@ impl Context {
             gaps: gap.into_iter().collect(),
             phase,
             history_origin: super::messages::history_origin(metadata),
+            source_row: None,
+            original_content: None,
         }
+    }
+    pub(in crate::adapters::codex) fn source_row(mut self, row: &[u8]) -> Self {
+        self.source_row = Some((row.as_ptr() as usize, row.len()));
+        self
     }
 }
 
@@ -140,6 +148,18 @@ pub(in crate::adapters::codex) fn record(
         collected_at,
     ) {
         Ok(mut event) => {
+            if matches!(event.payload(), SafePayload::Message { .. })
+                && let Some(content) = context.original_content.take()
+                && event.set_original_content(content).is_err()
+            {
+                issue(
+                    report,
+                    "invalidSourceField",
+                    "原文位置无效",
+                    Some(evidence.clone()),
+                );
+                return;
+            }
             facts.event_strings.share(&mut event);
             crate::adapters::codex::event_projection::apply(facts, &event, report);
             let id = event.shared_id();

@@ -13,6 +13,8 @@ const MAX_OWNER_WORK: usize = 100_000;
 pub struct NativeBoundaryIndex {
     pub method_version: String,
     pub event_count: usize,
+    /// Exact safe message count, including partitions without a resolved turn.
+    pub message_count: usize,
     /// The complete partition was examined; source coverage remains separate.
     pub complete: bool,
     /// None means a mixed source bucket; never infer one source from the first row.
@@ -60,6 +62,10 @@ pub(super) fn build(target: &EventTarget, events: &[Arc<Event>]) -> Result<Nativ
     let index = NativeBoundaryIndex {
         method_version: BOUNDARY_METHOD_VERSION.into(),
         event_count: events.len(),
+        message_count: events
+            .iter()
+            .filter(|e| matches!(e.payload(), crate::session_events::Payload::Message { .. }))
+            .count(),
         complete: true,
         source_instance_id: same_source
             .then(|| first_source.map(str::to_owned))
@@ -99,6 +105,14 @@ pub(super) fn validate(partition: &EventPartition) -> Result<()> {
         ));
     }
     if !index.complete
+        || index.message_count > index.event_count
+        || !partition.chunks.is_empty()
+            && index.message_count
+                != partition
+                    .chunks
+                    .iter()
+                    .map(|c| c.message_count)
+                    .sum::<usize>()
         || index.event_count != partition.count
         || index.summary.candidates > partition.count
         || index

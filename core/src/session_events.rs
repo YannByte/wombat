@@ -7,7 +7,7 @@ use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub const EVENT_VERSION: u32 = 4;
+pub const EVENT_VERSION: u32 = 5;
 mod review;
 pub use review::{ReviewObservation, SafetyLabel};
 pub mod title_observations;
@@ -153,7 +153,7 @@ pub enum ActivityKind {
 }
 
 /// Source-backed provenance only; an unclassified user record is not authorization.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageOrigin {
     AssistantVisible,
@@ -175,7 +175,7 @@ pub enum ContentPresence {
     Unknown,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageRecordKind {
     LegacySnapshot,
@@ -185,7 +185,7 @@ pub enum MessageRecordKind {
     Unknown,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentPhase {
     Commentary,
@@ -256,7 +256,8 @@ pub enum Payload {
     Activity {
         activity: ActivityKind,
     },
-    /// Presence is observed in memory; no body, size, hash or media reference is retained.
+    /// Message semantics retain presence only. Optional original-text locators live
+    /// on the envelope; neither bodies nor media references can be stored.
     Message {
         origin: MessageOrigin,
         presence: ContentPresence,
@@ -291,6 +292,7 @@ struct StoredEvent {
     collected_at: Arc<str>,
     gaps: Vec<Gap>,
     payload: Payload,
+    original_content: Option<Arc<crate::conversation_source::OriginalContent>>,
 }
 
 /// Constructors and deserialization both enforce the same current-format envelope.
@@ -481,10 +483,26 @@ impl Event {
             collected_at: collected_at.into(),
             gaps,
             payload,
+            original_content: None,
         })
     }
     pub fn id(&self) -> &str {
         &self.0.id
+    }
+    pub fn original_content(&self) -> Option<&crate::conversation_source::OriginalContent> {
+        self.0.original_content.as_deref()
+    }
+    pub(crate) fn set_original_content(
+        &mut self,
+        content: crate::conversation_source::OriginalContent,
+    ) -> Result<()> {
+        content.validate()?;
+        ensure!(
+            matches!(self.payload(), Payload::Message { .. }),
+            "content outside a message"
+        );
+        self.0.original_content = Some(Arc::new(content));
+        Ok(())
     }
     pub(crate) fn shared_id(&self) -> Arc<str> {
         Arc::clone(&self.0.id)
@@ -529,6 +547,13 @@ impl Event {
     // Constructors compute the identity once; persisted envelopes verify it before
     // entering the same semantic validation path.
     fn validate_fields(value: StoredEvent) -> Result<Self> {
+        if let Some(content) = &value.original_content {
+            ensure!(
+                matches!(value.payload, Payload::Message { .. }),
+                "content outside a message"
+            );
+            content.validate()?;
+        }
         ensure!(
             chrono::DateTime::parse_from_rfc3339(&value.collected_at).is_ok(),
             "invalid event collection time"

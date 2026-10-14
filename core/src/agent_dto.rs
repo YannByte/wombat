@@ -11,6 +11,8 @@ use std::collections::BTreeMap;
     deny_unknown_fields
 )]
 pub enum Request {
+    /// Discover activity, locate messages, search selected conversations or explicitly read bounded original text.
+    Conversation(crate::conversation_dto::Request),
     /// Query current usage and synchronize sources as requested. Params wrap query, mode and verify.
     Usage(crate::live::Request),
     /// Query fixed or saved usage views; explicit refresh scans sources and saves a new snapshot.

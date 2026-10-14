@@ -1,6 +1,6 @@
 ---
 name: wombat
-description: Show local Codex usage, estimated costs, task timing, account allowance and configuration findings. Find usage evidence and recheck authorized changes. Use for Wombat setup and Token budgets, not general project development.
+description: Show local Codex usage, estimated costs and recorded activity. Find earlier conversations and original evidence for daily work and usage reviews. Check timing, allowance, configuration and Token budgets; recheck authorized changes. Not general project development.
 ---
 
 # Wombat
@@ -12,6 +12,7 @@ Use the user's requested language. Otherwise, use the conversation language. For
 Select the smallest query that answers the question. Discover the executable and Agent API once through [startup](references/startup.md). Keep the discovery for later requests in this conversation. Read only the references for the current task:
 
 - Totals, trends, rankings or a task search: [usage](references/usage.md).
+- Daily work, earlier discussions or original message evidence: [conversation](references/conversation.md).
 - Estimated cost, missing model prices or price updates: [pricing](references/pricing.md). Use [usage](references/usage.md) for the selected usage.
 - High consumption, retries, input growth, repeated work or period review: [investigation](references/investigation.md).
 - Task distributions or contributions to growth: [statistics](references/statistics.md).

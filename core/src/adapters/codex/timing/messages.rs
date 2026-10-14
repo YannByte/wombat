@@ -107,6 +107,47 @@ fn content_presence(raw: Option<&RawValue>, native: bool) -> ContentPresence {
     .unwrap_or(ContentPresence::Unknown)
 }
 
+struct SourceParts {
+    native: bool,
+    row: (usize, usize),
+}
+impl<'de> Visitor<'de> for SourceParts {
+    type Value = crate::conversation_source::OriginalContent;
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("message content")
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let mut content = crate::conversation_source::OriginalContent::default();
+        let mut index = 0u32;
+        while let Some(raw) = seq.next_element::<&RawValue>()? {
+            match serde_json::from_str::<Part<'_>>(raw.get()) {
+                Ok(part)
+                    if if self.native {
+                        part.kind.as_deref() == Some("Text")
+                    } else {
+                        matches!(part.kind.as_deref(), Some("input_text" | "output_text"))
+                    } =>
+                {
+                    if let Some(text) = part.text {
+                        content.text(text, self.row, index);
+                    } else {
+                        content.partial = true;
+                    }
+                }
+                _ => content.partial = true,
+            }
+            index = index.saturating_add(1);
+        }
+        Ok(content)
+    }
+}
+impl<'de> serde::de::DeserializeSeed<'de> for SourceParts {
+    type Value = crate::conversation_source::OriginalContent;
+    fn deserialize<D: serde::Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        d.deserialize_seq(self)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn observe(
     p: &Payload<'_>,
@@ -270,6 +311,40 @@ pub(super) fn observe(
         Some("final_answer") => ContentPhase::FinalAnswer,
         _ => ContentPhase::Unknown,
     };
+    if let Some(context) = &mut facts.event_context
+        && let Some(row) = context.source_row
+        && record_kind != MessageRecordKind::Unknown
+        && !matches!(
+            origin,
+            MessageOrigin::Reasoning | MessageOrigin::Compaction | MessageOrigin::Unknown
+        )
+    {
+        use serde::de::DeserializeSeed;
+        let mut content = crate::conversation_source::OriginalContent::default();
+        if let Some(raw) = match record_kind {
+            MessageRecordKind::LegacySnapshot => p.message,
+            MessageRecordKind::Delta => p.delta,
+            _ => None,
+        } {
+            content.text(raw, row, 0);
+        } else if let Some(raw) = item.content {
+            content = SourceParts {
+                native: native && matches!(kind, "AgentMessage" | "agentMessage" | "agent_message"),
+                row,
+            }
+            .deserialize(&mut serde_json::Deserializer::from_str(raw.get()))
+            .unwrap_or(crate::conversation_source::OriginalContent {
+                chunks: vec![],
+                partial: true,
+            });
+            if content.chunks.is_empty() && !content.partial {
+                content.empty_value(raw, row);
+            }
+        } else {
+            content.partial = true;
+        }
+        context.original_content = Some(content);
+    }
     record(
         facts,
         thread.map(str::to_owned),

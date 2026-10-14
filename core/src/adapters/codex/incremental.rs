@@ -9,8 +9,8 @@ mod reduction;
 #[cfg(test)]
 mod reduction_tests;
 
-/// Required message mapping: version 2 retains boundaries for damaged nested items.
-pub(crate) const MESSAGE_OBSERVATION_VERSION: u32 = 2;
+/// Mapping 3 adds bounded original-text locators; damaged-item boundaries remain.
+pub(crate) const MESSAGE_OBSERVATION_VERSION: u32 = 3;
 /// Canonical operation outcome mapping, including persistent conflict evidence.
 pub(crate) const OPERATION_OBSERVATION_VERSION: u32 = 6;
 /// Measurement context conflict markers require explicit source observation headers.

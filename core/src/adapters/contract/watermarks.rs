@@ -2,7 +2,14 @@
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 
-pub const WATERMARK_FORMAT_VERSION: u32 = 1;
+pub const WATERMARK_FORMAT_VERSION: u32 = 2;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OriginalSource {
+    pub path: String,
+    pub physical_id: String,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -47,6 +54,7 @@ impl WatermarkIssue {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SourceWatermark {
+    pub original_source: Option<OriginalSource>,
     pub format_version: u32,
     pub source_instance_id: String,
     /// The exact file identity used by session_events::Position.
@@ -65,6 +73,13 @@ pub struct SourceWatermark {
 }
 impl SourceWatermark {
     pub(crate) fn validate(&self) -> Result<()> {
+        if let Some(source) = &self.original_source {
+            ensure!(
+                !source.physical_id.is_empty()
+                    && crate::hash(source.path.as_bytes()) == self.file_id,
+                "invalid original source identity"
+            );
+        }
         if self.format_version != WATERMARK_FORMAT_VERSION {
             return Err(crate::dto::operation_error(
                 "UNSUPPORTED_VERSION",

@@ -52,6 +52,7 @@ export function createHttpClient(options: { origin: string; token: string; fetch
     optimize: (r, q) => send('optimize', r, q),
     preferences: (r, q) => send('preferences', r, q),
     directories: (r, q) => send('directories', r, q),
+    conversation: (r,q) => send('conversation',r,q),
     timing: (r, q) => send('timing', r, q),
     account: (r, q) => send('account', r, q),
     handoff: (r, q) => send('handoff', r, q),

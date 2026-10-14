@@ -23,6 +23,7 @@ export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
     optimize: (request, queryOptions) => queryLive({ optimize: request }, queryOptions, options),
     preferences: (request, queryOptions) => invokeOperation('preferences', request, queryOptions, options),
     directories: createDirectoryTransport(options, options.directoryPicker),
+    conversation: (r, q) => !r.snapshotId.startsWith('live:') && !(r.baselineSnapshotId?.startsWith('live:')) ? invokeOperation('conversation', r, q, options) : queryLive({conversation:r},q,options),
     timing: (request, queryOptions) => request.action === 'capabilities'
       || (request.snapshotId != null && !request.snapshotId.startsWith('live:'))
       ? invokeOperation('timing', request, queryOptions, options)

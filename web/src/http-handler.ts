@@ -62,6 +62,7 @@ export function createHttpHandler({
           '/api/account',
           '/api/handoff',
           '/api/timing',
+          '/api/conversation',
           '/api/collection',
           '/api/setup',
           '/api/monitor',
@@ -115,6 +116,7 @@ export function createHttpHandler({
           req.url !== '/api/directories' &&
           req.url !== '/api/account' &&
           req.url !== '/api/timing' &&
+          req.url !== '/api/conversation' &&
           rawClient.directories
         )
           updateGrants(await rawClient.directories({ action: 'list' }, query));
@@ -135,56 +137,61 @@ export function createHttpHandler({
                     request as Parameters<NonNullable<UsageClient['collection']>>[0],
                     query,
                   )
-                : req.url === '/api/timing'
-                  ? await client.timing!(
-                      request as Parameters<NonNullable<UsageClient['timing']>>[0],
+                : req.url === '/api/conversation'
+                  ? await client.conversation!(
+                      request as Parameters<NonNullable<UsageClient['conversation']>>[0],
                       query,
                     )
-                  : req.url === '/api/query'
-                    ? await client.query(request as Parameters<UsageClient['query']>[0], query)
-                    : req.url === '/api/account'
-                      ? await client.account!(
-                          request as Parameters<NonNullable<UsageClient['account']>>[0],
-                          query,
-                        )
-                      : req.url === '/api/handoff'
-                        ? await client.handoff!(
-                            request as Parameters<NonNullable<UsageClient['handoff']>>[0],
+                  : req.url === '/api/timing'
+                    ? await client.timing!(
+                        request as Parameters<NonNullable<UsageClient['timing']>>[0],
+                        query,
+                      )
+                    : req.url === '/api/query'
+                      ? await client.query(request as Parameters<UsageClient['query']>[0], query)
+                      : req.url === '/api/account'
+                        ? await client.account!(
+                            request as Parameters<NonNullable<UsageClient['account']>>[0],
                             query,
                           )
-                        : req.url === '/api/prices'
-                          ? await client.prices(
-                              request as Parameters<UsageClient['prices']>[0],
+                        : req.url === '/api/handoff'
+                          ? await client.handoff!(
+                              request as Parameters<NonNullable<UsageClient['handoff']>>[0],
                               query,
                             )
-                          : req.url === '/api/config'
-                            ? await client.config!(
-                                request as Parameters<NonNullable<UsageClient['config']>>[0],
+                          : req.url === '/api/prices'
+                            ? await client.prices(
+                                request as Parameters<UsageClient['prices']>[0],
                                 query,
                               )
-                            : req.url === '/api/optimize'
-                              ? await client.optimize!(
-                                  request as Parameters<NonNullable<UsageClient['optimize']>>[0],
+                            : req.url === '/api/config'
+                              ? await client.config!(
+                                  request as Parameters<NonNullable<UsageClient['config']>>[0],
                                   query,
                                 )
-                              : req.url === '/api/directories'
-                                ? await client.directories!(
-                                    request as Parameters<
-                                      NonNullable<UsageClient['directories']>
-                                    >[0],
+                              : req.url === '/api/optimize'
+                                ? await client.optimize!(
+                                    request as Parameters<NonNullable<UsageClient['optimize']>>[0],
                                     query,
                                   )
-                                : req.url === '/api/preferences'
-                                  ? await client.preferences!(
+                                : req.url === '/api/directories'
+                                  ? await client.directories!(
                                       request as Parameters<
-                                        NonNullable<UsageClient['preferences']>
+                                        NonNullable<UsageClient['directories']>
                                       >[0],
                                       query,
                                     )
-                                  : await client.live!(
-                                      request as Parameters<NonNullable<UsageClient['live']>>[0],
-                                      query,
-                                    );
+                                  : req.url === '/api/preferences'
+                                    ? await client.preferences!(
+                                        request as Parameters<
+                                          NonNullable<UsageClient['preferences']>
+                                        >[0],
+                                        query,
+                                      )
+                                    : await client.live!(
+                                        request as Parameters<NonNullable<UsageClient['live']>>[0],
+                                        query,
+                                      );
         const result =
           'result' in value ? value.result : 'snapshotRef' in value ? value : undefined;
         if ('readView' in value) {

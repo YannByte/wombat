@@ -132,7 +132,7 @@ fn old_or_unknown_parser_watermark_header_is_rejected_without_mutation() {
     let (_root, _index, _path, source, mut db) = setup();
     sync(&mut db, &source).unwrap();
     let scope = format!("parser:{}:{VERSION}:1", source.id);
-    for header in [None, Some(serde_json::json!(2))] {
+    for header in [None, Some(serde_json::json!(WATERMARK_FORMAT_VERSION + 1))] {
         let mut old = crate::live_index::load_map(&db, &scope).unwrap();
         old.remove("watermarkVersion");
         if let Some(header) = header {

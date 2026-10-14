@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-note-bounded-conversation-access-for-codex": {
+      "zh": "ecda9f054f0b10535a82e6330798b1b1e43f285f8a57ba426ef4bfce2d120d0c",
+      "en": "d015ae03d9411effe890506c4676ca40cb898c34ec8fd6c26f461a490bbbc34a"
+    },
+    "/decision-note-bounded-conversation-access-for-codex/problem": {
+      "zh": "cfc8befa1bdfc2d8c950fcb1db797d560ab8ac12893948c276a0d79c9a6b20f3",
+      "en": "0f68c6cecfe65b4b932c021e5522fa71dd5bf67ef1bf368b7ddc1d5f9c0c3ae0"
+    },
+    "/decision-note-bounded-conversation-access-for-codex/proposal": {
+      "zh": "243f113c88a4f906803996f83b052f323e684f8472a317210c3d27ccfef62dcd",
+      "en": "4527f38c17f83073812378e77bd1f75981a0659d323ee0a55331d83b2749d82a"
+    },
+    "/decision-note-bounded-conversation-access-for-codex/alternatives-considered": {
+      "zh": "55a07fd7335732834637592340042db13d1293f525833bb58636dcbb64fe1efb",
+      "en": "21fc4f711f99403698b485238bd4104c79c9ef296efdf243893999263f585ba2"
+    },
+    "/decision-note-bounded-conversation-access-for-codex/acceptance-criteria": {
+      "zh": "d247d175a07615ae9774e4e161772e6c23a0b5d2af923d399b83018010cde3ab",
+      "en": "8e823c346d99a2af2d11c87f4f633db2c6453d7a4fb409df1a77cf07a7ecebee"
+    }
+  }
+}

@@ -1,7 +1,8 @@
 use super::*;
 fn row() -> SourceWatermark {
     SourceWatermark {
-        format_version: 1,
+        original_source: None,
+        format_version: crate::adapters::contract::WATERMARK_FORMAT_VERSION,
         source_instance_id: "s".into(),
         file_id: "f".into(),
         generation: None,
@@ -19,7 +20,7 @@ fn empty_generation_and_unknown_headers_are_not_complete_coverage() {
     value.generation = Some(String::new());
     assert!(value.validate().is_err());
     value = row();
-    value.format_version = 2;
+    value.format_version = WATERMARK_FORMAT_VERSION + 1;
     assert!(value.validate().is_err());
     value = row();
     value.observed_bytes = None;

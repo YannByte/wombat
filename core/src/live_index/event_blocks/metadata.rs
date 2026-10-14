@@ -28,6 +28,10 @@ pub(super) fn chunk(id: i64, digest: String, bytes: u64, events: &[Arc<Event>]) 
             sha256: digest,
         },
         count: events.len(),
+        message_count: events
+            .iter()
+            .filter(|e| matches!(e.payload(), crate::session_events::Payload::Message { .. }))
+            .count(),
         bytes,
         first: events[0].position().clone(),
         last: events[events.len() - 1].position().clone(),

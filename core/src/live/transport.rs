@@ -6,6 +6,11 @@ use super::*;
 struct TimingMessage {
     timing: crate::timing_dto::Request,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ConversationMessage {
+    conversation: crate::conversation_dto::Request,
+}
 
 pub fn serve() -> Result<()> {
     #[cfg(windows)]
@@ -265,6 +270,22 @@ pub fn serve() -> Result<()> {
                                 &jobs,
                                 &configs,
                                 &cancelled,
+                            )?)?);
+                        }
+                        if value.get("conversation").is_some() {
+                            let request: ConversationMessage = serde_json::from_value(value)
+                                .map_err(|_| {
+                                    operation_error(
+                                        "INVALID_ARGUMENT",
+                                        "Invalid conversation request",
+                                    )
+                                })?;
+                            return Ok(encode_success(&query::conversation_query(
+                                request.conversation,
+                                &state,
+                                &jobs,
+                                &configs,
+                                &std::sync::atomic::AtomicBool::new(false),
                             )?)?);
                         }
                         if value.get("handoff").is_some() {

@@ -1,0 +1,654 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Response",
+  "type": "object",
+  "properties": {
+    "outputVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "action": {
+      "$ref": "#/definitions/Action"
+    },
+    "snapshotId": {
+      "type": "string"
+    },
+    "baselineSnapshotId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "selection": {
+      "$ref": "#/definitions/Selection"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Activity"
+      }
+    },
+    "fragments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Fragment"
+      }
+    },
+    "nextCursor": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scanComplete": {
+      "description": "All matching indexed positions were visited; source completeness is separate.",
+      "type": "boolean"
+    },
+    "partial": {
+      "type": "boolean"
+    },
+    "limits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scannedEvents": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "sourceBytesRead": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "freshness": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Freshness"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "window": {
+      "description": "When present, completeness applies only to this requested source window.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ContextWindow"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "outputVersion",
+    "action",
+    "snapshotId",
+    "selection",
+    "items",
+    "fragments",
+    "scanComplete",
+    "partial",
+    "limits",
+    "scannedEvents",
+    "sourceBytesRead"
+  ],
+  "definitions": {
+    "Action": {
+      "type": "string",
+      "enum": [
+        "activity",
+        "locate",
+        "read",
+        "search",
+        "changes"
+      ]
+    },
+    "Selection": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "includeUndated": {
+          "type": "boolean",
+          "default": false
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "threads": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageOrigin"
+          },
+          "default": []
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentPhase"
+          },
+          "default": []
+        },
+        "recordKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageRecordKind"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessageOrigin": {
+      "description": "Source-backed provenance only; an unclassified user record is not authorization.",
+      "type": "string",
+      "enum": [
+        "assistant_visible",
+        "user_input",
+        "user_unclassified",
+        "injected_context",
+        "reasoning",
+        "inter_agent",
+        "inherited",
+        "compaction",
+        "unknown"
+      ]
+    },
+    "ContentPhase": {
+      "type": "string",
+      "enum": [
+        "commentary",
+        "final_answer",
+        "unknown"
+      ]
+    },
+    "MessageRecordKind": {
+      "type": "string",
+      "enum": [
+        "legacy_snapshot",
+        "response_snapshot",
+        "native_snapshot",
+        "delta",
+        "unknown"
+      ]
+    },
+    "Activity": {
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collectedAt": {
+          "type": "string"
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": "string"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MessageOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContentPhase"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeMessageId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recordKind": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MessageRecordKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hasTextLocator": {
+          "type": "boolean"
+        },
+        "contentPartial": {
+          "type": "boolean"
+        },
+        "change": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Change"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidence",
+        "collectedAt",
+        "kind",
+        "hasTextLocator",
+        "contentPartial"
+      ]
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "turnId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eventOffset": {
+          "description": "Exact position in the fixed target partition, not a raw file offset.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "sourceInstanceId",
+        "eventOffset"
+      ]
+    },
+    "Change": {
+      "type": "string",
+      "enum": [
+        "new_source_file",
+        "appended",
+        "generation_changed"
+      ]
+    },
+    "Fragment": {
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "text": {
+          "type": "string"
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentLocation"
+          }
+        },
+        "context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Activity"
+          }
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidence",
+        "text",
+        "locations",
+        "context",
+        "partial"
+      ]
+    },
+    "ContentLocation": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "byteStart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "byteEnd": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "part": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "byteStart",
+        "byteEnd",
+        "part"
+      ]
+    },
+    "Freshness": {
+      "type": "object",
+      "properties": {
+        "publicationChange": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PublicationChange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectLoads": {
+          "description": "Projects restored from committed facts; pending projects are not zero usage.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectLoad"
+          }
+        },
+        "status": {
+          "type": "string"
+        },
+        "initialScan": {
+          "description": "Ephemeral task headers; no completed ledger or coverage is available yet.",
+          "type": "boolean",
+          "default": false
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "errorCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "revision"
+      ]
+    },
+    "PublicationChange": {
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "baseline": {
+          "$ref": "#/definitions/SnapshotRef"
+        },
+        "current": {
+          "$ref": "#/definitions/SnapshotRef"
+        },
+        "measurementsAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "measurementsRemoved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "measurementsChanged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "threadsAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "turnsChanged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "pricesChanged": {
+          "type": "boolean"
+        },
+        "coverageChanged": {
+          "type": "boolean"
+        },
+        "delta": {
+          "$ref": "#/definitions/UsageDelta"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "methodVersion",
+        "baseline",
+        "current",
+        "measurementsAdded",
+        "measurementsRemoved",
+        "measurementsChanged",
+        "threadsAdded",
+        "turnsChanged",
+        "pricesChanged",
+        "coverageChanged",
+        "delta"
+      ]
+    },
+    "SnapshotRef": {
+      "type": "object",
+      "properties": {
+        "snapshotId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshotId",
+        "createdAt"
+      ]
+    },
+    "UsageDelta": {
+      "type": "object",
+      "properties": {
+        "tokens": {
+          "description": "Complete analyzed totals only; missing observations never become zero.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "cost": {
+          "description": "Complete configured valuations only, with exact decimal subtraction.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tokenRatio": {
+          "description": "No percentage for a zero or unavailable baseline.",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "ProjectLoad": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/definitions/ProjectLoadState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ]
+    },
+    "ProjectLoadState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "loading",
+        "ready"
+      ]
+    },
+    "ContextWindow": {
+      "type": "object",
+      "properties": {
+        "anchor": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "radius"
+      ]
+    }
+  }
+}

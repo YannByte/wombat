@@ -31,6 +31,32 @@ export function createScopedClient(
   );
   return createUsageClient({
     timing,
+    conversation: async (r, q) => {
+      if (!options.client.conversation)
+        throw new CoreError('CORE_UNAVAILABLE', 'Conversation access unavailable');
+      if (
+        r.roots?.length ||
+        !snapshots.has(r.snapshotId) ||
+        (r.baselineSnapshotId && !snapshots.has(r.baselineSnapshotId))
+      )
+        throw new CoreError(
+          'INVALID_ARGUMENT',
+          'Conversation access requires host-published read identities',
+        );
+      await revalidateFixed(q);
+      if (
+        !snapshots.has(r.snapshotId) ||
+        (r.baselineSnapshotId && !snapshots.has(r.baselineSnapshotId))
+      )
+        throw new CoreError('VIEW_EXPIRED', 'Read identity is no longer authorized');
+      const result = await options.client.conversation({ ...r, roots: readScope.roots ?? [] }, q);
+      if (
+        !snapshots.has(r.snapshotId) ||
+        (r.baselineSnapshotId && !snapshots.has(r.baselineSnapshotId))
+      )
+        throw new CoreError('VIEW_EXPIRED', 'Read identity is no longer authorized');
+      return result;
+    },
     monitor: async (r, q) => {
       if (!options.client.monitor)
         throw new CoreError('MONITOR_UNAVAILABLE', 'Monitor unavailable');

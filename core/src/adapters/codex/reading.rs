@@ -118,6 +118,7 @@ pub(super) fn read_file_flushing(
         .as_ref()
         .and_then(|c| c.state.event_generation.clone());
     let mut watermark = SourceWatermark {
+        original_source: None,
         format_version: WATERMARK_FORMAT_VERSION,
         source_instance_id: source.id.clone(),
         file_id: file_id.clone(),
@@ -154,6 +155,10 @@ pub(super) fn read_file_flushing(
         return Ok(());
     }
     let before = capture.cloned().or(opened);
+    watermark.original_source = before.as_ref().map(|meta| OriginalSource {
+        path: path.to_string_lossy().into_owned(),
+        physical_id: meta.physical.clone(),
+    });
     let length = before.as_ref().map_or(0, |m| m.len());
     watermark.observed_bytes = before.as_ref().map(|m| m.len());
     facts.watermarks.insert(file_id.clone(), watermark.clone());
@@ -328,14 +333,17 @@ pub(super) fn read_file_flushing(
             byte_offset: consumed - row.bytes().len() as u64,
             ordinal: 0,
         };
-        facts.event_context = Some(timing::Context::new(
-            position,
-            record.timestamp,
-            record.kind,
-            payload.kind.as_deref(),
-            &evidence,
-            record.metadata,
-        ));
+        facts.event_context = Some(
+            timing::Context::new(
+                position,
+                record.timestamp,
+                record.kind,
+                payload.kind.as_deref(),
+                &evidence,
+                record.metadata,
+            )
+            .source_row(row.bytes()),
+        );
         process(
             record.kind,
             payload,

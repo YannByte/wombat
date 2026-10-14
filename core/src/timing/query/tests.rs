@@ -119,7 +119,8 @@ fn data(events: Vec<Arc<Event>>) -> Collected {
             issues: vec![],
         }],
         watermarks: vec![SourceWatermark {
-            format_version: 1,
+            original_source: None,
+            format_version: crate::adapters::contract::WATERMARK_FORMAT_VERSION,
             source_instance_id: "source-private".into(),
             file_id: "file-private".into(),
             generation: Some("generation-private".into()),

@@ -2,57 +2,77 @@
 
 export type Request =
   | {
-      method: "usage";
+      method: "conversation";
       params: Request1;
     }
   | {
-      method: "snapshot";
+      method: "usage";
       params: Request2;
     }
   | {
-      method: "config";
+      method: "snapshot";
       params: Request3;
     }
   | {
-      method: "optimize";
+      method: "config";
       params: Request4;
     }
   | {
-      method: "timing";
+      method: "optimize";
       params: Request5;
     }
   | {
-      method: "setup";
+      method: "timing";
       params: Request6;
     }
   | {
-      method: "account";
+      method: "setup";
       params: Request7;
     }
   | {
-      method: "directories";
+      method: "account";
       params: Request8;
     }
   | {
-      method: "preferences";
+      method: "directories";
       params: Request9;
     }
   | {
-      method: "prices";
+      method: "preferences";
       params: Request10;
     }
   | {
-      method: "collection";
+      method: "prices";
       params: Request11;
     }
   | {
-      method: "handoff";
+      method: "collection";
       params: Request12;
     }
   | {
-      method: "monitor";
+      method: "handoff";
       params: Request13;
+    }
+  | {
+      method: "monitor";
+      params: Request14;
     };
+export type Action = "activity" | "locate" | "read" | "search" | "changes";
+/**
+ * Source-backed provenance only; an unclassified user record is not authorization.
+ */
+export type MessageOrigin =
+  | "assistant_visible"
+  | "user_input"
+  | "user_unclassified"
+  | "injected_context"
+  | "reasoning"
+  | "inter_agent"
+  | "inherited"
+  | "compaction"
+  | "unknown";
+export type ContentPhase = "commentary" | "final_answer" | "unknown";
+export type MessageRecordKind = "legacy_snapshot" | "response_snapshot" | "native_snapshot" | "delta" | "unknown";
 export type ComparisonRequest =
   | {
       baselineSince: string;
@@ -67,7 +87,7 @@ export type ComparisonRequest =
       kind: "sessions";
     };
 export type DriverDimension = "project" | "model" | "thread";
-export type Action =
+export type Action2 =
   | "refresh"
   | "usage"
   | "threads"
@@ -84,16 +104,16 @@ export type Group = "day" | "week" | "month";
 export type Sort = "tokens" | "cost" | "recent" | "time";
 export type Presentation = "distribution" | "details" | "projects" | "models";
 export type Mode = "auto" | "fresh" | "cached";
-export type Action2 = "list" | "detail" | "evidence" | "related_scopes" | "capabilities";
+export type Action3 = "list" | "detail" | "evidence" | "related_scopes" | "capabilities";
 export type Kind = "rule" | "skill" | "mcp" | "hook";
 export type Observation = "used" | "loaded_only" | "unknown";
 export type Sort2 = "tokens" | "activity" | "size" | "name" | "content_tokens" | "characters" | "recent";
-export type Action3 =
+export type Action4 =
   "list" | "detail" | "keep" | "not_applicable" | "redisplay" | "recheck" | "capabilities" | "checks" | "activity";
 export type DecisionReason = "necessary" | "object_changed" | "incorrect_evidence";
 export type Group2 = "pending" | "history";
 export type Category = "repair" | "trim" | "organize" | "space";
-export type Request5 =
+export type Request6 =
   | {
       threadId: string;
       turnId: string;
@@ -124,16 +144,16 @@ export type Request5 =
 export type Mode2 = "auto" | "fresh" | "cached";
 export type PrivacyProfile = "local" | "share-v1";
 export type EvidenceSet = "turn_events" | "use_objects" | "use_records";
-export type Action4 = "read" | "refresh" | "history";
-export type Action5 = "list" | "choose" | "confirm" | "authorize" | "revoke";
+export type Action5 = "read" | "refresh" | "history";
+export type Action6 = "list" | "choose" | "confirm" | "authorize" | "revoke";
 export type Purpose = "source" | "project";
-export type Action6 = "get" | "set";
+export type Action7 = "get" | "set";
 export type Language = "zh" | "en";
-export type Action7 = "status" | "update" | "auto_update";
-export type Action8 = "status" | "events" | "configure" | "pause" | "resume";
+export type Action8 = "status" | "update" | "auto_update";
+export type Action9 = "status" | "events" | "configure" | "pause" | "resume";
 export type Mode3 = "logs" | "hooks";
-export type Action9 = "preview" | "send";
-export type Request13 =
+export type Action10 = "preview" | "send";
+export type Request14 =
   | {
       action: "list";
     }
@@ -157,13 +177,57 @@ export type Request13 =
 export type Period = "day" | "week" | "month";
 
 export interface Request1 {
-  query: Request2;
+  action: Action;
+  snapshotId: string;
+  roots?: string[];
+  selection?: Selection;
+  limit?: number | null;
+  cursor?: string | null;
+  query?: string | null;
+  baselineSnapshotId?: string | null;
+  targets?: ReadTarget[];
+  maxScanBytes?: number | null;
+  anchor?: Evidence | null;
+  radius?: number | null;
+}
+export interface Selection {
+  since?: string | null;
+  until?: string | null;
+  timezone?: string | null;
+  includeUndated?: boolean;
+  sources?: string[];
+  projects?: string[];
+  threads?: string[];
+  turns?: string[];
+  origins?: MessageOrigin[];
+  phases?: ContentPhase[];
+  recordKinds?: MessageRecordKind[];
+}
+export interface ReadTarget {
+  evidence: Evidence;
+  cursor?: string | null;
+  maxBytes?: number | null;
+  before?: number;
+  after?: number;
+}
+export interface Evidence {
+  eventId: string;
+  sourceInstanceId: string;
+  threadId?: string | null;
+  turnId?: string | null;
+  /**
+   * Exact position in the fixed target partition, not a raw file offset.
+   */
+  eventOffset: number;
+}
+export interface Request2 {
+  query: Request3;
   mode?: Mode & string;
   verify?: boolean;
 }
-export interface Request2 {
+export interface Request3 {
   comparison?: ComparisonRequest | null;
-  action: Action;
+  action: Action2;
   snapshotId?: string | null;
   roots?: string[] | null;
   scope?: Scope;
@@ -204,8 +268,8 @@ export interface Scope {
    */
   turnId?: string | null;
 }
-export interface Request3 {
-  action?: Action2 & string;
+export interface Request4 {
+  action?: Action3 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
   snapshotId?: string | null;
@@ -230,8 +294,8 @@ export interface Scope2 {
   sourceInstanceId?: string | null;
   threadId?: string | null;
 }
-export interface Request4 {
-  action?: Action3 & string;
+export interface Request5 {
+  action?: Action4 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
   readView?: string | null;
@@ -267,29 +331,29 @@ export interface Scope3 {
 export interface Cursor {
   token: string;
 }
-export interface Request6 {
+export interface Request7 {
   project?: string | null;
   roots?: string[] | null;
 }
-export interface Request7 {
-  action?: Action4 & string;
-}
 export interface Request8 {
   action?: Action5 & string;
+}
+export interface Request9 {
+  action?: Action6 & string;
   purpose?: Purpose | null;
   path?: string | null;
   choiceToken?: string | null;
   grantId?: string | null;
 }
-export interface Request9 {
-  action: Action6;
-  language?: Language | null;
-}
 export interface Request10 {
   action: Action7;
+  language?: Language | null;
 }
 export interface Request11 {
-  action?: Action8 & string;
+  action: Action8;
+}
+export interface Request12 {
+  action?: Action9 & string;
   mode?: Mode3 | null;
   roots?: string[] | null;
   project?: string | null;
@@ -297,8 +361,8 @@ export interface Request11 {
   after?: number | null;
   limit?: number | null;
 }
-export interface Request12 {
-  action?: Action9 & string;
+export interface Request13 {
+  action?: Action10 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
   project?: string | null;
@@ -310,9 +374,9 @@ export interface Request12 {
   selectionVersion?: string | null;
   language?: string | null;
   withoutSkill?: boolean | null;
-  skillSelections?: Selection[] | null;
+  skillSelections?: Selection2[] | null;
 }
-export interface Selection {
+export interface Selection2 {
   projectId: string;
   path: string;
 }

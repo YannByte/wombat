@@ -1,3 +1,8 @@
+import type { Request as ConversationRequest } from './generated/conversation-request.js';
+import type { Response as ConversationResult } from './generated/conversation-response.js';
+export type { Request as ConversationRequest } from './generated/conversation-request.js';
+export type { Response as ConversationResult } from './generated/conversation-response.js';
+export type ConversationTransport = (request: ConversationRequest, options: QueryOptions) => Promise<unknown>;
 import type { Request as MonitorRequest } from './generated/monitor-request.js';
 import type { Response as MonitorResult } from './generated/monitor-response.js';
 export type { Request as MonitorRequest } from './generated/monitor-request.js';
@@ -103,6 +108,7 @@ export type PricingTransport = (request: PricingRequest, options: QueryOptions) 
 export type LiveTransport = (request: LiveRequest, options: QueryOptions) => Promise<unknown>;
 
 export interface UsageClient {
+  conversation?(request: ConversationRequest, options?: QueryOptions): Promise<ConversationResult>;
   monitor?(request: MonitorRequest, options?: QueryOptions): Promise<MonitorResult>;
   setup?(request: SetupRequest, options?: QueryOptions): Promise<SetupResult>;
   collection?(request: CollectionRequest, options?: QueryOptions): Promise<CollectionResult>;
@@ -119,6 +125,7 @@ export interface UsageClient {
 }
 
 export interface ClientTransports extends HostTransports {
+  conversation?: ConversationTransport;
   monitor?: MonitorTransport;
   setup?: SetupTransport;
   collection?: CollectionTransport;
@@ -221,6 +228,17 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
           },
         }
       : {}),
+    ...(transports.conversation ? {
+      async conversation(request: ConversationRequest, options: QueryOptions = {}): Promise<ConversationResult> {
+        const [{validate: input}, {validate: output}] = await Promise.all([import('./generated/validate-conversation-request.js'), import('./generated/validate-conversation-response.js')]);
+        throwIfCancelled(options);
+        if (!input(request)) throw new CoreError('INVALID_ARGUMENT', 'Invalid conversation request');
+        const result = await transports.conversation!(request, options);
+        throwIfCancelled(options);
+        if (!output(result) || !matchesConversationSelection(request, result) || result.outputVersion !== 1 || result.action !== request.action || result.snapshotId !== request.snapshotId || result.baselineSnapshotId !== (request.baselineSnapshotId ?? null) || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
+        return result;
+      },
+    } : {}),
     ...(transports.timing
       ? {
           async timing(request: TimingRequest, options: QueryOptions = {}): Promise<TimingResult> {
@@ -1143,4 +1161,18 @@ function matchesStatistics(request: Request, result: Response): boolean {
       (p) => p.completeTasks + p.incompleteTasks === p.measuredTasks,
     )
   );
+}
+
+function matchesConversationSelection(request: ConversationRequest, result: ConversationResult): boolean {
+  const defaults = { since: null, until: null, timezone: null, includeUndated: false, sources: [], projects: [], threads: [], turns: [], origins: [], phases: [], recordKinds: [] };
+  if (!Object.entries(defaults).every(([key, fallback]) => JSON.stringify((request.selection ?? {})[key as keyof NonNullable<ConversationRequest['selection']>] ?? fallback) === JSON.stringify(result.selection[key as keyof typeof result.selection] ?? fallback))) return false;
+  if (Boolean(request.anchor) !== Boolean(result.window)) return false;
+  if (request.anchor && result.window && (!sameConversationEvidence(request.anchor,result.window.anchor) || result.window.radius !== (request.radius ?? 20))) return false;
+  const s=request.selection ?? {}, has=(values: readonly string[] | undefined, value: string | null | undefined) => !values?.length || (value != null && values.includes(value));
+  if (!result.items.every(i=>has(s.sources,i.evidence.sourceInstanceId) && has(s.projects,i.project) && has(s.threads,i.evidence.threadId) && has(s.turns,i.evidence.turnId) && has(s.origins,i.origin) && has(s.phases,i.phase) && has(s.recordKinds,i.recordKind))) return false;
+  if (request.action === 'read' && (result.fragments.length !== request.targets?.length || !result.fragments.every((f,i)=>sameConversationEvidence(f.evidence,request.targets![i].evidence)))) return false;
+  return !result.fragments.some(f=>f.partial) || result.partial;
+}
+function sameConversationEvidence(a: NonNullable<ConversationRequest['targets']>[number]['evidence'], b: NonNullable<ConversationRequest['targets']>[number]['evidence']): boolean {
+ return a.eventId===b.eventId && a.sourceInstanceId===b.sourceInstanceId && (a.threadId??null)===(b.threadId??null) && (a.turnId??null)===(b.turnId??null) && a.eventOffset===b.eventOffset;
 }

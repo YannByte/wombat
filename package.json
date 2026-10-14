@@ -47,6 +47,7 @@
     "benchmark:usage": "node --import tsx scripts/benchmark-usage-v1.ts",
     "benchmark:live": "node --import tsx scripts/benchmark-live.ts",
     "benchmark:storage": "node --import tsx scripts/benchmark-storage.ts",
+    "benchmark:conversation": "node --import tsx scripts/benchmark-conversation-access.ts",
     "docs:structure": "node scripts/check-doc-structure.ts",
     "skills:scope": "node .agents/skills/wombat-review/scripts/scope.ts",
     "skills:verify": "node .agents/skills/wombat-verify/scripts/verify.ts",

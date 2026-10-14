@@ -4,11 +4,11 @@ import { spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { CoreError } from '../errors.js';
-import type { ConfigRequest, OptimizeRequest, LiveRequest, QueryOptions,HandoffRequest,TimingRequest,MonitorRequest } from '../client.js';
+import type { ConfigRequest, OptimizeRequest, LiveRequest, QueryOptions,HandoffRequest,TimingRequest,MonitorRequest,ConversationRequest } from '../client.js';
 import { binaryPath, decode, invokeOperation, type CoreProcessOptions } from './core.js';
 import { isLocalAccessDenied, localAccessError } from './local-access.js';
 
-type ProductRequest = {monitor:MonitorRequest} | { timing: TimingRequest } | LiveRequest | { config: ConfigRequest } | { optimize: OptimizeRequest } | {handoff:HandoffRequest};
+type ProductRequest = {conversation:ConversationRequest} | {monitor:MonitorRequest} | { timing: TimingRequest } | LiveRequest | { config: ConfigRequest } | { optimize: OptimizeRequest } | {handoff:HandoffRequest};
 type NativeRequest = ProductRequest & { nativeHooks?: Awaited<ReturnType<typeof captureHooks>> };
 function exchange(socket: string, request: NativeRequest, options: QueryOptions, config: CoreProcessOptions): Promise<unknown> {
   return new Promise((resolve, reject) => {

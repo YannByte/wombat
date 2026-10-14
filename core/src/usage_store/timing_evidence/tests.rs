@@ -88,6 +88,7 @@ fn timing_read_modes_share_all_charges() {
         event(30, None, None, true),
     ]);
     data.watermarks.push(SourceWatermark {
+        original_source: None,
         format_version: WATERMARK_FORMAT_VERSION,
         source_instance_id: "source".into(),
         file_id: "file".into(),
@@ -573,6 +574,7 @@ fn retained_generation_mismatch_and_failed_file_observation_are_public_coverage(
     let root = tempfile::tempdir().unwrap();
     let mut data = facts(vec![event(1, Some("thread"), Some("turn"), false)]);
     data.watermarks.push(SourceWatermark {
+        original_source: None,
         format_version: WATERMARK_FORMAT_VERSION,
         source_instance_id: "source".into(),
         file_id: "file".into(),

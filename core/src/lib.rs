@@ -5,6 +5,9 @@ pub mod agent_dto;
 pub mod collection;
 mod config;
 pub mod config_dto;
+mod conversation;
+pub mod conversation_dto;
+pub mod conversation_source;
 pub mod directories;
 pub mod dto;
 mod file_metadata;
@@ -129,6 +132,21 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<collection::Response>(),
+        )?),
+        "conversation" => Ok(serde_json::to_value(conversation::dispatch(
+            serde_json::from_value(args.clone()).map_err(|_| {
+                dto::operation_error("INVALID_ARGUMENT", "Invalid conversation request")
+            })?,
+        )?)?),
+        "schema_conversation_request" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<conversation_dto::Request>(),
+        )?),
+        "schema_conversation_response" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<conversation_dto::Response>(),
         )?),
         "timing" => Ok(serde_json::to_value(timing::dispatch(
             serde_json::from_value(args.clone())

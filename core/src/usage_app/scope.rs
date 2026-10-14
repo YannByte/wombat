@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn invalid(message: impl Into<String>) -> anyhow::Error {
     operation_error("INVALID_ARGUMENT", message)
 }
-pub(super) fn date(value: &str) -> Result<NaiveDate> {
+pub(crate) fn date(value: &str) -> Result<NaiveDate> {
     let result =
         NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| invalid("日期须为 YYYY-MM-DD"))?;
     if result.format("%Y-%m-%d").to_string() != value {
@@ -11,7 +11,7 @@ pub(super) fn date(value: &str) -> Result<NaiveDate> {
     }
     Ok(result)
 }
-pub(super) fn timezone(scope: &Scope) -> Result<Tz> {
+pub(crate) fn timezone(scope: &Scope) -> Result<Tz> {
     scope
         .timezone
         .as_deref()

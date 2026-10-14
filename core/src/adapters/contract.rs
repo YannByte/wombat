@@ -22,7 +22,9 @@ pub use operation_match::{
 mod watermarks;
 mod work;
 pub(crate) use watermarks::validate_watermarks;
-pub use watermarks::{SourceWatermark, WATERMARK_FORMAT_VERSION, WatermarkIssue, WatermarkState};
+pub use watermarks::{
+    OriginalSource, SourceWatermark, WATERMARK_FORMAT_VERSION, WatermarkIssue, WatermarkState,
+};
 pub(crate) use work::valid_work_path;
 pub use work::{
     ChangeKind, CommandSource, FilePathChange, ParsedCommand, WORK_OBSERVATION_VERSION,

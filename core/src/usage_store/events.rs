@@ -53,6 +53,7 @@ pub struct EventChunk {
     pub offset: usize,
     pub file: FileRef,
     pub count: usize,
+    pub message_count: usize,
     pub bytes: u64,
     pub first: Position,
     pub last: Position,
@@ -288,6 +289,12 @@ fn build_events(
                 offset: start,
                 file: FileRef { file: name, sha256 },
                 count: end - start,
+                message_count: events[start..end]
+                    .iter()
+                    .filter(|e| {
+                        matches!(e.payload(), crate::session_events::Payload::Message { .. })
+                    })
+                    .count(),
                 bytes: bytes.len() as u64,
                 first: events[start].position().clone(),
                 last: events[end - 1].position().clone(),
@@ -511,7 +518,7 @@ impl EventCursor {
     }
 }
 impl Snapshot {
-    pub(super) fn event_partition(&self, target: &EventTarget) -> Result<Option<&EventPartition>> {
+    pub(crate) fn event_partition(&self, target: &EventTarget) -> Result<Option<&EventPartition>> {
         if !target.valid() {
             return Err(operation_error("INVALID_ARGUMENT", "非法事件目标"));
         }

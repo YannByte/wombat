@@ -50,7 +50,7 @@ export function describeAgentApi(method?:string,includeOutput=false):AgentDescri
 }
 export function agentErrorOutput(error:unknown,cancelled=false):AgentErrorOutput {
  const code=cancelled?'CANCELLED':error instanceof CoreError&&/^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)?error.code:'INTERNAL_ERROR';
- const recovery:AgentErrorOutput['error']['recovery']=code==='INVALID_ARGUMENT'?'read_schema':code==='VIEW_EXPIRED'?'reacquire_view':['RESOURCE_LIMIT','OUTPUT_LIMIT','INPUT_LIMIT'].includes(code)?'narrow_query':code==='SYNC_PENDING'?'retry_same_scope':['CODEX_UNAVAILABLE','CORE_UNAVAILABLE','SKILL_RUNTIME_MISMATCH','SKILL_RESOURCE_CHANGED'].includes(code)?'check_setup':code==='CANCELLED'?'none':'inspect_state';
+ const recovery:AgentErrorOutput['error']['recovery']=code==='INVALID_ARGUMENT'?'read_schema':['VIEW_EXPIRED','SOURCE_CHANGED'].includes(code)?'reacquire_view':['RESOURCE_LIMIT','OUTPUT_LIMIT','INPUT_LIMIT'].includes(code)?'narrow_query':code==='SYNC_PENDING'?'retry_same_scope':['CODEX_UNAVAILABLE','CORE_UNAVAILABLE','SKILL_RUNTIME_MISMATCH','SKILL_RESOURCE_CHANGED'].includes(code)?'check_setup':code==='CANCELLED'?'none':'inspect_state';
  const message=t(code==='INVALID_ARGUMENT'?'cli.agent.invalid':recovery==='narrow_query'?'cli.agent.resource':code==='CANCELLED'?'common.cancelled':'cli.agent.failure',{code});
  return {outputVersion:1,error:{code,message,recovery}};
 }
@@ -86,6 +86,7 @@ async function call(request:AgentRequest,client:Partial<UsageClient>,options:Que
   case 'snapshot': {const r=await (client.query?.(request.params,options)??unavailable());return {result:r,exitCode:resultExitCode(r)};}
   case 'config': {const r=await (client.config?.(request.params,options)??unavailable());return {result:r,exitCode:configExitCode(r)};}
   case 'optimize': {const r=await (client.optimize?.(request.params,options)??unavailable());return {result:r,exitCode:optimizeExitCode(r)};}
+  case 'conversation': {const r=await (client.conversation?.(request.params,options)??unavailable());return {result:r,exitCode:r.partial?2:0};}
   case 'timing': {const r=await (client.timing?.(request.params,options)??unavailable());return {result:r,exitCode:timingExitCode(r)};}
   case 'setup': {const r=await (client.setup?.(request.params,options)??unavailable());return {result:r,exitCode:setupExitCode(r)};}
   case 'account': {const r=await (client.account?.(request.params,options)??unavailable());return {result:r,exitCode:accountExitCode(r)};}

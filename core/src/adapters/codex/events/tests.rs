@@ -329,7 +329,12 @@ fn incomplete_nested_tail_is_not_committed_and_restart_replays_one_safe_boundary
     assert_eq!(analysis(&appended).first_content_record_delay_ms, None);
     let safe = serde_json::to_string(&appended.events).unwrap();
     assert!(!safe.contains("SYNTHETIC_PRIVATE"));
-    assert!(safe.len() < 16 * 1024);
+    // Safe facts stay small; bounded source locators scale with text blocks.
+    let mut facts_only = serde_json::to_value(&appended.events).unwrap();
+    for event in facts_only.as_array_mut().unwrap() {
+        event.as_object_mut().unwrap().remove("originalContent");
+    }
+    assert!(serde_json::to_string(&facts_only).unwrap().len() < 16 * 1024);
     let verified = sync(&mut db, true);
     assert_eq!(
         serde_json::to_value(&verified.events).unwrap(),
@@ -340,7 +345,7 @@ fn incomplete_nested_tail_is_not_committed_and_restart_replays_one_safe_boundary
 
 #[test]
 fn prior_message_mapping_cannot_resume_cached_append_or_verified_parser_state() {
-    assert_eq!(incremental::MESSAGE_OBSERVATION_VERSION, 2);
+    assert_eq!(incremental::MESSAGE_OBSERVATION_VERSION, 3);
     for mode in [0, 1, 2] {
         let root = tempfile::tempdir().unwrap();
         let index = tempfile::tempdir().unwrap();

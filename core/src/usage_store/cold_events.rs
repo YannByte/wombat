@@ -206,9 +206,11 @@ pub(crate) fn build_from_sources(
      -> Result<Arc<EventPartition>> {
         chunks.sort_unstable_by(|a, b| super::events::position_order(&a.first, &b.first));
         let mut count = 0;
+        let mut message_count = 0;
         for chunk in &mut chunks {
             chunk.offset = count;
             count += chunk.count;
+            message_count += chunk.message_count;
         }
         let summary = if target.turn_id.is_some() && !mixed {
             reducer.finish()
@@ -223,6 +225,7 @@ pub(crate) fn build_from_sources(
             native_boundary: super::native_boundary::NativeBoundaryIndex {
                 method_version: BOUNDARY_METHOD_VERSION.into(),
                 event_count: count,
+                message_count,
                 complete: true,
                 source_instance_id: if mixed { None } else { source },
                 summary,

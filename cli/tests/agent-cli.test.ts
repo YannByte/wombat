@@ -15,6 +15,7 @@ const requests=[
  {method:'preferences',params:{action:'get'}},{method:'prices',params:{action:'status'}},
  {method:'monitor',params:{action:'list'}},
  {method:'collection',params:{action:'status'}},{method:'handoff',params:{action:'preview'}},
+ {method:'conversation',params:{action:'locate',snapshotId:'fixed',selection:{projects:['/synthetic'],recordKinds:['response_snapshot']},limit:3}},
 ];
 function capture(){const out:string[]=[];return {out,stdout:(s:string)=>{out.push(s);}};}
 test('local discovery exposes only reachable method schemas and current product result schemas',()=>{
