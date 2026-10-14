@@ -8,6 +8,49 @@ type DecodedMeasurementFrame = Option<(i64, Vec<(usize, PricedMeasurement)>)>;
 
 pub(super) struct ColdEvents(Mutex<Connection>, crate::pricing_sync::Response);
 impl ColdEvents {
+    pub(super) fn restore_details(&self, snapshot: &Snapshot) -> Result<Snapshot> {
+        let db = self
+            .0
+            .lock()
+            .map_err(|_| corrupt("detail lease unavailable"))?;
+        let mut collected = Collected::default();
+        for source in &snapshot.manifest.sources {
+            let value =
+                crate::live::load_collected_except(&db, &source.source.id, true, true, true)?
+                    .ok_or_else(|| corrupt("detail projection missing"))?;
+            collected.threads.extend(value.threads);
+            collected.turns.extend(value.turns);
+            collected
+                .title_observations
+                .extend(value.title_observations);
+        }
+        collected.sources = snapshot.manifest.sources.clone();
+        collected.issues = snapshot.manifest.issues.clone();
+        collected.watermarks = snapshot.manifest.watermarks.clone();
+        let key = snapshot
+            .manifest
+            .snapshot_ref
+            .snapshot_id
+            .split(':')
+            .nth(1)
+            .ok_or_else(|| corrupt("detail identity invalid"))?;
+        let events = load_index(&db, key)?.ok_or_else(|| corrupt("detail event index missing"))?;
+        let operations =
+            super::cold_operations::load_operations(&db, &collected.sources, &collected.threads)?;
+        let mut detailed = super::memory::memory_cold_operations(
+            collected,
+            snapshot.manifest.snapshot_ref.snapshot_id.clone(),
+            self.1.clone(),
+            events,
+            operations,
+        )?;
+        detailed.manifest.snapshot_ref = snapshot.manifest.snapshot_ref.clone();
+        detailed.cold_events = snapshot.cold_events.clone();
+        detailed.publication_change = snapshot.publication_change.clone();
+        drop(db);
+        detailed.add_measurement_turns()?;
+        Ok(detailed)
+    }
     pub(super) fn capture(
         db: &Connection,
         key: &str,
@@ -51,6 +94,7 @@ impl ColdEvents {
         tz: chrono_tz::Tz,
         thread: Option<&str>,
         turn: Option<&str>,
+        selection: Option<&dyn Fn(&super::ledger_projection::LedgerGroup) -> bool>,
         mut consume: impl FnMut(
             &super::ledger_projection::LedgerGroup,
             &dyn Fn() -> Result<Vec<PricedMeasurement>>,
@@ -71,6 +115,7 @@ impl ColdEvents {
                         thread,
                         turn,
                         after,
+                        selection,
                     )?
                 };
                 if page.is_empty() {
@@ -388,6 +433,21 @@ impl Snapshot {
         self.live_events = None;
         // Committed queries use aggregates and cold facts. The reader lease, not
         // a second canonical object graph, owns historical payload availability.
+        self.add_measurement_turns()?;
+        self.live_rows = Some(Arc::new(vec![]));
+        self.project_rows = Some(Arc::new(BTreeMap::new()));
+        self.summary_index = Arc::default();
+        Ok(())
+    }
+    fn add_measurement_turns(&mut self) -> Result<()> {
+        let reader = self
+            .cold_events
+            .as_ref()
+            .ok_or_else(|| corrupt("measurement lease missing"))?;
+        let db = reader
+            .0
+            .lock()
+            .map_err(|_| corrupt("measurement lease unavailable"))?;
         if let Some(turns) = &mut self.memory_turns {
             let turns = Arc::make_mut(turns);
             let owners: BTreeMap<_, _> = self
@@ -422,9 +482,6 @@ impl Snapshot {
                 }
             }
         }
-        self.live_rows = Some(Arc::new(vec![]));
-        self.project_rows = Some(Arc::new(BTreeMap::new()));
-        self.summary_index = Arc::default();
         Ok(())
     }
 }

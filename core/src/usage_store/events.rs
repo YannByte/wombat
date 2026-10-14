@@ -544,6 +544,9 @@ impl Snapshot {
         budget: EventReadBudget,
         cancelled: &AtomicBool,
     ) -> Result<Vec<Arc<Event>>> {
+        if let Some(view) = self.detailed_view()? {
+            return view.events_for_target(target, budget, cancelled);
+        }
         check_cancel(cancelled)?;
         let Some(partition) = self.event_partition(target)? else {
             encoded_size(&[], budget.max_bytes.min(MAX_EVENT_QUERY_BYTES), cancelled)?;
@@ -592,6 +595,9 @@ impl Snapshot {
         budget: EventReadBudget,
         cancelled: &AtomicBool,
     ) -> Result<EventPage> {
+        if let Some(view) = self.detailed_view()? {
+            return view.event_page(target, limit, cursor, budget, cancelled);
+        }
         check_cancel(cancelled)?;
         if limit == 0 || limit > MAX_EVENT_PAGE_ROWS {
             return Err(operation_error(
@@ -772,6 +778,9 @@ impl Snapshot {
     /// Internal snapshot export only. This intentionally traverses all attribution buckets,
     /// including unattributed facts; target queries must use the bounded methods above.
     pub(crate) fn events(&self) -> Result<Vec<Arc<Event>>> {
+        if let Some(view) = self.detailed_view()? {
+            return view.events();
+        }
         if let Some(buckets) = &self.live_events {
             return Ok(buckets
                 .values()

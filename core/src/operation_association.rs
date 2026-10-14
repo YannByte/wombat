@@ -190,16 +190,19 @@ fn observation(event: &Event) -> Option<Observation<'_>> {
         outcome: terminal,
     })
 }
-pub(crate) fn is_input(event: &Event) -> bool {
-    matches!(
-        event.payload(),
-        Payload::Operation { .. }
-            | Payload::Item { .. }
-            | Payload::Lifecycle {
-                lifecycle: LifecycleKind::Compaction,
-                ..
-            }
-    )
+/// Domain operation recovery needs operations and explicit item links. Anonymous
+/// message/reasoning phases cannot link an operation; timing still reads them.
+pub(crate) fn is_projection_input(event: &Event) -> bool {
+    match event.payload() {
+        Payload::Operation { .. } => true,
+        Payload::Item { native_id, .. }
+        | Payload::Lifecycle {
+            lifecycle: LifecycleKind::Compaction,
+            native_id,
+            ..
+        } => native_id.as_ref().is_some_and(|id| !id.is_empty()),
+        _ => false,
+    }
 }
 pub(crate) fn check(cancelled: &AtomicBool) -> Result<()> {
     if cancelled.load(Ordering::Relaxed) {

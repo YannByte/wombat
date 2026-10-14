@@ -1,10 +1,9 @@
 //! Fold committed sufficient statistics without materializing the canonical ledger.
 //! A timezone boundary reads only the members of that bounded canonical frame.
+use super::working_set::{Order, WorkingSet};
 use super::*;
 use crate::usage_store::ledger_projection::GroupKey;
 use bitvec::{order::Lsb0, vec::BitVec};
-mod working_set;
-use working_set::{Order, WorkingSet};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct Accumulator {
@@ -191,6 +190,28 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
         request.presentation,
         Some(Presentation::Projects | Presentation::Models)
     );
+    // Whole-task totals are needed only for tasks that can match this request.
+    // Discover that superset from the catalog; unrelated history stays compressed.
+    let mut candidate_tasks = BTreeSet::new();
+    if request.action == Action::Threads {
+        let exclude = |_: &crate::usage_store::ledger_projection::LedgerGroup| false;
+        snapshot.visit_ledger_catalog(tz, None, None, Some(&exclude), |group, _| {
+            if let Some(id) = &group.key.thread
+                && search_ids
+                    .as_ref()
+                    .is_none_or(|ids| ids.contains(id.as_str()))
+                && (request.scope.turn_id.is_some()
+                    || group.single_date(tz).is_none_or(|date| {
+                        scope::matches_fields(fields(&group.key), &request.scope, &projects, || {
+                            date
+                        })
+                    }))
+            {
+                candidate_tasks.insert(id.clone());
+            }
+            Ok(())
+        })?;
+    }
     let mut consume = |key: &GroupKey,
                        aggregate: &Aggregate,
                        date: Option<NaiveDate>,
@@ -231,6 +252,7 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                 .is_none_or(|ids| key.thread.as_deref().is_some_and(|id| ids.contains(id)));
         if request.action == Action::Threads
             && let Some(id) = &key.thread
+            && candidate_tasks.contains(id)
         {
             if current_task
                 .as_ref()
@@ -243,6 +265,7 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                 let mut task = Task::new()?;
                 current_turn_keys = thread_entries
                     .get(id.as_str())
+                    .filter(|_| !snapshot.is_summary_view())
                     .filter(|entry| {
                         entry
                             .turns
@@ -308,7 +331,20 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
         }
         Ok(())
     };
-    snapshot.visit_ledger_groups(tz, None, None, |group, read| {
+    let select = |group: &crate::usage_store::ledger_projection::LedgerGroup| {
+        if request.action == Action::Threads
+            && let Some(id) = &group.key.thread
+        {
+            return candidate_tasks.contains(id);
+        }
+        if request.scope.turn_id.is_some() {
+            return true;
+        }
+        group.single_date(tz).is_none_or(|date| {
+            scope::matches_fields(fields(&group.key), &request.scope, &projects, || date)
+        })
+    };
+    snapshot.visit_ledger_catalog(tz, None, None, Some(&select), |group, read| {
         if let Some(a) = group.single_date(tz) {
             consume(
                 &group.key,

@@ -40,6 +40,14 @@ test('live flags keep cached, fixed and watched queries distinct', () => {
   assert.deepEqual(parseUsageArgs(['usage','--root','/tmp/a']).request.roots,['/tmp/a']);
   for (const args of [['usage','--watch','--cached'],['usage','--snapshot','x','--fresh'],['threads','--watch'],['usage','--verify'],['refresh','--cached']]) assert.throws(()=>parseUsageArgs(args));
 });
+test('bounded preparation waits and explicit rebuilds do not enter usage filters',()=>{
+ const wait=parseUsageArgs(['usage','--wait-ms','600000','--include-history','--json']);
+ assert.equal(wait.mode,'fresh');assert.equal(wait.waitMs,600000);assert.equal(wait.includeHistory,true);
+ assert.equal(wait.request.scope,undefined);
+ assert.equal(parseUsageArgs(['usage','--rebuild']).rebuild,true);
+ assert.equal(parseUsageArgs(['usage','--rebuild']).mode,'fresh');
+ for(const args of [['usage','--wait-ms','0'],['usage','--wait-ms','600001'],['usage','--wait-ms','1.5'],['usage','--wait-ms','1','--cached'],['usage','--rebuild','--watch'],['usage','--rebuild','--snapshot','fixed'],['usage','--wait-ms','1','--wait-ms','2']]) assert.throws(()=>parseUsageArgs(args));
+});
 
 test('matching turns and turn location are only accepted by turns',()=>{
  assert.deepEqual(parseUsageArgs(['turns','--thread','id','--matched-only','--locate-turn','t']).request,{action:'turns',threadId:'id',matchedOnly:true,locateTurnId:'t'});

@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Map, Value};
 use std::{collections::HashSet, path::Path};
 
-const VERSION: i64 = 8;
+const VERSION: i64 = 9;
 mod codec;
 mod event_blocks;
 mod packed;
@@ -71,6 +71,7 @@ fn open_inner(path: &Path) -> Result<Connection> {
     db.execute_batch("PRAGMA page_size=4096; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192; PRAGMA temp_store=FILE; PRAGMA journal_size_limit=8388608; PRAGMA wal_autocheckpoint=512;")?;
     let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version == VERSION {
+        validation_indexes(&db)?;
         return Ok(db);
     }
     if version != 0 {
@@ -83,6 +84,7 @@ fn open_inner(path: &Path) -> Result<Connection> {
     // Another connection may have completed initialization while we waited.
     let version: i64 = tx.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version == VERSION {
+        validation_indexes(&tx)?;
         tx.commit()?;
         return Ok(db);
     }
@@ -104,9 +106,17 @@ fn open_inner(path: &Path) -> Result<Connection> {
     event_blocks::schema(&tx)?;
     packed::schema(&tx)?;
     crate::usage_store::ledger_projection_schema(&tx)?;
+    validation_indexes(&tx)?;
     tx.pragma_update(None, "user_version", VERSION)?;
     tx.commit()?;
     Ok(db)
+}
+
+fn validation_indexes(db: &Connection) -> Result<()> {
+    // Validate complete coverage without visiting pages holding compressed bodies.
+    // These secondary indexes are disposable within the current format only.
+    db.execute_batch("CREATE INDEX IF NOT EXISTS event_blocks_validation ON event_blocks(bucket,codec,count); CREATE INDEX IF NOT EXISTS measurement_summaries_coverage ON measurement_summaries(source,count);")?;
+    Ok(())
 }
 
 fn bucket(db: &Connection, scope: &str, field: &str) -> Result<i64> {
@@ -287,6 +297,20 @@ pub(crate) fn each_without_events(
         Ok(())
     })
 }
+/// Read one uncompressed metadata field without visiting turns or packed bodies.
+pub(crate) fn each_metadata_field(
+    db: &Connection,
+    scope: &str,
+    field: &str,
+    mut consume: impl FnMut(&str, &str) -> Result<()>,
+) -> Result<()> {
+    let mut query=db.prepare_cached("SELECT e.id,json(e.payload) FROM entries e JOIN buckets b ON b.id=e.bucket WHERE b.scope=?1 AND b.field=?2 AND e.id!=''")?;
+    let mut cursor = query.query(params![scope, field])?;
+    while let Some(row) = cursor.next()? {
+        consume(row.get_ref(0)?.as_str()?, row.get_ref(1)?.as_str()?)?;
+    }
+    Ok(())
+}
 
 fn each_row(
     db: &Connection,
@@ -364,6 +388,60 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn coverage_checks_use_small_covering_indexes_and_keep_exact_counts() {
+        let root = tempfile::tempdir().unwrap();
+        let db = open(&root.path().join("index.sqlite")).unwrap();
+        for (sql, index) in [
+            (
+                "SELECT coalesce(sum(count),0),count(*) FROM event_blocks WHERE bucket=1",
+                "event_blocks_validation",
+            ),
+            (
+                "SELECT EXISTS(SELECT 1 FROM event_blocks WHERE bucket=1 AND codec!=1)",
+                "event_blocks_validation",
+            ),
+            (
+                "SELECT coalesce(sum(count),0) FROM measurement_summaries WHERE source='source'",
+                "measurement_summaries_coverage",
+            ),
+        ] {
+            let plan: Vec<String> = db
+                .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                .unwrap()
+                .query_map([], |row| row.get(3))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap();
+            assert!(
+                plan.iter()
+                    .any(|line| line.contains(&format!("COVERING INDEX {index}"))),
+                "{plan:?}"
+            );
+        }
+        let origin = bucket(&db, "scope", "events").unwrap();
+        db.execute("INSERT INTO event_heads VALUES(?1,7,1)", [origin])
+            .unwrap();
+        db.execute(
+            "INSERT INTO event_blocks VALUES(?1,'file',0,0,'[null,null]',1,1,'digest',x'00',7)",
+            [origin],
+        )
+        .unwrap();
+        validate_cold_source(&db, "scope").unwrap();
+        db.execute("UPDATE event_blocks SET count=6 WHERE bucket=?1", [origin])
+            .unwrap();
+        assert!(validate_cold_source(&db, "scope").is_err());
+        db.execute(
+            "UPDATE event_blocks SET count=7,codec=99 WHERE bucket=?1",
+            [origin],
+        )
+        .unwrap();
+        assert_eq!(
+            failure_code(&validate_cold_source(&db, "scope").unwrap_err()),
+            "INDEX_UNSUPPORTED_VERSION"
+        );
+    }
+
+    #[test]
     fn current_schema_keeps_exact_values_across_reopen() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("index.sqlite");
@@ -378,7 +456,7 @@ mod tests {
     }
     #[test]
     fn unsupported_schema_is_rejected_without_mutating_records() {
-        for version in [0, 1, 2, 3, 4, 5, 6, 7, 99] {
+        for version in [0, 1, 2, 3, 4, 5, 6, 7, 8, 99] {
             let root = tempfile::tempdir().unwrap();
             let path = root.path().join("index.sqlite");
             let db = Connection::open(&path).unwrap();

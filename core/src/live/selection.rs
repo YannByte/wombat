@@ -4,7 +4,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Business entries validate their own parameters before requesting a read view.
 /// Selection owns only source scope, revision identity and synchronization policy.
-pub(super) struct ReadViewSelector {
+pub(super) struct ReadViewSelector<'a> {
+    pub(super) peer_closed: Option<&'a (dyn Fn() -> bool + Sync)>,
+    pub(super) wait_ms: Option<u64>,
+    pub(super) rebuild: bool,
+    pub(super) include_history: bool,
     roots: Vec<String>,
     selector: Option<String>,
     mode: Mode,
@@ -30,7 +34,7 @@ impl WaitPolicy {
         })
     }
 }
-impl ReadViewSelector {
+impl ReadViewSelector<'_> {
     pub(super) fn project(mut self, project: Option<String>) -> Self {
         self.project = project;
         self
@@ -90,6 +94,10 @@ impl ReadViewSelector {
             WaitPolicy::Auto
         };
         Ok(Self {
+            peer_closed: None,
+            wait_ms: None,
+            rebuild: false,
+            include_history: true,
             roots,
             selector,
             mode,
@@ -116,7 +124,14 @@ pub(super) fn select_view(
     jobs: &mpsc::SyncSender<Job>,
     cancelled: &AtomicBool,
 ) -> Result<(Arc<Snapshot>, Freshness)> {
-    check_cancel(cancelled)?;
+    let check_reader = || {
+        check_cancel(cancelled)?;
+        if request.peer_closed.is_some_and(|probe| probe()) {
+            return Err(operation_error("CANCELLED", "Caller disconnected"));
+        }
+        Ok(())
+    };
+    check_reader()?;
     let roots = request.roots.clone();
     let selector = &request.selector;
     let key = &request.key;
@@ -135,20 +150,44 @@ pub(super) fn select_view(
         .or_insert_with(|| Entry::new(roots));
     entry.touched = Instant::now();
     entry.preferred_project = request.project.clone();
+    let history_requested = selector.is_none()
+        && request.include_history
+        && entry.views.back().is_some_and(|(_, v)| {
+            v.manifest
+                .issues
+                .iter()
+                .any(|i| i.code == "historyDeferred")
+        });
+    if selector.is_none() {
+        entry.include_history |= request.include_history;
+    }
     let mut ticket = entry.completed;
     if request.wait != WaitPolicy::None
         && (request.mode == Mode::Fresh
             || request.refresh
             || request.capture_now
             || entry.requested == 0
+            || history_requested
             || entry.syncing
             || scheduling::auto_due(entry))
     {
-        ticket = scheduling::request(entry, key, request.verify, jobs)?;
+        ticket = scheduling::request_work(entry, key, request.verify, request.rebuild, jobs)?;
         let preview_at = Instant::now() + Duration::from_millis(250);
-        let deadline = Instant::now() + request.wait.timeout();
+        let deadline = Instant::now()
+            + request
+                .wait_ms
+                .map(Duration::from_millis)
+                .unwrap_or_else(|| request.wait.timeout());
         while entries[key].completed < ticket && Instant::now() < deadline {
-            check_cancel(cancelled)?;
+            check_reader()?;
+            if request.wait == WaitPolicy::Auto
+                && !request.capture_now
+                && entries[key].views.back().is_some_and(|(_, v)| {
+                    !preview::is_initial(v) && !collection::restoring_projects(v)
+                })
+            {
+                break;
+            }
             let initial_available = request.wait == WaitPolicy::Auto
                 && entries[key].views.back().is_some_and(|(_, v)| {
                     preview::is_initial(v) || collection::restoring_projects(v)
@@ -183,14 +222,14 @@ pub(super) fn select_view(
             && (entries[key].restoring || entries[key].syncing)
             && Instant::now() < deadline
         {
-            check_cancel(cancelled)?;
+            check_reader()?;
             entries = wake
                 .wait_timeout(entries, Duration::from_millis(50))
                 .unwrap()
                 .0;
         }
     }
-    check_cancel(cancelled)?;
+    check_reader()?;
     let entry = entries.get_mut(key).unwrap();
     let current =
         entry.completed >= ticket && entry.error.is_none() && !entry.syncing && !entry.restoring;

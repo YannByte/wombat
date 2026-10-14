@@ -440,7 +440,9 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
               result.result.action !== request.query.action ||
               !matchesComparison(request.query, result.result) ||
               !matchesInspection(request.query, result.result) ||
-              !matchesStatistics(request.query, result.result)
+              !matchesStatistics(request.query, result.result) ||
+              (result.additional?.length ?? 0) !== (request.also?.length ?? 0) ||
+              (result.additional ?? []).some((value, index) => { const query = request.also?.[index]; return !query || value.action !== query.action || value.snapshotRef.snapshotId !== result.result.snapshotRef.snapshotId || !matchesComparison(query, value) || !matchesInspection(query, value) || !matchesStatistics(query, value); })
             )
               throw new CoreError('PROTOCOL_ERROR', '实时用量数据格式不正确');
             return result;

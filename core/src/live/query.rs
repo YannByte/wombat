@@ -26,12 +26,46 @@ pub(super) fn monitor_query(
     }
     crate::monitor::dispatch_snapshot(request, &snapshot, freshness.checked_at.as_deref())
 }
+#[cfg(test)]
 pub(super) fn query(
     request: Request,
     shared: &Shared,
     jobs: &mpsc::SyncSender<Job>,
     configs: &Mutex<crate::config::Store>,
 ) -> Result<Response> {
+    query_with_probe(request, shared, jobs, configs, None)
+}
+pub(super) fn query_with_probe(
+    request: Request,
+    shared: &Shared,
+    jobs: &mpsc::SyncSender<Job>,
+    configs: &Mutex<crate::config::Store>,
+    peer_closed: Option<&(dyn Fn() -> bool + Sync)>,
+) -> Result<Response> {
+    if request.wait_ms.is_some_and(|ms| ms == 0 || ms > 600_000)
+        || request.wait_ms.is_some()
+            && (request.mode != Mode::Fresh || request.query.snapshot_id.is_some())
+        || request.also.len() > 8
+        || !request.also.is_empty() && request.query.action == usage_app_dto::Action::Refresh
+        || request.rebuild && (request.mode != Mode::Fresh || request.query.snapshot_id.is_some())
+    {
+        return Err(operation_error(
+            "INVALID_ARGUMENT",
+            "Invalid wait, rebuild or query batch",
+        ));
+    }
+    for query in &request.also {
+        if query.roots.is_some()
+            || query.snapshot_id.is_some()
+            || query.action == usage_app_dto::Action::Refresh
+        {
+            return Err(operation_error(
+                "INVALID_ARGUMENT",
+                "Batch queries use the selected revision and cannot refresh",
+            ));
+        }
+        crate::usage_app::validate(query)?;
+    }
     let mut validation = request.query.clone();
     validation.roots = None;
     crate::usage_app::validate(&validation)?;
@@ -39,7 +73,7 @@ pub(super) fn query(
     if request.verify && !refresh {
         return Err(operation_error("INVALID_ARGUMENT", "实时验证仅适用于更新"));
     }
-    let selector = selection::ReadViewSelector::new(
+    let mut selector = selection::ReadViewSelector::new(
         request.query.roots.clone().unwrap_or_default(),
         request.query.snapshot_id.clone(),
         if matches!(
@@ -60,6 +94,36 @@ pub(super) fn query(
         refresh,
     )?
     .project(request.query.scope.project.clone());
+    selector.wait_ms = request.wait_ms;
+    selector.peer_closed = peer_closed;
+    selector.rebuild = request.rebuild;
+    let cutoff = (chrono::Utc::now().date_naive() - chrono::Duration::days(30)).to_string();
+    let needs_history = |query: &usage_app_dto::Request| {
+        !matches!(
+            query.action,
+            usage_app_dto::Action::Usage
+                | usage_app_dto::Action::Threads
+                | usage_app_dto::Action::Statistics
+        ) || query.scope.all_time == Some(true)
+            || query.scope.undated == Some(true)
+            || query
+                .scope
+                .since
+                .as_ref()
+                .is_some_and(|date| date < &cutoff)
+            || query
+                .scope
+                .until
+                .as_ref()
+                .is_some_and(|date| date <= &cutoff)
+            || query.action == usage_app_dto::Action::Threads && query.scope.since.is_none()
+            || matches!(&query.comparison, Some(usage_app_dto::ComparisonRequest::Periods { baseline_since, baseline_until, .. }) if baseline_since < &cutoff || baseline_until <= &cutoff)
+    };
+    selector.include_history = request.include_history
+        || request.rebuild
+        || request.verify
+        || needs_history(&request.query)
+        || request.also.iter().any(needs_history);
     let cancelled = std::sync::atomic::AtomicBool::new(false);
     let (snapshot, freshness) = select_with_retained(&selector, shared, jobs, configs, &cancelled)?;
     let mut query = request.query;
@@ -77,11 +141,48 @@ pub(super) fn query(
         crate::usage_app::execute_snapshot(query, &snapshot)?
     };
     result.freshness = Some(freshness.clone());
+    let mut additional = Vec::with_capacity(request.also.len());
+    let mut batch_bytes = if request.also.is_empty() {
+        0
+    } else {
+        serde_json::to_vec(&result)?.len()
+    };
+    if batch_bytes > 2 * 1024 * 1024 {
+        return Err(operation_error(
+            "RESOURCE_LIMIT",
+            "Usage batch response exceeds budget",
+        ));
+    }
+    for query in request.also {
+        let mut value = crate::usage_app::execute_snapshot(query, &snapshot)?;
+        value.freshness = Some(freshness.clone());
+        let value_bytes = serde_json::to_vec(&value)?.len();
+        if value.inspection.is_some() && value_bytes > usage_app_dto::INSPECTION_RESPONSE_BYTES {
+            return Err(operation_error(
+                "RESOURCE_LIMIT",
+                "Inspection batch item exceeds its response budget",
+            ));
+        }
+        batch_bytes = batch_bytes
+            .checked_add(value_bytes)
+            .filter(|bytes| *bytes <= 2 * 1024 * 1024)
+            .ok_or_else(|| {
+                operation_error("RESOURCE_LIMIT", "Usage batch response exceeds budget")
+            })?;
+        additional.push(value);
+    }
     let response = Response {
         output_version: 1,
         result,
         freshness,
+        additional,
     };
+    if !response.additional.is_empty() && serde_json::to_vec(&response)?.len() > 2 * 1024 * 1024 {
+        return Err(operation_error(
+            "RESOURCE_LIMIT",
+            "Usage batch response exceeds budget",
+        ));
+    }
     if response.result.inspection.is_some()
         && serde_json::to_vec(&response)?.len() > usage_app_dto::INSPECTION_RESPONSE_BYTES
     {
@@ -155,6 +256,10 @@ pub(super) fn conversation_query(
             select_with_retained(&selector, shared, jobs, configs, cancelled).map(|(s, _)| s)
         })
         .transpose()?;
+    let snapshot = snapshot.detailed_view()?.unwrap_or(snapshot);
+    let baseline = baseline
+        .map(|s| s.detailed_view().map(|detail| detail.unwrap_or(s)))
+        .transpose()?;
     let mut result =
         crate::conversation::query(&snapshot, baseline.as_deref(), &request, cancelled)?;
     result.freshness = Some(freshness);
@@ -198,7 +303,10 @@ pub(super) fn config_query(
         let cancelled = std::sync::atomic::AtomicBool::new(false);
         let selected = select_view(&selector, shared, jobs, &cancelled);
         let (snapshot, status) = match selected {
-            Ok((snapshot, freshness)) => (Some(snapshot), freshness.status),
+            Ok((snapshot, freshness)) => (
+                Some(snapshot.detailed_view()?.unwrap_or(snapshot)),
+                freshness.status,
+            ),
             Err(error) if request.snapshot_id.is_some() => return Err(error),
             Err(error)
                 if error
@@ -251,6 +359,7 @@ pub(super) fn timing_query(
     };
     let selector = selection::ReadViewSelector::new(roots, identity, mode, false, false)?;
     let (snapshot, freshness) = select_with_retained(&selector, shared, jobs, configs, cancelled)?;
+    let snapshot = snapshot.detailed_view()?.unwrap_or(snapshot);
     crate::timing::query_on_snapshot(
         &snapshot,
         &request,

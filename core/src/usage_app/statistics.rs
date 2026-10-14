@@ -1,5 +1,6 @@
 //! Aggregate ledger measurements once per selected population, without reading operation bodies.
 use super::*;
+mod stored;
 
 pub(super) fn validate(request: &Request) -> Result<()> {
     if request.action != Action::Statistics {
@@ -105,6 +106,9 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
         let today = Utc::now().with_timezone(&tz).date_naive();
         request.scope.since = Some(default_report_start(today, &Group::Day)?.to_string());
         request.scope.until = today.succ_opt().map(|d| d.to_string());
+    }
+    if snapshot.has_stored_ledger() {
+        return stored::execute(request, snapshot, tz);
     }
     let live = snapshot.live_scope_ledger(&request.scope);
     let owned = if live.is_some() {

@@ -77,6 +77,9 @@ struct MemoryTurn {
     cold_operations: Vec<crate::live_index::FactLocation>,
 }
 pub struct Snapshot {
+    /// Statistics open independently of historical evidence. Details are loaded
+    /// at most once, from this view's pinned SQLite transaction, on demand.
+    lazy_details: Option<Mutex<Option<Arc<Snapshot>>>>,
     pub(crate) summary_index: Arc<crate::usage_app::SummaryIndex>,
     pub(crate) publication_change: Option<crate::usage_app_dto::PublicationChange>,
     pub(crate) project_loads: Vec<crate::live::ProjectLoad>,
@@ -158,4 +161,6 @@ mod observation_tests;
 pub(crate) use cold_events::build_from_sources as cold_event_index_from_sources;
 
 mod cold_operations;
-pub(crate) use cold_operations::{ColdOperations, load_operations as load_cold_operations};
+pub(crate) use cold_operations::ColdOperations;
+mod read_header;
+pub(crate) use read_header::{load as load_read_header, save as save_read_header};

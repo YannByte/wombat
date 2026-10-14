@@ -13,6 +13,12 @@
     },
     "freshness": {
       "$ref": "#/definitions/Freshness"
+    },
+    "additional": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Response"
+      }
     }
   },
   "required": [

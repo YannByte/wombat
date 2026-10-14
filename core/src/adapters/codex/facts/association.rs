@@ -1,7 +1,7 @@
 //! Retain canonical components, not their raw phase observations. The same
 //! resolver and merge rules serve full replay and one-target archive reduction.
 use super::*;
-use crate::operation_association::{OwnedAlias, Scope};
+use crate::operation_association::OwnedAlias;
 
 pub(in crate::adapters::codex) struct Prepared {
     preferred: String,
@@ -32,10 +32,20 @@ impl Facts {
         cancelled: &std::sync::atomic::AtomicBool,
     ) -> anyhow::Result<Vec<Prepared>> {
         let check = crate::operation_association::check;
-        let groups = crate::operation_association::resolve_groups(events, cancelled)?;
+        let groups = crate::operation_association::resolve_groups(
+            events
+                .into_iter()
+                .filter(|event| crate::operation_association::is_projection_input(event)),
+            cancelled,
+        )?;
         let mut prepared = Vec::with_capacity(groups.len());
         for group in groups {
             check(cancelled)?;
+            // A phase-only component has no domain operation. The archive keeps
+            // its aliases and phases for timing and future affected-target replay.
+            if group.operation_events.is_empty() {
+                continue;
+            }
             debug_assert!(!group.id.is_empty());
             let position = group.anchor.position();
             let file = match group.anchor.payload() {
@@ -71,15 +81,7 @@ impl Facts {
             };
             let first_issue = report.issues.len();
             let mut observed = group.operation_events.into_iter();
-            let Some(first) = observed.next() else {
-                prepared.push(Prepared {
-                    operation: None,
-                    aliases: Arc::from([]),
-                    issues: vec![],
-                    ..identity
-                });
-                continue;
-            };
+            let first = observed.next().expect("non-empty operation component");
             let crate::session_events::Payload::Operation { value, .. } = first.payload() else {
                 unreachable!()
             };
@@ -162,7 +164,6 @@ impl Facts {
         check(cancelled)?;
         let mut used_ids = BTreeSet::new();
         let mut operations = BTreeMap::new();
-        let mut aliases = HashMap::new();
         let mut operation_aliases = BTreeMap::new();
         for group in ordered {
             check(cancelled)?;
@@ -195,29 +196,6 @@ impl Facts {
             // including unchanged components inside a rewritten target.
             group.operation = Some(Arc::clone(&row));
             operations.insert(id.to_owned(), row);
-            for alias in group.aliases.iter() {
-                check(cancelled)?;
-                let (namespace, native) = match alias {
-                    OwnedAlias::Call(value) => ("call", value.as_str()),
-                    OwnedAlias::Item(value) => ("item", value.as_str()),
-                };
-                let scope = Scope {
-                    source: &group.scope.0,
-                    thread: group.scope.1.as_deref(),
-                    turn: group.scope.2.as_deref(),
-                };
-                let key = stable_id(&[
-                    scope.source,
-                    scope.thread.unwrap_or(""),
-                    scope.turn.unwrap_or(""),
-                    namespace,
-                    native,
-                ]);
-                if self.aliases.get(&key).map(String::as_str) != Some(id) {
-                    self.dirty_aliases.insert(key.clone());
-                }
-                aliases.insert(key, id.to_owned());
-            }
             operation_aliases.insert(id.to_owned(), Arc::clone(&group.aliases));
         }
         for id in self.operations.keys() {
@@ -229,8 +207,7 @@ impl Facts {
         self.dirty_operations
             .retain(|id| operations.contains_key(id));
         self.operations = operations;
-        self.aliases = aliases;
-        self.operation_aliases = operation_aliases;
+        self.operation_aliases = Arc::new(operation_aliases);
         self.operations_pending = false;
         Ok(())
     }

@@ -215,6 +215,7 @@ pub(super) fn save_with_prices(
         &serde_json::to_vec(&manifest.snapshot_ref)?,
     )?;
     Ok(Snapshot {
+        lazy_details: None,
         summary_index: Default::default(),
         publication_change: None,
         project_loads: vec![],
@@ -338,6 +339,7 @@ pub(super) fn load_at(root: &Path, id: Option<&str>) -> Result<Snapshot> {
         return Err(corrupt("快照身份不匹配"));
     }
     Ok(Snapshot {
+        lazy_details: None,
         summary_index: Default::default(),
         publication_change: None,
         project_loads: vec![],

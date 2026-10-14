@@ -568,6 +568,35 @@
         "verify": {
           "type": "boolean",
           "default": false
+        },
+        "waitMs": {
+          "description": "One bounded wait owned by this caller; cancelling it leaves shared work running.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 600000,
+          "default": null
+        },
+        "rebuild": {
+          "description": "Explicitly rebuild derived storage in a new generation; user records stay separate.",
+          "type": "boolean",
+          "default": false
+        },
+        "includeHistory": {
+          "description": "Include deferred historical files even for a recent query.",
+          "type": "boolean",
+          "default": false
+        },
+        "also": {
+          "description": "Additional queries share the selected immutable revision. No synchronization options.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Request3"
+          },
+          "maxItems": 8,
+          "default": []
         }
       },
       "additionalProperties": false,

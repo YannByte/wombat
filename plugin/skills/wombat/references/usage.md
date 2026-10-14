@@ -12,6 +12,8 @@ For “where did it go”, select `projects`, `models`, `distribution` or `detai
 
 For named tasks, use `threads --search TEXT`. For exact IDs, use `--locate-thread ID`. Pin the returned snapshot for follow-up pages. Use `turns --thread ID --sort tokens --limit 3 --json` at that snapshot.
 
+For a report that needs several views, check whether the discovered live usage Schema supports `also`. Put the overview in `query` and up to eight required statistics or ranking requests in `also`, each with the intended filters, `compact:true` and a small limit. Additional queries cannot select roots or snapshots, or refresh. Use `result` and `additional` from one response; all share a revision. Do not synchronize each dimension separately. `historyDeferred` means provisional coverage; retain that limitation and load full history only when the requested range requires it or the user asks.
+
 For a selected turn, use `--locate-turn ID`. For the turn's records, use `steps --thread ID --turn ID --json`. Pinned CLI queries cannot combine `--snapshot` with `--root` or `--fresh`. The snapshot already binds sources.
 
 Keep project/source-ID/date/model/effort filters. An exact project cwd excludes other worktrees. Include related worktrees or descendants only when requested with their explicit identities.

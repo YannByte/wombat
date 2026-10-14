@@ -29,6 +29,17 @@ const response: UsageResult = {
   quality: { status: 'complete', issues: [], sources: [] },
 };
 
+test('live batches reject missing, reordered or differently pinned results',async()=>{
+ const base={outputVersion:1,result:response,freshness:{status:'current',revision:'synthetic'},additional:[{...response,action:'threads'}]};
+ const request={query:{action:'usage'},mode:'cached',also:[{action:'threads'}]} as const;
+ for(const additional of [[],[{...response,action:'usage'}],[{...response,action:'threads',snapshotRef:{...response.snapshotRef,snapshotId:'other'}}]]){
+  const client=createUsageClient({query:async()=>response,live:async()=>({...base,additional})});
+  await assert.rejects(client.live!({...request,also:[...request.also]}),{code:'PROTOCOL_ERROR'});
+ }
+ const client=createUsageClient({query:async()=>response,live:async()=>base});
+ assert.deepEqual(await client.live!({...request,also:[...request.also]}),base);
+});
+
 test('a cancelled usage read discards a valid late transport response', async () => {
   const controller = new AbortController();
   let started!: () => void, finish!: (value: UsageResult) => void;

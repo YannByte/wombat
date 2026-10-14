@@ -91,10 +91,10 @@ fn archive_scopes_preserve_global_collisions_late_outcomes_and_unaffected_alloca
         fresh.operations, expected.operations,
         "Encoded write inputs preserve complete canonical outcomes"
     );
-    assert_eq!(fresh.aliases, expected.aliases);
+    assert_eq!(fresh.operation_aliases, expected.operation_aliases);
     let mut actual = reduction::load_streamed(&db, "facts", &report, &cancelled).unwrap();
     assert_eq!(actual.operations, expected.operations);
-    assert_eq!(actual.aliases, expected.aliases);
+    assert_eq!(actual.operation_aliases, expected.operation_aliases);
     assert_eq!(
         actual.operations["duplicate"].call_id.as_deref(),
         Some("first")
@@ -132,7 +132,7 @@ fn archive_scopes_preserve_global_collisions_late_outcomes_and_unaffected_alloca
     )
     .unwrap();
     assert_eq!(actual.operations, expected.operations);
-    assert_eq!(actual.aliases, expected.aliases);
+    assert_eq!(actual.operation_aliases, expected.operation_aliases);
     assert!(
         actual
             .operations

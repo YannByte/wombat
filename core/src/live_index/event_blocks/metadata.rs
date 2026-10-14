@@ -89,7 +89,7 @@ pub(super) fn associations(db: &Connection, id: i64, written: &Written) -> Resul
             && events.len() <= written.chunk.count
             && events
                 .iter()
-                .all(|e| crate::operation_association::is_input(e)),
+                .all(|e| crate::operation_association::is_projection_input(e)),
         "written association count mismatch",
     )?;
     Ok(events)

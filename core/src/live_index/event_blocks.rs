@@ -223,7 +223,7 @@ fn save_target(
                 raw.push(b',');
             }
             raw.extend_from_slice(&encoded);
-            if crate::operation_association::is_input(&events[end]) {
+            if crate::operation_association::is_projection_input(&events[end]) {
                 if association_count > 0 {
                     associations.push(b',');
                 }

@@ -1,7 +1,7 @@
-//! Restore committed facts one project at a time, prioritizing the visible project.
+//! Restore committed statistics independently of historical evidence.
 //! One read transaction binds every batch. Progress never seeds parser accounting.
 use super::*;
-use crate::live::{ProjectLoad, ProjectLoadState};
+use crate::live::ProjectLoadState;
 
 pub(crate) fn incomplete(snapshot: &Snapshot) -> bool {
     !snapshot.project_loads.is_empty()
@@ -14,11 +14,28 @@ pub(crate) fn restore_projects(
     db: &rusqlite::Connection,
     key: &str,
     roots: &[String],
-    priority: impl Fn() -> Option<String>,
+    _priority: impl Fn() -> Option<String>,
     mut publish: impl FnMut(Arc<Snapshot>),
 ) -> Result<Option<Arc<Snapshot>>> {
     let read_tx = db.unchecked_transaction()?;
     let db = &read_tx;
+    for source in sources(roots).sources {
+        validate_message_mapping(db, &source.id)?;
+        if crate::live_index::has_scope(db, &format!("projection:{}", source.id))?
+            && crate::live_index::scalar(
+                db,
+                &format!("projection:{}", source.id),
+                "watermarkVersion",
+            )?
+            .and_then(|v| v.as_u64())
+                != Some(u64::from(WATERMARK_FORMAT_VERSION))
+        {
+            return Err(operation_error(
+                "UNSUPPORTED_VERSION",
+                "Unsupported projection watermark version",
+            ));
+        }
+    }
     let prior = crate::live_index::load_map(db, &format!("view:{key}"))?;
     let Some(id) = prior.get("id").and_then(Value::as_str) else {
         return Ok(None);
@@ -47,119 +64,35 @@ pub(crate) fn restore_projects(
     if prior.get("prices").and_then(Value::as_str) != Some(&prices.catalog_hash) {
         return Ok(None);
     }
-    let mut collected = Collected::default();
-    for source in sources(roots).sources {
-        let epoch = crate::live_index::load_map(db, &format!("epoch:{}", source.id))?;
-        if prior.get("epochs").and_then(|v| v.get(&source.id)) != Some(&Value::Object(epoch)) {
-            return Ok(None);
-        }
-        let failure = prior
-            .get("failures")
-            .and_then(|v| v.get(&source.id))
-            .map(|v| serde_json::from_value::<SourceReport>(v.clone()))
-            .transpose()?;
-        let mut value = match load_collected_except(db, &source.id, true, true, true)? {
-            Some(value) => value,
-            None if failure.is_some() => Collected::default(),
-            None => return Ok(None),
-        };
-        if let Some(failure) = failure {
-            value.issues = failure.issues.clone();
-            value.sources = vec![failure];
-            value.watermarks = serde_json::from_value(
-                prior
-                    .get("failureWatermarks")
-                    .and_then(|v| v.get(&source.id))
-                    .ok_or_else(|| anyhow::anyhow!("missing failure watermark observations"))?
-                    .clone(),
-            )?;
-            validate_watermarks(&value.watermarks)?;
-        }
-        collected.watermarks.extend(value.watermarks);
-        collected.sources.extend(value.sources);
-        collected.issues.extend(value.issues);
-        collected.threads.extend(value.threads);
-        collected.turns.extend(value.turns);
-        collected.measurements.extend(value.measurements);
-        collected.operations.extend(value.operations);
-        collected
-            .title_observations
-            .extend(value.title_observations);
-    }
-    let events = crate::usage_store::load_cold_event_index(db, key)?
-        .ok_or_else(|| operation_error("INDEX_UNAVAILABLE", "已提交冷证据索引缺失"))?;
-    let operations =
-        crate::usage_store::load_cold_operations(db, &collected.sources, &collected.threads)?;
-    let mut snapshot = crate::usage_store::memory_cold_operations(
-        collected,
-        id.to_owned(),
-        prices.clone(),
-        events,
-        operations,
-    )?;
-    if let Some(at) = prior.get("createdAt").and_then(Value::as_str) {
-        snapshot.manifest.snapshot_ref.created_at = at.into();
-    }
-    snapshot.publication_change = publication_change;
-    snapshot.capture_cold_events(db, key, prices)?;
-    let mut groups: BTreeMap<Option<String>, usize> = BTreeMap::new();
-    for thread in &snapshot.manifest.threads {
-        groups.entry(thread.thread.project.clone()).or_default();
-    }
-    if groups.is_empty() {
-        groups.insert(None, 0);
-    }
-    let mut progress: Vec<_> = groups
-        .keys()
-        .cloned()
-        .map(|project| ProjectLoad {
-            project,
-            state: ProjectLoadState::Pending,
-        })
-        .collect();
-    // Build accounting and query indexes once. Project progress shares that state.
-    while groups.len() > 1 {
-        let project = next_project(&groups, priority());
-        groups.remove(&project);
-        for load in &mut progress {
-            if load.project == project {
-                load.state = ProjectLoadState::Ready;
-            } else if load.state == ProjectLoadState::Loading {
-                load.state = ProjectLoadState::Pending;
+    if let Some(mut snapshot) =
+        crate::usage_store::load_read_header(db, key, &prior, prices.clone())?
+    {
+        let expected: std::collections::BTreeSet<_> =
+            sources(roots).sources.into_iter().map(|s| s.id).collect();
+        let actual: std::collections::BTreeSet<_> = snapshot
+            .manifest
+            .sources
+            .iter()
+            .map(|s| s.source.id.clone())
+            .collect();
+        anyhow::ensure!(expected == actual, "query header source scope mismatch");
+        for source in &snapshot.manifest.sources {
+            let epoch = crate::live_index::load_map(db, &format!("epoch:{}", source.source.id))?;
+            if prior.get("epochs").and_then(|v| v.get(&source.source.id))
+                != Some(&Value::Object(epoch))
+            {
+                return Ok(None);
             }
         }
-        let next = next_project(&groups, priority());
-        progress
-            .iter_mut()
-            .find(|p| p.project == next)
-            .unwrap()
-            .state = ProjectLoadState::Loading;
-        publish(Arc::new(snapshot.project_view(
-            format!("live:{key}:{}", uuid::Uuid::new_v4()),
-            progress.clone(),
-        )));
+        snapshot.publication_change = publication_change;
+        read_tx.commit()?;
+        let snapshot = Arc::new(snapshot);
+        publish(Arc::clone(&snapshot));
+        return Ok(Some(snapshot));
     }
-    read_tx.commit()?;
-    let snapshot = Arc::new(snapshot);
-    publish(Arc::clone(&snapshot));
-    Ok(Some(snapshot))
-}
-
-fn next_project(
-    groups: &BTreeMap<Option<String>, usize>,
-    preferred: Option<String>,
-) -> Option<String> {
-    if let Some(project) = preferred
-        && groups.contains_key(&Some(project.clone()))
-    {
-        return Some(project);
-    }
-    groups
-        .iter()
-        .filter(|(project, _)| project.is_some())
-        .min_by_key(|(project, facts)| (*facts, *project))
-        .map(|(project, _)| project.clone())
-        .unwrap_or(None)
+    // An absent query header requires reconstruction from current canonical facts.
+    // Unknown projection formats still fail during synchronization, without deletion.
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -306,7 +239,7 @@ mod tests {
         );
         let mut queries = vec![];
         for timezone in ["UTC", "America/New_York", "Asia/Kathmandu"] {
-            for action in ["usage", "threads"] {
+            for action in ["usage", "threads", "statistics"] {
                 for scope in [
                     json!({"allTime":true}),
                     json!({"since":"2026-10-11","until":"2026-10-12"}),
@@ -320,12 +253,17 @@ mod tests {
                 }
             }
         }
-        for action in ["usage", "threads"] {
+        for action in ["usage", "threads", "statistics"] {
             queries.push(json!({"action":action,"scope":{"since":"2007-11-04","until":"2007-11-05","timezone":"America/St_Johns"}}));
         }
         for presentation in ["projects", "models", "distribution"] {
             queries.push(json!({"action":"usage","presentation":presentation,"scope":{"allTime":true,"timezone":"UTC"}}));
         }
+        for presentation in ["projects", "models"] {
+            queries.push(json!({"action":"statistics","presentation":presentation,"scope":{"allTime":true,"timezone":"UTC"}}));
+        }
+        queries.push(json!({"action":"statistics","scope":{"since":"2026-10-11","until":"2026-10-12","timezone":"Asia/Kathmandu"},"comparison":{"kind":"periods","baselineSince":"2026-10-10","baselineUntil":"2026-10-11","dimension":"model"}}));
+        queries.push(json!({"action":"statistics","threadId":stored.manifest.threads[0].thread.id,"scope":{"allTime":true,"timezone":"UTC"}}));
         for sort in ["cost", "recent", "tokens"] {
             queries.push(json!({"action":"threads","sort":sort,"search":"a","scope":{"allTime":true,"timezone":"UTC"},"limit":1}));
         }
@@ -347,6 +285,7 @@ mod tests {
                 "page",
                 "facets",
                 "distribution",
+                "statistics",
             ] {
                 assert_eq!(a.get(field), b.get(field), "{query}: {field}");
             }
@@ -680,7 +619,8 @@ mod tests {
             Some(330)
         );
         assert_eq!(crate::live_index::decoded_event_count(), before);
-        let partition = restored
+        let details = restored.detailed_view().unwrap().unwrap();
+        let partition = details
             .manifest
             .events
             .partitions
@@ -716,7 +656,7 @@ mod tests {
         );
     }
     #[test]
-    fn requested_project_is_readable_before_later_projects_without_changing_committed_facts() {
+    fn committed_statistics_restore_without_project_gating_or_evidence_loading() {
         let source = tempfile::tempdir().unwrap();
         let index = tempfile::tempdir().unwrap();
         fs::create_dir(source.path().join("sessions")).unwrap();
@@ -767,39 +707,12 @@ mod tests {
             .find(|t| t.thread.id == first.manifest.threads[0].thread.id)
             .unwrap();
         assert!(Arc::ptr_eq(&first.manifest.threads[0], shared));
-        for partition in &first.manifest.events.partitions {
-            let shared = restored
-                .manifest
-                .events
-                .partitions
-                .iter()
-                .find(|p| p.target == partition.target)
-                .unwrap();
-            assert!(Arc::ptr_eq(partition, shared));
-        }
-        assert!(incomplete(first));
-        assert_eq!(first.manifest.threads.len(), 1);
-        assert_eq!(
-            first.manifest.threads[0].thread.project.as_deref(),
-            Some("/synthetic/b")
-        );
-        assert_eq!(
-            first
-                .ledger()
-                .unwrap()
-                .iter()
-                .map(|r| r.fact.tokens.total.unwrap())
-                .sum::<u64>(),
-            220
-        );
-        assert!(
-            first
-                .project_loads
-                .iter()
-                .any(|p| p.project.as_deref() == Some("/synthetic/a")
-                    && p.state != ProjectLoadState::Ready)
-        );
-        assert!(first.manifest.sources.iter().all(|s| s.status == "partial"));
+        assert!(!incomplete(first));
+        assert_eq!(batches.len(), 1);
+        assert_eq!(first.manifest.threads.len(), 2);
+        assert!(first.manifest.events.partitions.is_empty());
+        assert!(first.manifest.threads.iter().all(|t| t.turns.is_empty()));
+        assert!(first.lazy_details_empty_for_test());
         let query = |project: &str| {
             serde_json::from_value(
                 json!({"action":"usage","scope":{"allTime":true,"project":project}}),
@@ -808,14 +721,10 @@ mod tests {
         };
         let ready = crate::usage_app::execute_snapshot(query("/synthetic/b"), first).unwrap();
         assert_eq!(ready.summary.tokens.total, Some(220));
-        let pending = crate::usage_app::execute_snapshot(query("/synthetic/a"), first).unwrap_err();
-        assert_eq!(
-            pending
-                .downcast_ref::<crate::dto::OperationError>()
-                .unwrap()
-                .code,
-            "SYNC_PENDING"
-        );
+        let ready = crate::usage_app::execute_snapshot(query("/synthetic/a"), first).unwrap();
+        assert_eq!(ready.summary.tokens.total, Some(110));
+        assert!(first.lazy_details_empty_for_test());
+        let details = restored.detailed_view().unwrap().unwrap();
         assert_eq!(
             restored
                 .ledger()
@@ -830,7 +739,7 @@ mod tests {
             committed.events().unwrap().len()
         );
         assert_eq!(
-            serde_json::to_value(&restored.manifest.events).unwrap(),
+            serde_json::to_value(&details.manifest.events).unwrap(),
             serde_json::to_value(&committed.manifest.events).unwrap()
         );
         let normalize = |snapshot: &Snapshot| {
@@ -843,7 +752,7 @@ mod tests {
             }
             manifest
         };
-        assert_eq!(normalize(&restored), normalize(&committed));
+        assert_eq!(normalize(&details), normalize(&committed));
         assert_eq!(
             crate::live_index::load_map(&db, &format!("view:{key}")).unwrap(),
             original

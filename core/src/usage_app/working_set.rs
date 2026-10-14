@@ -14,12 +14,14 @@ pub(super) enum Order {
     Period,
     Dimensions,
     Names,
+    Groups,
 }
 impl Order {
     fn sql(self) -> &'static str {
         match self {
             Self::Period => "json_extract(key,'$[0]') DESC,json_extract(key,'$[1]') DESC",
             Self::Dimensions => "json_extract(key,'$[1][0]'),json_extract(key,'$[1][1]')",
+            Self::Groups => "json_extract(key,'$[0]'),json_extract(key,'$[1]')",
             Self::Names => "json_extract(key,'$')",
         }
     }

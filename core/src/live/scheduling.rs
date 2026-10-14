@@ -46,18 +46,32 @@ impl Drop for WorkerLifecycle {
     }
 }
 
+#[cfg(test)]
 pub(super) fn request(
     entry: &mut Entry,
     key: &str,
     verify: bool,
     jobs: &mpsc::SyncSender<Job>,
 ) -> Result<u64> {
+    request_work(entry, key, verify, false, jobs)
+}
+pub(super) fn request_work(
+    entry: &mut Entry,
+    key: &str,
+    verify: bool,
+    rebuild: bool,
+    jobs: &mpsc::SyncSender<Job>,
+) -> Result<u64> {
     if let Some(work) = &mut entry.pending {
         work.verify |= verify;
+        work.rebuild |= rebuild;
+        work.include_history |= entry.include_history;
         return Ok(work.ticket);
     }
     if let Some(work) = entry.running
         && (!verify || work.verify)
+        && (!rebuild || work.rebuild)
+        && (!entry.include_history || work.include_history)
     {
         return Ok(work.ticket);
     }
@@ -75,7 +89,12 @@ pub(super) fn request(
         }
     })?;
     entry.requested = ticket;
-    entry.pending = Some(SyncWork { ticket, verify });
+    entry.pending = Some(SyncWork {
+        ticket,
+        verify,
+        rebuild,
+        include_history: entry.include_history,
+    });
     entry.syncing = true;
     entry.following = true;
     Ok(ticket)
@@ -93,6 +112,8 @@ pub(super) fn begin(entry: &mut Entry, queued: bool) -> Option<SyncWork> {
         SyncWork {
             ticket: entry.requested,
             verify: false,
+            rebuild: false,
+            include_history: entry.include_history,
         }
     };
     entry.running = Some(work);
@@ -248,6 +269,10 @@ mod tests {
             .unwrap(),
             mode: Mode::Auto,
             verify: false,
+            wait_ms: None,
+            rebuild: false,
+            include_history: false,
+            also: vec![],
         };
         let selector = selection::ReadViewSelector::new(
             roots.clone(),

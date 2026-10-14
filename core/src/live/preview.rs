@@ -55,7 +55,7 @@ mod tests {
         let request = |action: &str, snapshot: Option<&str>, mode: Mode| {
             Request {
             query: serde_json::from_value(json!({"action":action,"roots":roots,"snapshotId":snapshot,"scope":{"allTime":true}})).unwrap(),
-            mode, verify:false,
+            mode, verify:false, wait_ms:None, rebuild:false, include_history:false, also:vec![],
         }
         };
         let configs = Mutex::new(crate::config::Store::default());

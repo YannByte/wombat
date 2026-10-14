@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import { realpathSync } from 'node:fs';
-import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
@@ -32,9 +32,13 @@ test('index initialization faults return actual errors, retain unsupported recor
   const cli=spawnSync(process.execPath,[path.resolve('dist/wombat.js'),'optimize','history','--root',root,'--project-root',project,'--project',project,'--suggestion',suggestion.id,'--json'],{env:process.env,encoding:'utf8',timeout:10_000});assert.ifError(cli.error);assert.equal(cli.status,2,cli.stderr+cli.stdout);const record=JSON.parse(cli.stdout);assert.equal(record.suggestions[0].status,'verified');assert.equal(record.followUps[0].status,'unavailable');assert.equal(record.followUps[0].observedRecords,null);
   const retained=new DatabaseSync(database);assert.equal(retained.prepare('SELECT count(*) AS n FROM sample').get()!.n,1);assert.equal(retained.prepare('PRAGMA user_version').get()!.user_version,99);
   retained.close();
-  // Explicit test fixture reset, never performed by the product.
-  await rm(database);await rm(database+'-wal',{force:true});await rm(database+'-shm',{force:true});
-  const restored=await client.live!({query:{action:'usage',roots:[root]},mode:'fresh'});assert.equal(restored.freshness.status,'current');assert.equal(restored.result.summary.measurementCount,0);
-  const current=new DatabaseSync(database);assert.equal(current.prepare('PRAGMA user_version').get()!.user_version,8);current.close();
+  // Explicit repair uses the real CLI and publishes only the derived generation.
+  const rebuilt=spawnSync(process.execPath,[path.resolve('dist/wombat.js'),'usage','--root',root,'--rebuild','--wait-ms','20000','--json'],{env:{...process.env,WOMBAT_CORE_BIN:binary},encoding:'utf8',timeout:25000});
+  assert.ifError(rebuilt.error);assert.ok([0,2].includes(rebuilt.status!),rebuilt.stdout+rebuilt.stderr);
+  const restored=JSON.parse(rebuilt.stdout);assert.equal(restored.freshness.status,'current');assert.equal(restored.summary.measurementCount,0);
+  const pointer=JSON.parse(await readFile(path.join(data,'live-v2/active-index.json'),'utf8'));
+  const current=new DatabaseSync(path.join(data,'live-v2',pointer.directory,'index.sqlite'));assert.equal(current.prepare('PRAGMA user_version').get()!.user_version,9);current.close();
+  const original=new DatabaseSync(database,{readOnly:true});assert.equal(original.prepare('PRAGMA user_version').get()!.user_version,99);assert.equal(original.prepare('SELECT value FROM sample').get()!.value,'retained');original.close();
+  const reviewed=await browser.optimize!({project,group:'history',suggestionId:suggestion.id});assert.equal(reviewed.suggestions[0].status,'verified');assert.equal(reviewed.decisionRevision,history.decisionRevision);
  }finally{await host.close();service.kill('SIGTERM');await once(service,'exit').catch(()=>{});for(const[k,v]of Object.entries(previous)){if(v===undefined)delete process.env[k];else process.env[k]=v;}await rm(dir,{recursive:true,force:true});}
 });

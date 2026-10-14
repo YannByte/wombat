@@ -157,6 +157,20 @@ fn remaining(deadline: Instant) -> io::Result<Duration> {
 }
 
 impl Stream {
+    pub fn peer_probe(&self) -> impl Fn() -> bool + Sync + '_ {
+        let pipe = &self.pipe;
+        move || {
+            let mut byte = [0_u8; 1];
+            match pipe.lock().unwrap().try_read(&mut byte) {
+                Ok(0) => true,
+                Err(error) => matches!(
+                    error.kind(),
+                    io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionReset
+                ),
+                Ok(_) => byte[0] == 0,
+            }
+        }
+    }
     pub fn set_nonblocking(&self, _value: bool) -> io::Result<()> {
         Ok(())
     }

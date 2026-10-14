@@ -22,12 +22,12 @@ Examine returned freshness and coverage:
 
 - Complete current/fixed results support the requested conclusion and pinned drill-down.
 - initialScan or provisional history: tell the user that totals are incomplete. Examine existing tasks. Do not claim complete rankings or unused resources.
-- SYNC_PENDING without data: tell the user that preparation is in progress. Run the same query with `--fresh` at most once more. Normal queries wait roughly 2 seconds. Fresh waits at most 10 seconds and may return SYNC_TIMEOUT. Keep the original question for “continue”. A timeout does not stop shared scanning.
+- SYNC_PENDING without data: explain that preparation is in progress. If the discovered usage Schema supports `waitMs`, use one bounded fresh wait for the same scope (up to 600000 ms). Keep progress visible while waiting. Otherwise use the same query with `--fresh` at most once more. A timeout or cancellation does not stop shared scanning; do not start another scan or alternate repeated cached and fresh calls.
 - syncing/stale with committed results: give the data time. Answer what the evidence supports. Wait only if latest data is needed.
 - failed/partial: keep usable facts. Show failed sources or incomplete coverage.
 - Completed empty results: distinguish absent supported logs from filters matching nothing.
 - Expired view: read the same scope again. Tell the user about the version change.
-- Unknown formats: keep the data. Show the format error. Never clear or migrate the data.
+- Unknown formats: keep the data and show the format error. If the user asks to rebuild or repair the index and the discovered Schema supports `rebuild`, use that explicit rebuild on the same source roots. It preserves separate user records and publishes a new generation only after success. A usage question alone does not authorize rebuild. Never delete or migrate data as a query workaround.
 
 `--cached` and fixed snapshots stay offline. Missing cache returns NO_SNAPSHOT, not zero usage. If the user requests offline use, set `WOMBAT_AUTO_PRICES=0`. Do not invent a readiness flag, database query, project percentage or ETA. The existing Web may display ongoing preparation. Opening it must not create another index.
 

@@ -36,6 +36,33 @@ export interface Request {
   query: Request1;
   mode?: Mode & string;
   verify?: boolean;
+  /**
+   * One bounded wait owned by this caller; cancelling it leaves shared work running.
+   */
+  waitMs?: number | null;
+  /**
+   * Explicitly rebuild derived storage in a new generation; user records stay separate.
+   */
+  rebuild?: boolean;
+  /**
+   * Include deferred historical files even for a recent query.
+   */
+  includeHistory?: boolean;
+  /**
+   * Additional queries share the selected immutable revision. No synchronization options.
+   *
+   * @maxItems 8
+   */
+  also?:
+    | []
+    | [Request1]
+    | [Request1, Request1]
+    | [Request1, Request1, Request1]
+    | [Request1, Request1, Request1, Request1]
+    | [Request1, Request1, Request1, Request1, Request1]
+    | [Request1, Request1, Request1, Request1, Request1, Request1]
+    | [Request1, Request1, Request1, Request1, Request1, Request1, Request1]
+    | [Request1, Request1, Request1, Request1, Request1, Request1, Request1, Request1];
 }
 export interface Request1 {
   comparison?: ComparisonRequest | null;

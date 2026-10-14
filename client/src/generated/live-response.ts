@@ -214,6 +214,7 @@ export interface Response {
   outputVersion: number;
   result: Response1;
   freshness: Freshness;
+  additional?: Response1[];
 }
 export interface Response1 {
   statistics?: TaskStatistics | null;

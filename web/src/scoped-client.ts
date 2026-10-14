@@ -175,6 +175,8 @@ export function createScopedClient(
     prices: (r, q) => (r.action === 'auto_update' ? prices.update() : options.client.prices(r, q)),
     live: async (r, q) => {
       if (!options.client.live) throw new CoreError('LIVE_UNAVAILABLE', 'Live queries unavailable');
+      if (r.also?.some((query) => query.roots || query.snapshotId))
+        throw new CoreError('INVALID_ARGUMENT', 'Batch queries must share the host read scope');
       const result = prices.observe(
         r,
         await options.client.live({ ...r, query: scope(r.query) }, q),

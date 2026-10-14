@@ -25,6 +25,20 @@ pub struct Request {
     pub mode: Mode,
     #[serde(default)]
     pub verify: bool,
+    /// One bounded wait owned by this caller; cancelling it leaves shared work running.
+    #[serde(default)]
+    #[schemars(range(min = 1, max = 600000))]
+    pub wait_ms: Option<u64>,
+    /// Explicitly rebuild derived storage in a new generation; user records stay separate.
+    #[serde(default)]
+    pub rebuild: bool,
+    /// Include deferred historical files even for a recent query.
+    #[serde(default)]
+    pub include_history: bool,
+    /// Additional queries share the selected immutable revision. No synchronization options.
+    #[serde(default)]
+    #[schemars(length(max = 8))]
+    pub also: Vec<usage_app_dto::Request>,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -71,8 +85,11 @@ pub struct Response {
     pub output_version: u32,
     pub result: usage_app_dto::Response,
     pub freshness: Freshness,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional: Vec<usage_app_dto::Response>,
 }
 struct Entry {
+    include_history: bool,
     restoring: bool,
     preferred_project: Option<String>,
     roots: Vec<String>,
@@ -93,6 +110,7 @@ struct Entry {
 impl Entry {
     fn new(roots: Vec<String>) -> Self {
         Self {
+            include_history: false,
             restoring: false,
             preferred_project: None,
             roots,
@@ -121,6 +139,8 @@ struct Job {
 struct SyncWork {
     ticket: u64,
     verify: bool,
+    rebuild: bool,
+    include_history: bool,
 }
 
 fn directory() -> Result<PathBuf> {
@@ -179,12 +199,16 @@ pub fn endpoint() -> Result<Value> {
     Ok(json!({"protocolVersion":2,"socket":socket_path()?}))
 }
 mod collection;
+mod generation;
 mod preview;
 mod query;
 mod scheduling;
 mod selection;
 mod transport;
+pub(crate) use collection::load_collected_except;
 use collection::{restore_projects, source_key, sources, sync};
-use query::{config_query, query, timing_query};
+#[cfg(test)]
+use query::query;
+use query::{config_query, timing_query};
 use selection::select_view;
 pub use transport::serve;

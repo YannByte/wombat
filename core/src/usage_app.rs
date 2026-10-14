@@ -23,6 +23,7 @@ pub(crate) mod scope;
 pub(crate) mod statistics;
 mod stored;
 mod summary;
+mod working_set;
 use conversations::{step_items, thread_items, turn_items};
 use reports::{default_report_start, dimension_items, usage_items};
 pub(crate) use scope::validate;
@@ -115,6 +116,13 @@ pub fn execute(request: Request) -> Result<Response> {
 }
 
 pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<Response> {
+    if !matches!(
+        request.action,
+        Action::Usage | Action::Threads | Action::Statistics
+    ) && let Some(details) = snapshot.detailed_view()?
+    {
+        return execute_snapshot(request, &details);
+    }
     ensure_ready(&request, snapshot)?;
     let key = if snapshot.is_live() {
         // Default ranges roll over at midnight in the request timezone.

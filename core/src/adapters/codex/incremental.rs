@@ -5,6 +5,7 @@ use rusqlite::Connection;
 
 use crate::file_metadata::FileMetadata;
 use std::time::UNIX_EPOCH;
+mod recent;
 mod reduction;
 #[cfg(test)]
 mod reduction_tests;
@@ -389,12 +390,30 @@ pub(crate) fn sync_cached(
     let context = RunContext::default();
     sync_cached_with_context(db, source, verify, cache, &context)
 }
+pub(crate) fn sync_cached_recent(
+    db: &Connection,
+    source: &SourceInstance,
+    verify: bool,
+    cache: &mut Cache,
+) -> Result<Option<Synced>> {
+    sync_with_policy(db, source, verify, cache, &RunContext::default(), true)
+}
 fn sync_cached_with_context(
     db: &Connection,
     source: &SourceInstance,
     verify: bool,
     cache: &mut Cache,
     context: &RunContext,
+) -> Result<Option<Synced>> {
+    sync_with_policy(db, source, verify, cache, context, false)
+}
+fn sync_with_policy(
+    db: &Connection,
+    source: &SourceInstance,
+    verify: bool,
+    cache: &mut Cache,
+    context: &RunContext,
+    recent_only: bool,
 ) -> Result<Option<Synced>> {
     crate::operation_association::check(&context.cancelled)?;
     let mut report = SourceReport {
@@ -471,6 +490,23 @@ fn sync_cached_with_context(
         );
     }
     let observed_at = chrono::Utc::now().to_rfc3339();
+    let eligible = if recent_only && !verify {
+        recent::select(&files, &checkpoints)?
+    } else {
+        files.clone()
+    };
+    let deferred: Vec<_> = files
+        .difference(&eligible)
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    if !deferred.is_empty() {
+        issue(
+            &mut report,
+            "historyDeferred",
+            "Historical files are not indexed yet; results have partial source coverage and can change when history is loaded",
+            None,
+        );
+    }
     let title_stamp = FileMetadata::read(root.join("session_index.jsonl"))
         .ok()
         .map(|m| stamp(&m));
@@ -482,6 +518,9 @@ fn sync_cached_with_context(
     let mut observations = BTreeMap::new();
     let mut unchanged = BTreeMap::new();
     for file in &files {
+        if !eligible.contains(file) {
+            continue;
+        }
         let key = file.to_string_lossy().into_owned();
         let meta = FileMetadata::read(file)?;
         let cp = checkpoints.get(&key);
@@ -540,6 +579,7 @@ fn sync_cached_with_context(
     }
     changed |= !dirty.is_empty()
         || rebuild
+        || previous.get("deferredFiles") != Some(&serde_json::json!(deferred))
         || previous.get("missing") != Some(&serde_json::json!(missing));
     if !changed {
         return Ok(None);
@@ -562,7 +602,6 @@ fn sync_cached_with_context(
     facts.dirty_operations.clear();
     facts.retired_operations.clear();
     facts.dirty_measurements.clear();
-    facts.dirty_aliases.clear();
     let generations: BTreeMap<_, _> = checkpoints
         .iter()
         .filter_map(|(path, cp)| {
@@ -823,13 +862,13 @@ fn sync_cached_with_context(
         "titleStamp": title_stamp,
         "sourceVersions": report.source_versions
     });
+    metadata["deferredFiles"] = serde_json::json!(deferred);
     crate::observation_versions::ObservationHeaderSet::Parser
         .write_json(metadata.as_object_mut().expect("metadata is an object"));
     crate::live_index::save_map(db, &scope, metadata.as_object().unwrap())?;
     facts.dirty_measurements.clear();
     facts.dirty_operations.clear();
     facts.retired_operations.clear();
-    facts.dirty_aliases.clear();
     crate::operation_association::check(&context.cancelled)?;
     // Verification may temporarily own all observations. Ordinary appends use
     // canonical components and affected archive scopes; evidence stays durable.

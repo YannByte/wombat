@@ -7,6 +7,30 @@ pub(crate) struct ColdOperations {
     pub(super) unassigned: BTreeMap<String, UnassignedUseRecords>,
 }
 impl ColdOperations {
+    pub(crate) fn metadata(rows: &[Arc<Operation>]) -> Result<Self> {
+        let mut index = Self::default();
+        for operation in rows {
+            if operation.turn_id.as_deref().is_none_or(str::is_empty) {
+                index
+                    .unassigned
+                    .entry(operation.thread_id.to_string())
+                    .or_default()
+                    .observe(operation)?;
+            }
+            index
+                .turns
+                .entry((
+                    operation.thread_id.to_string(),
+                    operation
+                        .turn_id
+                        .as_deref()
+                        .unwrap_or("unassigned")
+                        .to_owned(),
+                ))
+                .or_default();
+        }
+        Ok(index)
+    }
     pub(crate) fn include_measurement_turns(&mut self, rows: &[Arc<Measurement>]) {
         for fact in rows {
             if let Some(thread) = &fact.thread_id {

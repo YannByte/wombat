@@ -207,6 +207,7 @@ fn memory_inner(
         threads,
     };
     Ok(Snapshot {
+        lazy_details: None,
         summary_index: Arc::new(summary_index),
         publication_change: None,
         project_loads: vec![],

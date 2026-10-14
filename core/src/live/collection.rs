@@ -22,7 +22,7 @@ fn load_collected_inner(
 ) -> Result<Option<Collected>> {
     load_collected_except(db, key, skip_events, skip_operations, false)
 }
-fn load_collected_except(
+pub(crate) fn load_collected_except(
     db: &rusqlite::Connection,
     key: &str,
     skip_events: bool,
@@ -168,6 +168,17 @@ pub(super) fn sync(
     prior_view: Option<&Snapshot>,
     caches: &mut BTreeMap<String, adapters::codex::incremental::Cache>,
 ) -> Result<Option<Arc<Snapshot>>> {
+    sync_with_policy(db, key, roots, verify, prior_view, caches, false)
+}
+pub(super) fn sync_with_policy(
+    db: &mut rusqlite::Connection,
+    key: &str,
+    roots: &[String],
+    verify: bool,
+    prior_view: Option<&Snapshot>,
+    caches: &mut BTreeMap<String, adapters::codex::incremental::Cache>,
+    recent_only: bool,
+) -> Result<Option<Arc<Snapshot>>> {
     let discovered = sources(roots);
     if !discovered.issues.is_empty()
         && !discovered
@@ -217,7 +228,11 @@ pub(super) fn sync(
         }
 
         let mut source_tx = tx.savepoint()?;
-        let outcome = adapters::codex::incremental::sync_cached(&source_tx, source, verify, cache);
+        let outcome = if recent_only {
+            adapters::codex::incremental::sync_cached_recent(&source_tx, source, verify, cache)
+        } else {
+            adapters::codex::incremental::sync_cached(&source_tx, source, verify, cache)
+        };
         let synced = match outcome {
             Ok(value) => {
                 source_tx.commit()?;
@@ -422,6 +437,7 @@ pub(super) fn sync(
     changed |= prior.get("failures").unwrap_or(&json!({})) != &serde_json::to_value(&failures)?;
     changed |= prior.get("epochs") != Some(&serde_json::to_value(&epochs)?);
     changed |= prior.get("prices").and_then(Value::as_str) != Some(&prices.catalog_hash);
+    changed |= !prior.contains_key("readHeader");
     if !changed {
         tx.commit()?;
         return Ok(None);
@@ -474,7 +490,10 @@ pub(super) fn sync(
     collected.events.clear();
     let id = format!("live:{key}:{}", uuid::Uuid::new_v4());
     let previous_events = match prior_view {
-        Some(view) => Some(view.manifest.events.clone()),
+        Some(view) if !view.manifest.events.partitions.is_empty() => {
+            Some(view.manifest.events.clone())
+        }
+        Some(_) => crate::usage_store::load_cold_event_index(&tx, key)?,
         None => crate::usage_store::load_cold_event_index(&tx, key)?,
     };
     let events = if changed_sources.is_empty() {
@@ -502,8 +521,8 @@ pub(super) fn sync(
             cache.share_measurements(collected.measurements.iter());
         }
     }
-    let mut operations =
-        crate::usage_store::load_cold_operations(&tx, &collected.sources, &collected.threads)?;
+    // Canonical operations were already reduced; do not decode them again for statistics.
+    let mut operations = crate::usage_store::ColdOperations::metadata(&collected.operations)?;
     operations.include_measurement_turns(&collected.measurements);
     let summary = crate::usage_store::ledger_projection::summary(&tx, &collected.sources)?;
     collected.measurements.clear();
@@ -531,8 +550,10 @@ pub(super) fn sync(
             .as_object()
             .unwrap(),
     )?;
+    crate::usage_store::save_read_header(&tx, key, &snapshot)?;
     tx.commit()?;
     snapshot.capture_cold_events(db, key, prices)?;
+    snapshot.defer_details();
     Ok(Some(Arc::new(snapshot)))
 }
 #[cfg(test)]

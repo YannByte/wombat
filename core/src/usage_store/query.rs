@@ -5,6 +5,9 @@ impl Snapshot {
         self.live_rows.is_some()
     }
     pub(crate) fn export_live(&self) -> Result<Snapshot> {
+        if let Some(view) = self.detailed_view()? {
+            return view.export_live();
+        }
         let prices = crate::pricing_sync::current()?;
         if prices.catalog_hash != self.manifest.price_catalog_hash {
             return Err(operation_error(
@@ -62,6 +65,9 @@ impl Snapshot {
             .flat_map(|turns| turns.values().flat_map(|t| t.operations.iter()))
     }
     pub(crate) fn operation_facts(&self) -> Result<Vec<Arc<Operation>>> {
+        if let Some(view) = self.detailed_view()? {
+            return view.operation_facts();
+        }
         let loaded: std::collections::HashSet<_> = self
             .manifest
             .threads
@@ -200,6 +206,9 @@ impl Snapshot {
         thread_id: &str,
         turn_id: &str,
     ) -> Result<Vec<Arc<Operation>>> {
+        if let Some(view) = self.detailed_view()? {
+            return view.operations_for_turn(thread_id, turn_id);
+        }
         let thread = self
             .manifest
             .threads
@@ -223,6 +232,9 @@ impl Snapshot {
             .collect())
     }
     pub fn turn(&self, thread_id: &str, turn_id: &str) -> Result<TurnData> {
+        if let Some(view) = self.detailed_view()? {
+            return view.turn(thread_id, turn_id);
+        }
         if self.has_stored_ledger() {
             let data = self
                 .memory_turns
@@ -296,94 +308,6 @@ impl Snapshot {
             serde_json::from_slice(&bytes).map_err(|e| corrupt(format!("轮次分片无效：{e}")))?;
         validate_measurements(&data.measurements)?;
         Ok(data)
-    }
-}
-
-impl Snapshot {
-    /// Project progress masks one already-prepared immutable view. Facts, pricing,
-    /// membership and aggregate indexes are shared rather than rebuilt per batch.
-    pub(crate) fn project_view(&self, id: String, progress: Vec<crate::live::ProjectLoad>) -> Self {
-        let ready: std::collections::BTreeSet<_> = progress
-            .iter()
-            .filter(|p| p.state == crate::live::ProjectLoadState::Ready)
-            .map(|p| &p.project)
-            .collect();
-        let threads: Vec<_> = self
-            .manifest
-            .threads
-            .iter()
-            .filter(|t| ready.contains(&t.thread.project))
-            .cloned()
-            .collect();
-        let loaded: std::collections::BTreeSet<_> =
-            threads.iter().map(|t| t.thread.id.as_str()).collect();
-        // Select shared immutable owners directly; cloning a complete manifest
-        // before masking also copies every turn and event locator transiently.
-        let manifest_ref = &self.manifest;
-        let mut manifest = Manifest {
-            schema_version: manifest_ref.schema_version,
-            observation_versions: manifest_ref.observation_versions,
-            title_observations: manifest_ref
-                .title_observations
-                .iter()
-                .filter(|o| loaded.contains(o.thread_id.as_str()))
-                .cloned()
-                .collect(),
-            snapshot_ref: SnapshotRef {
-                snapshot_id: id,
-                created_at: manifest_ref.snapshot_ref.created_at.clone(),
-            },
-            price_revision: manifest_ref.price_revision.clone(),
-            price_catalog_hash: manifest_ref.price_catalog_hash.clone(),
-            sources: manifest_ref.sources.clone(),
-            watermarks: manifest_ref.watermarks.clone(),
-            issues: manifest_ref.issues.clone(),
-            ledger: manifest_ref.ledger.clone(),
-            events: EventIndex {
-                version: manifest_ref.events.version,
-                partitions: manifest_ref
-                    .events
-                    .partitions
-                    .iter()
-                    .filter(|p| {
-                        p.target
-                            .thread_id
-                            .as_deref()
-                            .is_none_or(|t| loaded.contains(t))
-                    })
-                    .cloned()
-                    .collect(),
-            },
-            threads,
-        };
-        let issue = Issue {
-            code: "projectRestoreIncomplete".into(),
-            message: "已加载的项目可以查看，其他项目正在依次加载".into(),
-            source_instance_id: None,
-            evidence: None,
-        };
-        manifest.issues.push(issue.clone());
-        for source in &mut manifest.sources {
-            if source.status == "complete" {
-                source.status = "partial".into();
-            }
-            source.issues.push(issue.clone());
-        }
-        Self {
-            summary_index: Arc::clone(&self.summary_index),
-            publication_change: None,
-            project_loads: progress,
-            timing_cache: Mutex::default(),
-            query_cache: Mutex::default(),
-            query_work: Arc::clone(&self.query_work),
-            live_rows: self.live_rows.clone(),
-            project_rows: self.project_rows.clone(),
-            live_events: None,
-            cold_events: self.cold_events.clone(),
-            memory_turns: self.memory_turns.clone(),
-            manifest,
-            directory: self.directory.clone(),
-        }
     }
 }
 

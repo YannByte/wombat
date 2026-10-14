@@ -14,11 +14,13 @@ test('explicit refresh can publish beyond the read deadline while caller timeout
   const connections = new Set<Socket>();
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const controller = new AbortController();
-  let received = 0;
+  let received = 0, cancelledWaiters = 0;
   const server = createServer(socket => {
     connections.add(socket); socket.once('close', () => connections.delete(socket));
+    socket.on('data', bytes => { if(bytes.includes(0)) cancelledWaiters++; });
     socket.once('data', bytes => {
-      assert.equal(JSON.parse(bytes.toString()).query.action, 'refresh');
+      const request=JSON.parse(bytes.toString());
+      assert.ok(['refresh','usage'].includes(request.query.action));
       if (++received === 1) { controller.abort(); return; }
       const timer = setTimeout(() => { timers.delete(timer); socket.end('{"ok":true,"value":{"marker":"published"}}\n'); }, 12_300);
       timers.add(timer);
@@ -33,7 +35,8 @@ test('explicit refresh can publish beyond the read deadline while caller timeout
     const request = { query: { action: 'refresh' as const } };
     await assert.rejects(queryLive(request, { signal: controller.signal }, { binaryPath }), { code: 'CANCELLED' });
     await assert.rejects(queryLive(request, {}, { binaryPath, timeoutMs: 1000 }), { code: 'TIMEOUT' });
-    assert.deepEqual(await queryLive(request, {}, { binaryPath }), { marker: 'published' });
+    assert.deepEqual(await queryLive({query:{action:'usage'},mode:'fresh',waitMs:15000}, {}, { binaryPath }), { marker: 'published' });
+    assert.equal(cancelledWaiters,2,'Cancellation and timeout release only their own waiters');
   } finally {
     for (const timer of timers) clearTimeout(timer);
     for (const connection of connections) connection.destroy();

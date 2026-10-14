@@ -13,9 +13,12 @@ export interface Invocation {
   mode: 'auto' | 'fresh' | 'cached';
   watch: boolean;
   verify: boolean;
+  waitMs?: number;
+  rebuild?: boolean;
+  includeHistory?: boolean;
 }
 const actions = new Set(['refresh', 'usage', 'threads', 'turns', 'steps', 'compare', 'investigate', 'trajectory', 'resources', 'review', 'context', 'statistics']);
-const valued = new Set(['root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'turn', 'group', 'presentation', 'sort', 'search', 'limit', 'offset', 'locate-thread', 'locate-turn', 'locate-operation', 'baseline-since', 'baseline-until', 'dimension', 'other-thread']);
+const valued = new Set(['wait-ms', 'root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'turn', 'group', 'presentation', 'sort', 'search', 'limit', 'offset', 'locate-thread', 'locate-turn', 'locate-operation', 'baseline-since', 'baseline-until', 'dimension', 'other-thread']);
 let knownTimezones: Set<string> | undefined;
 function invalid(message: string): never { throw new CoreError('INVALID_ARGUMENT', message); }
 export function parseUsageArgs(argv: string[]): Invocation {
@@ -30,7 +33,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
   const roots: string[] = [];
   for (let i = 0;i < argv.length;i++) {
     const arg = argv[i];
-    if (['--fresh', '--cached', '--watch', '--verify'].includes(arg)) { if (liveFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", { p0: arg })); liveFlags.add(arg); continue; }
+    if (['--fresh', '--cached', '--watch', '--verify', '--rebuild', '--include-history'].includes(arg)) { if (liveFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", { p0: arg })); liveFlags.add(arg); continue; }
     if (arg === '--version' || arg === '-v') {
       version = true;
       continue;
@@ -81,6 +84,11 @@ export function parseUsageArgs(argv: string[]): Invocation {
     if (!json || action === 'refresh') invalid(t('cli.usage-app-cli.compactRequiresJson'));
     request.compact = true;
   }
+  const waitText = values.get('wait-ms');
+  if (waitText !== undefined && (!/^[0-9]+$/.test(waitText) || Number(waitText) < 1 || Number(waitText) > 600_000)) invalid(t('cli.usage-app-cli.wait_invalid'));
+  values.delete('wait-ms');
+  const rebuild = liveFlags.has('--rebuild');
+  if ((waitText !== undefined || rebuild) && (liveFlags.has('--cached') || liveFlags.has('--watch') || values.has('snapshot'))) invalid(t('cli.usage-app-cli.wait_invalid'));
   const scope: NonNullable<UsageRequest['scope']> = {};
   const allowed = action === 'refresh' ? new Set(['root']) : new Set(['root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'limit', 'offset', ...(action === 'compare' ? ['baseline-since', 'baseline-until', 'dimension', 'other-thread'] : []), ...(action === 'usage' ? ['group', 'presentation', 'sort'] : []), ...(action === 'statistics' ? ['presentation','baseline-since','baseline-until'] : []), ...(action === 'threads' ? ['sort', 'search', 'locate-thread'] : []), ...(action === 'turns' || action === 'steps' ? ['sort'] : []), ...(action === 'steps' ? ['turn','locate-operation'] : []), ...(action === 'investigate' ? ['turn'] : []), ...(action === 'turns' ? ['locate-turn'] : [])]);
   for (const name of [...values.keys(), ...(roots.length ? ['root'] : [])])
@@ -199,7 +207,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
   if (liveFlags.has('--verify') && action !== 'refresh') invalid(t("cli.usage-app-cli.verify_only_supports_refresh"));
   if (request.snapshotId && (liveFlags.has('--fresh') || roots.length)) invalid(t("cli.usage-app-cli.snapshot_cannot_be_combined_with_fresh"));
   if (action === 'refresh' && liveFlags.has('--cached')) invalid(t("cli.usage-app-cli.refresh_cannot_use_cached"));
-  return { request, json, help, version, mode: liveFlags.has('--cached') ? 'cached' : liveFlags.has('--fresh') ? 'fresh' : ['compare','investigate','trajectory','resources','review','context'].includes(action) ? 'cached' : 'auto', watch: liveFlags.has('--watch'), verify: liveFlags.has('--verify') };
+  return { request, json, help, version, ...(waitText !== undefined ? {waitMs: Number(waitText)} : {}), ...(rebuild ? {rebuild:true} : {}), ...(liveFlags.has('--include-history') ? {includeHistory:true} : {}), mode: waitText !== undefined || rebuild ? 'fresh' : liveFlags.has('--cached') ? 'cached' : liveFlags.has('--fresh') ? 'fresh' : ['compare','investigate','trajectory','resources','review','context'].includes(action) ? 'cached' : 'auto', watch: liveFlags.has('--watch'), verify: liveFlags.has('--verify') };
 }
 export function resultExitCode(result: UsageResult): number { return result.quality.status === 'partial' || result.inspection?.partial || (result.freshness && !['current', 'fixed'].includes(result.freshness.status)) ? 2 : 0; }
 export async function runUsageCli(argv = process.argv.slice(2)): Promise<number> {
@@ -250,7 +258,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
         } };
         const result = invocation.request.snapshotId && !invocation.request.snapshotId.startsWith('live:')
           ? await client.query(invocation.request, queryOptions)
-          : (await client.live!({ query: invocation.request, mode: invocation.mode, verify: invocation.verify }, queryOptions)).result;
+          : (await client.live!({ query: invocation.request, mode: invocation.mode, verify: invocation.verify, waitMs:invocation.waitMs, rebuild:invocation.rebuild, includeHistory:invocation.includeHistory }, queryOptions)).result;
         const revision = JSON.stringify([result.snapshotRef.snapshotId, result.scope, result.freshness?.status, result.quality]);
         if (!invocation.watch || revision !== lastRevision) {
           if (!invocation.json && result.freshness && !['current', 'fixed'].includes(result.freshness.status)) process.stderr.write(`Wombat · ${result.freshness.status === 'failed' && result.freshness.error ? result.freshness.error : result.freshness.projectLoads?.length ? t('webui.projectsProgress',{ready:result.freshness.projectLoads.filter(p=>p.state==='ready').length,total:result.freshness.projectLoads.length}) : result.freshness.initialScan ? t('webui.initialTasks') : result.freshness.status === 'syncing' ? t("cli.usage-app-cli.syncing_showing_committed_data") : result.freshness.error ?? t("cli.usage-app-cli.showing_cached_data")}\n`);

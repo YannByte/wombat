@@ -15,13 +15,19 @@ function exchange(socket: string, request: NativeRequest, options: QueryOptions,
     const client = createConnection(socket);
     const chunks: Buffer[] = []; let bytes = 0, done = false;
     const finish = (error?: Error, result?: unknown) => {
-      if (done) return; done = true; clearTimeout(timer); options.signal?.removeEventListener('abort', abort); client.destroy();
+      if (done) return; done = true; clearTimeout(timer); options.signal?.removeEventListener('abort', abort);
+      if (error instanceof CoreError && ['CANCELLED','TIMEOUT'].includes(error.code) && client.readyState === 'open') {
+        // Release this waiter without interrupting the shared scan. Bound cleanup
+        // even if the peer stops reading after accepting a large request.
+        const cleanup=setTimeout(()=>client.destroy(),100); cleanup.unref();
+        client.end('\0',()=>{clearTimeout(cleanup);client.destroy();});
+      } else client.destroy();
       if (error) reject(error); else resolve(result);
     };
     const abort = () => finish(new CoreError('CANCELLED', '已取消'));
     // Explicit refresh also writes and syncs an immutable generation. Keep the
     // short read deadline separate from that bounded publication operation.
-    const timeoutMs = config.timeoutMs ?? ('query' in request && request.query.action === 'refresh' ? 120_000 : 12_000);
+    const timeoutMs = config.timeoutMs ?? ('query' in request && request.waitMs ? request.waitMs + 2_000 : 'query' in request && request.query.action === 'refresh' ? 120_000 : 12_000);
     const timer = setTimeout(() => finish(new CoreError('TIMEOUT', '实时用量查询超时')), timeoutMs);
     options.signal?.addEventListener('abort', abort, { once: true });
     if (options.signal?.aborted) { abort(); return; }

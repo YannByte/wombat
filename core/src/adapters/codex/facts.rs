@@ -37,12 +37,10 @@ pub(super) struct Facts {
     #[serde(skip)]
     pub(super) retired_operations: BTreeSet<String>,
     #[serde(skip)]
-    pub(super) operation_aliases: BTreeMap<String, Arc<[crate::operation_association::OwnedAlias]>>,
+    pub(super) operation_aliases:
+        Arc<BTreeMap<String, Arc<[crate::operation_association::OwnedAlias]>>>,
     #[serde(skip)]
     pub(super) dirty_measurements: BTreeSet<String>,
-    #[serde(skip)]
-    pub(super) dirty_aliases: BTreeSet<String>,
-    pub(super) aliases: HashMap<String, String>,
     pub(super) parents: HashMap<String, String>,
     pub(super) measurement_conflicts: BTreeSet<String>,
     pub(super) projects: BTreeMap<String, BTreeSet<String>>,
@@ -74,9 +72,9 @@ impl Facts {
                 BTreeMap::new()
             },
             operation_aliases: if include_facts {
-                self.operation_aliases.clone()
+                Arc::clone(&self.operation_aliases)
             } else {
-                BTreeMap::new()
+                Arc::default()
             },
             parents: self.parents.clone(),
             measurement_conflicts: self.measurement_conflicts.clone(),

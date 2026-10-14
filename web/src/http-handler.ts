@@ -74,7 +74,7 @@ export function createHttpHandler({
       if (active.size >= 8) return reject(429);
       const controller = new AbortController();
       active.add(controller);
-      const timer = setTimeout(() => {
+      let timer = setTimeout(() => {
         controller.abort();
         res.destroy();
       }, 120_000);
@@ -105,6 +105,25 @@ export function createHttpHandler({
         } catch {
           reject(400);
           return;
+        }
+        if (
+          req.url === '/api/live' &&
+          request &&
+          typeof request === 'object' &&
+          'waitMs' in request &&
+          typeof request.waitMs === 'number' &&
+          Number.isSafeInteger(request.waitMs) &&
+          request.waitMs > 0
+        ) {
+          // Transport ceiling stays independent of the generated business limit.
+          // Invalid requests still fail client validation before reaching the core.
+          const deadline = Math.min(request.waitMs + 5_000, 605_000);
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            controller.abort();
+            res.destroy();
+          }, deadline);
+          req.setTimeout(deadline);
         }
         res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
         const query = {

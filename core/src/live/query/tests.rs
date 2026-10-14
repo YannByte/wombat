@@ -11,6 +11,64 @@ fn code(error: anyhow::Error) -> &'static str {
         .code
 }
 #[test]
+fn batched_reports_use_the_selected_revision_even_when_a_newer_view_exists() {
+    let source = tempfile::tempdir().unwrap();
+    let index = tempfile::tempdir().unwrap();
+    fs::create_dir(source.path().join("sessions")).unwrap();
+    let path = source.path().join("sessions/a.jsonl");
+    let row = |id: &str| {
+        json!({"type":"event_msg","timestamp":"2026-10-14T00:00:00Z","payload":{"type":"token_usage_record","response_id":id,"usage":{"input_tokens":100,"output_tokens":10,"total_tokens":110}}}).to_string()+"\n"
+    };
+    fs::write(
+        &path,
+        format!(
+            "{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"a\"}}}}\n{}",
+            row("one")
+        ),
+    )
+    .unwrap();
+    let roots = vec![source.path().to_string_lossy().into_owned()];
+    let key = source_key(&roots);
+    let mut db = crate::live_index::open(&index.path().join("index.sqlite")).unwrap();
+    let mut caches = BTreeMap::new();
+    let first = sync(&mut db, &key, &roots, false, None, &mut caches)
+        .unwrap()
+        .unwrap();
+    use std::io::Write;
+    fs::OpenOptions::new()
+        .append(true)
+        .open(path)
+        .unwrap()
+        .write_all(row("two").as_bytes())
+        .unwrap();
+    let second = sync(&mut db, &key, &roots, false, Some(&first), &mut caches)
+        .unwrap()
+        .unwrap();
+    let mut entry = Entry::new(roots);
+    entry.views.push_back((Instant::now(), Arc::clone(&first)));
+    entry.views.push_back((Instant::now(), second));
+    let state = Arc::new((Mutex::new(BTreeMap::from([(key, entry)])), Condvar::new()));
+    let (jobs, receiver) = mpsc::sync_channel(1);
+    let request=serde_json::from_value(json!({"query":{"action":"usage","snapshotId":first.manifest.snapshot_ref.snapshot_id,"scope":{"allTime":true},"compact":true},"mode":"cached","also":[{"action":"threads","scope":{"allTime":true},"compact":true},{"action":"usage","scope":{"allTime":true},"presentation":"models","compact":true}]})).unwrap();
+    let result = query(
+        request,
+        &state,
+        &jobs,
+        &Mutex::new(crate::config::Store::default()),
+    )
+    .unwrap();
+    assert_eq!(result.result.summary.tokens.total, Some(110));
+    assert_eq!(result.additional.len(), 2);
+    for additional in result.additional {
+        assert_eq!(additional.summary.tokens.total, Some(110));
+        assert_eq!(
+            additional.snapshot_ref.snapshot_id,
+            result.result.snapshot_ref.snapshot_id
+        );
+    }
+    assert!(receiver.try_recv().is_err());
+}
+#[test]
 fn usage_business_validation_precedes_view_selection_and_sync() {
     let state = state();
     let (jobs, receiver) = mpsc::sync_channel(1);
@@ -20,6 +78,13 @@ fn usage_business_validation_precedes_view_selection_and_sync() {
         json!({"query":{"action":"usage"},"verify":true}),
         json!({"query":{"action":"refresh"},"mode":"cached"}),
         json!({"query":{"action":"usage","snapshotId":"live::revision"}}),
+        json!({"query":{"action":"usage"},"waitMs":0,"mode":"fresh"}),
+        json!({"query":{"action":"usage"},"waitMs":600001,"mode":"fresh"}),
+        json!({"query":{"action":"usage"},"waitMs":1000}),
+        json!({"query":{"action":"usage"},"rebuild":true}),
+        json!({"query":{"action":"usage"},"also":[{"action":"refresh"}]}),
+        json!({"query":{"action":"usage"},"also":[{"action":"usage","roots":["/outside"]}]}),
+        json!({"query":{"action":"usage"},"also":[{"action":"steps"}]}),
     ] {
         let request: Request = serde_json::from_value(value).unwrap();
         assert_eq!(

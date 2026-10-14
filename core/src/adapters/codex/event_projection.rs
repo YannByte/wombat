@@ -5,7 +5,7 @@ use crate::session_events::{Event, Payload as SafePayload};
 /// Association reads these observations within one archive target, then releases
 /// them after producing canonical components.
 pub(super) fn association_input(event: &Event) -> bool {
-    crate::operation_association::is_input(event)
+    crate::operation_association::is_projection_input(event)
 }
 mod replay;
 pub(super) use replay::Replay;

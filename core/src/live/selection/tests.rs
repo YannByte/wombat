@@ -1,6 +1,46 @@
 use super::*;
 
 #[test]
+fn cached_history_interest_does_not_suppress_a_later_auto_backfill() {
+    let root = tempfile::tempdir().unwrap();
+    let roots = vec![root.path().to_string_lossy().into_owned()];
+    let key = source_key(&roots);
+    let mut view = fixture(&key, "recent");
+    Arc::get_mut(&mut view)
+        .unwrap()
+        .manifest
+        .issues
+        .push(Issue {
+            code: "historyDeferred".into(),
+            message: "Deferred synthetic history".into(),
+            source_instance_id: None,
+            evidence: None,
+        });
+    let state = shared(&key, roots.clone(), view);
+    {
+        let mut entries = state.0.lock().unwrap();
+        let entry = entries.get_mut(&key).unwrap();
+        entry.requested = 1;
+        entry.completed = 1;
+        entry.last_sync = Instant::now();
+    }
+    let (jobs, receiver) = mpsc::sync_channel(2);
+    let cached = ReadViewSelector::new(roots.clone(), None, Mode::Cached, false, false).unwrap();
+    select_view(&cached, &state, &jobs, &AtomicBool::new(false)).unwrap();
+    assert!(receiver.try_recv().is_err());
+    let automatic = ReadViewSelector::new(roots, None, Mode::Auto, false, false).unwrap();
+    let (_, freshness) = select_view(&automatic, &state, &jobs, &AtomicBool::new(false)).unwrap();
+    assert_eq!(freshness.status, "syncing");
+    assert!(!receiver.try_recv().unwrap().restore_only);
+    assert!(
+        state.0.lock().unwrap()[&key]
+            .pending
+            .unwrap()
+            .include_history
+    );
+}
+
+#[test]
 fn concurrent_cached_readers_share_one_restore_job_and_published_view() {
     let root = tempfile::tempdir().unwrap();
     let roots = vec![root.path().to_string_lossy().into_owned()];
@@ -129,7 +169,8 @@ fn auto_reads_reuse_committed_views_until_five_minutes_and_manual_refresh_bypass
             entry.last_sync = Instant::now();
             drop(entries);
             state.1.notify_all();
-            assert_eq!(reader.join().unwrap().1.status, "current");
+            let status = reader.join().unwrap().1.status;
+            assert!(status == "current" || request.mode == Mode::Auto && status == "syncing");
         });
     }
 }

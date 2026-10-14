@@ -8,7 +8,7 @@ use rusqlite::{Connection, params};
 use std::collections::{HashMap, VecDeque};
 use std::sync::OnceLock;
 
-const VERSION: i64 = 2;
+const VERSION: i64 = 3;
 const HOT_BYTES: usize = 8 * 1024 * 1024;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub(crate) struct GroupKey {
@@ -35,6 +35,36 @@ pub(crate) struct LedgerGroup {
     pub earliest: Option<i64>,
     pub latest: Option<i64>,
     pub latest_text: Option<String>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct Catalog {
+    key: GroupKey,
+    earliest: Option<i64>,
+    latest: Option<i64>,
+    latest_text: Option<String>,
+    count: i64,
+}
+impl Catalog {
+    fn from_group(group: &LedgerGroup) -> Self {
+        Self {
+            key: group.key.clone(),
+            earliest: group.earliest,
+            latest: group.latest,
+            latest_text: group.latest_text.clone(),
+            count: group.slots.len() as i64,
+        }
+    }
+    fn stub(&self, empty: &Aggregate) -> LedgerGroup {
+        LedgerGroup {
+            key: self.key.clone(),
+            aggregate: empty.clone(),
+            slots: vec![],
+            members: vec![],
+            earliest: self.earliest,
+            latest: self.latest,
+            latest_text: self.latest_text.clone(),
+        }
+    }
 }
 impl LedgerGroup {
     fn key(row: &PricedMeasurement) -> GroupKey {
@@ -192,7 +222,7 @@ impl LedgerGroup {
 }
 
 pub(crate) fn schema(db: &Connection) -> Result<()> {
-    db.execute_batch("CREATE TABLE measurement_summaries(source TEXT NOT NULL,block INTEGER NOT NULL,part INTEGER NOT NULL,thread TEXT,targets TEXT NOT NULL,version INTEGER NOT NULL,bytes INTEGER NOT NULL,digest TEXT NOT NULL,data BLOB NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(source,block,part)) WITHOUT ROWID; CREATE INDEX measurement_summaries_target ON measurement_summaries(source,thread,block,part);")?;
+    db.execute_batch("CREATE TABLE measurement_summaries(source TEXT NOT NULL,block INTEGER NOT NULL,part INTEGER NOT NULL,thread TEXT,targets TEXT NOT NULL,version INTEGER NOT NULL,bytes INTEGER NOT NULL,digest TEXT NOT NULL,count INTEGER NOT NULL,catalog TEXT NOT NULL,catalog_digest TEXT NOT NULL,data BLOB NOT NULL,PRIMARY KEY(source,block,part)) WITHOUT ROWID; CREATE INDEX measurement_summaries_target ON measurement_summaries(source,thread,block,part);")?;
     Ok(())
 }
 /// Rewrite statistics only for changed canonical frames, in the source transaction.
@@ -210,7 +240,7 @@ pub(crate) fn update(
     let mut cursor = query.query(params![format!("projection:{source}"), force])?;
     let mut pool = super::price_pool::PricePool::new(prices);
     let mut insert = db.prepare_cached(
-        "INSERT INTO measurement_summaries VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        "INSERT INTO measurement_summaries(source,block,part,thread,targets,version,bytes,digest,data,count,catalog,catalog_digest) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
     )?;
     while let Some(row) = cursor.next()? {
         let block: i64 = row.get(0)?;
@@ -281,6 +311,8 @@ pub(crate) fn update(
         for (part, mut group) in groups.into_values().enumerate() {
             group.members.sort_unstable_by(|a, b| a.0.cmp(&b.0));
             let (data, bytes, digest) = crate::live_index::encode_projection(&group)?;
+            let catalog = serde_json::to_string(&Catalog::from_group(&group))?;
+            let catalog_digest = crate::hash(catalog.as_bytes());
             insert.execute(params![
                 source,
                 block,
@@ -291,7 +323,9 @@ pub(crate) fn update(
                 bytes as i64,
                 digest,
                 data,
-                group.slots.len() as i64
+                group.slots.len() as i64,
+                catalog,
+                catalog_digest
             ])?;
         }
     }
@@ -343,6 +377,9 @@ impl HotCache {
 /// Copy one bounded page while holding the leased connection, then release it
 /// before reduction/decompression. Historical work cannot hold the hot cache lock.
 pub(super) struct StoredGroup {
+    catalog: Catalog,
+    excluded: bool,
+    stub: Option<Arc<LedgerGroup>>,
     pub block: i64,
     pub part: i64,
     version: i64,
@@ -360,11 +397,24 @@ pub(super) fn group_page(
     thread: Option<&str>,
     turn: Option<&str>,
     after: (i64, i64),
+    selection: Option<&dyn Fn(&LedgerGroup) -> bool>,
 ) -> Result<Vec<StoredGroup>> {
-    let mut query=db.prepare_cached("SELECT block,part,version,bytes,digest,data,thread,targets,count FROM measurement_summaries WHERE source=?1 AND (?2 IS NULL OR thread=?2) AND (?3 IS NULL OR EXISTS(SELECT 1 FROM json_each(targets) j WHERE j.value=?3 OR (?3='unassigned' AND j.value IS NULL))) AND (block,part)>(?4,?5) ORDER BY block,part LIMIT 16")?;
-    let mut cursor = query.query(params![source, thread, turn, after.0, after.1])?;
+    let mut query=db.prepare_cached("SELECT block,part,version,bytes,digest,CASE WHEN ?6 THEN NULL ELSE data END,thread,targets,count,catalog,catalog_digest FROM measurement_summaries WHERE source=?1 AND (?2 IS NULL OR thread=?2) AND (?3 IS NULL OR EXISTS(SELECT 1 FROM json_each(targets) j WHERE j.value=?3 OR (?3='unassigned' AND j.value IS NULL))) AND (block,part)>(?4,?5) ORDER BY block,part LIMIT ?7")?;
+    let mut cursor = query.query(params![
+        source,
+        thread,
+        turn,
+        after.0,
+        after.1,
+        selection.is_some(),
+        if selection.is_some() { 256 } else { 16 }
+    ])?;
     let mut out = vec![];
     let mut bytes = 0;
+    let empty = Aggregate::new(&[])?;
+    let mut payload_query = db.prepare_cached(
+        "SELECT data FROM measurement_summaries WHERE source=?1 AND block=?2 AND part=?3",
+    )?;
     while let Some(row) = cursor.next()? {
         let encoded: i64 = row.get(3)?;
         anyhow::ensure!(
@@ -372,17 +422,47 @@ pub(super) fn group_page(
             "aggregate size exceeds frame limit"
         );
         // The first valid frame is allowed; further frames wait for the next page.
-        if !out.is_empty() && bytes + encoded > 512 * 1024 {
+        let raw: String = row.get(9)?;
+        let digest: String = row.get(10)?;
+        anyhow::ensure!(
+            raw.len() <= 16 * 1024 && crate::hash(raw.as_bytes()) == digest,
+            "aggregate catalog checksum mismatch"
+        );
+        let catalog: Catalog = serde_json::from_str(&raw)?;
+        anyhow::ensure!(
+            catalog.key.source == source
+                && catalog.key.thread == row.get::<_, Option<String>>(6)?
+                && catalog.count == row.get::<_, i64>(8)?
+                && catalog.count > 0,
+            "aggregate catalog identity mismatch"
+        );
+        let stub = selection.map(|_| Arc::new(catalog.stub(&empty)));
+        let excluded = selection.is_some_and(|select| !select(stub.as_ref().unwrap()));
+        if !excluded && !out.is_empty() && bytes + encoded > 512 * 1024 {
             break;
         }
-        bytes += encoded;
+        if !excluded {
+            bytes += encoded;
+        }
+        let block: i64 = row.get(0)?;
+        let part: i64 = row.get(1)?;
+        let data = if excluded {
+            vec![]
+        } else if selection.is_some() {
+            payload_query.query_row(params![source, block, part], |r| r.get(0))?
+        } else {
+            row.get(5)?
+        };
         out.push(StoredGroup {
-            block: row.get(0)?,
-            part: row.get(1)?,
+            catalog,
+            excluded,
+            stub: excluded.then_some(stub).flatten(),
+            block,
+            part,
             version: row.get(2)?,
             bytes: encoded,
             digest: row.get(4)?,
-            data: row.get(5)?,
+            data,
             source: source.into(),
             thread: row.get(6)?,
             targets: row.get(7)?,
@@ -398,6 +478,11 @@ impl StoredGroup {
                 "INDEX_UNSUPPORTED_VERSION",
                 "Unsupported measurement aggregate version",
             ));
+        }
+        if self.excluded {
+            return self
+                .stub
+                .ok_or_else(|| corrupt("aggregate catalog selection missing"));
         }
         let cache_key = format!("{}:{}", self.digest, crate::hash(&self.data));
         let cached = hot_cache()
@@ -415,6 +500,10 @@ impl StoredGroup {
         };
         anyhow::ensure!(
             group.key.source == self.source
+                && group.key == self.catalog.key
+                && group.earliest == self.catalog.earliest
+                && group.latest == self.catalog.latest
+                && group.latest_text == self.catalog.latest_text
                 && group.key.thread == self.thread
                 && group.key.turn.is_none()
                 && group.targets()? == self.targets
@@ -473,7 +562,7 @@ pub(crate) fn summary(
     for source in sources {
         let mut after = (-1, -1);
         loop {
-            let page = group_page(db, &source.source.id, None, None, after)?;
+            let page = group_page(db, &source.source.id, None, None, after, None)?;
             if page.is_empty() {
                 break;
             }
@@ -540,6 +629,16 @@ impl Snapshot {
         tz: Tz,
         thread: Option<&str>,
         turn: Option<&str>,
+        consume: impl FnMut(&LedgerGroup, &dyn Fn() -> Result<Vec<PricedMeasurement>>) -> Result<()>,
+    ) -> Result<()> {
+        self.visit_ledger_catalog(tz, thread, turn, None, consume)
+    }
+    pub(crate) fn visit_ledger_catalog(
+        &self,
+        tz: Tz,
+        thread: Option<&str>,
+        turn: Option<&str>,
+        selection: Option<&dyn Fn(&LedgerGroup) -> bool>,
         mut consume: impl FnMut(&LedgerGroup, &dyn Fn() -> Result<Vec<PricedMeasurement>>) -> Result<()>,
     ) -> Result<()> {
         let ready: std::collections::HashSet<_> = self
@@ -555,19 +654,26 @@ impl Snapshot {
         self.cold_events
             .as_ref()
             .ok_or_else(|| corrupt("cold ledger is unavailable"))?
-            .groups(&self.manifest.sources, tz, thread, turn, |group, read| {
-                if !self.project_loads.is_empty() {
-                    let ready = group
-                        .key
-                        .thread
-                        .as_deref()
-                        .map_or(unassigned_ready, |id| ready.contains(id));
-                    if !ready {
-                        return Ok(());
+            .groups(
+                &self.manifest.sources,
+                tz,
+                thread,
+                turn,
+                selection,
+                |group, read| {
+                    if !self.project_loads.is_empty() {
+                        let ready = group
+                            .key
+                            .thread
+                            .as_deref()
+                            .map_or(unassigned_ready, |id| ready.contains(id));
+                        if !ready {
+                            return Ok(());
+                        }
                     }
-                }
-                consume(group, read)
-            })
+                    consume(group, read)
+                },
+            )
     }
 }
 impl Snapshot {
@@ -673,6 +779,9 @@ mod tests {
     fn stored(value: &LedgerGroup) -> StoredGroup {
         let (data, bytes, digest) = crate::live_index::encode_projection(value).unwrap();
         StoredGroup {
+            catalog: Catalog::from_group(value),
+            excluded: false,
+            stub: None,
             block: 1,
             part: 0,
             version: VERSION,

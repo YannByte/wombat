@@ -47,7 +47,9 @@ pub fn serve() -> Result<()> {
     let worker_state = Arc::clone(&shared);
     let worker = std::thread::spawn(move || -> Result<()> {
         let mut lifecycle = scheduling::WorkerLifecycle::new(Arc::clone(&worker_state));
-        let mut db = crate::live_index::open(&root.join("index.sqlite")).ok();
+        let mut db = generation::index_path(&root)
+            .and_then(|path| crate::live_index::open(&path))
+            .ok();
         let mut caches = BTreeMap::new();
         loop {
             let job = match receiver.recv_timeout(Duration::from_millis(500)) {
@@ -100,8 +102,46 @@ pub fn serve() -> Result<()> {
                 };
                 let Some(work) = work else { continue };
                 let verify = work.verify;
+                if work.rebuild {
+                    let outcome = generation::rebuild(&root, &key, &roots);
+                    let mut entries = worker_state.0.lock().unwrap();
+                    let entry = entries.get_mut(&key).unwrap();
+                    scheduling::finish(entry, work);
+                    entry.last_sync = Instant::now();
+                    match outcome {
+                        Ok((next, view)) => {
+                            db = Some(next);
+                            caches.clear();
+                            entry.views.push_back((Instant::now(), view));
+                            entry.error = None;
+                            entry.error_code = None;
+                            entry.checked = Some(chrono::Utc::now().to_rfc3339());
+                            while entry.views.len() > 8 {
+                                entry.views.pop_front();
+                            }
+                            // Other source sets must reacquire locators in the new database.
+                            for (other_key, other) in entries.iter_mut() {
+                                if other_key != &key {
+                                    other.views.clear();
+                                    if other.pending.is_none() {
+                                        other.requested = 0;
+                                        other.completed = 0;
+                                    }
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            entry.error_code = Some(crate::live_index::failure_code(&error));
+                            entry.error = Some(error.to_string());
+                        }
+                    }
+                    worker_state.1.notify_all();
+                    continue;
+                }
                 if db.is_none() {
-                    match crate::live_index::open(&root.join("index.sqlite")) {
+                    match generation::index_path(&root)
+                        .and_then(|path| crate::live_index::open(&path))
+                    {
                         Ok(opened) => db = Some(opened),
                         Err(error) => {
                             let mut entries = worker_state.0.lock().unwrap();
@@ -163,7 +203,15 @@ pub fn serve() -> Result<()> {
                     }
                     worker_state.1.notify_all();
                 }
-                let outcome = sync(db, &key, &roots, verify, prior_view.as_deref(), &mut caches);
+                let outcome = collection::sync_with_policy(
+                    db,
+                    &key,
+                    &roots,
+                    verify,
+                    prior_view.as_deref(),
+                    &mut caches,
+                    !work.include_history,
+                );
                 if outcome.is_err() {
                     caches.clear();
                 }
@@ -226,9 +274,12 @@ pub fn serve() -> Result<()> {
                         stream.set_write_timeout(Some(Duration::from_secs(12)))?;
                         let mut input = String::new();
                         use std::io::Read;
-                        BufReader::new(&stream)
+                        let mut reader = BufReader::new(&stream);
+                        reader
+                            .by_ref()
                             .take(1024 * 1024 + 1)
                             .read_line(&mut input)?;
+                        let buffered_cancel = reader.buffer().first() == Some(&0);
                         if input.len() > 1024 * 1024 {
                             return Err(operation_error("RESOURCE_LIMIT", "请求过大"));
                         }
@@ -399,7 +450,19 @@ pub fn serve() -> Result<()> {
                         }
                         let request: Request = serde_json::from_value(value)
                             .map_err(|_| operation_error("INVALID_ARGUMENT", "实时查询参数无效"))?;
-                        Ok(encode_success(&query(request, &state, &jobs, &configs)?)?)
+                        #[cfg(unix)]
+                        let probe = || buffered_cancel || peer_closed(&stream);
+                        #[cfg(windows)]
+                        let peer_probe = stream.peer_probe();
+                        #[cfg(windows)]
+                        let probe = || buffered_cancel || peer_probe();
+                        Ok(encode_success(&query::query_with_probe(
+                            request,
+                            &state,
+                            &jobs,
+                            &configs,
+                            Some(&probe),
+                        )?)?)
                     })();
                     let response = match result {
                         Ok(bytes) => Ok(bytes),
@@ -441,11 +504,59 @@ pub fn serve() -> Result<()> {
             Err(e) => return Err(e.into()),
         }
     }
+    // No active callers remain. Release read leases before the writer checkpoints
+    // and closes, so an idle exit does not leave its own obsolete WAL pages pinned.
+    *configs.lock().unwrap() = crate::config::Store::default();
+    shared.0.lock().unwrap().clear();
     drop(jobs);
     let _ = worker.join();
     #[cfg(unix)]
     let _ = fs::remove_file(socket);
     Ok(())
+}
+
+#[cfg(unix)]
+fn peer_closed(stream: &std::os::unix::net::UnixStream) -> bool {
+    use std::os::fd::AsRawFd;
+    let mut descriptor = libc::pollfd {
+        fd: stream.as_raw_fd(),
+        events: 0,
+        revents: 0,
+    };
+    let mut byte = 255_u8;
+    // NUL is a caller-cancellation marker after the complete JSON request.
+    // EOF alone can also mean a valid write half-close.
+    if unsafe {
+        libc::recv(
+            stream.as_raw_fd(),
+            (&raw mut byte).cast(),
+            1,
+            libc::MSG_PEEK | libc::MSG_DONTWAIT,
+        )
+    } == 1
+        && byte == 0
+    {
+        return true;
+    }
+    // SAFETY: one initialized descriptor, borrowed from a live stream; no wait.
+    // A caller can finish writing and still receive its response.
+    (unsafe { libc::poll(&raw mut descriptor, 1, 0) > 0 })
+        && descriptor.revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0
+}
+#[cfg(all(test, unix))]
+mod peer_tests {
+    use super::*;
+    #[test]
+    fn disconnected_waiter_is_detected_but_write_half_close_can_receive_a_result() {
+        let (server, client) = std::os::unix::net::UnixStream::pair().unwrap();
+        assert!(!peer_closed(&server));
+        client.shutdown(std::net::Shutdown::Write).unwrap();
+        assert!(!peer_closed(&server));
+        let (server, mut client) = std::os::unix::net::UnixStream::pair().unwrap();
+        use std::io::Write;
+        client.write_all(&[0]).unwrap();
+        assert!(peer_closed(&server));
+    }
 }
 
 fn restore_into(
