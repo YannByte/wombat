@@ -4,6 +4,16 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {inventory, hash} from './artifact-files.ts';
 
+/** JSON-form YAML keeps standalone and plugin presentation on one native JSON reader. */
+export function skillPresentation(file:string,reference:'$wombat:wombat'|'$wombat-collection:wombat') {
+  const source:unknown=JSON.parse(readFileSync(file,'utf8'));
+  const object=(value:unknown):value is Record<string,unknown>=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+  const view=object(source)?source.interface:null;
+  if(!object(view)||typeof view.display_name!=='string'||!view.display_name.trim()||typeof view.short_description!=='string'||view.short_description.length<25||view.short_description.length>64||typeof view.default_prompt!=='string'||!view.default_prompt.trim()||view.default_prompt.match(/\$wombat(?![\w:-])/g)?.length!==1)
+    throw new Error('Skill interface requires a display name, 25–64 character description and one $wombat reference');
+  return {displayName:view.display_name,shortDescription:view.short_description,defaultPrompt:[view.default_prompt.replace(/\$wombat(?![\w:-])/,reference)]};
+}
+
 export function buildSkill(root:string, output=path.join(root,'dist','skill')) {
   const metadata=JSON.parse(readFileSync(path.join(root,'plugin/package.json'),'utf8'));
   const version=JSON.parse(readFileSync(path.join(root,'package.json'),'utf8')).version;
@@ -20,14 +30,15 @@ export function buildSkill(root:string, output=path.join(root,'dist','skill')) {
     cpSync(path.join(root,'LICENSE'),path.join(plugin,'LICENSE'));
     const identity={name:'wombat',version,description:metadata.description,license:metadata.license,homepage:metadata.homepage};
     writeFileSync(path.join(plugin,'wombat-runtime.json'),JSON.stringify({format:1,version,requiredCapabilities:metadata.requiredCapabilities,skillContentHash:hash(JSON.stringify(files))},null,2)+'\n');
-    const presentation={displayName:'Wombat',shortDescription:metadata.description,defaultPrompt:['Use $wombat:wombat to explain my local Codex usage and configuration evidence.']};
+    const presentation=skillPresentation(path.join(root,'plugin/skills/wombat/agents/openai.yaml'),'$wombat:wombat');
     writeFileSync(path.join(plugin,'plugin.json'),JSON.stringify({$schema:'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',...identity,extensions:{'com.openai':{interface:presentation}}},null,2)+'\n');
     writeFileSync(path.join(plugin,'.codex-plugin/plugin.json'),JSON.stringify({...identity,skills:'./skills/',interface:presentation},null,2)+'\n');
     const collection=path.join(stage,'collection-plugin');
     cpSync(plugin,collection,{recursive:true});
     for(const directory of ['hooks','scripts'])cpSync(path.join(root,'plugin',directory),path.join(collection,directory),{recursive:true});
     const collectionIdentity={...identity,name:'wombat-collection'};
-    const collectionInterface={...presentation,displayName:'Wombat collection',defaultPrompt:['Use $wombat-collection:wombat to explain local usage and collection evidence.']};
+    const collectionPresentation=skillPresentation(path.join(root,'plugin/skills/wombat/agents/openai.yaml'),'$wombat-collection:wombat');
+    const collectionInterface={...collectionPresentation,displayName:collectionPresentation.displayName+' collection'};
     // Codex 0.160.1 skips lifecycle Hooks when a root manifest is present.
     // Keep this local-only package on its native compatibility manifest.
     rmSync(path.join(collection,'plugin.json'));

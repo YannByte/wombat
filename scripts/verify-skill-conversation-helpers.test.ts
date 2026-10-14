@@ -10,9 +10,14 @@ test('conversation arguments require explicit executables and reject ambiguous o
   const args=['--output-dir',path.join(tmpdir(),'conversation-output'),'--agent-bin',process.execPath];
   assert.deepEqual(parseConversationArgs(['--',...args]).languages,['en','zh']);
   assert.deepEqual(parseConversationArgs([...args,'--language','zh']).languages,['zh']);
+  assert.equal(parseConversationArgs(args).scenarios[0],'workflow');
+  assert.equal(parseConversationArgs([...args,'--scenario','all']).scenarios.length,7);
+  assert.equal(parseConversationArgs([...args,'--scenario','pricing','--variant','3']).variant,3);
+  assert.deepEqual(parseConversationArgs([...args,'--scenario','timing']).scenarios,['timing']);
   for(const extra of [['--language','fr'],['--last'],['--agent-bin',process.execPath],['--language'],['--unknown','value']])assert.throws(()=>parseConversationArgs([...args,...extra]));
   assert.throws(()=>parseConversationArgs(['--output-dir','relative','--agent-bin',process.execPath]));
   assert.throws(()=>parseConversationArgs(['--output-dir',path.join(tmpdir(),'conversation-output'),'--agent-bin','codex']));
+  for(const extra of [['--scenario','unknown'],['--variant','-1'],['--variant','4'],['--variant','1.0'],['--variant','no']])assert.throws(()=>parseConversationArgs([...args,...extra]));
 });
 test('native structured answers must preserve synthetic truth, task, suggestion and user decision',()=>{
   validateConversationAnswer(read,'read',expected,'en');validateConversationAnswer(follow,'continue',expected,'en');

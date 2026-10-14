@@ -1,16 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { validateAgentRequest } from '../src/index.js';
 
-test('configuration Skill examples use the generated method contract instead of shared CLI flags', () => {
-  const text = readFileSync(new URL('../../plugin/skills/wombat/references/configuration.md', import.meta.url), 'utf8');
-  const examples = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)];
-  assert.ok(examples.length > 0);
-  for (const [, body] of examples) {
-    const request = JSON.parse(body);
-    assert.equal(validateAgentRequest(request), true, JSON.stringify(validateAgentRequest.errors));
-    assert.equal(request.method, 'config');
-    assert.equal(validateAgentRequest({ ...request, params: { ...request.params, action: 'activity' } }), false);
+test('Skill Agent examples use generated contracts and reject CLI-only params', () => {
+  const directory = new URL('../../plugin/skills/wombat/references/', import.meta.url);
+  let checked = 0;
+  for (const file of readdirSync(directory).filter(file => file.endsWith('.md'))) {
+    const text = readFileSync(new URL(file, directory), 'utf8');
+    for (const [, body] of text.matchAll(/```json\n([\s\S]*?)\n```/g)) {
+      const request = JSON.parse(body);
+      if (!('method' in request)) continue; // Web contexts have a separate generated contract.
+      assert.equal(validateAgentRequest(request), true, file+': '+JSON.stringify(validateAgentRequest.errors));
+      assert.equal(validateAgentRequest({ ...request, params: { ...request.params, '--json': true } }), false);
+      if (request.method === 'config') assert.equal(validateAgentRequest({ ...request, params: { ...request.params, action: 'activity' } }), false);
+      checked++;
+    }
   }
+  assert.ok(checked > 0, 'No executable Agent examples were checked');
 });

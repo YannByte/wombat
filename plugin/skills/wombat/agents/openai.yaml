@@ -1,4 +1,7 @@
-interface:
-  display_name: "Wombat"
-  short_description: "Explore local usage, tasks and configuration evidence"
-  default_prompt: "Use $wombat to explain my local Codex usage and relevant configuration evidence."
+{
+  "interface": {
+    "display_name": "Wombat",
+    "short_description": "Understand usage, costs and evidence for useful improvements",
+    "default_prompt": "Use $wombat to show my recent Codex usage and the tasks that used the most Tokens."
+  }
+}
