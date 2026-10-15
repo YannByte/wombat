@@ -23,7 +23,7 @@ pub(crate) enum Alias<'a> {
     Call(&'a str),
     Item(&'a str),
 }
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, serde::Serialize, serde::Deserialize)]
 pub(crate) enum OwnedAlias {
     Call(String),
     Item(String),

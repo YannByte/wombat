@@ -8,6 +8,31 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { queryLive } from '../src/node/live.js';
 
+test('shutdown connection races retry read-only status but never repeat a control', async () => {
+  const dir=await mkdtemp(path.join(tmpdir(),'wombat-wire-shutdown-'));
+  const endpoint=process.platform==='win32'?`\\\\.\\pipe\\wombat-test-${randomUUID()}`:path.join(dir,'socket');
+  const binaryPath=path.join(dir,'endpoint.cjs');
+  const response=JSON.stringify({ok:true,value:{protocolVersion:2,socket:endpoint}});
+  await writeFile(binaryPath,`process.stdin.resume();process.stdin.on('end',()=>console.log(${JSON.stringify(response)}));`);
+  await chmod(binaryPath,0o700);
+  let reads=0,controls=0;
+  const server=createServer(socket=>socket.once('data',bytes=>{
+    const request=JSON.parse(bytes.toString());
+    if(request.service.action==='status'&&++reads===2)socket.end('{"ok":true,"value":{"marker":"still-running"}}\n');
+    else {if(request.service.action!=='status')controls++;socket.end();}
+  }));
+  try {
+    server.listen(endpoint);await once(server,'listening');
+    assert.deepEqual(await queryLive({service:{action:'status'}},{},{binaryPath},false),{marker:'still-running'});
+    assert.equal(reads,2);
+    await assert.rejects(queryLive({service:{action:'pause'}},{},{binaryPath}),{code:'SERVICE_CLOSED'});
+    assert.equal(controls,1);
+  } finally {
+    await new Promise<void>(resolve=>server.close(()=>resolve()));
+    await rm(dir,{recursive:true,force:true});
+  }
+});
+
 test('explicit refresh can publish beyond the read deadline while caller timeout and cancellation still apply', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'wombat-wire-refresh-'));
   const endpoint = process.platform === 'win32' ? `\\\\.\\pipe\\wombat-test-${randomUUID()}` : path.join(dir, 'socket');

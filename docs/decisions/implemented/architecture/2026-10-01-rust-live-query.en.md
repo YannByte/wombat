@@ -4,6 +4,8 @@
 
 Status: implemented
 
+The resident-indexing lifecycle partially supersedes the idle-exit choice; see the [resident-indexing proposal](../../proposed/architecture/2026-10-15-resident-indexing.en.md). Source isolation and immutable read semantics remain applicable.
+
 ## Problem
 
 A read error in one source prevented healthy sources in the batch from committing. Restoring a large cached source held the shared query lock and delayed other ready sources. Repeated queries recomputed summaries, and direct-response appends copied candidate maps and ran general reconciliation.

@@ -14,6 +14,7 @@ pub(crate) use event_blocks::each_group as each_event_group;
 pub(crate) use event_blocks::{read_cold_chunk, validate_cold_source};
 pub(crate) use event_blocks::{save as save_events, share as share_events};
 pub(crate) use packed::measurement_block;
+pub(crate) use packed::retain_prefix as retain_packed_prefix;
 pub(crate) use packed::{retain as retain_packed, upsert as put_packed};
 pub(crate) fn encode_projection<T: serde::Serialize>(
     value: &T,

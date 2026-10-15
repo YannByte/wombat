@@ -3,6 +3,7 @@ import type { CollectionResult, SetupResult, UsageClient, UsageResult } from '@w
 import { t, type MessageKey } from '@wombat/client/locale';
 import { Modal, timestamp } from './components.js';
 import { setupRegistrationLabel } from './setup-state.js';
+import { ServicePanel } from './ServicePanel.js';
 const skillStates = {
   available: 'skill.available',
   ambiguous: 'skill.ambiguous',
@@ -344,7 +345,8 @@ export function SetupPanel({
               <p>{t('setup.refreshNote')}</p>
               <CopyText value="wombat usage --json" />
               <p>{t('setup.backgroundNote')}</p>
-              <CopyText value="wombat usage --watch --json" />
+              <ServicePanel client={client} />
+              <CopyText value="wombat service status --json" />
               <button onClick={close}>{t('setup.viewData')}</button>
             </>
           ) : (

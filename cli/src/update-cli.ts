@@ -56,6 +56,7 @@ export interface UpdateResult {
   updated: boolean;
   checked: boolean;
   target: string;
+  serviceRestart?: 'confirmed' | 'unconfirmed';
 }
 
 export function updateHelp(): string {
@@ -109,7 +110,10 @@ function releaseBase(version: string): string {
 }
 
 async function* httpChunks(url: string, maximumBytes: number): AsyncGenerator<Uint8Array> {
-  const result = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(60_000) });
+  const result = await fetch(url, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(60_000),
+  });
   if (!result.ok || !result.body) {
     await result.body?.cancel();
     throw new Error(t('cli.update.downloadFailed', { value: `${result.status} ${url}` }));
@@ -200,7 +204,9 @@ function runTar(args: string[], cwd?: string): string {
   });
   if (result.error || result.status !== 0)
     throw new Error(
-      t('cli.update.extractFailed', { value: result.error?.message ?? result.stderr.trim() }),
+      t('cli.update.extractFailed', {
+        value: result.error?.message ?? result.stderr.trim(),
+      }),
     );
   return result.stdout;
 }
@@ -283,7 +289,12 @@ function switchPointer(root: string, next: string): void {
 }
 
 export async function updateInstalled(
-  options: { version?: string; check?: boolean; entryFile?: string; baseUrl?: string } = {},
+  options: {
+    version?: string;
+    check?: boolean;
+    entryFile?: string;
+    baseUrl?: string;
+  } = {},
 ): Promise<UpdateResult> {
   const installed = installation(options.entryFile ?? fileURLToPath(import.meta.url));
   const platform = target(),
@@ -376,12 +387,71 @@ export async function updateInstalled(
     switchPointer(installed.root, identity);
     for (const name of readdirSync(path.join(installed.root, 'versions'))) {
       if (name !== identity && name !== installed.currentId && safeIdentity(name))
-        rmSync(path.join(installed.root, 'versions', name), { recursive: true, force: true });
+        rmSync(path.join(installed.root, 'versions', name), {
+          recursive: true,
+          force: true,
+        });
     }
     result.updated = true;
+    const registration = path.join(installed.root, 'service-registration.json');
+    if (existsSync(registration)) {
+      // The runtime switch has completed. Unreadable or unknown service metadata
+      // must retain that result and expose unconfirmed startup without mutation.
+      result.serviceRestart = 'unconfirmed';
+      let service: { version?: unknown; enabled?: unknown } = {};
+      try {
+        const stat = lstatSync(registration);
+        if (stat.isFile() && !stat.isSymbolicLink() && stat.size <= 32768)
+          service = JSON.parse(readFileSync(registration, 'utf8'));
+      } catch {
+        /* Keep the new installation and report the independent service state. */
+      }
+      if (service.version === 1 && service.enabled === false) delete result.serviceRestart;
+      if (service.version === 1 && service.enabled === true) {
+        const nextRuntime = path.join(
+          destination,
+          'runtime',
+          process.platform === 'win32' ? 'node.exe' : 'node',
+        );
+        const restarted = spawnSync(
+          nextRuntime,
+          [path.join(destination, 'lib', 'wombat.js'), 'service', 'enable', '--json'],
+          {
+            env: {
+              ...process.env,
+              WOMBAT_INSTALL_ROOT: installed.root,
+              WOMBAT_ENDPOINT_FILE: path.join(installed.root, 'endpoint.json'),
+            },
+            encoding: 'utf8',
+            timeout: 60_000,
+            maxBuffer: 65536,
+            windowsHide: true,
+            killSignal: 'SIGKILL',
+          },
+        );
+        result.serviceRestart = 'unconfirmed';
+        if (!restarted.error && restarted.status === 0) {
+          try {
+            const status = JSON.parse(restarted.stdout) as {
+              running?: unknown;
+              autoStart?: unknown;
+            };
+            if (status.running === true && status.autoStart === true)
+              result.serviceRestart = 'confirmed';
+          } catch {
+            /* A completed update does not establish service startup. */
+          }
+        }
+      }
+    }
     return result;
   } finally {
-    rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    rmSync(scratch, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    });
   }
 }
 
@@ -395,11 +465,17 @@ export async function runUpdateCli(argv: string[]): Promise<number> {
     );
     return 0;
   }
-  const result = await updateInstalled({ version: invocation.version, check: invocation.check });
+  const result = await updateInstalled({
+    version: invocation.version,
+    check: invocation.check,
+  });
   if (invocation.json) process.stdout.write(JSON.stringify(result) + '\n');
   else if (result.updated)
     process.stdout.write(
-      t('cli.update.updated', { from: result.currentVersion, to: result.availableVersion }) + '\n',
+      t('cli.update.updated', {
+        from: result.currentVersion,
+        to: result.availableVersion,
+      }) + '\n',
     );
   else if (!result.updateAvailable)
     process.stdout.write(t('cli.update.current', { version: result.currentVersion }) + '\n');
@@ -410,5 +486,7 @@ export async function runUpdateCli(argv: string[]): Promise<number> {
         available: result.availableVersion,
       }) + '\n',
     );
-  return 0;
+  if (result.serviceRestart === 'unconfirmed' && !invocation.json)
+    process.stderr.write(t('service.updatePending') + '\n');
+  return result.serviceRestart === 'unconfirmed' ? 2 : 0;
 }

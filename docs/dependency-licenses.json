@@ -7,7 +7,7 @@
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
     "pnpm-lock.yaml": "7128a48df418f8e0b6ae85dace5a53b14dad5ee20e5a6e699ceda4f9351fda8d",
-    "core/Cargo.lock": "14ed998c1edfb6fd40113007c3e89e4e29a72f1e925aa6e1e9f1351decbaca5c"
+    "core/Cargo.lock": "cfea60a333beb53d3b4647ab07a2df54789da4af756efeea1dfa6e2343eebfc0"
   },
   "node": [
     {
@@ -1989,6 +1989,48 @@
       ]
     },
     {
+      "name": "ciborium-io",
+      "version": "0.2.2",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ]
+    },
+    {
+      "name": "ciborium-ll",
+      "version": "0.2.2",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ]
+    },
+    {
+      "name": "ciborium",
+      "version": "0.2.2",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ]
+    },
+    {
       "name": "core_detect",
       "version": "1.0.0",
       "license": "MIT/Apache-2.0",
@@ -2031,6 +2073,20 @@
       ]
     },
     {
+      "name": "crunchy",
+      "version": "0.2.4",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "3eab77734a181b2a2e8418af9004f960f715f04aac4d76a26cf774f63a7b13d1"
+        }
+      ]
+    },
+    {
       "name": "crypto-common",
       "version": "0.1.7",
       "license": "MIT OR Apache-2.0",
@@ -2041,6 +2097,20 @@
         {
           "name": "LICENSE-MIT",
           "sha256": "3521672491a3479422d5fe1aca6645dd2984090f85da6e5205abfb18fb7a6897"
+        }
+      ]
+    },
+    {
+      "name": "cty",
+      "version": "0.2.2",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE-MIT",
+          "sha256": "035e70219855119df4273b3c5b97543ae82e0dd60c520416e759107c602f651b"
         }
       ]
     },
@@ -2257,6 +2327,20 @@
       ]
     },
     {
+      "name": "fsevent-sys",
+      "version": "4.1.0",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "c4d64f0ce17c85d4a14e22d224fbbd76dbb1e03eb38f0d3c209fb38bdc8dc646"
+        }
+      ]
+    },
+    {
       "name": "funty",
       "version": "2.0.0",
       "license": "MIT",
@@ -2369,6 +2453,20 @@
       ]
     },
     {
+      "name": "half",
+      "version": "2.7.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE-MIT",
+          "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1"
+        }
+      ]
+    },
+    {
       "name": "hashbrown",
       "version": "0.12.3",
       "license": "MIT OR Apache-2.0",
@@ -2453,6 +2551,34 @@
       ]
     },
     {
+      "name": "inotify-sys",
+      "version": "0.1.8",
+      "license": "ISC",
+      "selectedLicense": "ISC",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "f68878c9ca61b25d4b2c470de571cb85ce97804a62bb153607f7e0e0d2684c8a"
+        }
+      ]
+    },
+    {
+      "name": "inotify",
+      "version": "0.11.5",
+      "license": "ISC",
+      "selectedLicense": "ISC",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "7f78b31de4e7a3e2ac8de40e2b409eda313f03637aa62b8416fbde9bdc5ce4c9"
+        }
+      ]
+    },
+    {
       "name": "interprocess",
       "version": "2.4.4",
       "license": "0BSD OR Apache-2.0",
@@ -2513,6 +2639,34 @@
       ]
     },
     {
+      "name": "kqueue-sys",
+      "version": "1.1.2",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "9dc7535841863372cb757676c5acd69c010572a85df23d3467d6bb3cc2829e84"
+        }
+      ]
+    },
+    {
+      "name": "kqueue",
+      "version": "1.2.1",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE",
+          "sha256": "9dc7535841863372cb757676c5acd69c010572a85df23d3467d6bb3cc2829e84"
+        }
+      ]
+    },
+    {
       "name": "lazy_static",
       "version": "1.5.1",
       "license": "MIT OR Apache-2.0",
@@ -2537,6 +2691,20 @@
         {
           "name": "LICENSE-MIT",
           "sha256": "123a331b5dbf04c30097fa43b8f858bc85df671fe776de498d01f3d6b7c1f69e"
+        }
+      ]
+    },
+    {
+      "name": "libmimalloc-sys",
+      "version": "0.1.49",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE.txt",
+          "sha256": "a08554fab028af3af047e8588d32d019662c1b1bf07959a195a2f75fe340726b"
         }
       ]
     },
@@ -2623,6 +2791,20 @@
       ]
     },
     {
+      "name": "mimalloc",
+      "version": "0.1.52",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE.txt",
+          "sha256": "a08554fab028af3af047e8588d32d019662c1b1bf07959a195a2f75fe340726b"
+        }
+      ]
+    },
+    {
       "name": "mio",
       "version": "1.2.3",
       "license": "MIT",
@@ -2651,6 +2833,34 @@
         {
           "name": "LICENSE-MIT",
           "sha256": "3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c"
+        }
+      ]
+    },
+    {
+      "name": "notify-types",
+      "version": "2.1.0",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE-MIT",
+          "sha256": "b63e167d61ced1d872a588c5ac764b0dda477d62209dc4f6b6bfea5517d0a24c"
+        }
+      ]
+    },
+    {
+      "name": "notify",
+      "version": "8.2.0",
+      "license": "CC0-1.0",
+      "selectedLicense": "CC0-1.0",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "LICENSE-CC0",
+          "sha256": "e0456cbab4f7b5e7203e678faff37eadbdfef02e822db3b7a52a1dd9d3dc514a"
         }
       ]
     },
@@ -3133,6 +3343,24 @@
         {
           "name": "LICENSE-MIT",
           "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "same-file",
+      "version": "1.0.6",
+      "license": "Unlicense/MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "COPYING",
+          "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f"
+        },
+        {
+          "name": "LICENSE-MIT",
+          "sha256": "cb3c929a05e6cbc9de9ab06a4c57eeb60ca8c724bef6c138c87d3a577e27aa14"
         }
       ]
     },
@@ -3687,6 +3915,24 @@
       ]
     },
     {
+      "name": "walkdir",
+      "version": "2.5.0",
+      "license": "Unlicense/MIT",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "COPYING",
+          "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f"
+        },
+        {
+          "name": "LICENSE-MIT",
+          "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f"
+        }
+      ]
+    },
+    {
       "name": "wasi",
       "version": "0.11.1+wasi-snapshot-preview1",
       "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
@@ -3789,6 +4035,150 @@
         {
           "name": "LICENSE-MIT",
           "sha256": "cb3c929a05e6cbc9de9ab06a4c57eeb60ca8c724bef6c138c87d3a577e27aa14"
+        }
+      ]
+    },
+    {
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_aarch64_msvc",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_i686_gnu",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_i686_gnullvm",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_i686_msvc",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_x86_64_gnu",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows_x86_64_msvc",
+      "version": "0.53.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
         }
       ]
     },
@@ -3902,7 +4292,43 @@
     },
     {
       "name": "windows-sys",
+      "version": "0.60.2",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows-sys",
       "version": "0.61.2",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "MIT",
+      "licenseSource": "locked crate package",
+      "enabledInBuild": true,
+      "files": [
+        {
+          "name": "license-apache-2.0",
+          "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b"
+        },
+        {
+          "name": "license-mit",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "name": "windows-targets",
+      "version": "0.53.5",
       "license": "MIT OR Apache-2.0",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
@@ -3952,7 +4378,7 @@
       "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE-BSD",
@@ -3970,7 +4396,7 @@
       "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
       "selectedLicense": "MIT",
       "licenseSource": "locked crate package",
-      "enabledInBuild": false,
+      "enabledInBuild": true,
       "files": [
         {
           "name": "LICENSE-BSD",
@@ -4201,22 +4627,6 @@
       "version": "1.0.109",
       "declaredLicense": "MIT OR Apache-2.0",
       "repository": "https://github.com/dtolnay/syn",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
-      "name": "zerocopy",
-      "version": "0.8.59",
-      "declaredLicense": "BSD-2-Clause OR Apache-2.0 OR MIT",
-      "repository": "https://github.com/google/zerocopy",
-      "status": "locked_optional_not_enabled",
-      "noticeVerified": true
-    },
-    {
-      "name": "zerocopy-derive",
-      "version": "0.8.59",
-      "declaredLicense": "BSD-2-Clause OR Apache-2.0 OR MIT",
-      "repository": "https://github.com/google/zerocopy",
       "status": "locked_optional_not_enabled",
       "noticeVerified": true
     }

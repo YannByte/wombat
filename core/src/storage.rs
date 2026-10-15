@@ -1,25 +1,25 @@
 use crate::{absolute, home};
 use anyhow::Result;
 use std::{
-    env, fs,
+    fs,
     io::Write,
     path::{Path, PathBuf},
 };
 
 pub fn data_home() -> Result<PathBuf> {
-    if let Some(dir) = env::var_os("WOMBAT_DATA_HOME") {
+    if let Some(dir) = crate::host_environment::get("WOMBAT_DATA_HOME") {
         return absolute(PathBuf::from(dir));
     }
     if cfg!(target_os = "macos") {
         return Ok(home().join("Library/Application Support/Wombat"));
     }
     if cfg!(windows) {
-        return Ok(env::var_os("LOCALAPPDATA")
+        return Ok(crate::host_environment::get("LOCALAPPDATA")
             .map(PathBuf::from)
             .unwrap_or_else(|| home().join("AppData/Local"))
             .join("Wombat"));
     }
-    Ok(env::var_os("XDG_DATA_HOME")
+    Ok(crate::host_environment::get("XDG_DATA_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| home().join(".local/share"))
         .join("wombat"))

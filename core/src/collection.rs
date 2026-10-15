@@ -253,7 +253,7 @@ fn native_source() -> Result<String> {
     let roots = crate::adapters::codex::CodexAdapter.discover(
         &crate::adapters::contract::DiscoveryRequest {
             roots: vec![
-                std::env::var_os("CODEX_HOME")
+                crate::host_environment::get("CODEX_HOME")
                     .map(PathBuf::from)
                     .unwrap_or_else(|| crate::home().join(".codex")),
             ],

@@ -89,6 +89,9 @@ pub struct Response {
     pub additional: Vec<usage_app_dto::Response>,
 }
 struct Entry {
+    paused: bool,
+    changed: bool,
+    last_cost: Duration,
     include_history: bool,
     restoring: bool,
     preferred_project: Option<String>,
@@ -110,6 +113,9 @@ struct Entry {
 impl Entry {
     fn new(roots: Vec<String>) -> Self {
         Self {
+            paused: service::paused().unwrap_or(true),
+            changed: false,
+            last_cost: Duration::ZERO,
             include_history: false,
             restoring: false,
             preferred_project: None,
@@ -196,14 +202,27 @@ fn socket_path() -> Result<PathBuf> {
     Ok(parent.join("usage-v2.sock"))
 }
 pub fn endpoint() -> Result<Value> {
-    Ok(json!({"protocolVersion":2,"socket":socket_path()?}))
+    let socket = socket_path()?;
+    let registration = crate::hash(
+        dunce::canonicalize(crate::storage::data_home()?)?
+            .to_string_lossy()
+            .as_bytes(),
+    );
+    let discovery = sources(&[]);
+    let roots: Vec<_> = discovery.sources.into_iter().map(|s| s.root).collect();
+    Ok(
+        json!({"protocolVersion":2,"socket":socket,"registrationId":registration,"defaultRoots":roots,"discoveryError":!discovery.issues.is_empty(),"contextKey":crate::hash(serde_json::to_vec(&crate::host_environment::context()?)?)}),
+    )
 }
 mod collection;
 mod generation;
 mod preview;
 mod query;
+mod resources;
 mod scheduling;
 mod selection;
+mod service;
+pub(crate) use service::offline as service_offline;
 mod transport;
 pub(crate) use collection::load_collected_except;
 use collection::{restore_projects, source_key, sources, sync};
@@ -212,3 +231,4 @@ use query::query;
 use query::{config_query, timing_query};
 use selection::select_view;
 pub use transport::serve;
+pub use transport::serve_resident;

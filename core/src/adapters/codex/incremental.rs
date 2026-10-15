@@ -9,6 +9,7 @@ mod recent;
 mod reduction;
 #[cfg(test)]
 mod reduction_tests;
+mod resume;
 
 /// Mapping 3 adds bounded original-text locators; damaged-item boundaries remain.
 pub(crate) const MESSAGE_OBSERVATION_VERSION: u32 = 3;
@@ -114,6 +115,8 @@ pub(crate) struct Cache {
     facts: Option<Facts>,
     projected: Option<Vec<Arc<Measurement>>>,
     seed: Option<ReusableFacts>,
+    pub(crate) encoded_bytes: u64,
+    resume_delta: Option<resume::Delta>,
 }
 
 struct ReusableFacts {
@@ -122,6 +125,26 @@ struct ReusableFacts {
 }
 
 impl Cache {
+    pub(crate) fn persist_resume(
+        &self,
+        db: &Connection,
+        source: &SourceInstance,
+        projection: &Collected,
+    ) -> Result<()> {
+        if let Some(facts) = &self.facts {
+            resume::save(db, source, facts, projection, self.resume_delta.as_ref())?;
+        }
+        Ok(())
+    }
+    pub(crate) fn refresh_encoded_bytes(&mut self, db: &Connection, source: &str) -> Result<()> {
+        self.encoded_bytes =
+            if self.facts.is_some() || self.seed.is_some() || self.projected.is_some() {
+                resume::weight(db, source)?
+            } else {
+                0
+            };
+        Ok(())
+    }
     pub(crate) fn needs_seed(&self) -> bool {
         self.facts.is_none() && self.seed.is_none()
     }
@@ -470,6 +493,7 @@ fn sync_with_policy(
         }
     }
     let previous = crate::live_index::load_map(db, &scope)?;
+    resume::validate(db, source)?;
     let mut checkpoints: BTreeMap<String, Checkpoint> = previous
         .get("checkpoints")
         .map(|v| serde_json::from_value(v.clone()))
@@ -588,17 +612,24 @@ fn sync_with_policy(
     let restoring = cache.facts.is_none();
     let mut facts = match cache.facts.take() {
         Some(facts) => facts,
-        None => load_facts(
-            db,
-            &fact_scope,
-            cache.seed.as_ref(),
-            &report,
-            &context.cancelled,
-            rebuild,
-        )?,
+        None => {
+            if !rebuild && let Some(facts) = resume::load(db, source)? {
+                facts
+            } else {
+                load_facts(
+                    db,
+                    &fact_scope,
+                    cache.seed.as_ref(),
+                    &report,
+                    &context.cancelled,
+                    rebuild,
+                )?
+            }
+        }
     };
     cache.seed = None;
     facts.dirty_events.clear();
+    facts.association_dirty.clear();
     facts.dirty_operations.clear();
     facts.retired_operations.clear();
     facts.dirty_measurements.clear();
@@ -866,6 +897,22 @@ fn sync_with_policy(
     crate::observation_versions::ObservationHeaderSet::Parser
         .write_json(metadata.as_object_mut().expect("metadata is an object"));
     crate::live_index::save_map(db, &scope, metadata.as_object().unwrap())?;
+    cache.resume_delta = if rebuild || previous.is_empty() {
+        None
+    } else {
+        Some(resume::Delta {
+            measurements: facts.dirty_measurements.clone(),
+            operations: facts.dirty_operations.clone(),
+            retired: !facts.retired_operations.is_empty(),
+            targets: crate::live_index::changed_event_targets(db)?
+                .into_iter()
+                .chain(facts.association_dirty.iter().cloned())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            raw: !direct_only,
+        })
+    };
     facts.dirty_measurements.clear();
     facts.dirty_operations.clear();
     facts.retired_operations.clear();
@@ -1166,6 +1213,8 @@ mod sharing_tests {
                 z.clone(),
             ]),
             seed: None,
+            encoded_bytes: 0,
+            resume_delta: None,
         };
         let rows = [
             row("a", 1),

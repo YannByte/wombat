@@ -35,6 +35,8 @@ pub(super) struct Facts {
     #[serde(skip)]
     pub(super) association_groups: Option<BTreeMap<String, Vec<association::Prepared>>>,
     #[serde(skip)]
+    pub(super) association_dirty: BTreeSet<String>,
+    #[serde(skip)]
     pub(super) retired_operations: BTreeSet<String>,
     #[serde(skip)]
     pub(super) operation_aliases:

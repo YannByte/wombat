@@ -71,7 +71,7 @@ impl AgentAdapter for CodexAdapter {
     fn discover(&self, request: &DiscoveryRequest) -> DiscoveryReport {
         let mut roots = if request.roots.is_empty() {
             vec![
-                env::var_os("CODEX_HOME")
+                crate::host_environment::get("CODEX_HOME")
                     .map(PathBuf::from)
                     .unwrap_or_else(|| crate::home().join(".codex")),
             ]

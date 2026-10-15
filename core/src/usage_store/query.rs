@@ -184,6 +184,9 @@ impl Snapshot {
         ))
     }
     pub fn ledger(&self) -> Result<Vec<PricedMeasurement>> {
+        if self.expired_detail_lease() {
+            return Err(operation_error("VIEW_EXPIRED", "Live data lease expired"));
+        }
         if self.has_stored_ledger() {
             return self.stored_measurements(None, None);
         }

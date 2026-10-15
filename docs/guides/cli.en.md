@@ -119,7 +119,21 @@ Choose presentation language with `--lang zh` or `--lang en`, or set `WOMBAT_LAN
 - `--snapshot ID` pins a current snapshot. Continue pagination with the same snapshotId instead of resolving latest again. Unknown formats are explicitly rejected.
 - Live queries accept `--root`. Omitting it always selects the default Codex source; another window's roots do not change this. Fixed usage snapshots cannot also specify source roots; timing roots bind the requested source scope to the fixed version.
 
-One data directory shares an on-demand Rust service. File notifications supplement polling roughly every 2 seconds; CLI watch queries roughly every second. Without a valid configuration view, the service exits about 15 seconds after its last call; configuration views last at most 10 minutes. Live operation has been accepted on macOS; Windows and Linux have not passed local installation acceptance. Accounting uses complete log records and cannot show tokens the model has not yet logged.
+One data directory shares a Rust service. The installed background service keeps indexing without a CLI or browser; `usage --watch` only observes results. Accounting uses complete log records and cannot show tokens the model has not yet logged. Service lifecycle and resource limits belong in the [core reference](../reference/core.en.md).
+
+## Background indexing
+
+```sh
+wombat service status --json
+wombat service pause --json
+wombat service resume --json
+wombat service stop --json
+wombat service start --json
+wombat service disable --json
+wombat service enable --json
+```
+
+`status` reports the running instance, preparation, committed-data readiness and configured automatic startup separately. `pause` takes effect at the current transaction boundary and preserves queries; `resume` continues indexing. `stop` waits boundedly for this instance to exit; later queries or login can start it again. `disable` removes current-user automatic startup and stops the service. `enable` registers and starts it. Automatic startup needs a managed installation and an available native user-session manager. An explicit-root Web host cannot change global service settings. Web setup exposes status and permitted pause/resume controls.
 
 ## Whole-turn timing
 
@@ -177,7 +191,7 @@ Only current usage-v4 snapshots (schema4) are readable. Usage JSON v5 and timing
 
 ## Local Web
 
-Run `wombat web` and open the printed link. `--port 0` selects a port automatically by default; repeat `--root <directory>` to restrict sources, use `--lang zh/en` for the initial language, and `--json` for one startup JSON record. Ctrl+C stops the service; closing a tab does not exit the CLI.
+Run `wombat web` and open the printed link. `--port 0` selects a port automatically by default; repeat `--root <directory>` to restrict sources, use `--lang zh/en` for the initial language, and `--json` for one startup JSON record. Ctrl+C stops this Web host; closing a tab does not exit the CLI.
 
 Access is local only; restart requires a new link. Pages provide usage, tasks, turns, sources, and prices; date, model, effort, and directory filters are retained in the URL. Reloading reads a local version again; use Refresh data to recover an expired version. Existing business interfaces are connected over HTTP and source logs remain read-only; remote deployment is unsupported. See [architecture](../development/architecture.en.md).
 

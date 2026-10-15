@@ -13,6 +13,12 @@ struct ConversationMessage {
 }
 
 pub fn serve() -> Result<()> {
+    run(false)
+}
+pub fn serve_resident() -> Result<()> {
+    run(true)
+}
+fn run(resident: bool) -> Result<()> {
     #[cfg(windows)]
     use crate::live_windows::Listener as UnixListener;
     use std::io::{BufRead, BufReader, Write};
@@ -28,6 +34,12 @@ pub fn serve() -> Result<()> {
     options.mode(0o600);
     let lock = options.open(root.join("service-v2.lock"))?;
     if lock.try_lock().is_err() {
+        if resident {
+            return Err(operation_error(
+                "SERVICE_ALREADY_RUNNING",
+                "Another service owns this data directory",
+            ));
+        }
         return Ok(());
     }
     let socket = socket_path()?;
@@ -44,19 +56,67 @@ pub fn serve() -> Result<()> {
     let configs = Arc::new(Mutex::new(crate::config::Store::default()));
     let shared: Shared = Arc::new((Mutex::new(BTreeMap::new()), Condvar::new()));
     let (jobs, receiver) = mpsc::sync_channel::<Job>(32);
+    let control = Arc::new(service::Control::new(resident)?);
+    service::publish_endpoint(&control)?;
+    if resident {
+        service::prepare(&shared, &jobs)?;
+    }
+    let worker_control = Arc::clone(&control);
+    let worker_jobs = jobs.clone();
     let worker_state = Arc::clone(&shared);
-    let worker = std::thread::spawn(move || -> Result<()> {
+    let worker_configs = Arc::clone(&configs);
+    let worker = std::thread::spawn(move || -> Result<Option<rusqlite::Connection>> {
         let mut lifecycle = scheduling::WorkerLifecycle::new(Arc::clone(&worker_state));
         let mut db = generation::index_path(&root)
             .and_then(|path| crate::live_index::open(&path))
             .ok();
         let mut caches = BTreeMap::new();
+        let mut watch = service::Watch::new(Arc::clone(&worker_control), worker_jobs.clone());
+        let mut changed_at: Option<Instant> = None;
+        let mut last_checkpoint = Instant::now();
         loop {
+            if worker_control
+                .stopping
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                break;
+            }
+            if worker_control
+                .resident
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                let key = source_key(&[]);
+                if !worker_control
+                    .paused
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                    && !worker_state.0.lock().unwrap().contains_key(&key)
+                {
+                    service::prepare(&worker_state, &worker_jobs)?;
+                }
+                watch.update(&worker_state, &worker_control, false);
+            }
             let job = match receiver.recv_timeout(Duration::from_millis(500)) {
                 Ok(job) => Some(job),
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 Err(_) => None,
             };
+            if worker_control
+                .changed
+                .swap(false, std::sync::atomic::Ordering::Relaxed)
+            {
+                changed_at.get_or_insert_with(Instant::now);
+            }
+            let changed_due =
+                changed_at.is_some_and(|at| at.elapsed() >= Duration::from_millis(500));
+            if changed_due {
+                changed_at = None;
+                watch.update(&worker_state, &worker_control, true);
+                for entry in worker_state.0.lock().unwrap().values_mut() {
+                    if entry.following {
+                        entry.changed = true;
+                    }
+                }
+            }
             if let Some(job) = &job
                 && job.restore_only
             {
@@ -77,14 +137,29 @@ pub fn serve() -> Result<()> {
             }
             let work: Vec<_> = {
                 let entries = worker_state.0.lock().unwrap();
+                let default_key = source_key(&[]);
                 entries
                     .iter()
                     .filter(|(key, e)| {
                         job.as_ref().is_some_and(|j| &j.key == *key)
-                            || e.pending.is_none()
+                            || !e.paused
+                                && e.pending.is_none()
                                 && e.following
-                                && e.touched.elapsed() < Duration::from_secs(15)
-                                && scheduling::auto_due(e)
+                                && (worker_control
+                                    .resident
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    && *key == &default_key
+                                    || e.touched.elapsed() < Duration::from_secs(15))
+                                && ((e.changed
+                                    && e.last_sync.elapsed()
+                                        >= e.last_cost.saturating_mul(4).clamp(
+                                            Duration::from_secs(1),
+                                            Duration::from_secs(60),
+                                        ))
+                                    || scheduling::auto_due(e)
+                                    || e.views
+                                        .back()
+                                        .is_some_and(|(_, v)| v.expired_detail_lease()))
                     })
                     .map(|(key, e)| {
                         (
@@ -96,14 +171,69 @@ pub fn serve() -> Result<()> {
                     .collect()
             };
             for (key, roots, queued) in work {
+                if source_key(&roots) != key {
+                    let mut entries = worker_state.0.lock().unwrap();
+                    let entry = entries.get_mut(&key).unwrap();
+                    if let Some(work) = scheduling::begin(entry, queued) {
+                        scheduling::finish(entry, work);
+                    }
+                    entry.error = Some("Source scope changed; reacquire the default view".into());
+                    entry.error_code = Some("SOURCE_SCOPE_CHANGED");
+                    worker_state.1.notify_all();
+                    continue;
+                }
                 let work = {
                     let mut entries = worker_state.0.lock().unwrap();
                     scheduling::begin(entries.get_mut(&key).unwrap(), queued)
                 };
                 let Some(work) = work else { continue };
+                let began = Instant::now();
+                worker_state
+                    .0
+                    .lock()
+                    .unwrap()
+                    .get_mut(&key)
+                    .unwrap()
+                    .changed = false;
+                if worker_control
+                    .paused
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                {
+                    let mut entries = worker_state.0.lock().unwrap();
+                    scheduling::finish(entries.get_mut(&key).unwrap(), work);
+                    worker_state.1.notify_all();
+                    continue;
+                }
                 let verify = work.verify;
                 if work.rebuild {
-                    let outcome = generation::rebuild(&root, &key, &roots);
+                    let resident = worker_control
+                        .resident
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    let outcome = resources::index_batch(|| {
+                        let (next, view) = generation::rebuild(&root, &key, &roots)?;
+                        Ok((
+                            next,
+                            if resident {
+                                drop(view);
+                                None
+                            } else {
+                                Some(view)
+                            },
+                        ))
+                    })
+                    .and_then(|(next, view)| {
+                        let view = match view {
+                            Some(view) => view,
+                            None => restore_projects(&next, &key, &roots, || None, |_| {})?
+                                .ok_or_else(|| {
+                                    operation_error(
+                                        "INDEX_UNAVAILABLE",
+                                        "Rebuilt header unavailable",
+                                    )
+                                })?,
+                        };
+                        Ok((next, view))
+                    });
                     let mut entries = worker_state.0.lock().unwrap();
                     let entry = entries.get_mut(&key).unwrap();
                     scheduling::finish(entry, work);
@@ -203,22 +333,71 @@ pub fn serve() -> Result<()> {
                     }
                     worker_state.1.notify_all();
                 }
-                let outcome = collection::sync_with_policy(
-                    db,
-                    &key,
-                    &roots,
-                    verify,
-                    prior_view.as_deref(),
-                    &mut caches,
-                    !work.include_history,
-                );
+                let (mut outcome, compact, mut resident_bytes, evicted) =
+                    resources::index_batch(|| {
+                        let mut outcome = collection::sync_with_policy(
+                            db,
+                            &key,
+                            &roots,
+                            verify,
+                            prior_view.as_deref(),
+                            &mut caches,
+                            !work.include_history,
+                        );
+                        let compact = worker_control
+                            .resident
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                            && outcome.as_ref().is_ok_and(|view| view.is_some());
+                        if compact {
+                            outcome = Ok(None);
+                        }
+                        let mut evicted = outcome.is_err();
+                        if outcome.is_err() {
+                            caches.clear();
+                        }
+                        for (source, cache) in &mut caches {
+                            cache.refresh_encoded_bytes(db, source)?;
+                        }
+                        let mut resident_bytes: u64 =
+                            caches.values().map(|c| c.encoded_bytes).sum();
+                        while resident_bytes > service::PARSER_CACHE_BUDGET {
+                            let Some(key) = caches
+                                .iter()
+                                .max_by_key(|(_, c)| c.encoded_bytes)
+                                .map(|(id, _)| id.clone())
+                            else {
+                                break;
+                            };
+                            resident_bytes = resident_bytes
+                                .saturating_sub(caches.remove(&key).unwrap().encoded_bytes);
+                            evicted = true;
+                        }
+                        if evicted {
+                            db.flush_prepared_statement_cache();
+                            db.execute_batch("PRAGMA shrink_memory")?;
+                            resources::release_unused();
+                        }
+                        Ok((outcome, compact, resident_bytes, evicted))
+                    })?;
+                if compact {
+                    outcome = restore_projects(db, &key, &roots, || None, |_| {});
+                }
                 if outcome.is_err() {
                     caches.clear();
+                    resident_bytes = 0;
                 }
+                worker_control
+                    .cache_bytes
+                    .store(resident_bytes, std::sync::atomic::Ordering::Relaxed);
                 let mut entries = worker_state.0.lock().unwrap();
                 let entry = entries.get_mut(&key).unwrap();
                 entry.attempt += 1;
                 entry.last_sync = Instant::now();
+                entry.last_cost = if prior_view.is_some() {
+                    began.elapsed()
+                } else {
+                    Duration::ZERO
+                };
                 scheduling::finish(entry, work);
                 match outcome {
                     Ok(view) => {
@@ -242,17 +421,63 @@ pub fn serve() -> Result<()> {
                     entry.views.pop_front();
                 }
                 worker_state.1.notify_all();
+                drop(entries);
+                drop(prior_view);
+                if evicted {
+                    resources::release_unused();
+                }
+            }
+            // Expire leases even when no new view is published. A permanent
+            // service cannot rely on another query or process exit for cleanup.
+            {
+                let mut entries = worker_state.0.lock().unwrap();
+                for entry in entries.values_mut() {
+                    if entry.touched.elapsed() > Duration::from_secs(60) {
+                        for (_, view) in &entry.views {
+                            view.release_detail_cache();
+                        }
+                    }
+                    while entry.views.len() > 1
+                        && entry
+                            .views
+                            .front()
+                            .is_some_and(|(at, _)| at.elapsed() > Duration::from_secs(600))
+                    {
+                        entry.views.pop_front();
+                    }
+                }
+                let default_key = source_key(&[]);
+                entries.retain(|key, entry| {
+                    key == &default_key
+                        || entry.syncing
+                        || entry.restoring
+                        || entry.touched.elapsed() < Duration::from_secs(600)
+                        || entry
+                            .views
+                            .iter()
+                            .any(|(_, view)| Arc::strong_count(view) > 1)
+                });
+            }
+            if last_checkpoint.elapsed() >= Duration::from_secs(30) {
+                worker_configs.lock().unwrap().has_views();
+                if let Some(db) = &db {
+                    if service::wal_pressure(db) {
+                        worker_configs.lock().unwrap().evict_unshared_snapshots();
+                    }
+                    db.execute_batch("PRAGMA wal_checkpoint(PASSIVE)")?;
+                    service::reclaim_wal(db, &worker_state)?;
+                }
+                last_checkpoint = Instant::now();
             }
         }
-        if let Some(db) = db {
-            db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
-        }
         lifecycle.completed();
-        Ok(())
+        Ok(db)
     });
     let mut last_client = Instant::now();
     let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     loop {
+        // Keep status available while an in-flight writer reaches its safe
+        // transaction boundary. Stop accepting only after that worker exits.
         if worker.is_finished() && active.load(std::sync::atomic::Ordering::Relaxed) == 0 {
             break;
         }
@@ -267,7 +492,9 @@ pub fn serve() -> Result<()> {
                 let state = Arc::clone(&shared);
                 let configs = Arc::clone(&configs);
                 let jobs = jobs.clone();
+                let control = Arc::clone(&control);
                 std::thread::spawn(move || {
+                    resources::interactive_request();
                     let result = (|| -> Result<Vec<u8>> {
                         stream.set_nonblocking(false)?;
                         stream.set_read_timeout(Some(Duration::from_secs(12)))?;
@@ -290,8 +517,41 @@ pub fn serve() -> Result<()> {
                             #[serde(default, rename = "nativeHooks")]
                             native_hooks: Option<crate::config::hooks::Capture>,
                         }
-                        let value: Value = serde_json::from_str(&input)
+                        let mut value: Value = serde_json::from_str(&input)
                             .map_err(|_| operation_error("INVALID_ARGUMENT", "查询参数无效"))?;
+                        if let Some(instance) = value
+                            .as_object_mut()
+                            .and_then(|v| v.remove("serviceInstanceId"))
+                            && instance.as_str() != Some(control.instance.as_str())
+                        {
+                            return Err(operation_error(
+                                "SERVICE_CHANGED",
+                                "Service instance changed; reconnect",
+                            ));
+                        }
+                        if value.get("service").is_some() {
+                            #[derive(Deserialize)]
+                            #[serde(deny_unknown_fields)]
+                            struct ServiceMessage {
+                                service: crate::service_dto::Request,
+                            }
+                            let request: ServiceMessage =
+                                serde_json::from_value(value).map_err(|_| {
+                                    operation_error("INVALID_ARGUMENT", "Invalid service request")
+                                })?;
+                            return Ok(encode_success(&service::handle(
+                                request.service,
+                                &control,
+                                &state,
+                                &jobs,
+                            )?)?);
+                        }
+                        if control.stopping.load(std::sync::atomic::Ordering::Relaxed) {
+                            return Err(operation_error(
+                                "SERVICE_STOPPING",
+                                "Service is stopping at a transaction boundary",
+                            ));
+                        }
                         if value.get("monitor").is_some() {
                             #[derive(Deserialize)]
                             #[serde(deny_unknown_fields)]
@@ -450,12 +710,14 @@ pub fn serve() -> Result<()> {
                         }
                         let request: Request = serde_json::from_value(value)
                             .map_err(|_| operation_error("INVALID_ARGUMENT", "实时查询参数无效"))?;
+                        let cancellation = PeerCancellation::new(buffered_cancel);
                         #[cfg(unix)]
-                        let probe = || buffered_cancel || peer_closed(&stream);
+                        let probe =
+                            || cancellation.observe(Instant::now(), || peer_closed(&stream));
                         #[cfg(windows)]
                         let peer_probe = stream.peer_probe();
                         #[cfg(windows)]
-                        let probe = || buffered_cancel || peer_probe();
+                        let probe = || cancellation.observe(Instant::now(), &peer_probe);
                         Ok(encode_success(&query::query_with_probe(
                             request,
                             &state,
@@ -484,7 +746,8 @@ pub fn serve() -> Result<()> {
                 if active.load(std::sync::atomic::Ordering::Relaxed) != 0 {
                     last_client = Instant::now();
                 }
-                if last_client.elapsed() > Duration::from_secs(15)
+                if !control.resident.load(std::sync::atomic::Ordering::Relaxed)
+                    && last_client.elapsed() > Duration::from_secs(15)
                     && active.load(std::sync::atomic::Ordering::Relaxed) == 0
                     && !configs.lock().unwrap().has_views()
                     && !shared
@@ -508,11 +771,71 @@ pub fn serve() -> Result<()> {
     // and closes, so an idle exit does not leave its own obsolete WAL pages pinned.
     *configs.lock().unwrap() = crate::config::Store::default();
     shared.0.lock().unwrap().clear();
+    control
+        .stopping
+        .store(true, std::sync::atomic::Ordering::Relaxed);
     drop(jobs);
-    let _ = worker.join();
+    let worker_result = worker.join();
     #[cfg(unix)]
     let _ = fs::remove_file(socket);
+    let db = worker_result.map_err(|_| {
+        operation_error("CORE_UNAVAILABLE", "Background indexing worker panicked")
+    })??;
+    if let Some(db) = db {
+        db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
+    }
     Ok(())
+}
+
+// Fact loops can check cancellation very often. Probe the OS at most once per
+// millisecond while preserving an already observed cancellation immediately.
+struct PeerCancellation {
+    state: Mutex<(Option<Instant>, bool)>,
+}
+impl PeerCancellation {
+    fn new(cancelled: bool) -> Self {
+        Self {
+            state: Mutex::new((None, cancelled)),
+        }
+    }
+    fn observe(&self, now: Instant, check: impl FnOnce() -> bool) -> bool {
+        let Ok(mut state) = self.state.lock() else {
+            return true;
+        };
+        if !state.1
+            && state
+                .0
+                .is_none_or(|last| now.saturating_duration_since(last) >= Duration::from_millis(1))
+        {
+            state.0 = Some(now);
+            state.1 = check();
+        }
+        state.1
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    #[test]
+    fn repeated_fact_checks_coalesce_and_observed_cancellation_stays_immediate() {
+        let at = Instant::now();
+        let probe = PeerCancellation::new(false);
+        let calls = std::cell::Cell::new(0);
+        for _ in 0..10000 {
+            assert!(!probe.observe(at, || {
+                calls.set(calls.get() + 1);
+                false
+            }));
+        }
+        assert_eq!(calls.get(), 1);
+        assert!(!probe.observe(at + Duration::from_micros(999), || panic!("too early")));
+        assert!(probe.observe(at + Duration::from_millis(1), || true));
+        assert!(probe.observe(at + Duration::from_millis(2), || panic!(
+            "already cancelled"
+        )));
+        assert!(PeerCancellation::new(true).observe(at, || panic!("buffered cancellation")));
+    }
 }
 
 #[cfg(unix)]

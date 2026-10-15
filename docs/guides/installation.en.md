@@ -22,6 +22,8 @@ Install a compatible local Codex first. The installer installs Wombat, registers
 
 If plugin installation fails, Wombat remains installed. Check the reported stage, then rerun the installer with `--plugin-only` on macOS/Linux or `-PluginOnly` on PowerShell. Keep any custom prefix option. This reuses the current runtime without downloading it or changing PATH; omit version and download-source options. A failed discovery check retains the installed plugin and data. To open Web, run `wombat web --open`, or add `--open` / `-Open` to the installer. Omit `--plugin` or `-Plugin` to install only the runtime and Web. If installation still fails, [report the problem](https://github.com/YannByte/wombat/issues). If the browser does not open, use the full URL printed in the terminal.
 
+A runtime that exposes service controls registers current-user automatic startup and prepares recent data in the background after installation. It does not open Web, trust Hooks or invoke a model. To omit automatic startup, add `--no-service` on macOS/Linux or `-NoService` on Windows. `--plugin-only` / `-PluginOnly` does not change the service. Older public runtimes without service controls retain their existing behavior. Check progress with `wombat service status --json`; installation success does not establish data readiness. See [background indexing](cli.en.md) for pause, resume and removal.
+
 ## Update
 
 To update Wombat and its Codex plugin, rerun the installation command above with the plugin option. Keep any options for a custom installation directory or a specific version.

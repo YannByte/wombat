@@ -30,8 +30,12 @@
       "en": "cfcd29aa701e358926ef720610ea8bfd04163393062050e955faa3d7c94f0d81"
     },
     "/cli-and-automation/automatic-synchronization": {
-      "zh": "ea87522b7d2aa6546902faf687e9d309e7303d37c6b64734b7343475201688e2",
-      "en": "c82285332867b19c56622bc8ea3c5d91c4a27043ddd34878b53b89c49732750f"
+      "zh": "e6f3cddbb6f94af3e18e2a6e89fa4de0ee62a64096970891d91cd519f7d34052",
+      "en": "3c982ea4f6e3282420ee4e49ed7cb7516d16d6763d2da651135f3734d3b163dd"
+    },
+    "/cli-and-automation/background-indexing": {
+      "zh": "98730ae2907bac893d98ec01261642d7107a359958cd43a5ae240f2d72bede7a",
+      "en": "d4db61ffbe551a64fb04762e1d33eda070d27ea1661b29bbe7a5bf9ca2aacec6"
     },
     "/cli-and-automation/whole-turn-timing": {
       "zh": "1b5b47db910a2823c3a12f939b159af1570b115e7c9608bc35d4f1103e51819c",
@@ -54,8 +58,8 @@
       "en": "13fd96b040afa4c2e6356707338d66c2e5c22b4ed94b107ee2da53e242430c8e"
     },
     "/cli-and-automation/local-web": {
-      "zh": "7b43eb1463913ef50fcb482891bbc8ce440575efa7f127890b078327bd321ffa",
-      "en": "0a3f3bd2e782c0e43db54b86abacccf4bbf5d2f027b0618cb2d4951436556f4b"
+      "zh": "6f7724e570f63962708e7700eec816b1dc8ba6969d3c907fe88acbd6f8d0207e",
+      "en": "a3472c22e3058938354f024d15afda8bf2ba6c327d0cef10f3efba7d7c3ee710"
     },
     "/cli-and-automation/read-only-configuration": {
       "zh": "8e32b7cb2274aecdb1b9f6d47b235844c292e5427a821a0da345e34ce29868d7",

@@ -3,16 +3,123 @@
 use super::*;
 use crate::operation_association::OwnedAlias;
 
+#[derive(Serialize, Deserialize)]
 pub(in crate::adapters::codex) struct Prepared {
     preferred: String,
     fallback: String,
     anchor: (Arc<str>, Arc<str>, Arc<str>, u64, u32),
     scope: (Arc<str>, Option<Arc<str>>, Option<Arc<str>>),
+    #[serde(skip)]
     operation: Option<Arc<Operation>>,
     aliases: Arc<[OwnedAlias]>,
     issues: Vec<Issue>,
 }
 impl Facts {
+    pub(in crate::adapters::codex) fn save_associations(
+        &self,
+        db: &rusqlite::Connection,
+        scope: &str,
+        changed: Option<&[String]>,
+    ) -> anyhow::Result<()> {
+        #[derive(Serialize)]
+        struct Stored<'a> {
+            target: &'a str,
+            #[serde(flatten)]
+            group: &'a Prepared,
+            operation_id: Option<&'a str>,
+        }
+        let selected: Vec<_> = match (&self.association_groups, changed) {
+            (Some(groups), Some(changed)) => changed
+                .iter()
+                .filter_map(|target| groups.get_key_value(target))
+                .collect(),
+            (Some(groups), None) => groups.iter().collect(),
+            (None, _) => vec![],
+        };
+        let rows: Vec<_> = selected
+            .into_iter()
+            .flat_map(|(target, groups)| {
+                let prefix = crate::hash(target);
+                groups.iter().enumerate().map(move |(n, group)| {
+                    (
+                        format!("{prefix}:{n}"),
+                        Stored {
+                            target,
+                            group,
+                            operation_id: group.operation.as_ref().map(|o| o.id.as_str()),
+                        },
+                    )
+                })
+            })
+            .collect();
+        crate::live_index::put_packed(
+            db,
+            scope,
+            "associations",
+            rows.iter().map(|(id, row)| (id.as_str(), row)),
+        )?;
+        if let Some(changed) = changed {
+            for target in changed {
+                let prefix = format!("{}:", crate::hash(target));
+                crate::live_index::retain_packed_prefix(
+                    db,
+                    scope,
+                    "associations",
+                    Some(&prefix),
+                    rows.iter()
+                        .filter(|(id, _)| id.starts_with(&prefix))
+                        .map(|(id, _)| id.as_str()),
+                )?;
+            }
+            return Ok(());
+        }
+        crate::live_index::retain_packed(
+            db,
+            scope,
+            "associations",
+            rows.iter().map(|(id, _)| id.as_str()),
+        )
+    }
+    pub(in crate::adapters::codex) fn restore_association(
+        &mut self,
+        payload: &str,
+    ) -> anyhow::Result<()> {
+        #[derive(Deserialize)]
+        struct Stored {
+            target: String,
+            #[serde(flatten)]
+            group: Prepared,
+            operation_id: Option<String>,
+        }
+        let mut stored: Stored = serde_json::from_str(payload)?;
+        if let Some(id) = stored.operation_id {
+            let operation = self
+                .operations
+                .get(&id)
+                .ok_or_else(|| anyhow::anyhow!("resume operation reference missing"))?;
+            stored.group.operation = Some(Arc::clone(operation));
+        }
+        self.association_groups
+            .get_or_insert_default()
+            .entry(stored.target)
+            .or_default()
+            .push(stored.group);
+        Ok(())
+    }
+    pub(in crate::adapters::codex) fn restore_aliases(&mut self) {
+        self.operation_aliases = Arc::new(
+            self.association_groups
+                .iter()
+                .flat_map(|g| g.values())
+                .flatten()
+                .filter_map(|g| {
+                    g.operation
+                        .as_ref()
+                        .map(|o| (o.id.clone(), Arc::clone(&g.aliases)))
+                })
+                .collect(),
+        );
+    }
     #[cfg(test)]
     pub(in crate::adapters::codex) fn associations_share_canonical_allocations(&self) -> bool {
         self.association_groups.as_ref().is_some_and(|groups| {
@@ -149,23 +256,24 @@ impl Facts {
         let check = crate::operation_association::check;
         check(cancelled)?;
         let mut ordered = Vec::new();
-        for groups in self
+        for (target, groups) in self
             .association_groups
             .as_mut()
             .expect("prepared associations")
-            .values_mut()
+            .iter_mut()
         {
             for group in groups {
                 check(cancelled)?;
-                ordered.push(group);
+                ordered.push((target, group));
             }
         }
-        ordered.sort_unstable_by(|a, b| (&a.anchor, &a.scope).cmp(&(&b.anchor, &b.scope)));
+        ordered
+            .sort_unstable_by(|(_, a), (_, b)| (&a.anchor, &a.scope).cmp(&(&b.anchor, &b.scope)));
         check(cancelled)?;
         let mut used_ids = BTreeSet::new();
         let mut operations = BTreeMap::new();
         let mut operation_aliases = BTreeMap::new();
-        for group in ordered {
+        for (target, group) in ordered {
             check(cancelled)?;
             let mut id = group.preferred.as_str();
             if !used_ids.insert(id) {
@@ -175,6 +283,9 @@ impl Facts {
             let Some(prepared) = &group.operation else {
                 continue;
             };
+            if prepared.id != id {
+                self.association_dirty.insert(target.clone());
+            }
             report.issues.extend(group.issues.iter().cloned());
             let operation = if prepared.id == id {
                 Arc::clone(prepared)

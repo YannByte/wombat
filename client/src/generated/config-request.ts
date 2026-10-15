@@ -11,6 +11,10 @@ export interface Request {
   projectRoots?: string[] | null;
   snapshotId?: string | null;
   readView?: string | null;
+  /**
+   * Check current configuration against committed usage without scheduling collection.
+   */
+  cachedUsage?: boolean;
   scope?: Scope;
   kind?: Kind | null;
   kinds?: Kind[] | null;

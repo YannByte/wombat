@@ -53,6 +53,12 @@ pub(super) fn request(
     verify: bool,
     jobs: &mpsc::SyncSender<Job>,
 ) -> Result<u64> {
+    if entry.paused {
+        return Err(operation_error(
+            "INDEX_PAUSED",
+            "Background indexing is paused; resume it or query committed data",
+        ));
+    }
     request_work(entry, key, verify, false, jobs)
 }
 pub(super) fn request_work(
@@ -62,6 +68,12 @@ pub(super) fn request_work(
     rebuild: bool,
     jobs: &mpsc::SyncSender<Job>,
 ) -> Result<u64> {
+    if entry.paused {
+        return Err(operation_error(
+            "INDEX_PAUSED",
+            "Background indexing is paused; resume it or query committed data",
+        ));
+    }
     if let Some(work) = &mut entry.pending {
         work.verify |= verify;
         work.rebuild |= rebuild;
@@ -113,7 +125,7 @@ pub(super) fn begin(entry: &mut Entry, queued: bool) -> Option<SyncWork> {
             ticket: entry.requested,
             verify: false,
             rebuild: false,
-            include_history: entry.include_history,
+            include_history: false,
         }
     };
     entry.running = Some(work);
@@ -122,6 +134,7 @@ pub(super) fn begin(entry: &mut Entry, queued: bool) -> Option<SyncWork> {
 }
 
 pub(super) fn finish(entry: &mut Entry, work: SyncWork) {
+    entry.include_history = false;
     entry.completed = work.ticket;
     entry.running = None;
     entry.syncing = entry.pending.is_some();

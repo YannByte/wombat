@@ -25,6 +25,8 @@ Node 客户端和本地服务使用协议 2，并隔离接口地址与服务锁�
 
 本地套接字或原生进程访问失败时，传输在观察到操作系统拒绝后返回 `LOCAL_ACCESS_DENIED`，不返回原生诊断文本或路径。连接无法建立时，账户各部分保留这一原因；缺失值仍为未知。调用方可以申请必要范围的访问权限并重试同一读取，但传输不会自行授予权限或自动重发写入。
 
+`UsageClient.service` 在 Node 和 HTTP 中使用 Rust 生成的版本 1 请求与响应。Rust 拥有就绪、进度、暂停状态及实例身份，Node 宿主拥有当前用户服务注册。受管启动器提供私有连接文件路径；客户端复用前检查协议、可执行文件身份和实例，安装后查询无需逐次启动内核进程获取连接地址。显式限定来源根的 Web 宿主仅返回裁剪后的服务状态，拒绝全局服务变更。读取状态不会启动已停止的服务。普通查询在已启用的原生注册与所请求数据目录匹配时重新启动该作业，否则启动按需进程。
+
 ## HTTP 传输
 
 `@wombat/client/http` 导出 `createHttpClient({ origin, token })`，实现同一 `UsageClient`，校验结果并保留进度、取消和错误。浏览器不直接访问内核；仅向本机宿主发送窄操作。
@@ -35,11 +37,11 @@ Node 客户端和本地服务使用协议 2，并隔离接口地址与服务锁�
 
 `createNodeClient({automaticPrices:false})`只关闭客户端的自动补价装饰，显式prices操作仍可用。CLI实时查询默认保留原行为；Web使用此原始客户端并由宿主持有后台补价生命周期。
 
-用户工作流复用通用入口的 WebViewRequest、validateWebViewRequest 和 webViewSearch；Node 入口另提供 manageSkill 与 discoverWombatSkill，分别管理独立副本和读取原生实例。公共状态来自 Rust，安装不查询日志；详见[契约](../development/contracts.md)。
+用户工作流复用通用入口的 WebViewRequest、validateWebViewRequest 和 webViewSearch；Node 入口另提供 manageSkill 与 discoverWombatSkill，分别管理独立副本和读取原生实例。公共状态来自 Rust；独立 Skill 安装不查询日志，受管运行时安装可以启动后台准备；详见[契约](../development/contracts.md)。
 
 ## 接入与运行时观察
 
-可选的 `UsageClient.setup` 与 `UsageClient.collection` 使用 Rust 生成的版本 1 协议，校验输入和输出。Node 接入检查分别读取运行时能力、按 cwd 限定的原生 Skill 发现和 Rust 绑定的 Hook 注册，总时限八秒，保留部分失败代码；不安装、不信任、不读取账户凭据、不启动模型任务。Node `receiveCodexHook` 只通过私有内核进程边界发送有上限的原始输入，HTTP 不开放该能力。采集调用的进程时限五秒，输出预算 2 MiB。Web 宿主负责来源与项目授权，内核负责安全事实与关联。
+可选的 `UsageClient.setup` 与 `UsageClient.collection` 使用 Rust 生成的版本 1 协议，校验输入和输出。Node 接入检查分别读取运行时能力、按 cwd 限定的原生 Skill 发现和 Rust 绑定的 Hook 注册，总时限八秒，保留部分失败代码。接入检查只将当前清单与已提交用量核对，不调度日志采集；不安装、不信任、不读取账户凭据、不启动模型任务。Node `receiveCodexHook` 只通过私有内核进程边界发送有上限的原始输入，HTTP 不开放该能力。采集调用的进程时限五秒，输出预算 2 MiB。Web 宿主负责来源与项目授权，内核负责安全事实与关联。
 
 接入检查返回完整 Codex 版本（含预发行与构建标识）、当前 Wombat 运行版本，并核对实际启用实例的内容哈希和能力声明。插件与运行时版本不同也可能兼容；版本相同不能单独证明兼容。无声明副本标为未受管，内容修改与能力缺失分别报告错误码。接入检查还返回已验证的运行时内置 marketplace 路径，用于生成显式原生安装命令。资源缺失保留为接入检查的部分错误；原生发现与采集事实仍可独立读取。
 

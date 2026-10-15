@@ -68,6 +68,22 @@ test('POSIX open option starts the installed launcher with the Web command', {sk
 
 const pluginSource = installer.match(/(install_plugin\(\) \{[\s\S]*?\n\})\ninstall_plugin\n/)?.[1];
 assert(pluginSource, 'install.sh must expose the tested install_plugin function');
+const serviceSource=installer.match(/(start_service\(\) \{[\s\S]*?\n\})\nstart_service\n/)?.[1];
+assert(serviceSource,'install.sh must expose the tested start_service function');
+test('background registration precedes plugin checks and respects opt-out, capabilities and failure',{skip:process.platform==='win32'},t=>{
+  const root=mkdtempSync(path.join(os.tmpdir(),'wombat-install-service-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+  const destination=path.join(root,'version'),launcher=path.join(root,'wombat'),marker=path.join(root,'calls'),script=path.join(root,'test.sh');
+  mkdirSync(path.join(destination,'runtime'),{recursive:true});symlinkSync(process.execPath,path.join(destination,'runtime/node'));
+  writeFileSync(launcher,'#!/bin/sh\nprintf "%s\\n" "$*" >> "$MARKER"\nif [ "$1" = api ]; then if [ "$LEGACY" = 1 ]; then printf \'{"methods":[]}\\n\'; else printf \'{"methods":["service"]}\\n\'; fi; else exit "${FAIL_SERVICE:-0}"; fi\n');chmodSync(launcher,0o755);
+  writeFileSync(script,'set -eu\n'+serviceSource+'\nstart_service\n');
+  const env={...process.env,launcher,destination,MARKER:marker,start_service:'1'};
+  execFileSync('sh',[script],{env,stdio:'pipe'});assert.equal(readFileSync(marker,'utf8'),'api --json\nservice enable --json\n');
+  rmSync(marker);execFileSync('sh',[script],{env:{...env,start_service:'0'},stdio:'pipe'});assert(!existsSync(marker));
+  execFileSync('sh',[script],{env:{...env,LEGACY:'1'},stdio:'pipe'});assert.equal(readFileSync(marker,'utf8'),'api --json\n');
+  assert.throws(()=>execFileSync('sh',[script],{env:{...env,FAIL_SERVICE:'17'},stdio:'pipe'}));
+  assert(installer.indexOf('\nstart_service\n')<installer.indexOf('\ninstall_plugin\n'));
+  assert(windowsInstaller.indexOf('if (-not $NoService)')<windowsInstaller.indexOf('if ($Plugin)'));
+});
 test('combined POSIX installation opens Web only after native plugin success', {skip: process.platform === 'win32'}, t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'wombat-install-plugin-flow-'));
   t.after(() => rmSync(root, {recursive: true, force: true}));

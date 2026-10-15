@@ -56,7 +56,7 @@ pub(crate) fn context(r: Request) -> Result<Context> {
         .iter()
         .filter_map(|s| dunce::canonicalize(&s.root).ok())
         .collect();
-    let home = std::env::var_os("CODEX_HOME")
+    let home = crate::host_environment::get("CODEX_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| crate::home().join(".codex"));
     let native_home_selected = dunce::canonicalize(home)

@@ -28,6 +28,10 @@ fn cached_history_interest_does_not_suppress_a_later_auto_backfill() {
     let cached = ReadViewSelector::new(roots.clone(), None, Mode::Cached, false, false).unwrap();
     select_view(&cached, &state, &jobs, &AtomicBool::new(false)).unwrap();
     assert!(receiver.try_recv().is_err());
+    assert!(
+        !state.0.lock().unwrap()[&key].include_history,
+        "A cached read must not expand subsequent background scans"
+    );
     let automatic = ReadViewSelector::new(roots, None, Mode::Auto, false, false).unwrap();
     let (_, freshness) = select_view(&automatic, &state, &jobs, &AtomicBool::new(false)).unwrap();
     assert_eq!(freshness.status, "syncing");

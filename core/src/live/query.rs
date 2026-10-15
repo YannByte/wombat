@@ -295,7 +295,11 @@ pub(super) fn config_query(
         let selector = selection::ReadViewSelector::new(
             request.roots.clone().unwrap_or_default(),
             request.snapshot_id.clone(),
-            Mode::Auto,
+            if request.cached_usage {
+                Mode::Cached
+            } else {
+                Mode::Auto
+            },
             false,
             false,
         )?

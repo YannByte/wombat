@@ -92,7 +92,11 @@ test('managed installation verifies and atomically selects a downloaded release'
     writeFileSync(path.join(releases, 'SHA256SUMS'), `${sha256}  ${archiveName}\n`);
     const baseUrl = pathToFileURL(releases).href.replace(/\/$/, '');
 
-    const checked = await updateInstalled({ baseUrl, entryFile: entry, check: true });
+    const checked = await updateInstalled({
+      baseUrl,
+      entryFile: entry,
+      check: true,
+    });
     assert.equal(checked.updated, false);
     assert.equal(checked.updateAvailable, true);
     assert.equal(readFileSync(path.join(install, 'current.txt'), 'utf8').trim(), oldId);
@@ -121,9 +125,18 @@ test('managed installation verifies and atomically selects a downloaded release'
       }),
     );
     writeFileSync(path.join(releases, 'SHA256SUMS'), `${sha256}  ${archiveName}\n`);
+    writeFileSync(
+      path.join(install, 'service-registration.json'),
+      JSON.stringify({ version: 99, enabled: true }),
+    );
     const updated = await updateInstalled({ baseUrl, entryFile: entry });
     const nextId = `0.3.0-${source.slice(0, 12)}-${sourceSha256.slice(0, 12)}`;
     assert.equal(updated.updated, true);
+    assert.equal(updated.serviceRestart, 'unconfirmed');
+    assert.equal(
+      JSON.parse(readFileSync(path.join(install, 'service-registration.json'), 'utf8')).version,
+      99,
+    );
     assert.equal(readFileSync(path.join(install, 'current.txt'), 'utf8').trim(), nextId);
     assert.equal(readFileSync(path.join(versions, nextId, 'lib', 'wombat.js'), 'utf8'), 'new');
     const current = await updateInstalled({
@@ -167,7 +180,14 @@ test('metadata checks cancel oversized streams before buffering their complete b
       version: '0.3.0',
       source,
       sourceSha256,
-      assets: [{ target, archive: `wombat-${target}.tar.gz`, sha256: 'a'.repeat(64), bytes: 100 }],
+      assets: [
+        {
+          target,
+          archive: `wombat-${target}.tar.gz`,
+          sha256: 'a'.repeat(64),
+          bytes: 100,
+        },
+      ],
     });
     const limit = 4 * 1024 * 1024,
       baseUrl = 'https://synthetic.invalid';
@@ -196,7 +216,9 @@ test('metadata checks cancel oversized streams before buffering their complete b
               cancelled = true;
             },
           }),
-          { headers: contentLength ? { 'Content-Length': contentLength } : undefined },
+          {
+            headers: contentLength ? { 'Content-Length': contentLength } : undefined,
+          },
         );
       await assert.rejects(
         updateInstalled({ entryFile: entry, baseUrl, check: true }),
@@ -226,7 +248,11 @@ test('metadata checks cancel oversized streams before buffering their complete b
     mkdirSync(releases);
     writeFileSync(path.join(releases, 'release-set.json'), metadata.padEnd(limit + 1, ' '));
     await assert.rejects(
-      updateInstalled({ entryFile: entry, baseUrl: pathToFileURL(releases).href, check: true }),
+      updateInstalled({
+        entryFile: entry,
+        baseUrl: pathToFileURL(releases).href,
+        check: true,
+      }),
       /上限|limit/i,
     );
     assert.equal(readFileSync(path.join(install, 'current.txt'), 'utf8').trim(), id);

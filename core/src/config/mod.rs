@@ -44,6 +44,10 @@ pub(crate) struct Store {
     views: VecDeque<(String, Instant, Arc<View>)>,
 }
 impl Store {
+    pub(crate) fn evict_unshared_snapshots(&mut self) {
+        self.views
+            .retain(|(_, _, view)| view.snapshot.is_none() || Arc::strong_count(view) > 1);
+    }
     pub fn has_views(&mut self) -> bool {
         self.views
             .retain(|(_, at, _)| at.elapsed() < Duration::from_secs(600));

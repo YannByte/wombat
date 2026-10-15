@@ -348,11 +348,20 @@ pub(crate) fn retain<'a>(
     field: &str,
     ids: impl Iterator<Item = &'a str>,
 ) -> Result<()> {
+    retain_prefix(db, scope, field, None, ids)
+}
+pub(crate) fn retain_prefix<'a>(
+    db: &Connection,
+    scope: &str,
+    field: &str,
+    prefix: Option<&str>,
+    ids: impl Iterator<Item = &'a str>,
+) -> Result<()> {
     let bucket = bucket(db, scope, field)?;
     let wanted: HashSet<_> = ids.collect();
     let obsolete = db
-        .prepare_cached("SELECT CASE WHEN typeof(id)='blob' THEN lower(hex(id)) ELSE id END FROM fact_rows WHERE bucket=?1")?
-        .query_map([bucket], |r| r.get::<_, String>(0))?
+        .prepare_cached("SELECT CASE WHEN typeof(id)='blob' THEN lower(hex(id)) ELSE id END FROM fact_rows WHERE bucket=?1 AND (?2 IS NULL OR substr(id,1,length(?2))=?2)")?
+        .query_map(params![bucket,prefix], |r| r.get::<_, String>(0))?
         .filter_map(|r| match r {
             Ok(id) if wanted.contains(id.as_str()) => None,
             other => Some(other),

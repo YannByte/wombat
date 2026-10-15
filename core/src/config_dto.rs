@@ -63,6 +63,9 @@ pub struct Request {
     pub project_roots: Option<Vec<String>>,
     pub snapshot_id: Option<String>,
     pub read_view: Option<String>,
+    /// Check current configuration against committed usage without scheduling collection.
+    #[serde(default)]
+    pub cached_usage: bool,
     #[serde(default)]
     pub scope: Scope,
     pub kind: Option<Kind>,

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Request",
+  "type": "object",
+  "properties": {
+    "action": {
+      "$ref": "#/definitions/Action"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "action"
+  ],
+  "definitions": {
+    "Action": {
+      "type": "string",
+      "enum": [
+        "status",
+        "start",
+        "pause",
+        "resume",
+        "stop",
+        "enable",
+        "disable"
+      ]
+    }
+  }
+}

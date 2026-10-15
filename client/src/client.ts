@@ -1,3 +1,8 @@
+import type { Request as ServiceRequest } from './generated/service-request.js';
+import type { Response as ServiceResult } from './generated/service-response.js';
+export type { Request as ServiceRequest } from './generated/service-request.js';
+export type { Response as ServiceResult } from './generated/service-response.js';
+export type ServiceTransport = (request:ServiceRequest,options:QueryOptions)=>Promise<unknown>;
 import type { Request as ConversationRequest } from './generated/conversation-request.js';
 import type { Response as ConversationResult } from './generated/conversation-response.js';
 export type { Request as ConversationRequest } from './generated/conversation-request.js';
@@ -108,6 +113,7 @@ export type PricingTransport = (request: PricingRequest, options: QueryOptions) 
 export type LiveTransport = (request: LiveRequest, options: QueryOptions) => Promise<unknown>;
 
 export interface UsageClient {
+  service?(request:ServiceRequest,options?:QueryOptions):Promise<ServiceResult>;
   conversation?(request: ConversationRequest, options?: QueryOptions): Promise<ConversationResult>;
   monitor?(request: MonitorRequest, options?: QueryOptions): Promise<MonitorResult>;
   setup?(request: SetupRequest, options?: QueryOptions): Promise<SetupResult>;
@@ -125,6 +131,7 @@ export interface UsageClient {
 }
 
 export interface ClientTransports extends HostTransports {
+  service?:ServiceTransport;
   conversation?: ConversationTransport;
   monitor?: MonitorTransport;
   setup?: SetupTransport;
@@ -155,6 +162,15 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
   } = transports;
   const hosts = transports;
   return {
+    ...(transports.service ? {async service(request:ServiceRequest,options:QueryOptions={}):Promise<ServiceResult>{
+      const [{validate:input},{validate:output}]=await Promise.all([import('./generated/validate-service-request.js'),import('./generated/validate-service-response.js')]);
+      throwIfCancelled(options);
+      if(!input(request))throw new CoreError('INVALID_ARGUMENT','Invalid service request');
+      const result=await transports.service!(request,options);
+      throwIfCancelled(options);
+      if(!output(result)||result.outputVersion!==1||result.action!==request.action)throw new CoreError('PROTOCOL_ERROR','Invalid service response');
+      return result;
+    }}:{}),
     ...(transports.monitor
       ? {
           async monitor(

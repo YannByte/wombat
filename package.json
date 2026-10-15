@@ -48,6 +48,8 @@
     "benchmark:live": "node --import tsx scripts/benchmark-live.ts",
     "benchmark:storage": "node --import tsx scripts/benchmark-storage.ts",
     "benchmark:readiness": "node --import tsx scripts/benchmark-readiness.ts",
+    "benchmark:resident": "node --import tsx scripts/benchmark-resident.ts",
+    "benchmark:query-gate": "node --import tsx scripts/query-latency-gate.ts",
     "benchmark:conversation": "node --import tsx scripts/benchmark-conversation-access.ts",
     "docs:structure": "node scripts/check-doc-structure.ts",
     "skills:scope": "node .agents/skills/wombat-review/scripts/scope.ts",

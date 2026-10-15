@@ -1,0 +1,3 @@
+export const INPUT_BYTES = 1024 * 1024,
+  INPUT_TIMEOUT_MS = 10_000,
+  OUTPUT_BYTES = 2 * 1024 * 1024;

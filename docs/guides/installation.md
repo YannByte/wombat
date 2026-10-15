@@ -22,6 +22,8 @@ curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/instal
 
 插件安装失败时，已安装的 Wombat 会保留。检查报错步骤后，macOS/Linux 重新执行安装器并使用 `--plugin-only`，PowerShell 使用 `-PluginOnly`；保留自定义安装目录选项。此模式复用当前运行时，不重复下载，也不修改 PATH；不要附加版本或下载源选项。发现检查失败会保留已安装插件和数据。需要打开 Web 时，执行 `wombat web --open`，或给安装器附加 `--open` / `-Open`。仅安装运行时与 Web，可省略 `--plugin` 或 `-Plugin`。再次失败时，在 [Issues](https://github.com/YannByte/wombat/issues) 反馈问题。浏览器未自动打开时，使用终端输出的完整地址。
 
+提供服务控制能力的运行时会在安装后注册当前用户的自动启动，并在后台准备近期数据，不打开 Web、不信任 Hooks，也不调用模型。若不需要自动启动，macOS/Linux 加 `--no-service`，Windows 加 `-NoService`。`--plugin-only` 或 `-PluginOnly` 不改变服务。尚未提供服务控制的公开运行时保留原有行为。可用 `wombat service status --json` 检查进度；安装成功不代表数据已经就绪。暂停、恢复和移除方式见[后台索引](cli.md)。
+
 ## 更新
 
 更新 Wombat 与 Codex 插件时，重新执行上面的带插件选项的安装命令。自定义安装目录或指定版本时，保留相应选项。

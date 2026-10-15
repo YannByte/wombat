@@ -410,6 +410,9 @@ pub(super) fn sync_with_policy(
                 &scope,
                 &adapters::codex::incremental::fact_scope(source),
             )?;
+            if let Some(cache) = caches.get(&source.id) {
+                cache.persist_resume(&tx, source, &value)?;
+            }
             updated.insert(source.id.clone(), value);
             crate::live_index::save_map(
                 &tx,

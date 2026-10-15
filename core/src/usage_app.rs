@@ -124,14 +124,22 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
         return execute_snapshot(request, &details);
     }
     ensure_ready(&request, snapshot)?;
-    let key = if snapshot.is_live() {
+    validate(&request)?;
+    let mut window = snapshot
+        .is_live()
+        .then(|| crate::query_cache::PageWindow::for_request(&request))
+        .flatten();
+    let planned = window
+        .as_ref()
+        .map_or_else(|| request.clone(), |w| w.request(&request));
+    let mut key = if snapshot.is_live() {
         // Default ranges roll over at midnight in the request timezone.
         Some(format!(
             "{}:{}",
             Utc::now()
                 .with_timezone(&timezone(&request.scope)?)
                 .date_naive(),
-            serde_json::to_string(&request)?
+            serde_json::to_string(&planned)?
         ))
     } else {
         None
@@ -139,9 +147,18 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
     if let Some(key) = &key
         && let Some(result) = snapshot.query_cache.lock().unwrap().get(key)
     {
-        return Ok(result);
+        return Ok(match &window {
+            Some(window) => window.project(result),
+            None => result,
+        });
     }
     // Duplicate misses on one immutable view share the completed result. Cache
+    if snapshot.expired_detail_lease() {
+        return Err(operation_error(
+            "VIEW_EXPIRED",
+            "Live data lease expired; reacquire the view",
+        ));
+    }
     // hits above remain available while a different request is being reduced.
     let _work = snapshot
         .query_work
@@ -150,28 +167,42 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
     if let Some(key) = &key
         && let Some(result) = snapshot.query_cache.lock().unwrap().get(key)
     {
-        return Ok(result);
+        return Ok(match &window {
+            Some(window) => window.project(result),
+            None => result,
+        });
     }
     let _permit = query_work::acquire();
     let compact = request.compact == Some(true);
-    let mut result = execute_uncached(request, snapshot)?;
+    let mut result = match execute_uncached(planned, snapshot) {
+        Ok(result) => result,
+        Err(error)
+            if window.is_some()
+                && error
+                    .downcast_ref::<crate::dto::OperationError>()
+                    .is_some_and(|e| matches!(e.code, "RESOURCE_LIMIT" | "OUTPUT_LIMIT")) =>
+        {
+            window = None;
+            key = None;
+            execute_uncached(request, snapshot)?
+        }
+        Err(error) => return Err(error),
+    };
     if compact {
         compact::apply(&mut result);
     }
     if let Some(key) = key
-        && let Some(bytes) = crate::query_cache::QueryCache::entry_size(&key, &result)
+        && let Some(payload) = crate::query_cache::QueryCache::encode(&key, &result)
     {
-        snapshot
-            .query_cache
-            .lock()
-            .unwrap()
-            .insert(key, &result, bytes);
+        snapshot.query_cache.lock().unwrap().insert(key, payload);
     }
-    Ok(result)
+    Ok(match window {
+        Some(window) => window.project(result),
+        None => result,
+    })
 }
 
 fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Response> {
-    validate(&request)?;
     if request.action == Action::Statistics {
         return statistics::execute(request, snapshot);
     }
@@ -550,3 +581,6 @@ pub(super) fn finish_response(
         },
     })
 }
+
+#[cfg(test)]
+mod page_cache_tests;

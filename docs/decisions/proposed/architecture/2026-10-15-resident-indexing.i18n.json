@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/proposal-resident-local-indexing": {
+      "zh": "1d5319d5aeadc857858d75a1c43f5826a51550784e0033644e24acc3a2e3db73",
+      "en": "3577e9741fef5068b3500567164d05039cf4f5eb592a005b6b3ebbeea6494dcc"
+    },
+    "/proposal-resident-local-indexing/problem": {
+      "zh": "d1fa9f59124cd05aff71e27394bd76bf771fa5e0d1517c3b1c5008aede431359",
+      "en": "efbd34d0340f6c2219f8834385e12df5832bb6650c57d25e3e75b2fb9b19da47"
+    },
+    "/proposal-resident-local-indexing/proposal": {
+      "zh": "2d538db8d63b9e4c99303cde08517079a5859682dd95958e5907b08ad3bab54a",
+      "en": "92980259eeb0c188aa3564592eea0e4722d867bf873d612a9edd258390d8c2de"
+    },
+    "/proposal-resident-local-indexing/alternatives-considered": {
+      "zh": "fc49e6f2c466ec5c1eed91fdbf85872fd59b109f6586f1acede555367d575c8e",
+      "en": "7a2c77e6b0fd9e639bed005e4dbaaa7f5a72a81bb0674ce3ca2a95ceedd715c6"
+    },
+    "/proposal-resident-local-indexing/acceptance-criteria": {
+      "zh": "cd07c7903412417b964a315ecccbd79adfb59f603ada2e40fadbbb3832fd5824",
+      "en": "7975dff88602e50b7ef0aff8658e69e7a04f77c83216597fe8d4b39dbd4cb8ea"
+    }
+  }
+}

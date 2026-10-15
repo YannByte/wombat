@@ -158,19 +158,28 @@ pub(super) fn select_view(
                 .iter()
                 .any(|i| i.code == "historyDeferred")
         });
-    if selector.is_none() {
-        entry.include_history |= request.include_history;
-    }
     let mut ticket = entry.completed;
-    if request.wait != WaitPolicy::None
+    if entry.paused && (request.mode == Mode::Fresh || request.refresh) && selector.is_none() {
+        return Err(operation_error(
+            "INDEX_PAUSED",
+            "Background indexing is paused",
+        ));
+    }
+    if !entry.paused
+        && request.wait != WaitPolicy::None
         && (request.mode == Mode::Fresh
             || request.refresh
             || request.capture_now
             || entry.requested == 0
             || history_requested
+            || entry
+                .views
+                .back()
+                .is_some_and(|(_, v)| v.expired_detail_lease())
             || entry.syncing
             || scheduling::auto_due(entry))
     {
+        entry.include_history |= request.include_history;
         ticket = scheduling::request_work(entry, key, request.verify, request.rebuild, jobs)?;
         let preview_at = Instant::now() + Duration::from_millis(250);
         let deadline = Instant::now()
@@ -231,8 +240,21 @@ pub(super) fn select_view(
     }
     check_reader()?;
     let entry = entries.get_mut(key).unwrap();
-    let current =
-        entry.completed >= ticket && entry.error.is_none() && !entry.syncing && !entry.restoring;
+    if entry.paused && (request.mode == Mode::Fresh || request.refresh) && selector.is_none() {
+        return Err(operation_error(
+            "INDEX_PAUSED",
+            "Background indexing is paused",
+        ));
+    }
+    let current = entry.completed >= ticket
+        && entry.error.is_none()
+        && !entry.syncing
+        && !entry.restoring
+        && !entry.changed
+        && entry
+            .views
+            .back()
+            .is_some_and(|(_, v)| !v.expired_detail_lease());
     if (request.mode == Mode::Fresh || request.refresh) && !current && selector.is_none() {
         return Err(operation_error(
             if entry.error.is_some() {
@@ -289,6 +311,8 @@ pub(super) fn select_view(
         initial_scan: preview::is_initial(&snapshot),
         status: if selector.is_some() {
             "fixed"
+        } else if entry.paused {
+            "paused"
         } else if current {
             "current"
         } else if entry.error.is_some() {

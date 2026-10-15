@@ -341,7 +341,7 @@ async function setupJourney(page:Page,fixture:Fixture,language:Language,width:nu
  assert.equal(await dialog.getByRole('button',{name:label('webui.next'),exact:true}).isEnabled(),false);
  await activate(dialog.getByRole('button',{name:label('setup.firstEvents'),exact:true}));
  await waitCount(page,'dialog .setup-events tbody tr',50);await overflow(page);
- await activate(dialog.locator('.setup-steps button').filter({hasText:label('setup.step.history')}));await text(dialog,'wombat usage --watch --json');
+ await activate(dialog.locator('.setup-steps button').filter({hasText:label('setup.step.history')}));await text(dialog,'wombat service status --json');
  await activate(dialog.locator('.setup-steps button').filter({hasText:label('setup.step.use')}));await text(dialog,label('setup.skillNote'));
  const question=dialog.locator('.setup-example .setup-copy').first();const beforeCopy=requests.length;await activate(question.getByRole('button',{name:label('setup.copyQuestion'),exact:true}));await text(question,label('setup.copied'));const copied=await page.evaluate<string>('navigator.clipboard.readText()');assert.ok(copied.includes(label('setup.exampleUsage'))&&copied.includes(fixture.project));assert.equal(requests.length,beforeCopy);
  await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});

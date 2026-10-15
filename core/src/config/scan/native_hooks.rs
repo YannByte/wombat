@@ -13,7 +13,7 @@ pub(super) fn append(
     let Some(capture) = capture.filter(|c| hooks::valid(c)) else {
         return;
     };
-    let home = std::env::var_os("CODEX_HOME")
+    let home = crate::host_environment::get("CODEX_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| crate::home().join(".codex"));
     let Ok(home) = dunce::canonicalize(home) else {

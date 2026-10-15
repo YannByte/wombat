@@ -334,6 +334,11 @@
       "zh": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.md",
       "en": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.en.md",
       "record": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.md",
+      "en": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.en.md",
+      "record": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.i18n.json"
     }
   ],
   "legacyUnpaired": [],

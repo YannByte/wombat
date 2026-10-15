@@ -41,6 +41,11 @@
         "null"
       ]
     },
+    "cachedUsage": {
+      "description": "Check current configuration against committed usage without scheduling collection.",
+      "type": "boolean",
+      "default": false
+    },
     "scope": {
       "default": {
         "allTime": null,

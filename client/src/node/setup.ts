@@ -20,7 +20,7 @@ export async function checkSetup(r:Request,q:QueryOptions,options:CoreProcessOpt
       nativeVersion(query,options),
       skillMarketplace(),
       r.project?discoverWombatSkill(r.project,query,options):Promise.resolve({status:'unavailable' as const,instances:[],errorCode:'PROJECT_REQUIRED'}),
-      r.project?queryLive({config:{action:'list',kind:'hook',roots:r.roots,projectRoots:[r.project],scope:{project:r.project},limit:1}},query,options):Promise.resolve(null),
+      r.project?queryLive({config:{action:'list',kind:'hook',cachedUsage:true,roots:r.roots,projectRoots:[r.project],scope:{project:r.project},limit:1}},query,options):Promise.resolve(null),
     ]);
     if(q.signal?.aborted)throw new CoreError('CANCELLED','Cancelled');
     const [version,marketplace,skills,config]=results,errorCodes:string[]=[];

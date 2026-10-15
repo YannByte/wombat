@@ -1,3 +1,19 @@
+// Reclaim freed scan pages in the long-lived native host.
+#[global_allocator]
+static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+/// Configure the native host before it starts long-lived work.
+#[doc(hidden)]
+pub fn configure_allocator() {
+    // The pinned mimalloc 2.3.2 header defines mi_option_disallow_arena_alloc=27.
+    // The Rust binding omits that option. Direct OS segments can be unmapped
+    // after large scans instead of retaining reusable pages in a 1 GiB arena.
+    const DISALLOW_ARENA_ALLOC: libmimalloc_sys::mi_option_t = 27;
+    // SAFETY: this is a valid option in the locked native dependency; it changes
+    // future allocation policy without invalidating existing allocations.
+    unsafe { libmimalloc_sys::mi_option_set(DISALLOW_ARENA_ALLOC, 1) }
+}
+
 mod account;
 pub mod account_dto;
 pub mod adapters;
@@ -13,6 +29,7 @@ pub mod dto;
 mod file_metadata;
 mod handoff;
 pub mod handoff_dto;
+pub mod host_environment;
 pub mod live;
 mod live_index;
 #[cfg(windows)]
@@ -27,6 +44,7 @@ pub mod preferences;
 pub mod pricing;
 pub mod pricing_sync;
 mod query_cache;
+pub mod service_dto;
 pub mod session_events;
 pub(crate) mod session_relations;
 pub mod setup_dto;
@@ -132,6 +150,19 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<collection::Response>(),
+        )?),
+        "service_offline" => Ok(serde_json::to_value(live::service_offline(
+            serde_json::from_value(args.clone())?,
+        )?)?),
+        "schema_service_request" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<service_dto::Request>(),
+        )?),
+        "schema_service_response" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<service_dto::Response>(),
         )?),
         "conversation" => Ok(serde_json::to_value(conversation::dispatch(
             serde_json::from_value(args.clone()).map_err(|_| {

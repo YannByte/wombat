@@ -3,6 +3,24 @@
   "title": "Request",
   "oneOf": [
     {
+      "description": "Inspect or control local background indexing and current-user automatic startup.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "service"
+        },
+        "params": {
+          "$ref": "#/definitions/Request"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
       "description": "Discover activity, locate messages, search selected conversations or explicitly read bounded original text.",
       "type": "object",
       "properties": {
@@ -11,7 +29,7 @@
           "const": "conversation"
         },
         "params": {
-          "$ref": "#/definitions/Request"
+          "$ref": "#/definitions/Request2"
         }
       },
       "required": [
@@ -29,7 +47,7 @@
           "const": "usage"
         },
         "params": {
-          "$ref": "#/definitions/Request2"
+          "$ref": "#/definitions/Request3"
         }
       },
       "required": [
@@ -47,7 +65,7 @@
           "const": "snapshot"
         },
         "params": {
-          "$ref": "#/definitions/Request3"
+          "$ref": "#/definitions/Request4"
         }
       },
       "required": [
@@ -65,7 +83,7 @@
           "const": "config"
         },
         "params": {
-          "$ref": "#/definitions/Request4"
+          "$ref": "#/definitions/Request5"
         }
       },
       "required": [
@@ -83,7 +101,7 @@
           "const": "optimize"
         },
         "params": {
-          "$ref": "#/definitions/Request5"
+          "$ref": "#/definitions/Request6"
         }
       },
       "required": [
@@ -101,7 +119,7 @@
           "const": "timing"
         },
         "params": {
-          "$ref": "#/definitions/Request6"
+          "$ref": "#/definitions/Request7"
         }
       },
       "required": [
@@ -119,7 +137,7 @@
           "const": "setup"
         },
         "params": {
-          "$ref": "#/definitions/Request7"
+          "$ref": "#/definitions/Request8"
         }
       },
       "required": [
@@ -137,7 +155,7 @@
           "const": "account"
         },
         "params": {
-          "$ref": "#/definitions/Request8"
+          "$ref": "#/definitions/Request9"
         }
       },
       "required": [
@@ -155,7 +173,7 @@
           "const": "directories"
         },
         "params": {
-          "$ref": "#/definitions/Request9"
+          "$ref": "#/definitions/Request10"
         }
       },
       "required": [
@@ -173,7 +191,7 @@
           "const": "preferences"
         },
         "params": {
-          "$ref": "#/definitions/Request10"
+          "$ref": "#/definitions/Request11"
         }
       },
       "required": [
@@ -191,7 +209,7 @@
           "const": "prices"
         },
         "params": {
-          "$ref": "#/definitions/Request11"
+          "$ref": "#/definitions/Request12"
         }
       },
       "required": [
@@ -209,7 +227,7 @@
           "const": "collection"
         },
         "params": {
-          "$ref": "#/definitions/Request12"
+          "$ref": "#/definitions/Request13"
         }
       },
       "required": [
@@ -227,7 +245,7 @@
           "const": "handoff"
         },
         "params": {
-          "$ref": "#/definitions/Request13"
+          "$ref": "#/definitions/Request14"
         }
       },
       "required": [
@@ -245,7 +263,7 @@
           "const": "monitor"
         },
         "params": {
-          "$ref": "#/definitions/Request14"
+          "$ref": "#/definitions/Request15"
         }
       },
       "required": [
@@ -261,6 +279,30 @@
       "properties": {
         "action": {
           "$ref": "#/definitions/Action"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ]
+    },
+    "Action": {
+      "type": "string",
+      "enum": [
+        "status",
+        "start",
+        "pause",
+        "resume",
+        "stop",
+        "enable",
+        "disable"
+      ]
+    },
+    "Request2": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/Action2"
         },
         "snapshotId": {
           "type": "string"
@@ -358,7 +400,7 @@
         "snapshotId"
       ]
     },
-    "Action": {
+    "Action2": {
       "type": "string",
       "enum": [
         "activity",
@@ -551,11 +593,11 @@
         "eventOffset"
       ]
     },
-    "Request2": {
+    "Request3": {
       "type": "object",
       "properties": {
         "query": {
-          "$ref": "#/definitions/Request3"
+          "$ref": "#/definitions/Request4"
         },
         "mode": {
           "default": "auto",
@@ -593,7 +635,7 @@
           "description": "Additional queries share the selected immutable revision. No synchronization options.",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Request3"
+            "$ref": "#/definitions/Request4"
           },
           "maxItems": 8,
           "default": []
@@ -604,7 +646,7 @@
         "query"
       ]
     },
-    "Request3": {
+    "Request4": {
       "type": "object",
       "properties": {
         "comparison": {
@@ -618,7 +660,7 @@
           ]
         },
         "action": {
-          "$ref": "#/definitions/Action2"
+          "$ref": "#/definitions/Action3"
         },
         "snapshotId": {
           "type": [
@@ -823,7 +865,7 @@
         "thread"
       ]
     },
-    "Action2": {
+    "Action3": {
       "type": "string",
       "enum": [
         "refresh",
@@ -972,14 +1014,14 @@
         "cached"
       ]
     },
-    "Request4": {
+    "Request5": {
       "type": "object",
       "properties": {
         "action": {
           "default": "list",
           "allOf": [
             {
-              "$ref": "#/definitions/Action3"
+              "$ref": "#/definitions/Action4"
             }
           ]
         },
@@ -1012,6 +1054,11 @@
             "string",
             "null"
           ]
+        },
+        "cachedUsage": {
+          "description": "Check current configuration against committed usage without scheduling collection.",
+          "type": "boolean",
+          "default": false
         },
         "scope": {
           "default": {
@@ -1098,7 +1145,7 @@
       },
       "additionalProperties": false
     },
-    "Action3": {
+    "Action4": {
       "type": "string",
       "enum": [
         "list",
@@ -1191,14 +1238,14 @@
         "recent"
       ]
     },
-    "Request5": {
+    "Request6": {
       "type": "object",
       "properties": {
         "action": {
           "default": "list",
           "allOf": [
             {
-              "$ref": "#/definitions/Action4"
+              "$ref": "#/definitions/Action5"
             }
           ]
         },
@@ -1323,7 +1370,7 @@
       },
       "additionalProperties": false
     },
-    "Action4": {
+    "Action5": {
       "type": "string",
       "enum": [
         "list",
@@ -1410,7 +1457,7 @@
         "turnId"
       ]
     },
-    "Request6": {
+    "Request7": {
       "oneOf": [
         {
           "type": "object",
@@ -1629,7 +1676,7 @@
         "use_records"
       ]
     },
-    "Request7": {
+    "Request8": {
       "type": "object",
       "properties": {
         "project": {
@@ -1650,21 +1697,21 @@
       },
       "additionalProperties": false
     },
-    "Request8": {
+    "Request9": {
       "type": "object",
       "properties": {
         "action": {
           "default": "read",
           "allOf": [
             {
-              "$ref": "#/definitions/Action5"
+              "$ref": "#/definitions/Action6"
             }
           ]
         }
       },
       "additionalProperties": false
     },
-    "Action5": {
+    "Action6": {
       "type": "string",
       "enum": [
         "read",
@@ -1672,14 +1719,14 @@
         "history"
       ]
     },
-    "Request9": {
+    "Request10": {
       "type": "object",
       "properties": {
         "action": {
           "default": "list",
           "allOf": [
             {
-              "$ref": "#/definitions/Action6"
+              "$ref": "#/definitions/Action7"
             }
           ]
         },
@@ -1714,7 +1761,7 @@
       },
       "additionalProperties": false
     },
-    "Action6": {
+    "Action7": {
       "type": "string",
       "enum": [
         "list",
@@ -1731,11 +1778,11 @@
         "project"
       ]
     },
-    "Request10": {
+    "Request11": {
       "type": "object",
       "properties": {
         "action": {
-          "$ref": "#/definitions/Action7"
+          "$ref": "#/definitions/Action8"
         },
         "language": {
           "anyOf": [
@@ -1753,7 +1800,7 @@
         "action"
       ]
     },
-    "Action7": {
+    "Action8": {
       "type": "string",
       "enum": [
         "get",
@@ -1767,11 +1814,11 @@
         "en"
       ]
     },
-    "Request11": {
+    "Request12": {
       "type": "object",
       "properties": {
         "action": {
-          "$ref": "#/definitions/Action8"
+          "$ref": "#/definitions/Action9"
         }
       },
       "additionalProperties": false,
@@ -1779,7 +1826,7 @@
         "action"
       ]
     },
-    "Action8": {
+    "Action9": {
       "type": "string",
       "enum": [
         "status",
@@ -1787,14 +1834,14 @@
         "auto_update"
       ]
     },
-    "Request12": {
+    "Request13": {
       "type": "object",
       "properties": {
         "action": {
           "default": "status",
           "allOf": [
             {
-              "$ref": "#/definitions/Action9"
+              "$ref": "#/definitions/Action10"
             }
           ]
         },
@@ -1848,7 +1895,7 @@
       },
       "additionalProperties": false
     },
-    "Action9": {
+    "Action10": {
       "type": "string",
       "enum": [
         "status",
@@ -1865,14 +1912,14 @@
         "hooks"
       ]
     },
-    "Request13": {
+    "Request14": {
       "type": "object",
       "properties": {
         "action": {
           "default": "preview",
           "allOf": [
             {
-              "$ref": "#/definitions/Action10"
+              "$ref": "#/definitions/Action11"
             }
           ]
         },
@@ -1967,7 +2014,7 @@
       },
       "additionalProperties": false
     },
-    "Action10": {
+    "Action11": {
       "type": "string",
       "enum": [
         "preview",
@@ -1990,7 +2037,7 @@
         "path"
       ]
     },
-    "Request14": {
+    "Request15": {
       "oneOf": [
         {
           "type": "object",

@@ -119,7 +119,21 @@ web --context FILE --json 接收受限生成契约：page 为 usage/threads/inst
 - `--snapshot ID`固定当前快照，后续分页继续传同一snapshotId，不能重新解析latest。未知格式明确拒绝。
 - `--root` 可用于实时查询；每次省略时仍使用默认 Codex 来源，不会因为另一窗口指定根而改变。固定用量快照不能同时指定来源根；耗时查询的来源根用于将请求范围绑定到固定版本。
 
-同一数据目录共用按需 Rust 服务；文件通知加约2秒巡检，CLI watch约每秒查询。没有有效配置读取版本时，最后一个调用结束约15秒后退出；配置读取版本最长保留10分钟。实时接口当前在macOS验收；Windows/Linux 未作本机安装验收。计量以完整日志记录为准，模型还未写入的Token无法即时显示。
+同一数据目录共用 Rust 服务。安装后的后台服务无需 CLI 或浏览器持续连接即可索引，`usage --watch` 只观察结果。计量以完整日志记录为准，模型尚未写入的 Token 无法即时显示。服务生命周期及资源限制归[内核参考](../reference/core.md)所有。
+
+## 后台索引
+
+```sh
+wombat service status --json
+wombat service pause --json
+wombat service resume --json
+wombat service stop --json
+wombat service start --json
+wombat service disable --json
+wombat service enable --json
+```
+
+`status` 分别报告运行实例、准备进度、已提交数据是否就绪及自动启动配置。`pause` 在当前事务边界生效，仍可查询已有数据；`resume` 继续索引。`stop` 有界等待当前实例退出，后续查询或登录仍可能启动它。`disable` 移除当前用户的自动启动配置并停止服务，`enable` 注册并启动服务。自动启动需要受管安装及可用的原生用户会话管理器。显式限定来源根的 Web 宿主不能修改全局服务设置。Web 接入面板展示状态及允许的暂停或恢复入口。
 
 ## 整轮耗时
 
@@ -177,7 +191,7 @@ wombat timing capabilities
 
 ## 本机 Web
 
-执行 `wombat web` 并打开输出链接。`--port 0` 默认自动选端口；可重复 `--root <目录>` 限定来源，`--lang zh/en` 选择初始语言，`--json` 输出一行启动信息。Ctrl+C 关闭服务，关闭标签不退出 CLI。
+执行 `wombat web` 并打开输出链接。`--port 0` 默认自动选端口；可重复 `--root <目录>` 限定来源，`--lang zh/en` 选择初始语言，`--json` 输出一行启动信息。Ctrl+C 停止此 Web 宿主，关闭标签不退出 CLI。
 
 仅本机可访问，重启后须打开新链接。页面提供用量、任务、轮次、来源与价表；日期、模型、强度、目录筛选同步写入地址。浏览器刷新会重新读取本机版本，过期版本可点更新数据恢复。既有业务接口已通过 HTTP 打通，原始日志仍只读；不支持远程部署。详情见[架构](../development/architecture.md)。
 

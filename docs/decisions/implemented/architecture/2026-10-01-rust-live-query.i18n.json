@@ -2,8 +2,8 @@
   "version": 2,
   "sections": {
     "/decision-note-rust-live-queries-and-failure-isolation": {
-      "zh": "5dba129667612059643408da86619382d02735ef0ec970b558d1607474e05706",
-      "en": "671eb1777e06a2c72d56de14e770aaaad2c24a2fd25414d1e2ca8c7cc96ebc6c"
+      "zh": "d9cb904bffc0264a9b811d45fb17d09bf29565637adb5e5bfa329184edc6f0f2",
+      "en": "fa62a2ad221288ef01d2b910d0007b1bf1258fb7d41b41d421b533295e9d95f0"
     },
     "/decision-note-rust-live-queries-and-failure-isolation/problem": {
       "zh": "f2c6a53a2fb645d800f9660f447fdbbe3eea9ccb7b2800694212bc47a7b2f737",

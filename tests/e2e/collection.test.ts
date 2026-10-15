@@ -27,6 +27,8 @@ test('collection CLI, Rust, Web and setup retain privacy, scope and the log ledg
  const client=createNodeClient({binaryPath:binary,codexBinaryPath:native.binary,automaticPrices:false});let host:Awaited<ReturnType<typeof startWebHost>>|undefined;
  const run=(args:string[],input='')=>{const result=spawnSync(process.execPath,[entry,...args],{env:process.env,input,encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});assert.ifError(result.error);assert.ok(!/PRIVATE_INPUT|PRIVATE_OUTPUT|PRIVATE_PROMPT/.test(result.stdout+result.stderr));return result;};
  try {
+  await client.setup!({project});
+  await assert.rejects(client.live!({query:{action:'usage',roots:[source]},mode:'cached'}),{code:'NO_SNAPSHOT'});
   const before=(await client.live!({query:{action:'usage',roots:[source],scope:{allTime:true},limit:1},mode:'fresh'})).result;assert.equal(before.summary.tokens.total,110);
   assert.equal((await client.collection!({})).state,'logs_only');
   const mode=run(['collection','mode','hooks','--json']);assert.equal(mode.status,0);assert.equal(JSON.parse(mode.stdout).state,'waiting');

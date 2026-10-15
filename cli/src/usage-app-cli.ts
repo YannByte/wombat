@@ -1,10 +1,12 @@
+import { firstCommandIndex } from './command-routing.js';
+import { resultExitCode } from './exit-codes.js';
 import { configureLanguage } from './locale.js';
 import { t, progressText } from '@wombat/client/locale';
 import { setTimeout as delay } from 'node:timers/promises';
 import packageMetadata from '../package.json' with { type: 'json' };
 import { CoreError, type UsageRequest, type UsageResult } from '@wombat/client';
 import { createNodeClient } from '@wombat/client/node';
-export function usageHelp(): string { return (t("statistics.help") + "\n" + t("monitor.help") + "\n" + t("cli.usage-app-cli.help") + "\n" + t("comparison.help") + "\n" + t("inspection.help") + "\n").replace('  wombat optimize', `${t('cli.update.summary')}\n${t('skill.summary')}\n${t('setup.summaryHelp')}\n${t('collection.summaryHelp')}\n${t('cli.doctor.summary')}\n${t('cli.timing.summary')}\n  wombat optimize`); }
+export function usageHelp(): string { return (t("service.help") + "\n" + t("statistics.help") + "\n" + t("monitor.help") + "\n" + t("cli.usage-app-cli.help") + "\n" + t("comparison.help") + "\n" + t("inspection.help") + "\n").replace('  wombat optimize', `${t('cli.update.summary')}\n${t('skill.summary')}\n${t('setup.summaryHelp')}\n${t('collection.summaryHelp')}\n${t('cli.doctor.summary')}\n${t('cli.timing.summary')}\n  wombat optimize`); }
 export interface Invocation {
   request: UsageRequest;
   json: boolean;
@@ -209,13 +211,10 @@ export function parseUsageArgs(argv: string[]): Invocation {
   if (action === 'refresh' && liveFlags.has('--cached')) invalid(t("cli.usage-app-cli.refresh_cannot_use_cached"));
   return { request, json, help, version, ...(waitText !== undefined ? {waitMs: Number(waitText)} : {}), ...(rebuild ? {rebuild:true} : {}), ...(liveFlags.has('--include-history') ? {includeHistory:true} : {}), mode: waitText !== undefined || rebuild ? 'fresh' : liveFlags.has('--cached') ? 'cached' : liveFlags.has('--fresh') ? 'fresh' : ['compare','investigate','trajectory','resources','review','context'].includes(action) ? 'cached' : 'auto', watch: liveFlags.has('--watch'), verify: liveFlags.has('--verify') };
 }
-export function resultExitCode(result: UsageResult): number { return result.quality.status === 'partial' || result.inspection?.partial || (result.freshness && !['current', 'fixed'].includes(result.freshness.status)) ? 2 : 0; }
+export { resultExitCode } from './exit-codes.js';
 export async function runUsageCli(argv = process.argv.slice(2)): Promise<number> {
   // Timing owns its default JSON and safe error envelope, including language errors.
-  let commandIndex = 0;
-  while (argv[commandIndex] === '--lang' || argv[commandIndex]?.startsWith('--lang=')) {
-    commandIndex += argv[commandIndex] === '--lang' ? 2 : 1;
-  }
+  const commandIndex = firstCommandIndex(argv);
   if (argv[commandIndex] === 'timing') {
     return (await import('./timing-cli.js')).runTimingCli([...argv.slice(0, commandIndex), ...argv.slice(commandIndex + 1)]);
   }
@@ -225,6 +224,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
   const json = argv.includes('--json');
   try {
     argv = configureLanguage(argv);
+    if (argv[0] === 'service') return await (await import('./service-cli.js')).runServiceCli(argv.slice(1));
     if (argv[0] === 'monitor') return await (await import('./monitor-cli.js')).runMonitorCli(argv.slice(1));
     if (argv[0] === 'setup') return await (await import('./setup-cli.js')).runSetupCli(argv.slice(1));
     if (argv[0] === 'collection') return await (await import('./collection-cli.js')).runCollectionCli(argv.slice(1));
@@ -243,7 +243,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
       return 0;
     }
     if (invocation.help) {
-      process.stdout.write(invocation.json ? JSON.stringify({ outputVersion: 5, name: 'Wombat', commands: ['refresh', 'usage', 'threads', 'turns', 'steps', 'prices', 'web', 'optimize', 'directories', 'account', 'update', 'doctor', 'timing', 'compare', 'investigate', 'trajectory', 'resources', 'review', 'context', 'skill', 'collection', 'hook', 'setup', 'api', 'call', 'statistics', 'monitor'], help: usageHelp() }) + '\n' : usageHelp());
+      process.stdout.write(invocation.json ? JSON.stringify({ outputVersion: 5, name: 'Wombat', commands: ['service', 'refresh', 'usage', 'threads', 'turns', 'steps', 'prices', 'web', 'optimize', 'directories', 'account', 'update', 'doctor', 'timing', 'compare', 'investigate', 'trajectory', 'resources', 'review', 'context', 'skill', 'collection', 'hook', 'setup', 'api', 'call', 'statistics', 'monitor'], help: usageHelp() }) + '\n' : usageHelp());
       return 0;
     }
     const client = createNodeClient();

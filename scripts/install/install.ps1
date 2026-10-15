@@ -3,6 +3,7 @@ param(
   [string]$Prefix = "$HOME\.local",
   [string]$BaseUrl = "",
   [switch]$NoModifyPath,
+  [switch]$NoService,
   [switch]$Plugin,
   [switch]$PluginOnly,
   [switch]$Open
@@ -13,6 +14,7 @@ $installRoot = Join-Path $Prefix "lib\wombat"
 $binDir = Join-Path $Prefix "bin"
 $launcher = Join-Path $binDir "wombat.cmd"
 if ($PluginOnly) {
+  $NoService = $true
   if ($Version -ne "latest" -or $BaseUrl) { throw "-PluginOnly uses the current installed version; omit -Version and -BaseUrl" }
   $pointer = Join-Path $installRoot "current.txt"
   if (-not (Test-Path (Join-Path $installRoot ".managed-by-wombat") -PathType Leaf) -or -not (Test-Path $pointer -PathType Leaf) -or (Get-Item $installRoot).LinkType -or (Get-Item $pointer).LinkType -or (Get-Item $pointer).Length -gt 128) { throw "A managed Wombat installation is required for -PluginOnly" }
@@ -83,6 +85,8 @@ try {
   $launcherText = @'
 @echo off
 rem Wombat managed GitHub installation
+set "WOMBAT_INSTALL_ROOT=%~dp0..\lib\wombat"
+set "WOMBAT_ENDPOINT_FILE=%~dp0..\lib\wombat\endpoint.json"
 set /p WOMBAT_RELEASE=<"%~dp0..\lib\wombat\current.txt"
 "%~dp0..\lib\wombat\versions\%WOMBAT_RELEASE%\runtime\node.exe" "%~dp0..\lib\wombat\versions\%WOMBAT_RELEASE%\lib\wombat.js" %*
 '@
@@ -111,6 +115,14 @@ set /p WOMBAT_RELEASE=<"%~dp0..\lib\wombat\current.txt"
 finally {
   if (Test-Path $temp) { Remove-Item -Recurse -Force $temp }
 }
+}
+if (-not $NoService) {
+  Write-Host "Starting background indexing for recent data..."
+  $capabilities = & $launcher api --json | ConvertFrom-Json
+  if ($capabilities.methods -contains "service") {
+    & $launcher service enable --json
+    if ($LASTEXITCODE -ne 0) { throw "Wombat is installed; background startup could not be confirmed. Retry wombat service enable --json." }
+  } else { Write-Host "This runtime does not provide background service controls. Installed files are retained." }
 }
 if ($Plugin) {
   $pluginBootstrap = @'
@@ -219,6 +231,7 @@ command=${JSON.stringify(e.command)}
   $pluginBootstrap | & (Join-Path $destination "runtime\node.exe") --input-type=commonjs - (Join-Path $destination "lib\skill")
   if ($LASTEXITCODE -ne 0) { throw "Codex plugin installation failed. Wombat remains installed; check Codex and rerun with -Plugin." }
 }
+
 if ($Open) {
   Write-Host "Starting Wombat..."
   & $launcher web --open

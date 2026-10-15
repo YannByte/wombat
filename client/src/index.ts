@@ -1,3 +1,4 @@
+export type {ServiceRequest,ServiceResult,ServiceTransport} from './client.js';
 export type {ConversationRequest, ConversationResult, ConversationTransport} from './client.js';
 export type {MonitorRequest,MonitorResult,MonitorTransport} from './client.js';
 export type { SetupRequest,SetupResult,SetupTransport } from './client.js';

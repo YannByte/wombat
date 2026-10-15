@@ -2,7 +2,7 @@
 
 Use `wombat setup --project PROJECT --json` for read-only checks of the runtime, actual Skill discovery and scoped Hook registration. Use `wombat collection status --project PROJECT --json` to examine actual receipt. These checks do not install, enable, trust or invoke a model. Use the startup reference for executable discovery. Keep discovery names exactly as returned: standalone `$wombat`, base plugin `$wombat:wombat`, or collection plugin `$wombat-collection:wombat`. Multiple enabled instances require the user's choice.
 
-Prepare the smallest live usage query for the original question. Existing Rust log adapters handle history and later appends. For continuous read-only synchronization, the user can keep `wombat usage --watch --json` running. A one-time query does not establish a permanent background watcher.
+Prepare the smallest live usage query for the original question. Existing Rust log adapters handle history and later appends. When the discovered API includes `service`, use its read-only status action to distinguish a running service, background preparation, paused indexing and committed-data readiness. Managed installation can keep indexing without an open conversation or browser; `usage --watch` only observes results. A one-time query does not prove automatic startup is configured. Change service startup or pause state only when the user asks.
 
 If the user requests live collection, select `wombat collection mode hooks --json`. Then install the local collection plugin from the runtime's `lib/skill` marketplace. The base plugin contains no Hooks. Select one Skill installation mode rather than adding competing instances.
 

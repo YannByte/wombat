@@ -105,10 +105,10 @@ try {
   const installAt = performance.now();
   const firstInstall = process.platform === 'win32'
     ? spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('scripts/install/install.ps1'),
-      '-Version', set.version, '-Prefix', prefix, '-BaseUrl', pathToFileURL(releaseDirectory).href, '-NoModifyPath'],
+      '-Version', set.version, '-Prefix', prefix, '-BaseUrl', pathToFileURL(releaseDirectory).href, '-NoModifyPath', '-NoService'],
       {encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true})
     : spawnSync('sh', [path.resolve('scripts/install/install.sh'), '--version', set.version, '--prefix', prefix,
-      '--base-url', pathToFileURL(releaseDirectory).href, '--no-modify-path'],
+      '--base-url', pathToFileURL(releaseDirectory).href, '--no-modify-path', '--no-service'],
       {encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024});
   assert.ifError(firstInstall.error); assert.equal(firstInstall.status, 0, firstInstall.stderr + firstInstall.stdout);
   const firstInstallMs = Math.round(performance.now() - installAt);

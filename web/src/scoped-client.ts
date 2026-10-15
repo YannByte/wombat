@@ -30,6 +30,25 @@ export function createScopedClient(
     revalidateFixed,
   );
   return createUsageClient({
+    service: async (r, q) => {
+      if (!options.client.service)
+        throw new CoreError('CORE_UNAVAILABLE', 'Service controls unavailable');
+      if (r.action !== 'status' && options.roots?.length)
+        throw new CoreError('EACCES', 'Global service controls require an unrestricted local host');
+      const result = await options.client.service(r, q);
+      return options.roots?.length
+        ? {
+            ...result,
+            controlsAvailable: false,
+            runtime: null,
+            revision: null,
+            checkedAt: null,
+            ready: null,
+            preparing: null,
+            errorCode: null,
+          }
+        : result;
+    },
     timing,
     conversation: async (r, q) => {
       if (!options.client.conversation)

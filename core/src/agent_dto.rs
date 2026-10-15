@@ -11,6 +11,8 @@ use std::collections::BTreeMap;
     deny_unknown_fields
 )]
 pub enum Request {
+    /// Inspect or control local background indexing and current-user automatic startup.
+    Service(crate::service_dto::Request),
     /// Discover activity, locate messages, search selected conversations or explicitly read bounded original text.
     Conversation(crate::conversation_dto::Request),
     /// Query current usage and synchronize sources as requested. Params wrap query, mode and verify.
