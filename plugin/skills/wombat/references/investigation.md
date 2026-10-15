@@ -2,6 +2,8 @@
 
 Select the analysis that answers the question. Use a suitable snapshot. If no snapshot exists or current data is needed, use the original scoped live usage or task query. Read the relevant input Schema once. The following human CLI entries show the corresponding query actions:
 
+For an open-ended improvement question, use the [bounded query flow](query-flow.md): batch totals and rankings, select relevant turns, then read specific evidence. Give concrete changes only after checking the selected work. Do not start by running every whole-period analysis.
+
 | Question | Query and follow-up |
 |---|---|
 | What needs a check? | `investigate --snapshot ID --limit 3 --json`. Select useful candidates and their evidence. |

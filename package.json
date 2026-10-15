@@ -59,6 +59,7 @@
     "verify:skill-native": "node --import tsx scripts/verify-skill-native.ts",
     "verify:onboarding": "node --import tsx scripts/verify-onboarding.ts",
     "verify:agent-query": "node --import tsx scripts/verify-agent-query.ts",
+    "verify:query-flow": "node --import tsx --test tests/e2e/query-flow.test.ts",
     "skill:build": "node scripts/build-skill.ts",
     "verify:skill-conversation": "node --import tsx scripts/verify-skill-conversation.ts",
     "verify:skill-native-events": "node --import tsx scripts/verify-skill-native-events.ts",
