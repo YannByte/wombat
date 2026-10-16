@@ -290,8 +290,11 @@ function optionalReleaseView(repository: string, tag: string): ReleaseView | und
 }
 
 export function installSourceArgs(version: string, baseUrl: string, publicDownload: boolean, windows: boolean): string[] {
-  if (!publicDownload) return windows ? ['-Version', version, '-BaseUrl', baseUrl] : ['--version', version, '--base-url', baseUrl];
-  return version.includes('-') ? (windows ? ['-Version', version] : ['--version', version]) : [];
+  // Isolated archive acceptance must not register a user-session service that
+  // outlives its temporary prefix or competes with the active installation.
+  const isolated = windows ? ['-NoService'] : ['--no-service'];
+  if (!publicDownload) return [...(windows ? ['-Version', version, '-BaseUrl', baseUrl] : ['--version', version, '--base-url', baseUrl]), ...isolated];
+  return [...(version.includes('-') ? (windows ? ['-Version', version] : ['--version', version]) : []), ...isolated];
 }
 
 export async function readPublicInstaller(repository: string, installer: 'install.sh' | 'install.ps1', expected: string, fetcher = fetch): Promise<string> {
