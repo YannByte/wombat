@@ -315,10 +315,14 @@ async function comparisons(page:Page,fixture:Fixture,language:Language,width:num
   await activate(page.getByRole('button',{name:label('task.backToList'),exact:true}));
   await page.waitForFunction(()=>!new URL(location.href).searchParams.has('thread'));
   await page.locator('.thread-list').waitFor();await settled(page);
+  // Returning restores keyboard focus after React commits the route. Visibility
+  // alone can race that restoration and send the next Enter to the task row.
+  await page.waitForFunction(()=>document.activeElement?.classList.contains('thread-row'));
  }
  const changes=page.locator('.thread-list details').filter({hasText:label('comparison.refresh')}).first();
  if(await changes.getAttribute('open')==null)await activate(changes.locator('summary'));
  await text(changes,label('comparison.refreshNote'));await text(changes,'+110 Token');
+ if(width<=760)assert.equal(new URL(page.url()).searchParams.has('thread'),false,'Opening refresh changes must keep the narrow task list visible');
 }
 
 async function setupJourney(page:Page,fixture:Fixture,language:Language,width:number,source:string) {
