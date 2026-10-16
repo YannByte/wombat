@@ -1,21 +1,23 @@
 {
-  "summary": "This release adds bounded access to recorded Codex activity and original conversation evidence for daily work reports and follow-up questions.",
+  "summary": "This release keeps local indexing ready in the background and makes focused usage reviews and original-evidence reads faster.",
   "highlights": [
-    "Find recorded activity by date, project, task or turn, including observations without Token usage records. Keep recorded activity separate from verified completed work.",
-    "Locate user and assistant messages, or inspect messages around a recorded tool operation. Read selected original text in bounded batches with context and continuation; conversation bodies stay out of the index.",
-    "Search literal text within selected tasks or projects and continue unfinished scans. Compare fixed views to identify new files, appended observations and changed source generations.",
-    "Use the same generated conversation contract through the Agent CLI and authorized Web API. The Codex Skill combines activity and selected text with usage facts to support daily work reports."
+    "Managed installation starts a resident local indexer. Recent activity is prepared in the background, then file notifications and periodic discovery keep committed views current. Pause, resume and inspect the service through the CLI or Web.",
+    "Prepare the recent 30 days by default and load older history when requested. Persist parser recovery state and bound reusable caches to reduce repeated work after restart.",
+    "Reuse committed usage views for compact daily, model, project and task summaries. Combine related queries against one fixed view, then inspect only the selected tasks or turns.",
+    "Locate or search conversation evidence, then read selected text in bounded batches. The Codex Skill now carries filters and continuation details through the workflow and bases improvement suggestions on specific recorded evidence."
   ],
   "knownLimitations": [
     "Codex is the only production data source in this release; support for other agents is planned.",
-    "Original-text access supports selected message mappings and text parts. Unknown mappings, non-text content and delta-stream assembly remain explicit gaps; there is no new transcript panel in the Web dashboard.",
+    "Recent preparation covers the default 30-day window. Historical requests can require additional preparation. Missing, deferred, partial and unpriced results remain explicit.",
+    "Background indexing and cache limits do not impose a hard process-memory ceiling. Initial preparation, large source catch-up and detail requests can still use substantial memory and temporary disk space.",
+    "Measured warm complete CLI requests met a 100 ms P95 target on the local acceptance corpus. Cold requests and individual outliers can exceed 100 ms; this is not a per-request latency guarantee.",
+    "The 24-hour resident workload qualification and native user-session manager acceptance on Linux and Windows remain separate acceptance work. macOS crash recovery and pause/resume were tested locally; generated service definitions alone do not prove login-startup behavior.",
+    "Original-text access supports selected message mappings and text parts. Unknown mappings, non-text content and delta-stream assembly remain explicit gaps; there is no transcript panel in the Web dashboard.",
     "Conversation reads verify selected source text blocks and reject changed, replaced, missing or unavailable sources. A successful snippet does not prove that the complete source file is unchanged. Changes require a valid fixed baseline and do not establish additional work or savings.",
     "API costs are estimates. Unpriced or partial data stays explicit and is separate from subscription allowance.",
-    "This release changes derived event, message-observation and source-watermark formats. Older indexes require a rebuild and are preserved without migration or automatic deletion. Follow the documented format recovery and preserve user decisions. A different WOMBAT_DATA_HOME creates an isolated store; it does not repair the old store or transfer its decisions.",
+    "Unsupported derived index and parser-cache formats require a rebuild. Existing data is not migrated or automatically deleted. Follow the documented format recovery and preserve user decisions; a different WOMBAT_DATA_HOME does not transfer them.",
     "Timing describes recorded activity and can be partial or provisional. It does not establish why work was slow, code quality, token savings, or model performance.",
     "A sharing summary removes direct identifiers but does not guarantee anonymity. Preview it before sharing.",
-    "First rebuilding and ordinary source catch-up can still use substantial memory and temporary disk space. The aggregate cache limit is not a process-memory ceiling, and full replay or large detail requests remain expensive. Persisting aggregates also adds write work.",
-    "Complete requests on the measured real corpus still exceeded 100 ms. Repeated compact requests can be faster, but the strict latency target remains unfinished.",
     "Native Codex plugin discovery and Hook registration require a compatible local Codex. Windows Hook collection remains unverified."
   ]
 }
