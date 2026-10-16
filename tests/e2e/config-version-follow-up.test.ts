@@ -18,7 +18,18 @@ test('follow-up confirms exact read and loaded versions while preserving review 
     const checkedBody = 'SYNTHETIC_PRIVATE_CHECKED_RULE_VERSION';
     await writeFile(file, checkedBody);
     await browser.optimize!({ action: 'recheck', project: f.project, suggestionId: suggestion.id });
-    const baseline = await browser.optimize!({ group: 'history', project: f.project, suggestionId: suggestion.id });
+    const history = async () => {
+      // Automatic reads can return a syncing preview. Final follow-up assertions
+      // need a completed usage revision and the configuration view bound to it.
+      const usage = await browser.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'fresh' });
+      assert.equal(usage.freshness.status, 'current');
+      assert.equal(usage.freshness.initialScan, false);
+      const config = await browser.config!({ action: 'list', snapshotId: usage.result.snapshotRef.snapshotId });
+      assert.ok(config.readView);
+      assert.equal(config.usageRevision, usage.result.snapshotRef.snapshotId);
+      return browser.optimize!({ group: 'history', project: f.project, suggestionId: suggestion.id, readView: config.readView });
+    };
+    const baseline = await history();
     const observation = baseline.followUps[0]; assert.equal(observation.status, 'no_observed_records');
     const before = new Date(Date.parse(observation.after) - 1).toISOString();
     await delay(10); const readAt = new Date().toISOString();
@@ -26,7 +37,6 @@ test('follow-up confirms exact read and loaded versions while preserving review 
     await f.append('task', [measurement('task', 'before', 30, before), measurement('task', 'after', 80, readAt), ...read, ...read]);
     // A different project in the same source cannot enter this follow-up comparison.
     await f.write('other', [row('session_meta', { id: 'other', cwd: f.dir }, initial), row('turn_context', { turn_id: 'turn', model: 'gpt-5.4' }, initial), measurement('other', 'foreign-project', 999, readAt)]);
-    const history = () => browser.optimize!({ group: 'history', project: f.project, suggestionId: suggestion.id });
     const readResult = await history();
     assert.equal(readResult.followUps[0].status, 'read_content_matched');
     assert.equal(readResult.followUps[0].matchingReadRecords, 1, 'Replayed native reads count once');
@@ -50,7 +60,7 @@ test('follow-up confirms exact read and loaded versions while preserving review 
     await f.stop(); await f.start();
     const restored = await history(); assert.equal(restored.followUps[0].status, 'loaded_content_matched');
     assert.equal(restored.followUps[0].recordId, observation.recordId);
-    const cli = JSON.parse(f.cli(['optimize', 'history', '--root', f.root, '--project-root', f.project, '--project', f.project, '--suggestion', suggestion.id, '--json'], '', 2));
+    const cli = JSON.parse(f.cli(['optimize', 'history', '--root', f.root, '--project-root', f.project, '--project', f.project, '--suggestion', suggestion.id, '--read-view', restored.readView!, '--json'], '', 2));
     assert.equal(cli.followUps[0].status, 'loaded_content_matched'); assert.equal(cli.followUps[0].matchingReadRecords, 1); assert.equal(cli.followUps[0].matchingLoadRecords, 1);
     assert.ok(!JSON.stringify([loaded, cli]).includes(checkedBody));
     // Synthetic source retains its literal text; derived stores must retain only safe observations.
