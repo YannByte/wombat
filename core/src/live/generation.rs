@@ -60,7 +60,9 @@ pub(super) fn rebuild(
     // The read view pins this transaction. SQLite's FULL checkpoint syncs the
     // committed WAL; publication never relies on renaming an open database.
     db.execute_batch("PRAGMA wal_checkpoint(FULL)")?;
-    fs::File::open(&path)?.sync_all()?;
+    // Windows requires write access to flush an existing file. Opening without
+    // create/truncate keeps this completed generation intact before publication.
+    fs::OpenOptions::new().write(true).open(&path)?.sync_all()?;
     let name = stage
         .path()
         .file_name()
