@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import {spawnSync} from 'node:child_process';
 import {installBundledPlugin} from './install-plugin-bootstrap.ts';
 import {embedBootstrap, generateInstallers, installerDependencyNotice} from './generate-installers.ts';
 
@@ -17,7 +18,15 @@ function fixture(t: {after: (fn: () => void) => void}, scenario = 'fresh') {
     mkdirSync(path.join(marketplace,name),{recursive:true});
     writeFileSync(path.join(marketplace,name,'wombat-runtime.json'),JSON.stringify({format:1,version:'1.2.3',skillContentHash:contentHash}));
   }
-  writeFileSync(path.join(marketplace,'../wombat.js'),`const scenario=process.env.SCENARIO,name=scenario==='collection'||scenario.startsWith('upgrade')?'wombat-collection':'wombat',p=process.env.INSTALLED+'/skills/wombat/SKILL.md';console.log(JSON.stringify({outputVersion:1,discovery:{status:scenario==='verify-missing'?'missing':'available',instances:[{name:name+':wombat',path:p,enabled:true}]},runtimeChecks:[{path:p,status:scenario==='verify-incompatible'?'incompatible':'compatible',pluginVersion:'1.2.3',skillContentHash:scenario==='verify-hash'?'b'.repeat(64):'a'.repeat(64)}],errorCodes:['HOOK_UNAVAILABLE']}));process.exit(2);`);
+  writeFileSync(path.join(marketplace,'../wombat.js'),`
+import {writeFileSync} from 'node:fs';
+writeFileSync(process.env.TRACE+'.verify',JSON.stringify({args:process.argv.slice(2),binary:process.env.WOMBAT_CODEX_BIN}));
+const scenario=process.env.SCENARIO,name=scenario==='collection'||scenario.startsWith('upgrade')?'wombat-collection':'wombat',p=process.env.INSTALLED+'/skills/wombat/SKILL.md';
+const status={'verify-missing':'missing','verify-disabled':'disabled','verify-ambiguous':'ambiguous','verify-denied':'unavailable','verify-disconnected':'unavailable','verify-parse':'unavailable'}[scenario]||'available';
+const errorCode={'verify-denied':'LOCAL_ACCESS_DENIED','verify-disconnected':'CODEX_DISCONNECTED','verify-parse':'SKILL_PARSE_ERROR'}[scenario]||null;
+const check={path:p,status:scenario==='verify-incompatible'?'incompatible':'compatible',pluginVersion:scenario==='verify-version'?'0.1.0':'1.2.3',skillContentHash:scenario==='verify-hash'?'b'.repeat(64):'a'.repeat(64)};
+if(scenario==='verify-invalid'){console.log('{PRIVATE_NATIVE_OUTPUT');process.exit(2);}
+console.log(JSON.stringify({outputVersion:1,discovery:{status,errorCode,instances:[{name:scenario==='verify-selection'?'wombat':name+':wombat',path:p,enabled:true}]},runtimeChecks:scenario==='verify-timeout'?[]:[check],hooks:{private:'PRIVATE_HOOK_COMMAND'},errorCodes:[scenario==='verify-timeout'||scenario==='slow-hooks'?'SETUP_TIMEOUT':'HOOK_UNAVAILABLE']}));process.exit(2);`);
   writeFileSync(binary, `import{appendFileSync}from'node:fs';const args=process.argv.slice(2),scenario=process.env.SCENARIO;appendFileSync(process.env.TRACE,JSON.stringify(args)+'\\n');
 if(scenario==='timeout')setInterval(()=>{},1000);
 else if(scenario==='failure')process.exit(9);
@@ -31,6 +40,23 @@ else console.log('ok');`);
   return {root, marketplace, binary, trace, env: {...process.env, SCENARIO: scenario, TRACE: trace, INSTALLED: path.join(root, 'installed'), OLD_SOURCE: path.join(root, 'old/lib/skill')}};
 }
 function calls(file: string): string[][] {return readFileSync(file, 'utf8').trim().split('\n').map(line => JSON.parse(line));}
+test('plugin entry runs directly on the required Node runtime without a TypeScript loader', () => {
+  const result = spawnSync(process.execPath, [path.resolve('scripts/install-plugin-bootstrap.ts')], {encoding: 'utf8', timeout: 5000});
+  assert.ifError(result.error);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /A bundled plugin marketplace path is required/);
+});
+async function failure(t: {after: (fn: () => void) => void}, run: Promise<unknown>): Promise<{message: string; report: Record<string, unknown>; directory: string}> {
+  let message = '';
+  await assert.rejects(run, error => {message = String(error); return true;});
+  const file = message.match(/Diagnostic summary: (.+)$/)?.[1];
+  assert.ok(file, message);
+  const directory = path.dirname(file);
+  t.after(() => rmSync(directory, {recursive: true, force: true}));
+  assert.deepEqual(readdirSync(directory), ['diagnostic.json'], 'raw command logs must not be retained');
+  if (process.platform !== 'win32') assert.equal(statSync(file).mode & 0o777, 0o600);
+  return {message, report: JSON.parse(readFileSync(file, 'utf8')), directory};
+}
 
 test('installer notices use actual license filenames on case-sensitive filesystems', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'wombat-installer-notices-'));
@@ -57,25 +83,29 @@ test('installer notices reject missing files, directories and unreviewed license
   assert.throws(() => installerDependencyNotice(root), /Review installer dependency license/);
 });
 
-for (const scenario of ['fresh', 'collection', 'upgrade']) test('plugin installer uses native management: ' + scenario, async t => {
+for (const scenario of ['fresh', 'collection', 'upgrade', 'slow-hooks']) test('plugin installer uses native management: ' + scenario, async t => {
   const f = fixture(t, scenario);
-  assert.equal(await installBundledPlugin(f.marketplace, f), scenario === 'fresh' ? 'wombat' : 'wombat-collection');
+  const name = scenario === 'collection' || scenario === 'upgrade' ? 'wombat-collection' : 'wombat';
+  assert.equal(await installBundledPlugin(f.marketplace, f), name);
   const trace = calls(f.trace);
   assert.deepEqual(trace[0], ['plugin', 'list', '--marketplace', 'wombat-local', '--json']);
   assert.deepEqual(trace[1], ['plugin', 'marketplace', 'list', '--json']);
   if (scenario === 'upgrade') assert.deepEqual(trace[2], ['plugin', 'marketplace', 'remove', 'wombat-local']);
   assert.deepEqual(trace.at(-2), ['plugin', 'marketplace', 'add', f.marketplace]);
-  assert.deepEqual(trace.at(-1), ['plugin', 'add', (scenario === 'fresh' ? 'wombat' : 'wombat-collection') + '@wombat-local', '--json']);
+  assert.deepEqual(trace.at(-1), ['plugin', 'add', name + '@wombat-local', '--json']);
   assert.equal(trace.some(args => args.includes('hooks') || args.includes('trust')), false);
+  assert.deepEqual(JSON.parse(readFileSync(f.trace+'.verify', 'utf8')), {args: ['setup', '--project', process.cwd(), '--json'], binary: f.binary});
 });
 for (const [scenario, message] of [['conflict', /Multiple Wombat/], ['foreign', /not local/], ['invalid', /Unrecognized/], ['failure', /Wombat is installed/], ['large', /Wombat is installed/], ['timeout', /Wombat is installed/]] as const) test('plugin installer stops on ' + scenario, async t => {
   const f = fixture(t, scenario);
-  await assert.rejects(installBundledPlugin(f.marketplace, {...f, timeoutMs: scenario === 'timeout' ? 500 : 3000}), message);
+  const result = await failure(t, installBundledPlugin(f.marketplace, {...f, timeoutMs: scenario === 'timeout' ? 500 : 3000}));
+  assert.match(result.message, message);
   assert.equal(calls(f.trace).some(args => args[1] === 'add'), false);
 });
 test('plugin installer rejects missing Codex and invalid catalogs', async t => {
   const f = fixture(t);
-  await assert.rejects(installBundledPlugin(f.marketplace, {binary: path.join(f.root, 'missing')}), /Wombat is installed/);
+  const result = await failure(t, installBundledPlugin(f.marketplace, {binary: path.join(f.root, 'missing')}));
+  assert.match(result.message, /Wombat is installed/);
   writeFileSync(path.join(f.marketplace, '.agents/plugins/marketplace.json'), '{"name":"foreign","plugins":[]}');
   await assert.rejects(installBundledPlugin(f.marketplace, f), /Invalid bundled/);
 });
@@ -98,12 +128,28 @@ test('installer aggregate detects generated drift without modifying files', t =>
 
 test('failed upgrade restores the previous marketplace source', async t => {
   const f = fixture(t, 'upgrade-failure');
-  await assert.rejects(installBundledPlugin(f.marketplace, f), /Wombat is installed/);
+  const result = await failure(t, installBundledPlugin(f.marketplace, f));
+  assert.match(result.message, /Wombat is installed/);
+  assert.equal(result.report.stage, 'install', 'recovery must preserve the failing stage');
   assert.deepEqual(calls(f.trace).slice(-2), [['plugin', 'marketplace', 'remove', 'wombat-local'], ['plugin', 'marketplace', 'add', f.env.OLD_SOURCE]]);
 });
 
-for(const scenario of ['verify-missing','verify-incompatible','verify-hash']) test('post-install verification fails without rolling back installed files: '+scenario,async t=>{
+for(const [scenario, expected] of [
+  ['verify-missing', 'PLUGIN_NOT_DISCOVERED'], ['verify-disabled', 'PLUGIN_DISABLED'], ['verify-ambiguous', 'PLUGIN_AMBIGUOUS'],
+  ['verify-denied', 'LOCAL_ACCESS_DENIED'], ['verify-disconnected', 'CODEX_DISCONNECTED'], ['verify-parse', 'SKILL_PARSE_ERROR'],
+  ['verify-timeout', 'SETUP_TIMEOUT'], ['verify-incompatible', 'SKILL_RUNTIME_MISMATCH'], ['verify-hash', 'PLUGIN_CONTENT_MISMATCH'],
+  ['verify-version', 'PLUGIN_VERSION_MISMATCH'], ['verify-selection', 'PLUGIN_SELECTION_MISMATCH'], ['verify-invalid', 'SETUP_INVALID_RESPONSE'],
+]) test('post-install verification retains specific diagnostics without rolling back: '+scenario,async t=>{
   const f=fixture(t,scenario);
-  await assert.rejects(installBundledPlugin(f.marketplace,f),/files are installed.*verification is incomplete/);
+  const result = await failure(t, installBundledPlugin(f.marketplace,f));
+  assert.equal(result.report.stage, 'verify');
+  assert.equal(result.report.code, expected);
+  assert.equal(result.report.project, process.cwd());
+  assert.match(result.message, /Do not reinstall the runtime/);
+  if (['verify-denied', 'verify-disconnected', 'verify-timeout'].includes(scenario)) {
+    assert.match(result.message, /read-only check: wombat setup/);
+    assert.doesNotMatch(result.message, /--plugin-only/);
+  }
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_'), 'diagnostics must exclude native output and unrelated Hook content');
   assert.equal(calls(f.trace).at(-1)?.[1],'add');
 });
