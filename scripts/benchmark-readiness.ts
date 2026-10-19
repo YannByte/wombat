@@ -15,7 +15,8 @@ import {
 } from '@wombat/client';
 import { option, positiveInteger, fileSha256 } from './benchmark-common.js';
 import { directoryBytes } from './benchmark-live-helpers.js';
-import { validateReadinessPaths } from './readiness-benchmark-paths.js';
+import { validateReadinessPaths, readinessCliEnvironment } from './readiness-benchmark-paths.js';
+import { requireQueryLatency } from './query-latency-gate.js';
 
 assert(process.platform !== 'win32', 'Peak-RSS measurement requires POSIX /usr/bin/time');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -27,6 +28,7 @@ assert(
 const core = path.resolve(option('--core', path.join(repo, 'dist/wombat-core')));
 const cli = path.resolve(option('--cli', path.join(repo, 'dist/wombat.js')));
 assert(existsSync(core) && existsSync(cli), 'Build the release core and CLI first');
+const coreSha256 = fileSha256(core), cliSha256 = fileSha256(cli);
 const sourceOption = process.argv.includes('--source-root')
   ? path.resolve(option('--source-root'))
   : undefined;
@@ -116,7 +118,10 @@ const env = {
   WOMBAT_CORE_BIN: core,
   WOMBAT_AUTO_PRICES: '0',
   CODEX_HOME: source,
+  WOMBAT_ENDPOINT_FILE: path.join(output, 'runtime', 'endpoint.json'),
 };
+const cliEnv = readinessCliEnvironment(core, cli, env);
+const cliEntry = cliEnv.WOMBAT_CORE_BIN ? 'explicit core override' : 'managed installed discovery';
 const endpoint = spawnSync(core, [], {
   input: JSON.stringify({ op: 'live_endpoint', args: {} }),
   env,
@@ -145,6 +150,9 @@ async function start(): Promise<Service> {
   const start = performance.now(),
     rssSamples: Service['rssSamples'] = [];
   const sampler = setInterval(() => {
+    // Synchronous process probes delay this parent's CLI completion callbacks.
+    // Native /usr/bin/time still records the entire core lifetime's peak RSS.
+    if (phase.endsWith('query-gate')) return;
     const pids =
       spawnSync('pgrep', ['-P', String(child.pid)], {
         encoding: 'utf8',
@@ -176,7 +184,11 @@ async function start(): Promise<Service> {
       child.once('close', resolve);
     }),
   };
-  child.once('close', () => clearInterval(sampler));
+  const ordinal = services.length;
+  child.once('close', () => {
+    clearInterval(sampler);
+    writeFileSync(path.join(output, `native-resource-${ordinal}.log`), service.stderr, {mode:0o600});
+  });
   services.push(service);
   child.stderr?.on('data', (chunk: Buffer) => {
     service.stderr = (service.stderr + chunk.toString()).slice(-8192);
@@ -254,6 +266,14 @@ const also: NonNullable<LiveRequest['also']> = [
   { action: 'usage', scope, presentation: 'projects', compact: true, limit: 3 },
 ];
 const timings: Record<string, unknown> = {};
+const cliQueryTimings: Record<string, {samplesMs: number[]}> = {};
+function saveProgress(status: string) {
+  writeFileSync(path.join(output, 'readiness-progress.json'), JSON.stringify({
+    formatVersion: 1, stage:status, scope, coreSha256, cliSha256, cliEntry,
+    preparation:{dataAbsentBeforeStartup:true,historySeeded:false}, timings, cliQueryTimings,
+    observedPeakRssBytes:services.map(s=>Math.max(0,...s.rssSamples.map(sample=>sample.bytes))),
+  },null,2)+'\n',{mode:0o600});
+}
 async function timed(name: string, request: LiveRequest): Promise<LiveResult> {
   const before = performance.now();
   const result = await client.live!(request);
@@ -263,16 +283,17 @@ async function timed(name: string, request: LiveRequest): Promise<LiveResult> {
     quality: result.result.quality.status,
     total: result.result.summary.tokens.total,
   };
+  saveProgress(name);
   assert(!result.freshness.initialScan, 'A preview is not a completed measurement result');
   for (const additional of result.additional ?? [])
     assert.equal(additional.snapshotRef.snapshotId, result.result.snapshotRef.snapshotId);
   return result;
 }
-async function firstCli(request: LiveRequest): Promise<LiveResult> {
+async function firstCli(request: LiveRequest, recordInitial = true): Promise<LiveResult> {
   const before = performance.now();
   const value = await new Promise<LiveResult>((resolve, reject) => {
     const child = spawn(process.execPath, [cli, 'call', '--json'], {
-      env,
+      env:cliEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true,
     });
@@ -326,13 +347,14 @@ async function firstCli(request: LiveRequest): Promise<LiveResult> {
     child.stdin.end(JSON.stringify({ method: 'usage', params: request }));
   });
   assert(!value.freshness.initialScan, 'CLI preview cannot establish usage');
-  timings.recentPreparation = {
+  if (recordInitial) timings.recentPreparation = {
     elapsedMs: performance.now() - before,
     entry: 'assembled CLI call',
     revision: value.freshness.revision,
     quality: value.result.quality.status,
     total: value.result.summary.tokens.total,
   };
+  if (recordInitial) saveProgress('recentPreparation');
   for (const additional of value.additional ?? [])
     assert.equal(additional.snapshotRef.snapshotId, value.result.snapshotRef.snapshotId);
   return value;
@@ -381,12 +403,39 @@ try {
       s.issues.some((i) => i.code === 'historyDeferred'),
     ),
   );
+  writeFileSync(path.join(output, 'history-result.json'), JSON.stringify(complete), {mode:0o600});
   const all = await timed('allTime', {
     query: { action: 'usage', scope: { allTime: true }, compact: true },
     mode: 'cached',
   });
   if (!sourceOption)
     assert.equal(all.result.summary.tokens.total, (hotFiles + coldFiles) * records * 110);
+  writeFileSync(path.join(output, 'all-time-result.json'), JSON.stringify(all), {mode:0o600});
+  note('complete-cli-query-gate');
+  const entries: [string, UsageRequest][] = [
+    ['usage', query], ['threads', also[0]], ['models', also[1]], ['projects', also[2]],
+    ['statistics', {action:'statistics',scope}],
+  ];
+  for (const [name, entry] of entries) {
+    const first: number[] = [], repeat: number[] = [];
+    cliQueryTimings[name + 'DistinctRequests'] = {samplesMs:first};
+    cliQueryTimings[name + 'RepeatedRequests'] = {samplesMs:repeat};
+    for (let sample = 1; sample <= 20; sample++) {
+      const request: LiveRequest = {query:{...entry, compact:false,limit:sample,snapshotId:complete.result.snapshotRef.snapshotId},mode:'cached'};
+      for (const samples of [first,repeat]) {
+        const began = performance.now();
+        const result = await firstCli(request, false);
+        samples.push(performance.now() - began);
+        assert.deepEqual(result.result.summary, complete.result.summary, 'CLI query changed the selected usage');
+      }
+    }
+    saveProgress('cli-query-group-' + name);
+    writeFileSync(path.join(output,'query-gate-report.json'),JSON.stringify({
+      cliQueryTimings, scope, cache:'Unique noncompact requests and exact repeats; ready pinned view; OS cache uncontrolled',
+      coreSha256,cliSha256,cliEntry,
+    },null,2)+'\n',{mode:0o600});
+    requireQueryLatency(Object.fromEntries(Object.entries(cliQueryTimings).map(([name,group])=>[name,group.samplesMs])));
+  }
   const peakFirst = await stopped(service);
   note('restart');
   const restarted = await start();
@@ -396,6 +445,8 @@ try {
     complete.result.summary,
     'Restart changed committed usage',
   );
+  writeFileSync(path.join(output, 'restart-result.json'), JSON.stringify(restored), {mode:0o600});
+  phase = 'restart-query-gate';
   const samples: number[] = [];
   const repeats: number[] = [];
   for (let sample = 1; sample <= 20; sample++) {
@@ -416,11 +467,16 @@ try {
   timings.uncachedQueries = { p95Ms: p95(samples), samplesMs: samples };
   timings.repeatedQueries = { p95Ms: p95(repeats), samplesMs: repeats };
   const peakRestart = await stopped(restarted);
+  assert.equal(fileSha256(core), coreSha256, 'Measured core changed');
+  assert.equal(fileSha256(cli), cliSha256, 'Measured CLI changed');
   const report = {
     formatVersion: 1,
     platform: process.platform,
     architecture: process.arch,
-    coreSha256: fileSha256(core),
+    coreSha256,
+    cliSha256,
+    cliEntry,
+    resourceMeasurement:'Native OS core lifetime peak; 500 ms RSS polling paused during query timing to avoid delaying CLI callbacks',
     sourceRoot: source,
     sourceKind: sourceOption ? 'read-only real logs' : 'independent synthetic fixture',
     preparation: { dataAbsentBeforeStartup: true, historySeeded: false },
@@ -428,6 +484,7 @@ try {
     cache:
       'OS file cache uncontrolled; release core; uncached reductions and repeated requests reported separately',
     timings,
+    cliQueryTimings,
     peakRssBytes: { first: peakFirst, restart: peakRestart },
     rssSamples: services.map((service) => service.rssSamples),
     productBytesAfterExit: directoryBytes(data),

@@ -118,45 +118,29 @@ test('fixed snapshot footprint separates event, ledger, thread and manifest logi
   }
 });
 
-test('SQLite logical payload report distinguishes owned JSONB bytes from projection expansion', () => {
+test('SQLite payload measurement accepts current packed storage and rejects unknown schemas', () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'wombat-index-helper-test-'));
-  const databaseFile = path.join(root, 'index.sqlite');
-  const database = new DatabaseSync(databaseFile);
+  const file = path.join(root, 'index.sqlite');
+  const db = new DatabaseSync(file);
   try {
-    database.exec(`
-      CREATE TABLE buckets (id INTEGER PRIMARY KEY, scope TEXT NOT NULL, field TEXT NOT NULL, UNIQUE(scope,field));
-      CREATE TABLE entries (bucket INTEGER NOT NULL, id TEXT NOT NULL, payload BLOB, source_bucket INTEGER, member TEXT, PRIMARY KEY(bucket,id));
-      INSERT INTO buckets VALUES (1,'parser:synthetic:1:1:facts','events');
-      INSERT INTO buckets VALUES (2,'parser:synthetic:1:1:facts','measurements');
-      INSERT INTO buckets VALUES (3,'parser:synthetic:1:1:facts','operations');
-      INSERT INTO buckets VALUES (4,'projection:synthetic','events');
-      INSERT INTO buckets VALUES (5,'projection:synthetic','operations');
-      INSERT INTO buckets VALUES (6,'projection:synthetic','measurements');
-    `);
-    database.prepare('INSERT INTO entries(bucket,id,payload) VALUES(?,?,jsonb(?))').run(1, 'event-1', '{"kind":"message","text":"合成"}');
-    database.prepare('INSERT INTO entries(bucket,id,payload) VALUES(?,?,jsonb(?))').run(2, 'measurement-1', '{"measurement":{"timestamp":"2026-10-01T00:00:01Z","tokens":{"total":7}}}');
-    database.prepare('INSERT INTO entries(bucket,id,payload) VALUES(?,?,jsonb(?))').run(3, 'operation-1', '{"name":"read_file","callId":"synthetic"}');
-    database.prepare('INSERT INTO entries(bucket,id,source_bucket,member) VALUES(?,?,?,?)').run(4, 'event-1', 1, '$');
-    database.prepare('INSERT INTO entries(bucket,id,source_bucket,member) VALUES(?,?,?,?)').run(5, 'operation-1', 3, '$');
-    database.prepare('INSERT INTO entries(bucket,id,source_bucket,member) VALUES(?,?,?,?)').run(6, 'measurement-1', 2, '$.measurement');
-    const expectedStored = Object.fromEntries([1, 2, 3].map(bucket => [bucket, Number(database.prepare('SELECT length(payload) AS n FROM entries WHERE bucket=?').get(bucket)!.n)]));
-    database.close();
-
-    const footprint = liveIndexPayloadFootprint(databaseFile);
-    assert.deepEqual(footprint, [
-      { scopeKind: 'parserFacts', field: 'events', entries: 1, storedJsonbPayloadBytes: expectedStored[1], expandedJsonBytes: Buffer.byteLength('{"kind":"message","text":"合成"}') },
-      { scopeKind: 'parserFacts', field: 'measurements', entries: 1, storedJsonbPayloadBytes: expectedStored[2], expandedJsonBytes: Buffer.byteLength('{"measurement":{"timestamp":"2026-10-01T00:00:01Z","tokens":{"total":7}}}') },
-      { scopeKind: 'parserFacts', field: 'operations', entries: 1, storedJsonbPayloadBytes: expectedStored[3], expandedJsonBytes: Buffer.byteLength('{"name":"read_file","callId":"synthetic"}') },
-      { scopeKind: 'projection', field: 'events', entries: 1, storedJsonbPayloadBytes: 0, expandedJsonBytes: Buffer.byteLength('{"kind":"message","text":"合成"}') },
-      { scopeKind: 'projection', field: 'measurements', entries: 1, storedJsonbPayloadBytes: 0, expandedJsonBytes: Buffer.byteLength('{"timestamp":"2026-10-01T00:00:01Z","tokens":{"total":7}}') },
-      { scopeKind: 'projection', field: 'operations', entries: 1, storedJsonbPayloadBytes: 0, expandedJsonBytes: Buffer.byteLength('{"name":"read_file","callId":"synthetic"}') },
+    db.exec(`PRAGMA user_version=9;
+      CREATE TABLE buckets(id INTEGER PRIMARY KEY,scope TEXT,field TEXT);
+      CREATE TABLE event_blocks(bucket INTEGER,count INTEGER,data BLOB,bytes INTEGER);
+      CREATE TABLE fact_blocks(bucket INTEGER,data BLOB,bytes INTEGER);
+      CREATE TABLE fact_rows(bucket INTEGER);
+      INSERT INTO buckets VALUES(1,'parser:synthetic:1:1:facts','events'),(2,'projection:synthetic','measurements');
+      INSERT INTO event_blocks VALUES(1,7,x'010203',123);
+      INSERT INTO fact_blocks VALUES(2,x'0102',456);
+      INSERT INTO fact_rows VALUES(2),(2);`);
+    assert.deepEqual(liveIndexPayloadFootprint(file), [
+      {scopeKind:'parserFacts',field:'events',entries:7,storedJsonbPayloadBytes:0,expandedJsonBytes:0,storedCompressedPayloadBytes:3,decodedFrameBytes:123},
+      {scopeKind:'projection',field:'measurements',entries:2,storedJsonbPayloadBytes:0,expandedJsonBytes:0,storedCompressedPayloadBytes:2,decodedFrameBytes:456},
     ]);
-  } finally {
-    try { database.close(); } catch { /* already closed before the read-only helper check */ }
-    rmSync(root, { recursive: true, force: true });
-  }
+    db.exec('PRAGMA user_version=99');
+    assert.throws(() => liveIndexPayloadFootprint(file), /Unsupported live index schema.*99/);
+    assert.equal(db.prepare('SELECT count(*) AS n FROM fact_rows').get()!.n,2);
+  } finally { db.close(); rmSync(root,{recursive:true,force:true}); }
 });
-
 
 test('benchmark failures retain the bounded CLI code and message, without dumping source rows or details',()=>{
  const stdout=JSON.stringify({outputVersion:3,error:{code:'RESOURCE_LIMIT',message:'Synthetic snapshot limit',details:{source:'SYNTHETIC_PRIVATE_DETAIL'}},rows:[{text:'SYNTHETIC_PRIVATE_BODY'}]});
@@ -213,7 +197,7 @@ test('compressed index report counts physical frames once and preserves fact cou
   const root=mkdtempSync(path.join(os.tmpdir(),'wombat-packed-footprint-'));
   const file=path.join(root,'index.sqlite');const db=new DatabaseSync(file);
   try {
-    db.exec(`PRAGMA user_version=6;
+    db.exec(`PRAGMA user_version=9;
       CREATE TABLE buckets(id INTEGER PRIMARY KEY,scope TEXT,field TEXT);
       CREATE TABLE event_blocks(bucket INTEGER,count INTEGER,data BLOB,bytes INTEGER);
       CREATE TABLE fact_blocks(bucket INTEGER,data BLOB,bytes INTEGER);

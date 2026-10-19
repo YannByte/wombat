@@ -159,43 +159,19 @@ export function liveIndexPayloadFootprint(databaseFile: string): IndexPayloadFoo
   const database = new DatabaseSync(databaseFile, { readOnly: true });
   try {
     const schema = Number(database.prepare('PRAGMA user_version').get()?.user_version);
-    if (schema === 5 || schema === 6 || schema === 7 || schema === 8) {
-      return database.prepare(`
-        SELECT CASE WHEN b.scope LIKE 'parser:%:facts' THEN 'parserFacts' ELSE 'projection' END AS scopeKind,
-          b.field, SUM(e.count) AS entries, SUM(length(e.data)) AS compressed, SUM(e.bytes) AS decoded
-        FROM buckets b JOIN event_blocks e ON e.bucket=b.id GROUP BY b.id
-        UNION ALL
-        SELECT CASE WHEN b.scope LIKE 'view:%:evidence' THEN 'queryEvidence' ELSE 'projection' END, b.field, (SELECT COUNT(*) FROM fact_rows r WHERE r.bucket=b.id), SUM(length(f.data)), SUM(f.bytes)
-        FROM buckets b JOIN fact_blocks f ON f.bucket=b.id GROUP BY b.id
-        ORDER BY scopeKind, field
-      `).all().map(row => ({scopeKind: row.scopeKind as IndexPayloadFootprint['scopeKind'], field: row.field as IndexPayloadFootprint['field'], entries:Number(row.entries), storedJsonbPayloadBytes:0, expandedJsonBytes:0, storedCompressedPayloadBytes:Number(row.compressed), decodedFrameBytes:Number(row.decoded)}));
-    }
-    const rows = database.prepare(`
-      SELECT
-        CASE WHEN b.scope LIKE 'parser:%:facts' THEN 'parserFacts' ELSE 'projection' END AS scopeKind,
-        b.field AS field,
-        COUNT(*) AS entries,
-        COALESCE(SUM(CASE WHEN e.payload IS NULL THEN 0 ELSE length(e.payload) END), 0) AS storedJsonbPayloadBytes,
-        COALESCE(SUM(CASE
-          WHEN e.payload IS NOT NULL THEN length(CAST(json(e.payload) AS BLOB))
-          WHEN source.payload IS NOT NULL THEN length(CAST(json_extract(source.payload, e.member) AS BLOB))
-          ELSE 0
-        END), 0) AS expandedJsonBytes
-      FROM buckets b
-      JOIN entries e ON e.bucket = b.id
-      LEFT JOIN entries source ON source.bucket = e.source_bucket AND source.id = e.id
-      WHERE b.field IN ('events', 'operations', 'measurements')
-        AND (b.scope LIKE 'parser:%:facts' OR b.scope LIKE 'projection:%')
-      GROUP BY scopeKind, b.field
-      ORDER BY scopeKind, b.field
-    `).all();
-    return rows.map(row => ({
-      scopeKind: row.scopeKind as IndexPayloadFootprint['scopeKind'],
-      field: row.field as IndexPayloadFootprint['field'],
-      entries: Number(row.entries),
-      storedJsonbPayloadBytes: Number(row.storedJsonbPayloadBytes),
-      expandedJsonBytes: Number(row.expandedJsonBytes),
-    }));
+    const owner = readFileSync(path.resolve(import.meta.dirname, '../core/src/live_index.rs'), 'utf8');
+    const current = Number(/^const VERSION: i64 = (\d+);$/m.exec(owner)?.[1]);
+    if (!Number.isSafeInteger(current)) throw new Error('Cannot read the core-owned live index version');
+    if (schema !== current) throw new Error(`Unsupported live index schema for payload measurement: ${schema}`);
+    return database.prepare(`
+      SELECT CASE WHEN b.scope LIKE 'parser:%:facts' THEN 'parserFacts' ELSE 'projection' END AS scopeKind,
+        b.field, SUM(e.count) AS entries, SUM(length(e.data)) AS compressed, SUM(e.bytes) AS decoded
+      FROM buckets b JOIN event_blocks e ON e.bucket=b.id GROUP BY b.id
+      UNION ALL
+      SELECT CASE WHEN b.scope LIKE 'view:%:evidence' THEN 'queryEvidence' ELSE 'projection' END, b.field, (SELECT COUNT(*) FROM fact_rows r WHERE r.bucket=b.id), SUM(length(f.data)), SUM(f.bytes)
+      FROM buckets b JOIN fact_blocks f ON f.bucket=b.id GROUP BY b.id
+      ORDER BY scopeKind, field
+    `).all().map(row => ({scopeKind: row.scopeKind as IndexPayloadFootprint['scopeKind'], field: row.field as IndexPayloadFootprint['field'], entries:Number(row.entries), storedJsonbPayloadBytes:0, expandedJsonBytes:0, storedCompressedPayloadBytes:Number(row.compressed), decodedFrameBytes:Number(row.decoded)}));
   } finally {
     database.close();
   }
