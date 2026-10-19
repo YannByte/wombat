@@ -8,6 +8,7 @@ English | [中文](README.zh-CN.md)
 
 - `@wombat/client` exports `createUsageClient`, types, and `CoreError`. This entry loads no Node or terminal libraries.
 - `@wombat/client/node` exports `createNodeClient` for the local core process and shared service.
+- `@wombat/client/node/runtime` enables optional Node module compilation reuse for managed CLI installations. Its cache belongs to the installed version, contains no query data, and is removed with that version. Read-only installations and Node cache overrides retain normal behavior.
 - `@wombat/client/http` exports `createHttpClient` for the local Web host.
 - `@wombat/client/locale` supplies presentation language support.
 

@@ -1,4 +1,6 @@
 import { firstCommandIndex } from "./command-routing.js";
+import { enableInstalledCompileCache } from "@wombat/client/node/runtime";
+enableInstalledCompileCache();
 const argv = process.argv.slice(2),
   index = firstCommandIndex(argv);
 const command = argv[index];

@@ -12,6 +12,10 @@
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node/index.js"
     },
+    "./node/runtime": {
+      "types": "./dist/node/runtime.d.ts",
+      "import": "./dist/node/runtime.js"
+    },
     "./locale": {
       "types": "./dist/locale/index.d.ts",
       "import": "./dist/locale/index.js"
