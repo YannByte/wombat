@@ -2,11 +2,19 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fromMarkdown } from 'mdast-util-from-markdown';
+import { skillNames, skillPresentation } from './build-skill.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillRoots = ['.agents/skills', 'plugin/skills'];
 const errors = [];
 let checked = 0;
+
+try {
+  const names=skillNames(root);
+  const directories=readdirSync(path.join(root,'plugin/skills'),{withFileTypes:true}).filter(e=>e.isDirectory()).map(e=>e.name).sort();
+  if(JSON.stringify([...names].sort())!==JSON.stringify(directories))errors.push('plugin/package.json: declared Skills must match the shipped directories');
+  for(const name of names)skillPresentation(path.join(root,'plugin/skills',name,'agents/openai.yaml'),'$wombat:'+name);
+}catch(error){errors.push(error.message);}
 
 // Check authored resource links too: moving a procedure must not strand its callers.
 function resourceLinks(directory) {

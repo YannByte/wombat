@@ -3,7 +3,7 @@
 Use this flow for usage improvement questions or a work review that needs original evidence. Keep a simple totals question to one query.
 
 1. Resolve the requested dates, timezone and filters. Start with a compact usage query. Batch only needed rankings through `also`; totals come from `summary`, never the returned page. With a ready background index, use `mode:"cached"` when its recorded cutoff is adequate. Otherwise use the normal readiness flow.
-2. Select a task from the returned ranking. Query its matching turns with `matchedOnly:true` and the original filters. Use `method:"usage"`, `mode:"cached"` and `query.snapshotId` for a returned `live:` ID. `method:"snapshot"` addresses saved disk snapshots.
+2. Select a task from the returned ranking. Query its matching turns with `matchedOnly:true` and the original filters. Use `method:"usage"`, `mode:"cached"` and `query.snapshotId` for a returned `live:` ID. `method:"snapshot"` addresses saved disk snapshots; omit `roots` because that snapshot already binds its sources.
 3. For a specific candidate, inspect its exact task and turn. Do not start with a whole-day deep analysis when bounded evidence can answer the question. On `RESOURCE_LIMIT`, narrow once to that selection. Smaller pages cannot reduce whole-task computation.
 4. Execute dependent `conversation` location and bounded reads consecutively in one host invocation. Use [read-located.ts](../scripts/read-located.ts) when the host can import TypeScript. It needs a caller that uses the selected CLI, sends one generated request, accepts exits 0/2 and parses the validated JSON. Do not install a runtime for this helper; the same two public calls work in other hosts.
 

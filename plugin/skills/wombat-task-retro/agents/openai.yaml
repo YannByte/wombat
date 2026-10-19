@@ -1,0 +1,7 @@
+{
+  "interface": {
+    "display_name": "Wombat task retrospective",
+    "short_description": "Investigate slow, costly or repetitive Codex tasks",
+    "default_prompt": "Use $wombat-task-retro to investigate this Codex task and suggest one evidence-backed improvement."
+  }
+}

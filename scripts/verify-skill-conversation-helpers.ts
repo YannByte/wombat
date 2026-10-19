@@ -7,7 +7,7 @@ export function parseConversationArgs(args:string[]) {
   const values=new Map<string,string>();
   for(let i=0;i<args.length;i++){
     const key=args[i],value=args[++i];
-    if(!['--output-dir','--agent-bin','--language','--scenario','--variant'].includes(key)||values.has(key)||!value||value.startsWith('--'))throw new Error('Usage: verify:skill-conversation --output-dir ABSOLUTE_EXTERNAL_PATH --agent-bin ABSOLUTE_EXECUTABLE [--language en|zh|both] [--scenario workflow|usage|pricing|timing|statistics|monitor|account|all] [--variant 0..3]');
+    if(!['--output-dir','--agent-bin','--language','--scenario','--variant'].includes(key)||values.has(key)||!value||value.startsWith('--'))throw new Error('Usage: verify:skill-conversation --output-dir ABSOLUTE_EXTERNAL_PATH --agent-bin ABSOLUTE_EXECUTABLE [--language en|zh|both] [--scenario workflow|usage|pricing|timing|statistics|monitor|account|daily-review|task-retro|config-review|all] [--variant 0..3]');
     values.set(key,value);
   }
   const output=values.get('--output-dir'),agentBin=values.get('--agent-bin'),language=values.get('--language')??'both';

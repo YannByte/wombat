@@ -1,0 +1,7 @@
+{
+  "interface": {
+    "display_name": "Wombat configuration review",
+    "short_description": "Review Codex rules and Skills, then recheck changes",
+    "default_prompt": "Use $wombat-config-review to review this project’s AGENTS.md and Skills, with concrete evidence and suggested changes."
+  }
+}

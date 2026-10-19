@@ -2,14 +2,14 @@
 
 中文 | [English](README.md)
 
-本目录包含用户插件源码。同一个 Skill 支持中文和英文。Codex 管理已安装的插件。
+本目录包含用户插件源码。每个 Skill 同时支持中文和英文。Codex 管理已安装的插件。
 
 ## 源码入口
 
-- `skills/wombat/SKILL.md` 定义用户流程。
+- `skills/` 包含[查询与任务入口](../docs/guides/plugin.md)和共用运行参考。
 - `hooks/` 包含采集声明。
 - `scripts/` 包含 POSIX 采集桥接脚本。
-- `package.json` 定义插件元数据和所需能力。根清单维护版本号。
+- `package.json` 定义插件元数据、分发的 Skill 名称和所需能力。根清单维护版本号。
 
 ## 限制
 

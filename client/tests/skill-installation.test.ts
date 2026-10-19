@@ -45,6 +45,14 @@ test('runtime checks bind the discovered copy to capabilities and content rather
   const original=JSON.parse(await readFile(file,'utf8'));
   const read=async()=>(await skillRuntimeChecks(discovery))[0];
   assert.equal((await read()).status,'compatible');
+  const task=path.join(plugin,'skills/wombat-task-retro/SKILL.md');
+  const taskBody=await readFile(task,'utf8');await writeFile(task,'Synthetic task customization');
+  assert.equal((await read()).status,'modified','Changes to another shipped Skill must invalidate the bundle');
+  await writeFile(task,taskBody);assert.equal((await read()).status,'compatible');
+  for(const skills of [[...original.skills,original.skills[0]],[{name:'../other',contentHash:'a'.repeat(64)}],[]]){
+    await writeFile(file,JSON.stringify({...original,skills}));assert.equal((await read()).errorCode,'SKILL_MANIFEST_INVALID');
+  }
+  await writeFile(file,JSON.stringify(original));
   await writeFile(file,JSON.stringify({...original,version:'0.1.0'}));assert.equal((await read()).status,'compatible');
   await writeFile(file,JSON.stringify({...original,requiredCapabilities:['future-capability']}));
   const incompatible=await read();assert.equal(incompatible.status,'incompatible');assert.deepEqual(incompatible.missingCapabilities,['future-capability']);

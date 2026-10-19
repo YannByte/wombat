@@ -2,14 +2,14 @@
 
 English | [中文](README.zh-CN.md)
 
-This directory contains the user plugin source. One Skill serves Chinese and English. Codex manages installed plugins.
+This directory contains the user plugin source. Each Skill serves Chinese and English. Codex manages installed plugins.
 
 ## Source entries
 
-- `skills/wombat/SKILL.md` defines the user workflow.
+- `skills/` contains the [query and task entries](../docs/guides/plugin.en.md) and shared runtime references.
 - `hooks/` contains collection declarations.
 - `scripts/` contains the POSIX collection bridge.
-- `package.json` defines plugin metadata and required capabilities. The root manifest owns the version.
+- `package.json` defines plugin metadata, shipped Skill names and required capabilities. The root manifest owns the version.
 
 ## Limits
 

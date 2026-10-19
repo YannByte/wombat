@@ -13,7 +13,17 @@ function check(script: string, files: Record<string, string>) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'wombat-guidance-'));
   try {
     mkdirSync(path.join(root, 'scripts'));
-    if (script === 'check-skills.mjs') symlinkSync(path.resolve(scripts, '../node_modules'), path.join(root, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+    if (script === 'check-skills.mjs') {
+      symlinkSync(path.resolve(scripts, '../node_modules'), path.join(root, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+      for (const helper of ['build-skill.ts', 'artifact-files.ts']) copyFileSync(path.join(scripts, helper), path.join(root, 'scripts', helper));
+      const names=['wombat',...new Set(Object.keys(files).flatMap(file=>file.match(/^plugin\/skills\/([^/]+)\/SKILL\.md$/)?.[1]??[]))].filter((name,i,all)=>all.indexOf(name)===i);
+      const defaults:Record<string,string>={
+        'plugin/package.json':JSON.stringify({skills:names}),
+        'plugin/skills/wombat/SKILL.md':'---\nname: wombat\ndescription: Synthetic usage query\n---\nQuery selected usage.\n',
+      };
+      for(const name of names) defaults[`plugin/skills/${name}/agents/openai.yaml`]=JSON.stringify({interface:{display_name:name,short_description:'Inspect synthetic project evidence',default_prompt:`Use $${name} to inspect selected evidence.`}});
+      files={...defaults,...files};
+    }
     copyFileSync(path.join(scripts, script), path.join(root, 'scripts', script));
     for (const [relative, content] of Object.entries(files)) {
       const file = path.join(root, relative);
@@ -30,6 +40,20 @@ function check(script: string, files: Record<string, string>) {
     rmSync(root, { recursive: true, force: true });
   }
 }
+
+test('shipped Skill checks reject undeclared directories, missing entries and invalid presentation',()=>{
+  const skill='---\nname: sample\ndescription: Synthetic workflow\n---\nRun a check.\n';
+  const cases:Record<string,string>[]=[
+    {'plugin/skills/sample/SKILL.md':skill,'plugin/package.json':JSON.stringify({skills:['wombat']})},
+    {'plugin/package.json':JSON.stringify({skills:['wombat','missing']})},
+    {'plugin/skills/wombat/agents/openai.yaml':JSON.stringify({interface:{display_name:'Wombat',short_description:'short',default_prompt:'Use $wombat.'}})},
+  ];
+  for(const files of cases) {
+    const result=check('check-skills.mjs',files);
+    assert.equal(result.status,1);
+    assert.match(result.output,/declared Skills must match|Skill interface requires/);
+  }
+});
 
 test('document budgets count Unicode characters and reject excess or missing files', () => {
   const manifest = JSON.stringify({ 'AGENTS.md': 3 });

@@ -12,13 +12,13 @@ Replace the two root placeholders with authorized paths. This request reads four
 {"method":"config","params":{"action":"list","roots":["SOURCE_ROOT"],"projectRoots":["PROJECT_ROOT"],"scope":{"project":"PROJECT_ROOT"},"kinds":["rule","skill","mcp","hook"],"limit":3}}
 ```
 
-Keep version domains separate: usage `snapshotId` fixes usage. Configuration `readView` fixes inventory. Optimization also binds `decisionRevision`. A first inventory query may use `snapshotId` for historical usage evidence, but must not combine it with `readView`.
+Keep version domains separate: usage `snapshotId` fixes usage. Configuration `readView` fixes inventory. Optimization also binds `decisionRevision`. Start current-file checks without a usage snapshot. If historical usage evidence is needed, a first inventory query can use a `live:` usage `snapshotId`, but cannot combine it with `readView`. Saved disk snapshot IDs are not configuration views.
 
-For later inventory calls, use only `readView`. Suggestions do not take `snapshotId`. Fixed-turn `optimize activity` instead takes the nested `activity` selection. There is no inventory `activity` action.
+For later inventory calls, keep the original `roots`, `projectRoots` and `scope`. Select `readView` instead of usage `snapshotId`. Suggestions do not take `snapshotId`. Fixed-turn `optimize activity` instead takes the nested `activity` selection. There is no inventory `activity` action.
 
 On invalid arguments, read that method's Schema. Correct the request once. Do not try more variants.
 
-For item detail/evidence/related scopes use `config` with the returned item ID and `readView`. For suggestion detail use `optimize` with the returned suggestion ID, `readView` and `decisionRevision`. Keep project roots and scope on every call. Without the Agent API, use the documented `optimize inventory` and `optimize detail` CLI entries after reading their help once.
+For item detail/evidence/related scopes use `config` with the returned item ID and `readView`. For suggestion detail use `optimize` with the returned suggestion ID, `readView` and `decisionRevision`. Keep the original source and project selection on every call. Without the Agent API, use the documented `optimize inventory` and `optimize detail` CLI entries after reading their help once.
 
 Current configuration does not establish historical contents or loading. Suggestions do not accept usage date/model filters such as `--all-time`. Inventory date filters narrow historical evidence, not current-file checks.
 

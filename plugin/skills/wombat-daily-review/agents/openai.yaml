@@ -1,0 +1,7 @@
+{
+  "interface": {
+    "display_name": "Wombat daily review",
+    "short_description": "Review daily usage and select useful improvements",
+    "default_prompt": "Use $wombat-daily-review to review today’s Codex usage and identify the most useful improvement."
+  }
+}

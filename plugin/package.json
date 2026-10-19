@@ -18,5 +18,11 @@
     "usage-statistics-v1",
     "monitor-v1",
     "config-content-hashes-v1"
+  ],
+  "skills": [
+    "wombat",
+    "wombat-daily-review",
+    "wombat-task-retro",
+    "wombat-config-review"
   ]
 }

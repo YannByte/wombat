@@ -99,7 +99,19 @@ export async function skillRuntimeChecks(discovery:Discovery,query:QueryOptions=
       result.skillContentHash=expected;
       result.requiredCapabilities=value.requiredCapabilities;
       result.missingCapabilities=result.requiredCapabilities.filter(c=>!skillCapabilities.includes(c));
-      if(hash(JSON.stringify(await inventory(directory,query)))!==expected)return {...result,status:'modified',errorCode:'SKILL_RESOURCE_CHANGED'};
+      let actual:string;
+      if(!standalone&&value.skills!==undefined){
+        if(!Array.isArray(value.skills)||!value.skills.length||value.skills.length>32)throw new CoreError('SKILL_MANIFEST_INVALID','Invalid plugin Skill inventory');
+        const skills:{name:string;contentHash:string}[]=[];
+        for(const skill of value.skills){
+          if(!object(skill)||typeof skill.name!=='string'||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill.name)||skill.name.length>64||typeof skill.contentHash!=='string'||!/^[0-9a-f]{64}$/.test(skill.contentHash)||skills.some(s=>s.name===skill.name))throw new CoreError('SKILL_MANIFEST_INVALID','Invalid plugin Skill identity');
+          if(hash(JSON.stringify(await inventory(path.join(path.dirname(directory),skill.name),query)))!==skill.contentHash)return {...result,status:'modified',errorCode:'SKILL_RESOURCE_CHANGED'};
+          skills.push({name:skill.name,contentHash:skill.contentHash});
+        }
+        if(skills[0].name!=='wombat')throw new CoreError('SKILL_MANIFEST_INVALID','Missing plugin query entry');
+        actual=hash(JSON.stringify(skills));
+      }else actual=hash(JSON.stringify(await inventory(directory,query)));
+      if(actual!==expected)return {...result,status:'modified',errorCode:'SKILL_RESOURCE_CHANGED'};
       return {...result,status:result.missingCapabilities.length?'incompatible':'compatible',errorCode:result.missingCapabilities.length?'SKILL_RUNTIME_MISMATCH':null};
     }catch(error){if(query.signal?.aborted)throw error;return {...result,errorCode:error instanceof CoreError?error.code:'SKILL_UNAVAILABLE'};}
     })());

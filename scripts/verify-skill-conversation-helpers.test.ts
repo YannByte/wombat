@@ -11,7 +11,7 @@ test('conversation arguments require explicit executables and reject ambiguous o
   assert.deepEqual(parseConversationArgs(['--',...args]).languages,['en','zh']);
   assert.deepEqual(parseConversationArgs([...args,'--language','zh']).languages,['zh']);
   assert.equal(parseConversationArgs(args).scenarios[0],'workflow');
-  assert.equal(parseConversationArgs([...args,'--scenario','all']).scenarios.length,7);
+  assert.equal(parseConversationArgs([...args,'--scenario','all']).scenarios.length,10);
   assert.equal(parseConversationArgs([...args,'--scenario','pricing','--variant','3']).variant,3);
   assert.deepEqual(parseConversationArgs([...args,'--scenario','timing']).scenarios,['timing']);
   for(const extra of [['--language','fr'],['--last'],['--agent-bin',process.execPath],['--language'],['--unknown','value']])assert.throws(()=>parseConversationArgs([...args,...extra]));

@@ -1,10 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {focusedQuestions,focusedQuestion,focusedResults,validateFocusedResults,isFocusedScenario,type FocusedScenario} from './skill-conversation-cases.ts';
 
-const scope={snapshotId:'fixed-synthetic-view',project:'/synthetic/project'};
+const scope={snapshotId:'fixed-synthetic-view',project:'/synthetic/project',threadId:'selected-task'};
 const usage={outputVersion:5,action:'usage',snapshotRef:{snapshotId:scope.snapshotId},scope:{project:scope.project,allTime:true},summary:{tokens:{total:1100000}}};
 const values:Record<FocusedScenario,Record<string,unknown>[]>={
+  'daily-review':[usage,{...usage,action:'threads',items:[{kind:'thread',id:scope.threadId}]}],
+  'task-retro':[{...usage,scope:{...usage.scope,threadId:scope.threadId},inspection:{}},{outputVersion:1,snapshotId:scope.snapshotId,selection:{projects:[scope.project],threads:[scope.threadId]},items:[],fragments:[{text:'SYNTHETIC_WORK_EVIDENCE'}]}],
+  'config-review':[{action:'list',suggestions:[{id:'original',item:{path:path.join(scope.project,'.agents/skills/sample/SKILL.md')},findings:[{rule:'descriptionSize'}]}]}],
   usage:[usage],
   pricing:[{...usage,summary:{tokens:{total:1101000},price:{cost:null,knownCost:'7.25'}}}],
   timing:[{outputVersion:6,action:'summary',time:{nativeWallClockMs:{value:15000}}}],
@@ -30,7 +34,7 @@ test('capability checks accept independent truth and reject unrelated queries, m
   for(const scenario of Object.keys(values).filter(isFocusedScenario)){
     validateFocusedResults(scenario,values[scenario],scope);
     assert.throws(()=>validateFocusedResults(scenario,[],scope));
-    assert.throws(()=>validateFocusedResults(scenario,[...values[scenario],{action:'list',suggestions:[]}],scope));
+    assert.throws(()=>validateFocusedResults(scenario,[...values[scenario],scenario==='config-review'?usage:{action:'list',suggestions:[]}],scope));
     assert.throws(()=>validateFocusedResults(scenario,[...values[scenario],{action:'upsert',plans:[]}],scope));
   }
   for(const change of [{snapshotRef:{snapshotId:'other'}},{scope:{project:'/other'}},{summary:{tokens:{total:0}}}])assert.throws(()=>validateFocusedResults('usage',[{...usage,...change}],scope));
@@ -38,6 +42,15 @@ test('capability checks accept independent truth and reject unrelated queries, m
   assert.throws(()=>validateFocusedResults('timing',[{outputVersion:6,time:{nativeWallClockMs:{value:null}}}],scope));
   assert.throws(()=>validateFocusedResults('statistics',[{...usage,statistics:{population:{completeTasks:1,medianTokens:0,p90Tokens:0}}}],scope));
   assert.throws(()=>validateFocusedResults('account',[{windows:[{usedPercent:null,durationMinutes:17}]}],scope));
+});
+
+test('task workflows require selected original evidence and reject unrelated task identities',()=>{
+  assert.throws(()=>validateFocusedResults('task-retro',[values['task-retro'][0]],scope));
+  assert.throws(()=>validateFocusedResults('task-retro',[values['task-retro'][1]],scope));
+  const wrong={...values['task-retro'][1],selection:{projects:[scope.project],threads:['other-task']}};
+  assert.throws(()=>validateFocusedResults('task-retro',[values['task-retro'][0],wrong],scope));
+  assert.throws(()=>validateFocusedResults('daily-review',[usage],scope));
+  assert.throws(()=>validateFocusedResults('config-review',[{suggestions:[{item:{path:'/other'},findings:[{rule:'descriptionSize'}]}]}],scope));
 });
 
 test('navigation accepts observed empty dates and a different selected project only at the original view',()=>{
