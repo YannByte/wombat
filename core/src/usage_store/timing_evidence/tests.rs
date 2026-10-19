@@ -335,7 +335,7 @@ fn current_hash_corruption_and_unknown_event_version_propagate() {
             "UNSUPPORTED_VERSION"
         );
     }
-    disk.manifest.events.version = 1;
+    disk.manifest.events.version = 2;
     let slice = &disk.manifest.threads[0].turns["turn"].slice;
     let path = disk.directory.join(&disk.manifest.threads[0].file.file);
     let mut bytes = fs::read(&path).unwrap();

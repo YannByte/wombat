@@ -55,6 +55,37 @@ fn locate(snapshot: &Snapshot) -> Evidence {
     assert!(r.items[0].has_text_locator);
     r.items[0].evidence.clone()
 }
+
+#[test]
+fn expired_scan_slice_still_advances_through_messages_and_control_events() {
+    let (_root, snapshot, _path) = fixture("PRIVATE_SYNTHETIC_PROGRESS");
+    let cancelled = AtomicBool::new(false);
+    for action in [Action::Activity, Action::Locate, Action::Search] {
+        let mut r = request(&snapshot, action);
+        if action == Action::Search {
+            r.query = Some("PRIVATE_SYNTHETIC_PROGRESS".into());
+            r.selection.projects = vec!["/synthetic/project".into()];
+        }
+        let expected = query(&snapshot, None, &r, &cancelled).unwrap();
+        let mut items = vec![];
+        let mut complete = false;
+        for _ in 0..snapshot.events().unwrap().len() + 1 {
+            let page = query_with_scan_budget(&snapshot, None, &r, &cancelled, 0).unwrap();
+            items.extend(page.items);
+            if page.scan_complete {
+                complete = true;
+                break;
+            }
+            assert_ne!(page.next_cursor, r.cursor, "expired slice must advance");
+            r.cursor = page.next_cursor;
+        }
+        assert!(complete, "continuation did not finish");
+        assert_eq!(
+            serde_json::to_value(items).unwrap(),
+            serde_json::to_value(expected.items).unwrap()
+        );
+    }
+}
 fn read_request(snapshot: &Snapshot, evidence: Evidence, max: usize) -> Request {
     let mut r = request(snapshot, Action::Read);
     r.targets.push(ReadTarget {

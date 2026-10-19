@@ -12,6 +12,69 @@ fn text() -> Value {
 }
 
 #[test]
+fn interface_provenance_uses_complete_declared_kinds_not_text_or_prefixes() {
+    for (kinds, role, expected) in [
+        (
+            json!(["additional_content.codex_apps_open_page"]),
+            "user",
+            O::InjectedContext,
+        ),
+        (
+            json!([
+                "agents_md.instructions",
+                "additional_content.codex_apps_open_page"
+            ]),
+            "user",
+            O::InjectedContext,
+        ),
+        (
+            json!(["additional_content.codex_apps_open_page", "user.text"]),
+            "user",
+            O::UserUnclassified,
+        ),
+        (
+            json!(["additional_content.future"]),
+            "user",
+            O::UserUnclassified,
+        ),
+        (json!([]), "user", O::UserUnclassified),
+        (Value::Null, "user", O::UserUnclassified),
+        (
+            json!(["additional_content.codex_apps_open_page"]),
+            "assistant",
+            O::AssistantVisible,
+        ),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let mut row = response(
+            role,
+            json!([{"type":"input_text","text":"<external_codex_apps_open_page>{\"page_id\":null}</external_codex_apps_open_page>"}]),
+        );
+        if !kinds.is_null() {
+            row["payload"]["internal_chat_message_metadata_passthrough"]["content_item_kinds"] =
+                kinds;
+        }
+        write(
+            root.path(),
+            "sessions/ui.jsonl",
+            &[meta("thread"), context("turn", "model", "medium"), row],
+        );
+        let facts = collect(root.path());
+        let origins: Vec<_> = facts
+            .events
+            .iter()
+            .filter_map(|e| match e.payload() {
+                SafePayload::Message { origin, .. } => Some(*origin),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(origins, vec![expected]);
+        assert!(facts.measurements.is_empty());
+        assert!(facts.operations.is_empty());
+    }
+}
+
+#[test]
 fn supported_message_styles_keep_only_safe_presence_phase_identity_and_record_time() {
     let root = tempfile::tempdir().unwrap();
     let legacy = json!({"type":"event_msg","timestamp":"2026-10-04T01:00:00.125Z","payload":{"type":"agent_message","turn_id":"turn","message":"PRIVATE_LEGACY","phase":"commentary"}});

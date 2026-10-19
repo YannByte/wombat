@@ -451,7 +451,7 @@ fn hashes_versions_duplicate_positions_and_index_corruption_fail_closed() {
     fs::write(&path, original).unwrap();
     let manifest_path = snapshot.directory.join("manifest.json");
     let raw = serde_json::to_value(&snapshot.manifest).unwrap();
-    for version in [0, 2] {
+    for version in [0, 1, 3] {
         let mut changed = raw.clone();
         changed["events"]["version"] = serde_json::json!(version);
         fs::write(&manifest_path, serde_json::to_vec(&changed).unwrap()).unwrap();
@@ -511,7 +511,7 @@ fn valid_hash_cannot_hide_unknown_block_or_event_version_or_scope_mismatch() {
     let original: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
     let target = EventTarget::turn("a", "turn");
     let mut changed = original.clone();
-    changed["version"] = serde_json::json!(2);
+    changed["version"] = serde_json::json!(3);
     rewrite_block(&mut snapshot, changed);
     assert!(
         snapshot

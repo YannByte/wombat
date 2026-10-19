@@ -21,6 +21,9 @@ use std::{
 const MAX_OUTPUT: usize = 1024 * 1024;
 const EVENT_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_EVENTS: usize = 2000;
+// Leave room for CLI/HTTP transport and other readers between scan slices.
+// This is cooperative: a frame or source read can exceed the time slice.
+const SCAN_MILLIS: u128 = 20;
 const MAX_CURSOR: usize = 32768;
 mod source;
 #[cfg(test)]
@@ -195,10 +198,62 @@ fn event(snapshot: &Snapshot, evidence: &Evidence, cancelled: &AtomicBool) -> Re
         })
         .ok_or_else(|| error("NOT_FOUND"))
 }
+struct Calendar {
+    timezone: chrono_tz::Tz,
+    first: Option<String>,
+    last: Option<String>,
+}
+impl Calendar {
+    fn new(selection: &Selection) -> Result<Self> {
+        let timezone = crate::usage_app::scope::timezone(&crate::usage_app_dto::Scope {
+            timezone: selection.timezone.clone(),
+            ..Default::default()
+        })?;
+        let boundary = |value: &Option<String>, upper: bool| {
+            value
+                .as_deref()
+                .and_then(|s| crate::usage_app::scope::date(s).ok())
+                .and_then(|d| d.and_hms_opt(0, 0, 0))
+                .and_then(|d| {
+                    let local = d.and_local_timezone(timezone);
+                    if upper {
+                        local.latest()
+                    } else {
+                        local.earliest()
+                    }
+                })
+                .map(|d| {
+                    d.to_utc()
+                        .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
+                })
+        };
+        // Nonexistent local midnight disables that pruning bound. Exact message
+        // dates remain authoritative, including historical timezone transitions.
+        Ok(Self {
+            timezone,
+            first: boundary(&selection.since, false),
+            last: boundary(&selection.until, true),
+        })
+    }
+    fn matches_chunk(&self, selection: &Selection, chunk: &crate::usage_store::EventChunk) -> bool {
+        if selection.since.is_none() && selection.until.is_none()
+            || chunk.message_time.undated && selection.include_undated
+        {
+            return true;
+        }
+        let (Some(first), Some(last)) = (&chunk.message_time.first, &chunk.message_time.last)
+        else {
+            return false;
+        };
+        !self.first.as_ref().is_some_and(|since| last < since)
+            && !self.last.as_ref().is_some_and(|until| first >= until)
+    }
+}
 fn selected(
     event: &Event,
     selection: &Selection,
     projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
+    calendar: &Calendar,
 ) -> Result<bool> {
     let has = |values: &[String], value: Option<&str>| {
         values.is_empty() || value.is_some_and(|v| values.iter().any(|x| x == v))
@@ -219,16 +274,12 @@ fn selected(
         return Ok(false);
     }
     if selection.since.is_some() || selection.until.is_some() {
-        let tz = crate::usage_app::scope::timezone(&crate::usage_app_dto::Scope {
-            timezone: selection.timezone.clone(),
-            ..Default::default()
-        })?;
         let date = event
             .time()
             .timestamp
             .as_deref()
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|d| d.with_timezone(&tz).date_naive().to_string());
+            .map(|d| d.with_timezone(&calendar.timezone).date_naive().to_string());
         if let Some(date) = date {
             if selection.since.as_ref().is_some_and(|s| date < *s)
                 || selection.until.as_ref().is_some_and(|s| date >= *s)
@@ -345,6 +396,7 @@ fn activity(
         change,
     }
 }
+#[allow(clippy::too_many_arguments)]
 fn fragment(
     snapshot: &Snapshot,
     request: &Request,
@@ -352,9 +404,10 @@ fn fragment(
     projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
     reader: &mut Reader<'_>,
     cancelled: &AtomicBool,
+    calendar: &Calendar,
 ) -> Result<Fragment> {
     let event = event(snapshot, &target.evidence, cancelled)?;
-    if !selected(&event, &request.selection, projects)? {
+    if !selected(&event, &request.selection, projects, calendar)? {
         return Err(error("NOT_FOUND"));
     }
     let content = event
@@ -454,7 +507,7 @@ fn fragment(
         for (index, event) in page.events.iter().enumerate() {
             let offset = start + index;
             if offset != target.evidence.event_offset
-                && selected(event, &request.selection, projects)?
+                && selected(event, &request.selection, projects, calendar)?
             {
                 context.push(activity(event, offset, projects, None));
             }
@@ -476,11 +529,23 @@ pub(crate) fn query(
     request: &Request,
     cancelled: &AtomicBool,
 ) -> Result<Response> {
+    query_with_scan_budget(snapshot, baseline, request, cancelled, SCAN_MILLIS)
+}
+
+fn query_with_scan_budget(
+    snapshot: &Snapshot,
+    baseline: Option<&Snapshot>,
+    request: &Request,
+    cancelled: &AtomicBool,
+    scan_millis: u128,
+) -> Result<Response> {
     validate(request)?;
     check(cancelled)?;
+    let calendar = Calendar::new(&request.selection)?;
     if request.snapshot_id != snapshot.manifest.snapshot_ref.snapshot_id {
         return Err(error("VIEW_EXPIRED"));
     }
+    let event_index = snapshot.event_index()?;
     let mut projects = BTreeMap::new();
     for thread in &snapshot.manifest.threads {
         if (!request.selection.threads.is_empty()
@@ -529,10 +594,13 @@ pub(crate) fn query(
     if let Some(anchor) = &request.anchor {
         let anchor_event = event(snapshot, anchor, cancelled)?;
         let mut owner = request.selection.clone();
-        owner.origins.clear();
+        owner.origins = match anchor_event.payload() {
+            Payload::Message { origin, .. } => vec![*origin],
+            _ => vec![],
+        };
         owner.phases.clear();
         owner.record_kinds.clear();
-        if !selected(&anchor_event, &owner, &projects)? {
+        if !selected(&anchor_event, &owner, &projects, &calendar)? {
             return Err(error("NOT_FOUND"));
         }
         let radius = request.radius.unwrap_or(20);
@@ -552,7 +620,7 @@ pub(crate) fn query(
         response.scanned_events = page.events.len();
         for (index, e) in page.events.iter().enumerate() {
             if matches!(e.payload(), Payload::Message { .. })
-                && selected(e, &request.selection, &projects)?
+                && selected(e, &request.selection, &projects, &calendar)?
             {
                 response
                     .items
@@ -572,6 +640,7 @@ pub(crate) fn query(
                 &projects,
                 &mut reader,
                 cancelled,
+                &calendar,
             )?);
         }
     } else {
@@ -586,10 +655,10 @@ pub(crate) fn query(
                 ..Default::default()
             });
         if state.binding != key
-            || state.partition > snapshot.manifest.events.partitions.len()
+            || state.partition > event_index.partitions.len()
             || (request.cursor.is_some()
-                && (state.partition >= snapshot.manifest.events.partitions.len()
-                    || state.offset >= snapshot.manifest.events.partitions[state.partition].count))
+                && (state.partition >= event_index.partitions.len()
+                    || state.offset >= event_index.partitions[state.partition].count))
         {
             return Err(error("CURSOR_MISMATCH"));
         }
@@ -623,16 +692,16 @@ pub(crate) fn query(
         let started = Instant::now();
         let limit = request.limit.unwrap_or(20);
         let mut metadata = 0;
-        'scan: while state.partition < snapshot.manifest.events.partitions.len() {
+        'scan: while state.partition < event_index.partitions.len() {
             check(cancelled)?;
             if response.scanned_events >= MAX_EVENTS
                 || metadata >= 10000
-                || started.elapsed().as_millis() >= 80
+                || metadata > 0 && started.elapsed().as_millis() >= scan_millis
             {
                 response.limits.push("scan_budget".into());
                 break;
             }
-            let partition = &snapshot.manifest.events.partitions[state.partition];
+            let partition = &event_index.partitions[state.partition];
             metadata += 1;
             if matches!(request.action, Action::Locate | Action::Search)
                 && partition.native_boundary.message_count == 0
@@ -669,21 +738,54 @@ pub(crate) fn query(
                 state.chunk = 0;
                 continue;
             }
-            let cursor = snapshot.event_cursor_at_offset(t, state.offset, cancelled)?;
-            let page = snapshot.event_page(
-                t,
-                64,
-                cursor.as_ref(),
-                EventReadBudget {
-                    max_facts: 2000,
-                    max_bytes: EVENT_BYTES,
-                },
-                cancelled,
-            )?;
-            let page_start = state.offset;
-            for (index, e) in page.events.iter().enumerate() {
-                state.offset = page_start + index;
-                if response.scanned_events >= MAX_EVENTS || started.elapsed().as_millis() >= 80 {
+            let messages_only = matches!(request.action, Action::Locate | Action::Search);
+            let (events, next_offset) = if messages_only {
+                let number = partition
+                    .chunks
+                    .partition_point(|c| c.offset + c.count <= state.offset);
+                let chunk = &partition.chunks[number];
+                let next = chunk.offset + chunk.count;
+                if chunk.message_count == 0 || !calendar.matches_chunk(&request.selection, chunk) {
+                    state.offset = next;
+                    state.chunk = 0;
+                    continue;
+                }
+                let events = snapshot
+                    .message_chunk(partition, chunk, cancelled)?
+                    .into_iter()
+                    .filter(|(offset, _)| *offset >= state.offset)
+                    .collect::<Vec<_>>();
+                (events, next)
+            } else {
+                let cursor = snapshot.event_cursor_at_offset(t, state.offset, cancelled)?;
+                let page = snapshot.event_page(
+                    t,
+                    200,
+                    cursor.as_ref(),
+                    EventReadBudget {
+                        max_facts: 2000,
+                        max_bytes: EVENT_BYTES,
+                    },
+                    cancelled,
+                )?;
+                let next = state.offset + page.events.len();
+                (
+                    page.events
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, e)| (state.offset + i, e))
+                        .collect(),
+                    next,
+                )
+            };
+            for (offset, e) in &events {
+                state.offset = *offset;
+                if response.scanned_events >= MAX_EVENTS
+                    // Decoding a single frame can consume the cooperative slice.
+                    // Still visit one fact so its continuation cannot stall.
+                    || response.scanned_events > 0
+                        && started.elapsed().as_millis() >= scan_millis
+                {
                     response.limits.push("scan_budget".into());
                     break 'scan;
                 }
@@ -701,7 +803,7 @@ pub(crate) fn query(
                         _ => None,
                     }
                 });
-                if selected(e, &request.selection, &projects)?
+                if selected(e, &request.selection, &projects, &calendar)?
                     && (!matches!(request.action, Action::Locate | Action::Search) || is_message)
                     && (request.action != Action::Changes || change.is_some())
                 {
@@ -749,14 +851,16 @@ pub(crate) fn query(
                     break 'scan;
                 }
             }
+            state.offset = next_offset;
+            state.chunk = 0;
         }
-        while state.partition < snapshot.manifest.events.partitions.len()
-            && state.offset >= snapshot.manifest.events.partitions[state.partition].count
+        while state.partition < event_index.partitions.len()
+            && state.offset >= event_index.partitions[state.partition].count
         {
             state.partition += 1;
             state.offset = 0;
         }
-        response.scan_complete = state.partition == snapshot.manifest.events.partitions.len();
+        response.scan_complete = state.partition == event_index.partitions.len();
         response.next_cursor = (!response.scan_complete)
             .then(|| serde_json::to_string(&state))
             .transpose()?;

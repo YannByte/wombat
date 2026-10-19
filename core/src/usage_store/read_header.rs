@@ -24,7 +24,7 @@ pub(crate) fn save(db: &Connection, key: &str, snapshot: &Snapshot) -> Result<()
         ledger: m.ledger.clone(),
         title_observations: m.title_observations.clone(),
         events: EventIndex {
-            version: 1,
+            version: super::events::EVENT_INDEX_VERSION,
             partitions: vec![],
         },
         threads: m
@@ -91,6 +91,7 @@ pub(crate) fn load(
         None,
     )?;
     snapshot.manifest = header.manifest;
+    snapshot.live_events = None;
     let mut titles = Vec::new();
     for source in &snapshot.manifest.sources {
         crate::live_index::each_metadata_field(

@@ -6,9 +6,38 @@ use rusqlite::{Connection, OpenFlags};
 
 type DecodedMeasurementFrame = Option<(i64, Vec<(usize, PricedMeasurement)>)>;
 
-pub(super) struct ColdEvents(Mutex<Connection>, crate::pricing_sync::Response);
+pub(super) struct ColdEvents(
+    Mutex<Connection>,
+    crate::pricing_sync::Response,
+    std::sync::OnceLock<EventIndex>,
+);
 impl ColdEvents {
+    // The immutable directory serves evidence reads and full detail restoration.
+    // Share its Arc partitions rather than loading a second copy or operation data.
+    pub(super) fn event_index(&self, snapshot: &Snapshot) -> Result<&EventIndex> {
+        if let Some(index) = self.2.get() {
+            return Ok(index);
+        }
+        let db = self
+            .0
+            .lock()
+            .map_err(|_| corrupt("detail lease unavailable"))?;
+        if self.2.get().is_none() {
+            let key = snapshot
+                .manifest
+                .snapshot_ref
+                .snapshot_id
+                .split(':')
+                .nth(1)
+                .ok_or_else(|| corrupt("detail identity invalid"))?;
+            let index =
+                load_index(&db, key)?.ok_or_else(|| corrupt("detail event index missing"))?;
+            let _ = self.2.set(index);
+        }
+        Ok(self.2.get().expect("directory loaded under lease lock"))
+    }
     pub(super) fn restore_details(&self, snapshot: &Snapshot) -> Result<Snapshot> {
+        let events = snapshot.event_index()?.clone();
         let db = self
             .0
             .lock()
@@ -27,14 +56,6 @@ impl ColdEvents {
         collected.sources = snapshot.manifest.sources.clone();
         collected.issues = snapshot.manifest.issues.clone();
         collected.watermarks = snapshot.manifest.watermarks.clone();
-        let key = snapshot
-            .manifest
-            .snapshot_ref
-            .snapshot_id
-            .split(':')
-            .nth(1)
-            .ok_or_else(|| corrupt("detail identity invalid"))?;
-        let events = load_index(&db, key)?.ok_or_else(|| corrupt("detail event index missing"))?;
         let operations =
             super::cold_operations::load_operations(&db, &collected.sources, &collected.threads)?;
         let mut detailed = super::memory::memory_cold_operations(
@@ -86,7 +107,11 @@ impl ColdEvents {
                 "measurement aggregate coverage mismatch"
             );
         }
-        Ok(Arc::new(Self(Mutex::new(reader), prices)))
+        Ok(Arc::new(Self(
+            Mutex::new(reader),
+            prices,
+            Default::default(),
+        )))
     }
     pub(super) fn groups(
         &self,
@@ -212,6 +237,13 @@ impl ColdEvents {
         let db = self.0.lock().map_err(|_| corrupt("冷证据读取锁不可用"))?;
         crate::live_index::read_cold_chunk(&db, chunk)
     }
+    pub(super) fn read_messages(
+        &self,
+        chunk: &EventChunk,
+    ) -> Result<super::message_events::MessageRows> {
+        let db = self.0.lock().map_err(|_| corrupt("冷证据读取锁不可用"))?;
+        crate::live_index::read_cold_chunk_as(&db, chunk)
+    }
 }
 
 /// Complete reductions and locators need only one decoded frame, even for a
@@ -320,7 +352,7 @@ pub(crate) fn build_from_sources(
     }
     partitions.sort_unstable_by(|a, b| a.target.cmp(&b.target));
     let index = EventIndex {
-        version: 1,
+        version: super::events::EVENT_INDEX_VERSION,
         partitions,
     };
     super::events::validate_index(&index)?;
@@ -333,7 +365,13 @@ pub(crate) fn save_index(
     prior: Option<&EventIndex>,
 ) -> Result<()> {
     let scope = format!("view:{key}:evidence");
-    crate::live_index::put(db, &scope, "version", "", &1_u32)?;
+    crate::live_index::put(
+        db,
+        &scope,
+        "version",
+        "",
+        &super::events::EVENT_INDEX_VERSION,
+    )?;
     let previous: BTreeMap<_, _> = prior
         .into_iter()
         .flat_map(|p| &p.partitions)
@@ -367,7 +405,7 @@ pub(crate) fn load_index(db: &Connection, key: &str) -> Result<Option<EventIndex
     let Some(version) = crate::live_index::scalar(db, &scope, "version")? else {
         return Ok(None);
     };
-    if version.as_u64() != Some(1) {
+    if version.as_u64() != Some(u64::from(super::events::EVENT_INDEX_VERSION)) {
         return Err(operation_error("UNSUPPORTED_VERSION", "不支持此冷证据索引"));
     }
     let mut values = BTreeMap::new();
@@ -396,7 +434,7 @@ pub(crate) fn load_index(db: &Connection, key: &str) -> Result<Option<EventIndex
         return Err(corrupt("冷证据索引不完整"));
     }
     let index = EventIndex {
-        version: 1,
+        version: super::events::EVENT_INDEX_VERSION,
         partitions: values.into_values().map(Arc::new).collect(),
     };
     super::events::validate_index(&index)?;

@@ -14,7 +14,7 @@ mod reduction_tests;
 mod resume;
 
 /// Mapping 3 adds bounded original-text locators; damaged-item boundaries remain.
-pub(crate) const MESSAGE_OBSERVATION_VERSION: u32 = 3;
+pub(crate) const MESSAGE_OBSERVATION_VERSION: u32 = 4;
 /// Canonical operation outcome mapping, including persistent conflict evidence.
 pub(crate) const OPERATION_OBSERVATION_VERSION: u32 = 6;
 /// Measurement context conflict markers require explicit source observation headers.

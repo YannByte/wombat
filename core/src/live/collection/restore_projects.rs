@@ -826,6 +826,7 @@ mod tests {
             let rows = [
                 json!({"type":"session_meta","payload":{"id":name,"cwd":project}}),
                 json!({"type":"turn_context","payload":{"turn_id":"turn","model":"gpt-5.4"}}),
+                json!({"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Keep original evidence"}],"internal_chat_message_metadata_passthrough":{"turn_id":"turn"}}}),
                 json!({"type":"event_msg","payload":{"type":"token_usage_record","thread_id":name,"turn_id":"turn","response_id":"response","usage":{"input_tokens":tokens-10,"output_tokens":10,"total_tokens":tokens}}}),
             ];
             fs::write(
@@ -886,7 +887,31 @@ mod tests {
         let ready = crate::usage_app::execute_snapshot(query("/synthetic/a"), first).unwrap();
         assert_eq!(ready.summary.tokens.total, Some(110));
         assert!(first.lazy_details_empty_for_test());
+        let request = serde_json::from_value(json!({"action":"locate","snapshotId":restored.manifest.snapshot_ref.snapshot_id,"selection":{"projects":["/synthetic/a"]}})).unwrap();
+        let cancelled = std::sync::atomic::AtomicBool::new(false);
+        let messages = crate::conversation::query(&restored, None, &request, &cancelled).unwrap();
+        let eager = crate::conversation::query(&committed, None, &request, &cancelled).unwrap();
+        assert_eq!(messages.items.len(), 1);
+        assert_eq!(
+            serde_json::to_value(messages.items).unwrap(),
+            serde_json::to_value(eager.items).unwrap()
+        );
+        assert_eq!(
+            restored.events().unwrap().len(),
+            committed.events().unwrap().len()
+        );
+        assert!(
+            restored.lazy_details_empty_for_test(),
+            "evidence reads must not load accounting or operation directories"
+        );
         let details = restored.detailed_view().unwrap().unwrap();
+        assert!(
+            Arc::ptr_eq(
+                &restored.event_index().unwrap().partitions[0],
+                &details.manifest.events.partitions[0]
+            ),
+            "full details must share the already loaded evidence directory"
+        );
         assert_eq!(
             restored
                 .ledger()

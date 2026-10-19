@@ -14,7 +14,7 @@ pub(crate) use event_blocks::each_group as each_event_group;
 pub(crate) use event_blocks::{
     discard_origins as discard_event_origins, save as save_events, share as share_events,
 };
-pub(crate) use event_blocks::{read_cold_chunk, validate_cold_source};
+pub(crate) use event_blocks::{read_cold_chunk, read_cold_chunk_as, validate_cold_source};
 pub(crate) use packed::{
     measurement_block, prepare_write as prepare_fact_write,
     retain_streamed as retain_packed_streamed,

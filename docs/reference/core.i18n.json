@@ -18,8 +18,8 @@
       "en": "3634154b3bbd88ea28973dd534e81f97fff7434c8e55c51cf15a9a67b1ac5b2a"
     },
     "/rust-core/storage-and-service-lifecycle": {
-      "zh": "abbfd0178e88ccd5f3e45c072631ea6f2ca2f1d3da31bf03fabb7da457256297",
-      "en": "e9589a56af7e5d845698464c7284046d458c90606f0dbe6ef97c6a0186201167"
+      "zh": "647ebead03d079ea9d8ce7567b68dd4981fb211c9f5b20140d261a497cf34b39",
+      "en": "56a80d7b624c0fd47eacb1a9837a92b859d9df2941af6fb783ea48f23bb05640"
     },
     "/rust-core/runtime-collection": {
       "zh": "1682a7a522f79ea35e1e54ec89701c25a4e13adedece3302a9b13ffd18ee087d",
@@ -30,8 +30,8 @@
       "en": "2b853b98df5be8becac0c3a4685aa05eef20a3766fdd55bcf74c8eb54152344f"
     },
     "/rust-core/conversation-evidence": {
-      "zh": "9d2b6fb6fc7928fdbef59e4d30743e520326e883632f26f6db8b479c3f5ba4fb",
-      "en": "4646fc3b945eb7de2a00733674e73d6172b5a640dd843bb0d20076b5b885a285"
+      "zh": "22b9a0a1f781936002176372aaf7be78488b7c9056e3d424dcf5316ff19193e6",
+      "en": "7b60d4078db546ffe44c32d6df17a0551c9c2f4cbeb0ba65e000d72a7fc58afc"
     }
   }
 }

@@ -254,7 +254,9 @@ pub(super) fn observe(
                     && kinds.iter().all(|kind| {
                         matches!(
                             kind.as_ref(),
-                            "agents_md.instructions" | "environments.environment_context"
+                            "agents_md.instructions"
+                                | "environments.environment_context"
+                                | "additional_content.codex_apps_open_page"
                         )
                     })
             })

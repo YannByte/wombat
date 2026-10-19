@@ -13,7 +13,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering as AtomicOrdering},
 };
 
-const EVENT_INDEX_VERSION: u32 = 1;
+pub(super) const EVENT_INDEX_VERSION: u32 = 2;
 pub const MAX_TARGET_EVENTS: usize = 100_000;
 pub const MAX_EVENT_PAGE_ROWS: usize = 200;
 const MAX_EVENT_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
@@ -54,6 +54,7 @@ pub struct EventChunk {
     pub file: FileRef,
     pub count: usize,
     pub message_count: usize,
+    pub message_time: super::message_events::MessageTimeRange,
     pub bytes: u64,
     pub first: Position,
     pub last: Position,
@@ -295,6 +296,7 @@ fn build_events(
                         matches!(e.payload(), crate::session_events::Payload::Message { .. })
                     })
                     .count(),
+                message_time: super::message_events::MessageTimeRange::build(&events[start..end]),
                 bytes: bytes.len() as u64,
                 first: events[start].position().clone(),
                 last: events[end - 1].position().clone(),
@@ -411,6 +413,30 @@ fn check_block_versions(bytes: &[u8]) -> Result<()> {
     }
     Ok(())
 }
+pub(super) fn read_block_bytes(
+    directory: &Path,
+    chunk: &EventChunk,
+    cancelled: &AtomicBool,
+) -> Result<Vec<u8>> {
+    check_cancel(cancelled)?;
+    let file = fs::File::open(safe_file(directory, &chunk.file.file)?)
+        .map_err(|e| corrupt(format!("事件块无法读取：{e}")))?;
+    let size = file.metadata()?.len();
+    if size != chunk.bytes {
+        return Err(corrupt("事件分片校验失败：长度不匹配"));
+    }
+    if size > MAX_EVENT_CHUNK_BYTES {
+        return Err(resource_limit());
+    }
+    let mut bytes = Vec::with_capacity(size as usize);
+    file.take(size + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 != size || crate::hash(&bytes) != chunk.file.sha256 {
+        return Err(corrupt("事件分片校验失败"));
+    }
+    check_cancel(cancelled)?;
+    check_block_versions(&bytes)?;
+    Ok(bytes)
+}
 pub(super) fn validate_index(index: &EventIndex) -> Result<()> {
     check_index_version(Some(u64::from(index.version)))?;
     let mut files = BTreeSet::new();
@@ -425,6 +451,7 @@ pub(super) fn validate_index(index: &EventIndex) -> Result<()> {
         }
         let mut count = 0usize;
         for (number, chunk) in partition.chunks.iter().enumerate() {
+            chunk.message_time.validate(chunk.message_count)?;
             if chunk.offset != count
                 || chunk.count == 0
                 || chunk.count > MAX_EVENT_PAGE_ROWS
@@ -518,23 +545,36 @@ impl EventCursor {
     }
 }
 impl Snapshot {
+    pub(crate) fn event_index(&self) -> Result<&EventIndex> {
+        if self.is_summary_view() {
+            let cold = self.cold_events.as_ref().ok_or_else(|| {
+                operation_error(
+                    "VIEW_EXPIRED",
+                    "Live detail lease expired; reacquire the view",
+                )
+            })?;
+            if self.manifest.events.partitions.is_empty() {
+                return cold.event_index(self);
+            }
+        }
+        Ok(&self.manifest.events)
+    }
     pub(crate) fn event_partition(&self, target: &EventTarget) -> Result<Option<&EventPartition>> {
         if !target.valid() {
             return Err(operation_error("INVALID_ARGUMENT", "非法事件目标"));
         }
-        if self.manifest.events.version != EVENT_INDEX_VERSION {
+        let index = self.event_index()?;
+        if index.version != EVENT_INDEX_VERSION {
             return Err(operation_error(
                 "UNSUPPORTED_VERSION",
                 "不支持此事件索引版本",
             ));
         }
-        Ok(self
-            .manifest
-            .events
+        Ok(index
             .partitions
             .binary_search_by(|p| p.target.cmp(target))
             .ok()
-            .map(|i| self.manifest.events.partitions[i].as_ref()))
+            .map(|i| index.partitions[i].as_ref()))
     }
     /// Returns the entire exact attribution bucket or an error, never a truncated success.
     /// Metadata checks reject oversized targets before opening an event block.
@@ -544,9 +584,6 @@ impl Snapshot {
         budget: EventReadBudget,
         cancelled: &AtomicBool,
     ) -> Result<Vec<Arc<Event>>> {
-        if let Some(view) = self.detailed_view()? {
-            return view.events_for_target(target, budget, cancelled);
-        }
         check_cancel(cancelled)?;
         let Some(partition) = self.event_partition(target)? else {
             encoded_size(&[], budget.max_bytes.min(MAX_EVENT_QUERY_BYTES), cancelled)?;
@@ -595,9 +632,6 @@ impl Snapshot {
         budget: EventReadBudget,
         cancelled: &AtomicBool,
     ) -> Result<EventPage> {
-        if let Some(view) = self.detailed_view()? {
-            return view.event_page(target, limit, cursor, budget, cancelled);
-        }
         check_cancel(cancelled)?;
         if limit == 0 || limit > MAX_EVENT_PAGE_ROWS {
             return Err(operation_error(
@@ -716,25 +750,13 @@ impl Snapshot {
                         events: cold.read(chunk)?,
                     }
                 } else {
-                    // Check the actual filesystem length before allocation, not just manifest claims.
-                    let path = safe_file(&self.directory, &chunk.file.file)?;
-                    let file = fs::File::open(path)
-                        .map_err(|e| corrupt(format!("事件块无法读取：{e}")))?;
-                    let size = file.metadata()?.len();
-                    if size != chunk.bytes {
-                        return Err(corrupt("事件分片校验失败：长度不匹配"));
-                    }
-                    read_bytes = read_bytes.checked_add(size).ok_or_else(resource_limit)?;
-                    if size > MAX_EVENT_CHUNK_BYTES || read_bytes > max_bytes {
+                    read_bytes = read_bytes
+                        .checked_add(chunk.bytes)
+                        .ok_or_else(resource_limit)?;
+                    if read_bytes > max_bytes {
                         return Err(resource_limit());
                     }
-                    let mut bytes = Vec::with_capacity(size as usize);
-                    file.take(size + 1).read_to_end(&mut bytes)?;
-                    if bytes.len() as u64 != size || crate::hash(&bytes) != chunk.file.sha256 {
-                        return Err(corrupt("事件分片校验失败"));
-                    }
-                    check_cancel(cancelled)?;
-                    check_block_versions(&bytes)?;
+                    let bytes = read_block_bytes(&self.directory, chunk, cancelled)?;
                     let block: EventBlock = serde_json::from_slice(&bytes).map_err(|e| {
                         if e.to_string().contains("unsupported event version") {
                             operation_error("UNSUPPORTED_VERSION", "不支持此事件版本")
@@ -778,9 +800,6 @@ impl Snapshot {
     /// Internal snapshot export only. This intentionally traverses all attribution buckets,
     /// including unattributed facts; target queries must use the bounded methods above.
     pub(crate) fn events(&self) -> Result<Vec<Arc<Event>>> {
-        if let Some(view) = self.detailed_view()? {
-            return view.events();
-        }
         if let Some(buckets) = &self.live_events {
             return Ok(buckets
                 .values()
@@ -790,7 +809,7 @@ impl Snapshot {
         }
         let mut events = Vec::new();
         let cancelled = AtomicBool::new(false);
-        for partition in &self.manifest.events.partitions {
+        for partition in &self.event_index()?.partitions {
             for offset in (0..partition.count).step_by(MAX_EVENT_PAGE_ROWS) {
                 events.extend(self.event_range(
                     partition,

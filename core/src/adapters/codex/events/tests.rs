@@ -345,7 +345,7 @@ fn incomplete_nested_tail_is_not_committed_and_restart_replays_one_safe_boundary
 
 #[test]
 fn prior_message_mapping_cannot_resume_cached_append_or_verified_parser_state() {
-    assert_eq!(incremental::MESSAGE_OBSERVATION_VERSION, 3);
+    assert_eq!(incremental::MESSAGE_OBSERVATION_VERSION, 4);
     for mode in [0, 1, 2] {
         let root = tempfile::tempdir().unwrap();
         let index = tempfile::tempdir().unwrap();
@@ -369,7 +369,7 @@ fn prior_message_mapping_cannot_resume_cached_append_or_verified_parser_state() 
                 .write_all(format!("{}\n", message(2, true)).as_bytes())
                 .unwrap();
         }
-        for version in [None, Some(1), Some(99)] {
+        for version in [None, Some(1), Some(3), Some(99)] {
             let mut old = original.clone();
             old.remove("messageObservationVersion");
             if let Some(version) = version {

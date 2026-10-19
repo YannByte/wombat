@@ -256,10 +256,6 @@ pub(super) fn conversation_query(
             select_with_retained(&selector, shared, jobs, configs, cancelled).map(|(s, _)| s)
         })
         .transpose()?;
-    let snapshot = snapshot.detailed_view()?.unwrap_or(snapshot);
-    let baseline = baseline
-        .map(|s| s.detailed_view().map(|detail| detail.unwrap_or(s)))
-        .transpose()?;
     let mut result =
         crate::conversation::query(&snapshot, baseline.as_deref(), &request, cancelled)?;
     result.freshness = Some(freshness);

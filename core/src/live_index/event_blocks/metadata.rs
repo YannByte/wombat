@@ -44,6 +44,7 @@ pub(super) fn chunk(id: i64, digest: String, bytes: u64, events: &[Arc<Event>]) 
             .iter()
             .filter(|e| matches!(e.payload(), crate::session_events::Payload::Message { .. }))
             .count(),
+        message_time: crate::usage_store::MessageTimeRange::build(events),
         bytes,
         first: events[0].position().clone(),
         last: events[events.len() - 1].position().clone(),

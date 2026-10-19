@@ -530,6 +530,27 @@ pub(crate) fn read_cold_chunk(
     db: &Connection,
     chunk: &crate::usage_store::EventChunk,
 ) -> Result<Rows> {
+    let events: Rows = read_cold_chunk_as(db, chunk)?;
+    require_index(
+        events.len() == chunk.count,
+        "cold event chunk count mismatch",
+    )?;
+    #[cfg(test)]
+    DECODED.set(DECODED.get() + events.len());
+    require_index(
+        events.first().map(|e| e.position()) == Some(&chunk.first)
+            && events.last().map(|e| e.position()) == Some(&chunk.last),
+        "cold event chunk boundary mismatch",
+    )?;
+    validate_window(&events, &key(&events[0])?)?;
+    Ok(events)
+}
+
+/// Both full evidence reads and message-only reads verify the same immutable frame.
+pub(crate) fn read_cold_chunk_as<T: serde::de::DeserializeOwned>(
+    db: &Connection,
+    chunk: &crate::usage_store::EventChunk,
+) -> Result<T> {
     let id = chunk
         .file
         .file
@@ -553,20 +574,26 @@ pub(crate) fn read_cold_chunk(
             && row.get::<_, i64>(4)? == chunk.count as i64,
         "cold event chunk identity mismatch",
     )?;
-    let events: Rows = codec::decode(
+    let domain = crate::hash(serde_json::to_vec(&(
+        &chunk.first.source_instance_id,
+        &chunk.first.file_id,
+        &chunk.first.generation,
+    ))?);
+    require_index(
+        row.get::<_, String>(5)? == domain
+            && row.get::<_, i64>(6)? == (chunk.first.byte_offset / WINDOW) as i64
+            && chunk.last.source_instance_id == chunk.first.source_instance_id
+            && chunk.last.file_id == chunk.first.file_id
+            && chunk.last.generation == chunk.first.generation
+            && chunk.last.byte_offset / WINDOW == chunk.first.byte_offset / WINDOW,
+        "cold event chunk source mismatch",
+    )?;
+    codec::decode(
         row.get_ref(0)?.as_blob()?,
         row.get(1)?,
         row.get_ref(2)?.as_str()?,
         row.get(3)?,
-    )?;
-    require_index(
-        events.len() == chunk.count,
-        "cold event chunk count mismatch",
-    )?;
-    #[cfg(test)]
-    DECODED.set(DECODED.get() + events.len());
-    validate_window(&events, &(row.get(5)?, row.get(6)?))?;
-    Ok(events)
+    )
 }
 
 #[cfg(test)]

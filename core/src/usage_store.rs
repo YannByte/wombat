@@ -133,6 +133,8 @@ pub use events::{
 mod event_tests;
 mod files;
 mod memory;
+pub(crate) mod message_events;
+pub use message_events::MessageTimeRange;
 mod native_boundary;
 pub use native_boundary::NativeBoundaryIndex;
 mod price_pool;
