@@ -8,6 +8,7 @@ mod instructions;
 mod observation_tests;
 mod operations;
 pub(crate) mod preview;
+mod projection;
 mod runtime_review;
 mod skills;
 #[cfg(test)]
@@ -227,7 +228,7 @@ fn finish_facts(
             return;
         }
     };
-    titles::apply_titles(&mut facts);
+    titles::apply_titles(&mut facts.metadata);
     if crate::operation_association::check(cancelled).is_err() {
         report.status = "cancelled".into();
         return;
@@ -241,47 +242,19 @@ fn finish_projection(
     mut facts: Facts,
     report: &mut SourceReport,
     cancelled: &std::sync::atomic::AtomicBool,
-) -> anyhow::Result<Facts> {
-    crate::operation_association::check(cancelled)?;
-    facts.resolve_operations(report, cancelled)?;
-    let parents = std::mem::take(&mut facts.parents);
-    let forest = session_relations::SessionRelations::new_cancellable(&parents, cancelled)?;
-    if forest.unresolved > 0 {
-        issue(
-            report,
-            "forkAncestryCycle",
-            "分叉关系存在循环，保留相关事实而不推断重放",
-            None,
-        );
-    }
-    facts.remove_inherited(&forest, cancelled)?;
-    facts.remove_inherited_operations(&forest, report, cancelled)?;
-    crate::operation_association::check(cancelled)?;
-    facts.reconcile_direct(report, cancelled)?;
-    for (thread, projects) in &facts.projects {
-        crate::operation_association::check(cancelled)?;
-        if projects.len() > 1 {
-            if let Some(value) = facts.threads.get_mut(thread) {
-                value.project = None;
-            }
-            issue(
-                report,
-                "projectConflict",
-                "对话记录涉及多个工作目录，未推断单一项目",
-                None,
-            );
-        }
-    }
-    crate::operation_association::check(cancelled)?;
-    Ok(facts)
+) -> anyhow::Result<projection::Projection> {
+    let mut projected = projection::build(&mut facts, report, cancelled)?;
+    projected.events = std::mem::take(&mut facts.events).into_values().collect();
+    Ok(projected)
 }
 
 fn emit_facts(
-    facts: Facts,
+    projected: projection::Projection,
     sink: &mut dyn FactSink,
     cancelled: &std::sync::atomic::AtomicBool,
 ) -> anyhow::Result<()> {
     crate::operation_association::check(cancelled)?;
+    let facts = projected.metadata;
     for observation in facts.title_observations.into_values() {
         crate::operation_association::check(cancelled)?;
         sink.push(Fact::TitleObservation(observation));
@@ -312,15 +285,15 @@ fn emit_facts(
         turn.ordinal = *number;
         sink.push(Fact::Turn(turn));
     }
-    for (_, candidate) in facts.measurements {
+    for measurement in projected.measurements {
         crate::operation_association::check(cancelled)?;
-        sink.push(Fact::Measurement(candidate.measurement));
+        sink.push(Fact::Measurement(measurement));
     }
-    for event in facts.events.into_values() {
+    for event in projected.events {
         crate::operation_association::check(cancelled)?;
         sink.push(Fact::Event(event));
     }
-    for operation in facts.operations.into_values() {
+    for operation in projected.operations {
         crate::operation_association::check(cancelled)?;
         sink.push(Fact::Operation(operation));
     }

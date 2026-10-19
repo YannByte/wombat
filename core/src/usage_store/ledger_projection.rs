@@ -10,6 +10,8 @@ use std::sync::OnceLock;
 
 const VERSION: i64 = 3;
 const HOT_BYTES: usize = 8 * 1024 * 1024;
+mod filter;
+pub(crate) use filter::{Filter, Scan};
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub(crate) struct GroupKey {
     pub agent: String,
@@ -235,9 +237,19 @@ pub(crate) fn update(
     force: bool,
 ) -> Result<()> {
     db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS changed_fact_blocks(bucket INTEGER,block INTEGER,PRIMARY KEY(bucket,block)) WITHOUT ROWID;")?;
-    db.execute("DELETE FROM measurement_summaries WHERE source=?1 AND block NOT IN (SELECT f.id FROM fact_blocks f JOIN buckets b ON b.id=f.bucket WHERE b.scope=?2 AND b.field='measurements')",params![source,format!("projection:{source}")])?;
-    let mut query=db.prepare("SELECT f.id FROM fact_blocks f JOIN buckets b ON b.id=f.bucket WHERE b.scope=?1 AND b.field='measurements' AND (?2 OR EXISTS(SELECT 1 FROM changed_fact_blocks c WHERE c.bucket=f.bucket AND c.block=f.id)) ORDER BY f.id")?;
-    let mut cursor = query.query(params![format!("projection:{source}"), force])?;
+    let obsolete = if force {
+        ""
+    } else {
+        " AND block IN (SELECT block FROM changed_fact_blocks)"
+    };
+    db.execute(&format!("DELETE FROM measurement_summaries WHERE source=?1 {obsolete} AND NOT EXISTS(SELECT 1 FROM fact_blocks f JOIN buckets b ON b.id=f.bucket WHERE f.id=measurement_summaries.block AND b.scope=?2 AND b.field='measurements')"),params![source,format!("projection:{source}")])?;
+    let sql = if force {
+        "SELECT f.id FROM buckets b JOIN fact_blocks f ON f.bucket=b.id WHERE b.scope=?1 AND b.field='measurements' ORDER BY f.id"
+    } else {
+        "SELECT f.id FROM buckets b JOIN changed_fact_blocks c ON c.bucket=b.id JOIN fact_blocks f ON f.id=c.block AND f.bucket=c.bucket WHERE b.scope=?1 AND b.field='measurements' ORDER BY f.id"
+    };
+    let mut query = db.prepare(sql)?;
+    let mut cursor = query.query([format!("projection:{source}")])?;
     let mut pool = super::price_pool::PricePool::new(prices);
     let mut insert = db.prepare_cached(
         "INSERT INTO measurement_summaries(source,block,part,thread,targets,version,bytes,digest,data,count,catalog,catalog_digest) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
@@ -397,18 +409,26 @@ pub(super) fn group_page(
     thread: Option<&str>,
     turn: Option<&str>,
     after: (i64, i64),
-    selection: Option<&dyn Fn(&LedgerGroup) -> bool>,
+    scan: Scan<'_>,
 ) -> Result<Vec<StoredGroup>> {
-    let mut query=db.prepare_cached("SELECT block,part,version,bytes,digest,CASE WHEN ?6 THEN NULL ELSE data END,thread,targets,count,catalog,catalog_digest FROM measurement_summaries WHERE source=?1 AND (?2 IS NULL OR thread=?2) AND (?3 IS NULL OR EXISTS(SELECT 1 FROM json_each(targets) j WHERE j.value=?3 OR (?3='unassigned' AND j.value IS NULL))) AND (block,part)>(?4,?5) ORDER BY block,part LIMIT ?7")?;
-    let mut cursor = query.query(params![
-        source,
-        thread,
-        turn,
-        after.0,
-        after.1,
-        selection.is_some(),
-        if selection.is_some() { 256 } else { 16 }
-    ])?;
+    crate::usage_app::query_work::charge(0, 0)?;
+    let _budget = crate::usage_app::query_work::SqlBudget::new(db)?;
+    let sql = format!(
+        "SELECT block,part,version,bytes,digest,CASE WHEN ?6 THEN NULL ELSE data END,thread,targets,count,catalog,catalog_digest FROM measurement_summaries WHERE source=?1 AND (?2 IS NULL OR thread=?2) AND (?3 IS NULL OR EXISTS(SELECT 1 FROM json_each(targets) j WHERE j.value=?3 OR (?3='unassigned' AND j.value IS NULL))) AND (block,part)>(?4,?5) {} ORDER BY block,part LIMIT ?7",
+        scan.filter.sql()
+    );
+    let mut query = db.prepare_cached(&sql)?;
+    let mut values: Vec<rusqlite::types::Value> = vec![
+        source.to_owned().into(),
+        thread.map(str::to_owned).into(),
+        turn.map(str::to_owned).into(),
+        after.0.into(),
+        after.1.into(),
+        i64::from(scan.select.is_some()).into(),
+        if scan.select.is_some() { 256_i64 } else { 16 }.into(),
+    ];
+    values.extend(scan.filter.values.iter().cloned());
+    let mut cursor = query.query(rusqlite::params_from_iter(values))?;
     let mut out = vec![];
     let mut bytes = 0;
     let empty = Aggregate::new(&[])?;
@@ -423,6 +443,7 @@ pub(super) fn group_page(
         );
         // The first valid frame is allowed; further frames wait for the next page.
         let raw: String = row.get(9)?;
+        crate::usage_app::query_work::charge(1, raw.len())?;
         let digest: String = row.get(10)?;
         anyhow::ensure!(
             raw.len() <= 16 * 1024 && crate::hash(raw.as_bytes()) == digest,
@@ -436,8 +457,10 @@ pub(super) fn group_page(
                 && catalog.count > 0,
             "aggregate catalog identity mismatch"
         );
-        let stub = selection.map(|_| Arc::new(catalog.stub(&empty)));
-        let excluded = selection.is_some_and(|select| !select(stub.as_ref().unwrap()));
+        let stub = scan.select.map(|_| Arc::new(catalog.stub(&empty)));
+        let excluded = scan
+            .select
+            .is_some_and(|select| !select(stub.as_ref().unwrap()));
         if !excluded && !out.is_empty() && bytes + encoded > 512 * 1024 {
             break;
         }
@@ -448,7 +471,7 @@ pub(super) fn group_page(
         let part: i64 = row.get(1)?;
         let data = if excluded {
             vec![]
-        } else if selection.is_some() {
+        } else if scan.select.is_some() {
             payload_query.query_row(params![source, block, part], |r| r.get(0))?
         } else {
             row.get(5)?
@@ -484,6 +507,7 @@ impl StoredGroup {
                 .stub
                 .ok_or_else(|| corrupt("aggregate catalog selection missing"));
         }
+        crate::usage_app::query_work::charge(0, self.data.len())?;
         let cache_key = format!("{}:{}", self.digest, crate::hash(&self.data));
         let cached = hot_cache()
             .lock()
@@ -562,7 +586,14 @@ pub(crate) fn summary(
     for source in sources {
         let mut after = (-1, -1);
         loop {
-            let page = group_page(db, &source.source.id, None, None, after, None)?;
+            let page = group_page(
+                db,
+                &source.source.id,
+                None,
+                None,
+                after,
+                Scan::new(&Filter::default(), None),
+            )?;
             if page.is_empty() {
                 break;
             }
@@ -639,6 +670,22 @@ impl Snapshot {
         thread: Option<&str>,
         turn: Option<&str>,
         selection: Option<&dyn Fn(&LedgerGroup) -> bool>,
+        consume: impl FnMut(&LedgerGroup, &dyn Fn() -> Result<Vec<PricedMeasurement>>) -> Result<()>,
+    ) -> Result<()> {
+        self.visit_ledger_filtered(
+            tz,
+            thread,
+            turn,
+            Scan::new(&Filter::default(), selection),
+            consume,
+        )
+    }
+    pub(crate) fn visit_ledger_filtered(
+        &self,
+        tz: Tz,
+        thread: Option<&str>,
+        turn: Option<&str>,
+        scan: Scan<'_>,
         mut consume: impl FnMut(&LedgerGroup, &dyn Fn() -> Result<Vec<PricedMeasurement>>) -> Result<()>,
     ) -> Result<()> {
         let ready: std::collections::HashSet<_> = self
@@ -659,7 +706,7 @@ impl Snapshot {
                 tz,
                 thread,
                 turn,
-                selection,
+                scan,
                 |group, read| {
                     if !self.project_loads.is_empty() {
                         let ready = group

@@ -171,7 +171,9 @@ impl<K: Ord + Serialize + DeserializeOwned, V: Clone + Serialize + DeserializeOw
         prefix: Option<&str>,
         mut consume: impl FnMut(&K, &V) -> Result<()>,
     ) -> Result<()> {
+        super::query_work::charge(0, 0)?;
         if let Some(disk) = &self.disk {
+            let _budget = super::query_work::SqlBudget::new(&disk.db)?;
             let sql = format!(
                 "SELECT key,payload FROM reductions {} ORDER BY {}",
                 if prefix.is_some() {
@@ -188,6 +190,7 @@ impl<K: Ord + Serialize + DeserializeOwned, V: Clone + Serialize + DeserializeOw
                 query.query([])?
             };
             while let Some(row) = cursor.next()? {
+                super::query_work::charge(1, 0)?;
                 let key: K = serde_json::from_str(row.get_ref(0)?.as_str()?)?;
                 let value: V = serde_json::from_str(row.get_ref(1)?.as_str()?)?;
                 consume(&key, &value)?;

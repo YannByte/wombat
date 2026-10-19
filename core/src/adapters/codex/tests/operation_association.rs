@@ -79,10 +79,7 @@ fn late_bridge_retracts_old_rows_preserves_ids_and_agrees_after_restart() {
     let second = incremental::sync_cached(&tx, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    assert!(
-        second.operations.is_none(),
-        "retirement requires full source replacement"
-    );
+
     assert_eq!(second.collected.operations.len(), 1);
     assert_eq!(second.collected.operations[0].id, canonical);
     assert_eq!(second.collected.operations[0].evidence.len(), 3);
@@ -447,7 +444,8 @@ fn cancelled_fork_operation_reduction_preserves_existing_canonical_rows() {
     let parents = facts.parents.clone();
     let forest = super::super::session_relations::SessionRelations::new(&parents);
     let error = facts
-        .remove_inherited_operations(
+        .project_operations(
+            &mut Facts::default(),
             &forest,
             &mut report,
             &std::sync::atomic::AtomicBool::new(true),

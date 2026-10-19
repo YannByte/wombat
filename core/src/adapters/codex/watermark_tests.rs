@@ -243,7 +243,7 @@ fn missing_or_future_message_mapping_refuses_append_and_warm_parser_without_muta
         );
         tx.commit().unwrap();
     }
-    assert!(!cache.needs_seed());
+    assert_eq!(cache.encoded_bytes, 0);
     let scope = format!("parser:{}:{VERSION}:1", source.id);
     let facts_scope = format!("{scope}:facts");
     let original = crate::live_index::load_map(&db, &scope).unwrap();

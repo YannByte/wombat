@@ -516,6 +516,14 @@ impl Event {
     pub fn time(&self) -> &Time {
         &self.0.time
     }
+    pub(crate) fn retain_collection_time(&mut self, value: String) -> Result<()> {
+        ensure!(
+            chrono::DateTime::parse_from_rfc3339(&value).is_ok(),
+            "invalid retained collection time"
+        );
+        self.0.collected_at = value.into();
+        Ok(())
+    }
     pub fn collected_at(&self) -> &str {
         &self.0.collected_at
     }

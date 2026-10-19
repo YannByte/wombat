@@ -5,6 +5,7 @@ mod mcp;
 mod merge;
 mod outcome;
 mod replay;
+pub(in crate::adapters::codex) use replay::{finish_replay, merge_replay, owner_key, replay_plan};
 mod work;
 pub(super) use merge::merge_metadata;
 pub(crate) use work::review_target;

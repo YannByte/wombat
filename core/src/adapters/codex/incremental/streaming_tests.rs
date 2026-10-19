@@ -31,10 +31,7 @@ fn first_scan_streams_multiple_batches_and_preserves_every_observation_on_append
             .unwrap();
         assert_eq!(result.collected.measurements[0].tokens.total, Some(110));
         assert!(result.collected.events.is_empty());
-        let facts = cache.facts.as_ref().unwrap();
-        assert!(facts.pending_events.is_empty());
-        assert!(facts.events.is_empty());
-        assert!(facts.association_groups.is_some());
+        assert_eq!(cache.encoded_bytes, 0);
         original = crate::live_index::load_map(&tx, &fact_scope(&source)).unwrap();
         assert!(original["events"].as_object().unwrap().len() > 1700);
         tx.commit().unwrap();
@@ -68,7 +65,6 @@ fn first_scan_streams_multiple_batches_and_preserves_every_observation_on_append
         .unwrap();
     assert_eq!(result.collected.measurements[0].tokens.total, Some(110));
     assert!(result.collected.events.is_empty());
-    assert!(restarted.facts.as_ref().unwrap().streaming);
-    assert!(restarted.facts.as_ref().unwrap().events.is_empty());
+    assert_eq!(restarted.encoded_bytes, 0);
     tx.commit().unwrap();
 }

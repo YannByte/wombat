@@ -117,8 +117,8 @@ fn archive_scopes_preserve_global_collisions_late_outcomes_and_unaffected_alloca
         .unwrap();
     assert_eq!(
         crate::live_index::decoded_event_count() - before,
-        2,
-        "Only the changed target is expanded"
+        0,
+        "Changed targets reuse encoded write inputs without decoding archive frames"
     );
     assert!(Arc::ptr_eq(&untouched, &actual.operations["id-0"]));
     assert!(actual.associations_share_canonical_allocations());
@@ -152,8 +152,13 @@ fn incomplete_pass_local_association_inputs_fail_without_changing_committed_obse
     crate::live_index::save_events(&db, "facts", [&event], true, &cancelled).unwrap();
     {
         let tx = db.unchecked_transaction().unwrap();
-        tx.execute("UPDATE written_association_blocks SET payload='[]'", [])
-            .unwrap();
+        let (payload, bytes, digest) =
+            crate::live_index::encode_projection(&Vec::<Arc<Event>>::new()).unwrap();
+        tx.execute(
+            "UPDATE written_association_blocks SET payload=?1,bytes=?2,digest=?3",
+            rusqlite::params![payload, bytes as i64, digest],
+        )
+        .unwrap();
         let mut facts = Facts {
             operations_pending: true,
             ..Facts::default()

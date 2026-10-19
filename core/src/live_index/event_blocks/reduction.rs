@@ -71,6 +71,8 @@ pub(crate) fn each_group(
                 .prepare_cached("SELECT data FROM event_blocks WHERE rowid=?1")?
                 .query_row([id], |r| r.get(0))?;
             let events: Rows = codec::decode(&data, bytes, &digest, version)?;
+            #[cfg(test)]
+            DECODED.set(DECODED.get() + events.len());
             require_index(
                 !events.is_empty() && events.len() <= 200 && events.len() as i64 == count,
                 "event reduction count mismatch",
@@ -84,8 +86,6 @@ pub(crate) fn each_group(
                 .all(|e| (e.thread_id(), e.turn_id()) == (owner.0.as_deref(), owner.1.as_deref())),
             "event reduction target mismatch",
         )?;
-        #[cfg(test)]
-        DECODED.set(DECODED.get() + events.len());
         for mut event in events {
             if observe(&mut event)? {
                 retained.insert(event.shared_id(), event);

@@ -94,7 +94,7 @@ impl ColdEvents {
         tz: chrono_tz::Tz,
         thread: Option<&str>,
         turn: Option<&str>,
-        selection: Option<&dyn Fn(&super::ledger_projection::LedgerGroup) -> bool>,
+        scan: super::ledger_projection::Scan<'_>,
         mut consume: impl FnMut(
             &super::ledger_projection::LedgerGroup,
             &dyn Fn() -> Result<Vec<PricedMeasurement>>,
@@ -115,7 +115,7 @@ impl ColdEvents {
                         thread,
                         turn,
                         after,
-                        selection,
+                        scan,
                     )?
                 };
                 if page.is_empty() {

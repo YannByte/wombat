@@ -160,7 +160,7 @@ mod observation_tests;
 
 pub(crate) use cold_events::build_from_sources as cold_event_index_from_sources;
 
-mod cold_operations;
+pub(crate) mod cold_operations;
 pub(crate) use cold_operations::ColdOperations;
 mod read_header;
 pub(crate) use read_header::{load as load_read_header, save as save_read_header};

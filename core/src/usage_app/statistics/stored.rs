@@ -1,7 +1,7 @@
 //! Exact task populations reduce persisted aggregates; operation bodies stay cold.
 use super::*;
 use crate::usage_app::working_set::{Order, WorkingSet};
-use crate::usage_store::ledger_projection::{GroupKey, LedgerGroup};
+use crate::usage_store::ledger_projection::{GroupKey, LedgerGroup, Scan};
 
 struct Population {
     tasks: WorkingSet<Option<String>, Aggregate>,
@@ -44,7 +44,7 @@ impl Population {
             }
             Ok(())
         })?;
-        totals.sort_unstable_by(f64::total_cmp);
+        let (median_tokens, p90_tokens) = crate::statistics::population_quantiles(&mut totals);
         Ok(TaskPopulation {
             measured_tasks: measured,
             complete_tasks: totals.len(),
@@ -53,8 +53,8 @@ impl Population {
             mean_tokens: sum
                 .filter(|_| !totals.is_empty())
                 .map(|n| n as f64 / totals.len() as f64),
-            median_tokens: crate::statistics::quantile(&totals, 0.5),
-            p90_tokens: crate::statistics::quantile(&totals, 0.9),
+            median_tokens,
+            p90_tokens,
             unassigned_usage: unassigned,
         })
     }
@@ -99,13 +99,33 @@ pub(super) fn execute(request: Request, snapshot: &Snapshot, tz: Tz) -> Result<R
     let selected = |key: &GroupKey, scope: &Scope, date| {
         scope::matches_fields(fields(key), scope, &projects, || date)
     };
+    let context_filter = crate::usage_store::ledger_projection::Filter::scope(&range, &projects);
+    let ambiguous = |group: &LedgerGroup| group.single_date(tz).is_none();
+    snapshot.visit_ledger_filtered(
+        tz,
+        None,
+        None,
+        Scan::new(&context_filter, Some(&ambiguous)),
+        |group, read| {
+            let mut observe = |key: &GroupKey, date: Option<NaiveDate>| {
+                if selected(key, &range, date)
+                    && let Some(date) = date
+                {
+                    first = Some(first.map_or(date, |d: NaiveDate| d.min(date)));
+                    last = Some(last.map_or(date, |d: NaiveDate| d.max(date)));
+                }
+            };
+            if let Some(date) = group.single_date(tz) {
+                observe(&group.key, date);
+            } else {
+                for row in read()? {
+                    observe(&group.key, local_date(&row, tz));
+                }
+            }
+            Ok(())
+        },
+    )?;
     let mut consume = |key: &GroupKey, value: &Aggregate, date: Option<NaiveDate>| -> Result<()> {
-        if selected(key, &range, date)
-            && let Some(date) = date
-        {
-            first = Some(first.map_or(date, |d: NaiveDate| d.min(date)));
-            last = Some(last.map_or(date, |d: NaiveDate| d.max(date)));
-        }
         if selected(key, &request.scope, date) {
             current.add(key.thread.clone(), value)?;
             if let Some(dimension) = &request.presentation {
@@ -143,18 +163,31 @@ pub(super) fn execute(request: Request, snapshot: &Snapshot, tz: Tz) -> Result<R
                     .is_some_and(|scope| selected(&group.key, scope, date))
         })
     };
-    snapshot.visit_ledger_catalog(tz, None, None, Some(&select), |group, read| {
-        if let Some(date) = group.single_date(tz) {
-            consume(&group.key, &group.aggregate, date)
-        } else {
-            for row in read()? {
-                let mut key = group.key.clone();
-                key.turn = row.fact.turn_id.as_deref().map(str::to_owned);
-                consume(&key, &Aggregate::new(&[&row])?, local_date(&row, tz))?;
+    let filter = crate::usage_store::ledger_projection::Filter::scope(&request.scope, &projects);
+    let filter = match &baseline_scope {
+        Some(scope) => filter.either(crate::usage_store::ledger_projection::Filter::scope(
+            scope, &projects,
+        )),
+        None => filter,
+    };
+    snapshot.visit_ledger_filtered(
+        tz,
+        None,
+        None,
+        Scan::new(&filter, Some(&select)),
+        |group, read| {
+            if let Some(date) = group.single_date(tz) {
+                consume(&group.key, &group.aggregate, date)
+            } else {
+                for row in read()? {
+                    let mut key = group.key.clone();
+                    key.turn = row.fact.turn_id.as_deref().map(str::to_owned);
+                    consume(&key, &Aggregate::new(&[&row])?, local_date(&row, tz))?;
+                }
+                Ok(())
             }
-            Ok(())
-        }
-    })?;
+        },
+    )?;
     let population = current.finish()?;
     let selected_task = if let Some(id) = &request.thread_id {
         let task = current.tasks.get(&Some(id.clone()))?.ok_or_else(|| {

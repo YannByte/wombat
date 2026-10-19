@@ -59,6 +59,7 @@ impl Snapshot {
         };
         Ok(collected)
     }
+    #[cfg(test)]
     pub(crate) fn resident_operation_facts(&self) -> impl Iterator<Item = &Arc<Operation>> {
         self.memory_turns
             .iter()
@@ -100,6 +101,7 @@ impl Snapshot {
         }
         Ok(out)
     }
+    #[cfg(test)]
     pub(crate) fn measurement_facts(&self) -> impl Iterator<Item = &Arc<Measurement>> {
         self.live_rows
             .iter()

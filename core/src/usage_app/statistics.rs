@@ -50,7 +50,7 @@ pub(crate) fn population(rows: &[&PricedMeasurement]) -> Result<TaskPopulation> 
                 .filter(|s| *s <= MAX_SAFE_INTEGER);
         }
     }
-    totals.sort_unstable_by(f64::total_cmp);
+    let (median_tokens, p90_tokens) = crate::statistics::population_quantiles(&mut totals);
     Ok(TaskPopulation {
         measured_tasks: tasks.len(),
         complete_tasks: totals.len(),
@@ -59,8 +59,8 @@ pub(crate) fn population(rows: &[&PricedMeasurement]) -> Result<TaskPopulation> 
         mean_tokens: sum
             .filter(|_| !totals.is_empty())
             .map(|s| s as f64 / totals.len() as f64),
-        median_tokens: crate::statistics::quantile(&totals, 0.5),
-        p90_tokens: crate::statistics::quantile(&totals, 0.9),
+        median_tokens,
+        p90_tokens,
         unassigned_usage: summarize(&unassigned)?,
     })
 }

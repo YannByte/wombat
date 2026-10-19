@@ -15,7 +15,7 @@ mod comparison;
 mod conversations;
 mod inspection;
 pub(crate) use comparison::publication_change;
-mod query_work;
+pub(crate) mod query_work;
 #[cfg(test)]
 mod report_tests;
 mod reports;
@@ -116,6 +116,7 @@ pub fn execute(request: Request) -> Result<Response> {
 }
 
 pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<Response> {
+    let _budget = query_work::Budget::enter();
     if !matches!(
         request.action,
         Action::Usage | Action::Threads | Action::Statistics
@@ -160,10 +161,7 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
         ));
     }
     // hits above remain available while a different request is being reduced.
-    let _work = snapshot
-        .query_work
-        .lock()
-        .map_err(|_| operation_error("RESOURCE_LIMIT", "Query worker unavailable"))?;
+    let _work = query_work::lock(&snapshot.query_work)?;
     if let Some(key) = &key
         && let Some(result) = snapshot.query_cache.lock().unwrap().get(key)
     {
@@ -172,7 +170,7 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
             None => result,
         });
     }
-    let _permit = query_work::acquire();
+    let _permit = query_work::acquire()?;
     let compact = request.compact == Some(true);
     let mut result = match execute_uncached(planned, snapshot) {
         Ok(result) => result,
@@ -186,7 +184,7 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
             key = None;
             execute_uncached(request, snapshot)?
         }
-        Err(error) => return Err(error),
+        Err(error) => return Err(query_work::query_error(error)),
     };
     if compact {
         compact::apply(&mut result);

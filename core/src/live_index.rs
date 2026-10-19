@@ -11,10 +11,14 @@ mod packed;
 #[cfg(test)]
 pub(crate) use event_blocks::decoded_event_count;
 pub(crate) use event_blocks::each_group as each_event_group;
+pub(crate) use event_blocks::{
+    discard_origins as discard_event_origins, save as save_events, share as share_events,
+};
 pub(crate) use event_blocks::{read_cold_chunk, validate_cold_source};
-pub(crate) use event_blocks::{save as save_events, share as share_events};
-pub(crate) use packed::measurement_block;
-pub(crate) use packed::retain_prefix as retain_packed_prefix;
+pub(crate) use packed::{
+    measurement_block, prepare_write as prepare_fact_write,
+    retain_streamed as retain_packed_streamed,
+};
 pub(crate) use packed::{retain as retain_packed, upsert as put_packed};
 pub(crate) fn encode_projection<T: serde::Serialize>(
     value: &T,
@@ -69,7 +73,7 @@ pub(crate) fn open(path: &Path) -> Result<Connection> {
 fn open_inner(path: &Path) -> Result<Connection> {
     let mut db = Connection::open(path)?;
     db.busy_timeout(std::time::Duration::from_secs(2))?;
-    db.execute_batch("PRAGMA page_size=4096; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192; PRAGMA temp_store=FILE; PRAGMA journal_size_limit=8388608; PRAGMA wal_autocheckpoint=512;")?;
+    db.execute_batch("PRAGMA page_size=4096; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192; PRAGMA temp_store=FILE; PRAGMA temp.cache_size=-8192; PRAGMA journal_size_limit=8388608; PRAGMA wal_autocheckpoint=512;")?;
     let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version == VERSION {
         validation_indexes(&db)?;
@@ -116,7 +120,7 @@ fn open_inner(path: &Path) -> Result<Connection> {
 fn validation_indexes(db: &Connection) -> Result<()> {
     // Validate complete coverage without visiting pages holding compressed bodies.
     // These secondary indexes are disposable within the current format only.
-    db.execute_batch("CREATE INDEX IF NOT EXISTS event_blocks_validation ON event_blocks(bucket,codec,count); CREATE INDEX IF NOT EXISTS measurement_summaries_coverage ON measurement_summaries(source,count);")?;
+    db.execute_batch("CREATE INDEX IF NOT EXISTS event_blocks_validation ON event_blocks(bucket,codec,count); CREATE INDEX IF NOT EXISTS measurement_summaries_coverage ON measurement_summaries(source,count); CREATE INDEX IF NOT EXISTS measurement_summaries_model ON measurement_summaries(source,json_extract(catalog,'$.key.model'),block,part);")?;
     Ok(())
 }
 
@@ -234,6 +238,14 @@ pub(crate) fn has_scope(db: &Connection, scope: &str) -> Result<bool> {
 
 /// Read one directly stored scalar header; references are not a supported header shape.
 pub(crate) fn scalar(db: &Connection, scope: &str, field: &str) -> Result<Option<Value>> {
+    scalar_as(db, scope, field)
+}
+
+pub(crate) fn scalar_as<T: serde::de::DeserializeOwned>(
+    db: &Connection,
+    scope: &str,
+    field: &str,
+) -> Result<Option<T>> {
     let payload: Option<String> = db.prepare_cached("SELECT json(e.payload) FROM buckets b JOIN entries e ON e.bucket=b.id WHERE b.scope=?1 AND b.field=?2 AND e.id=''")?
         .query_row(rusqlite::params![scope, field], |row| row.get(0)).optional()?;
     payload
@@ -370,6 +382,7 @@ pub(crate) fn replace_field<'a, T: serde::Serialize + 'a>(
     prune(db, bucket, &desired)
 }
 
+#[cfg(test)]
 pub(crate) fn remove(db: &Connection, scope: &str, field: &str, id: &str) -> Result<()> {
     let bucket: Option<i64> = db
         .prepare_cached("SELECT id FROM buckets WHERE scope=?1 AND field=?2")?

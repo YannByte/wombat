@@ -6,48 +6,38 @@ pub(crate) struct ColdOperations {
     pub(super) turns: BTreeMap<(String, String), Vec<crate::live_index::FactLocation>>,
     pub(super) unassigned: BTreeMap<String, UnassignedUseRecords>,
 }
-impl ColdOperations {
-    pub(crate) fn metadata(rows: &[Arc<Operation>]) -> Result<Self> {
-        let mut index = Self::default();
-        for operation in rows {
-            if operation.turn_id.as_deref().is_none_or(str::is_empty) {
-                index
-                    .unassigned
-                    .entry(operation.thread_id.to_string())
-                    .or_default()
-                    .observe(operation)?;
-            }
-            index
-                .turns
-                .entry((
-                    operation.thread_id.to_string(),
-                    operation
-                        .turn_id
-                        .as_deref()
-                        .unwrap_or("unassigned")
-                        .to_owned(),
-                ))
-                .or_default();
-        }
-        Ok(index)
-    }
-    pub(crate) fn include_measurement_turns(&mut self, rows: &[Arc<Measurement>]) {
-        for fact in rows {
-            if let Some(thread) = &fact.thread_id {
-                self.turns
-                    .entry((
-                        thread.to_string(),
-                        fact.turn_id.as_deref().unwrap_or("unassigned").to_owned(),
-                    ))
-                    .or_default();
-            }
-        }
-    }
-}
 pub(crate) fn load_operations(
     db: &rusqlite::Connection,
     sources: &[SourceReport],
     threads: &[Thread],
+) -> Result<ColdOperations> {
+    load(db, sources, threads, true)
+}
+pub(crate) fn load_metadata(
+    db: &rusqlite::Connection,
+    sources: &[SourceReport],
+    threads: &[Thread],
+) -> Result<ColdOperations> {
+    let mut result = load(db, sources, threads, false)?;
+    let mut query=db.prepare_cached("SELECT DISTINCT thread,j.value FROM measurement_summaries,json_each(targets) j WHERE source=?1 AND thread IS NOT NULL")?;
+    for source in sources {
+        let mut rows = query.query([&source.source.id])?;
+        while let Some(row) = rows.next()? {
+            let thread: String = row.get(0)?;
+            let turn: Option<String> = row.get(1)?;
+            result
+                .turns
+                .entry((thread, turn.unwrap_or_else(|| "unassigned".into())))
+                .or_default();
+        }
+    }
+    Ok(result)
+}
+fn load(
+    db: &rusqlite::Connection,
+    sources: &[SourceReport],
+    threads: &[Thread],
+    locations: bool,
 ) -> Result<ColdOperations> {
     let owners: std::collections::HashMap<_, _> = threads
         .iter()
@@ -77,7 +67,7 @@ pub(crate) fn load_operations(
                         .or_default()
                         .observe(&operation)?;
                 }
-                index
+                let target = index
                     .turns
                     .entry((
                         operation.thread_id.to_string(),
@@ -87,12 +77,14 @@ pub(crate) fn load_operations(
                             .unwrap_or("unassigned")
                             .to_owned(),
                     ))
-                    .or_default()
-                    .push(crate::live_index::FactLocation {
+                    .or_default();
+                if locations {
+                    target.push(crate::live_index::FactLocation {
                         block: location.block,
                         slot: location.slot,
                         id: id.to_owned(),
                     });
+                }
                 Ok(())
             },
         )?;

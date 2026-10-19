@@ -26,9 +26,11 @@ impl Write for BudgetWriter {
 
 const MAX_ENTRIES: usize = 16;
 const MAX_BYTES: usize = 2 * 1024 * 1024;
-const MAX_ENTRY_BYTES: usize = 512 * 1024;
+// Full responses can include substantial fixed source coverage. Admit one
+// complete window without increasing the total per-view cache budget.
+const MAX_ENTRY_BYTES: usize = MAX_BYTES;
 
-/// Compact pages share one default-sized window; all business filters remain in
+/// Usage pages share one default-sized window; all business filters remain in
 /// the request key. Crossing a window or using location-driven paging stays exact.
 pub(crate) struct PageWindow {
     offset: usize,
@@ -40,12 +42,10 @@ impl PageWindow {
         let offset = r.offset.unwrap_or(0);
         let limit = r.limit.unwrap_or(50);
         let start = offset / 50 * 50;
-        (r.compact == Some(true)
-            && matches!(
-                r.action,
-                Action::Usage | Action::Threads | Action::Statistics
-            )
-            && r.locate_thread_id.is_none()
+        (matches!(
+            r.action,
+            Action::Usage | Action::Threads | Action::Statistics
+        ) && r.locate_thread_id.is_none()
             && r.locate_turn_id.is_none()
             && r.locate_operation_id.is_none()
             && limit > 0

@@ -66,6 +66,40 @@ fn compact_page_windows_preserve_uncached_results_totals_order_and_boundaries() 
     }
 }
 #[test]
+fn full_page_windows_preserve_fields_and_reuse_expired_views() {
+    let mut snapshot = fixture();
+    for action in ["usage", "threads", "statistics"] {
+        for offset in [0, 1, 49, 50, 79, 80] {
+            for limit in [1, 7, 20, 50, 60] {
+                let mut r = request(action, None, offset, limit);
+                r.compact = Some(false);
+                let expected = execute_uncached(r.clone(), &snapshot).unwrap();
+                let actual = execute_snapshot(r, &snapshot).unwrap();
+                assert_eq!(
+                    serde_json::to_value(actual).unwrap(),
+                    serde_json::to_value(expected).unwrap()
+                );
+            }
+        }
+    }
+    let mut r = request("threads", None, 0, 50);
+    r.compact = Some(false);
+    let expected = execute_snapshot(r.clone(), &snapshot).unwrap();
+    snapshot.defer_details();
+    r.limit = Some(7);
+    r.offset = Some(3);
+    let actual = execute_snapshot(r, &snapshot).unwrap();
+    assert_eq!(actual.items.len(), 7);
+    assert_eq!(
+        serde_json::to_value(&actual.items).unwrap(),
+        serde_json::to_value(&expected.items[3..10]).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(actual.summary).unwrap(),
+        serde_json::to_value(expected.summary).unwrap()
+    );
+}
+#[test]
 fn a_cached_window_answers_new_page_sizes_without_reading_expired_facts() {
     let mut snapshot = fixture();
     let mut prefix = execute_uncached(request("threads", None, 0, 50), &snapshot).unwrap();

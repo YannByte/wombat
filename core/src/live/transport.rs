@@ -355,23 +355,9 @@ fn run(resident: bool) -> Result<()> {
                         if outcome.is_err() {
                             caches.clear();
                         }
-                        for (source, cache) in &mut caches {
-                            cache.refresh_encoded_bytes(db, source)?;
-                        }
-                        let mut resident_bytes: u64 =
-                            caches.values().map(|c| c.encoded_bytes).sum();
-                        while resident_bytes > service::PARSER_CACHE_BUDGET {
-                            let Some(key) = caches
-                                .iter()
-                                .max_by_key(|(_, c)| c.encoded_bytes)
-                                .map(|(id, _)| id.clone())
-                            else {
-                                break;
-                            };
-                            resident_bytes = resident_bytes
-                                .saturating_sub(caches.remove(&key).unwrap().encoded_bytes);
-                            evicted = true;
-                        }
+                        let (resident_bytes, trimmed) =
+                            resources::trim_parser_caches(db, &mut caches)?;
+                        evicted |= trimmed;
                         if evicted {
                             db.flush_prepared_statement_cache();
                             db.execute_batch("PRAGMA shrink_memory")?;
@@ -423,7 +409,7 @@ fn run(resident: bool) -> Result<()> {
                 worker_state.1.notify_all();
                 drop(entries);
                 drop(prior_view);
-                if evicted {
+                if evicted || compact {
                     resources::release_unused();
                 }
             }

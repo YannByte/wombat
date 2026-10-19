@@ -223,7 +223,7 @@ fn save_target(
                 raw.push(b',');
             }
             raw.extend_from_slice(&encoded);
-            if crate::operation_association::is_projection_input(&events[end]) {
+            if metadata::projection_input(&events[end]) {
                 if association_count > 0 {
                     associations.push(b',');
                 }
@@ -244,8 +244,8 @@ fn save_target(
             digest,
             bytes as u64,
             &events[start..end],
-            &associations,
-            association_count,
+            (&associations, association_count),
+            encoder,
         )?;
         start = end;
         part += 1;
@@ -334,6 +334,24 @@ pub(crate) fn save<'a>(
         "invalid observation count delta",
     )?;
     db.execute("INSERT INTO event_heads VALUES(?1,?2,?3) ON CONFLICT(bucket) DO UPDATE SET event_count=excluded.event_count,block_count=excluded.block_count WHERE event_count!=excluded.event_count OR block_count!=excluded.block_count", params![bucket,totals.0,totals.1])?;
+    Ok(())
+}
+/// Retire replaced physical generations before replay, preserving untouched
+/// windows so read-only verification does not rewrite identical observations.
+pub(crate) fn discard_origins(
+    db: &Connection,
+    scope: &str,
+    origins: &std::collections::BTreeSet<String>,
+) -> Result<()> {
+    let bucket = bucket(db, scope, "events")?;
+    for origin in origins {
+        db.execute("INSERT OR IGNORE INTO changed_event_targets SELECT DISTINCT target FROM event_blocks WHERE bucket=?1 AND origin=?2",params![bucket,origin])?;
+        db.execute(
+            "DELETE FROM event_blocks WHERE bucket=?1 AND origin=?2",
+            params![bucket, origin],
+        )?;
+    }
+    db.execute("UPDATE event_heads SET event_count=(SELECT coalesce(sum(count),0) FROM event_blocks WHERE bucket=?1),block_count=(SELECT count(*) FROM event_blocks WHERE bucket=?1) WHERE bucket=?1",[bucket])?;
     Ok(())
 }
 pub(crate) fn share(db: &Connection, scope: &str, origin: &str) -> Result<()> {

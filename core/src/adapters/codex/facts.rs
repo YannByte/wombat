@@ -1,6 +1,7 @@
 //! Physical and native identities, thread/turn facts and operation attribution.
 use super::*;
 mod association;
+pub(super) use association::Prepared;
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
 pub(super) struct Facts {
@@ -21,6 +22,8 @@ pub(super) struct Facts {
     pub(super) retained_collection_times: BTreeMap<Arc<str>, String>,
     #[serde(skip)]
     pub(super) streaming: bool,
+    #[serde(skip)]
+    pub(super) external: bool,
     #[serde(skip)]
     pub(super) pending_events: Vec<Arc<crate::session_events::Event>>,
     pub(super) events: BTreeMap<Arc<str>, Arc<crate::session_events::Event>>,
@@ -57,33 +60,6 @@ pub(super) struct Candidate {
 }
 
 impl Facts {
-    pub(super) fn fork_derived(&self, include_facts: bool) -> Self {
-        Self {
-            watermarks: self.watermarks.clone(),
-            title_observations: self.title_observations.clone(),
-            threads: self.threads.clone(),
-            turns: self.turns.clone(),
-            measurements: if include_facts {
-                self.measurements.clone()
-            } else {
-                BTreeMap::new()
-            },
-            operations: if include_facts {
-                self.operations.clone()
-            } else {
-                BTreeMap::new()
-            },
-            operation_aliases: if include_facts {
-                Arc::clone(&self.operation_aliases)
-            } else {
-                Arc::default()
-            },
-            parents: self.parents.clone(),
-            measurement_conflicts: self.measurement_conflicts.clone(),
-            projects: self.projects.clone(),
-            ..Self::default()
-        }
-    }
     pub(super) fn project_thread(
         &mut self,
         source_id: &str,

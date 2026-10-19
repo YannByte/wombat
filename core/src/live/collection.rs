@@ -14,6 +14,7 @@ pub(super) fn source_key(roots: &[String]) -> String {
 pub(super) fn load_collected(db: &rusqlite::Connection, key: &str) -> Result<Option<Collected>> {
     load_collected_inner(db, key, false, false)
 }
+#[cfg(test)]
 fn load_collected_inner(
     db: &rusqlite::Connection,
     key: &str,
@@ -203,30 +204,6 @@ pub(super) fn sync_with_policy(
     }
     for source in &discovered.sources {
         let cache = caches.entry(source.id.clone()).or_default();
-        if cache.needs_seed()
-            && let Some(prior) = prior_view
-        {
-            let source_threads: std::collections::HashSet<_> = prior
-                .manifest
-                .threads
-                .iter()
-                .filter(|t| t.thread.source_instance_id == source.id)
-                .map(|t| t.thread.id.as_str())
-                .collect();
-            cache.seed(
-                prior
-                    .measurement_facts()
-                    .filter(|r| r.source_instance_id.as_ref() == source.id)
-                    .cloned()
-                    .collect(),
-                prior
-                    .resident_operation_facts()
-                    .filter(|r| source_threads.contains(r.thread_id.as_ref()))
-                    .cloned()
-                    .collect(),
-            );
-        }
-
         let mut source_tx = tx.savepoint()?;
         let outcome = if recent_only {
             adapters::codex::incremental::sync_cached_recent(&source_tx, source, verify, cache)
@@ -283,7 +260,7 @@ pub(super) fn sync_with_policy(
                 // Source savepoint was rolled back: only previous committed file
                 // positions may be retained. This attempt has no captured length.
                 let at = chrono::Utc::now().to_rfc3339();
-                let watermarks = load_collected_inner(&tx, &source.id, true, false)?
+                let watermarks = load_collected_except(&tx, &source.id, true, true, true)?
                     .map(|v| v.watermarks)
                     .or_else(|| {
                         prior_view.map(|v| {
@@ -357,62 +334,12 @@ pub(super) fn sync_with_policy(
             )?;
             save!(threads);
             save!(turns);
-            if let Some(delta) = synced.measurements {
-                crate::live_index::put_packed(
-                    &tx,
-                    &scope,
-                    "measurements",
-                    delta.upsert.iter().map(|r| (r.id.as_str(), r)),
-                )?;
-                for id in delta.remove {
-                    crate::live_index::remove(&tx, &scope, "measurements", &id)?;
-                }
-            } else {
-                crate::live_index::put_packed(
-                    &tx,
-                    &scope,
-                    "measurements",
-                    value.measurements.iter().map(|r| (r.id.as_str(), r)),
-                )?;
-                crate::live_index::retain_packed(
-                    &tx,
-                    &scope,
-                    "measurements",
-                    value.measurements.iter().map(|r| r.id.as_str()),
-                )?;
-            }
             crate::live_index::put(&tx, &scope, "issues", "", &value.issues)?;
-            crate::live_index::put_packed(
-                &tx,
-                &scope,
-                "operations",
-                value
-                    .operations
-                    .iter()
-                    .filter(|r| {
-                        synced
-                            .operations
-                            .as_ref()
-                            .is_none_or(|dirty| dirty.contains(&r.id))
-                    })
-                    .map(|r| (r.id.as_str(), r)),
-            )?;
-            if synced.operations.is_none() {
-                crate::live_index::retain_packed(
-                    &tx,
-                    &scope,
-                    "operations",
-                    value.operations.iter().map(|r| r.id.as_str()),
-                )?;
-            }
             crate::live_index::share_events(
                 &tx,
                 &scope,
                 &adapters::codex::incremental::fact_scope(source),
             )?;
-            if let Some(cache) = caches.get(&source.id) {
-                cache.persist_resume(&tx, source, &value)?;
-            }
             updated.insert(source.id.clone(), value);
             crate::live_index::save_map(
                 &tx,
@@ -457,7 +384,7 @@ pub(super) fn sync_with_policy(
     for source in &discovered.sources {
         let mut value = match updated.remove(&source.id) {
             Some(value) => value,
-            None => load_collected_inner(&tx, &source.id, true, false)?.unwrap_or_default(),
+            None => load_collected_except(&tx, &source.id, true, true, true)?.unwrap_or_default(),
         };
         if let Some(failure) = failures.get(&source.id) {
             value.sources = vec![failure.clone()];
@@ -514,19 +441,13 @@ pub(super) fn sync_with_policy(
         crate::usage_store::save_cold_event_index(&tx, key, &events, previous_events.as_ref())?;
     }
     // Committed views own metadata and locators, not a second priced ledger.
-    // Parser candidates remain source state; share exact canonical Arcs before
-    // dropping the collection wrapper rather than repricing the whole history.
-    collected
-        .measurements
-        .sort_unstable_by(|a, b| a.id.cmp(&b.id));
-    for source in &discovered.sources {
-        if let Some(cache) = caches.get_mut(&source.id) {
-            cache.share_measurements(collected.measurements.iter());
-        }
-    }
+    // Parser recovery has already been persisted and its cache bounded above.
     // Canonical operations were already reduced; do not decode them again for statistics.
-    let mut operations = crate::usage_store::ColdOperations::metadata(&collected.operations)?;
-    operations.include_measurement_turns(&collected.measurements);
+    let operations = crate::usage_store::cold_operations::load_metadata(
+        &tx,
+        &collected.sources,
+        &collected.threads,
+    )?;
     let summary = crate::usage_store::ledger_projection::summary(&tx, &collected.sources)?;
     collected.measurements.clear();
     collected.operations.clear();

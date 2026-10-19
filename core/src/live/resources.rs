@@ -42,6 +42,34 @@ pub(super) fn index_batch<T: Send>(
     })
 }
 
+/// Recovery state is persisted in the transaction before this boundary. Bound its cache
+/// before ledger aggregation and view publication can overlap with parser heaps.
+pub(super) fn trim_parser_caches(
+    db: &rusqlite::Connection,
+    caches: &mut std::collections::BTreeMap<String, crate::adapters::codex::incremental::Cache>,
+) -> anyhow::Result<(u64, bool)> {
+    for (source, cache) in caches.iter_mut() {
+        cache.refresh_encoded_bytes(db, source)?;
+    }
+    let mut bytes = caches
+        .values()
+        .map(|cache| cache.encoded_bytes)
+        .sum::<u64>();
+    let mut evicted = false;
+    while bytes > super::service::PARSER_CACHE_BUDGET {
+        let Some(key) = caches
+            .iter()
+            .max_by_key(|(_, cache)| cache.encoded_bytes)
+            .map(|(id, _)| id.clone())
+        else {
+            break;
+        };
+        bytes = bytes.saturating_sub(caches.remove(&key).unwrap().encoded_bytes);
+        evicted = true;
+    }
+    Ok((bytes, evicted))
+}
+
 pub(super) fn interactive_request() {
     #[cfg(target_os = "macos")]
     unsafe {

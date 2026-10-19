@@ -315,7 +315,6 @@ fn unknown_output_survives_incremental_sync_restart_and_retains_the_previous_vie
         .unwrap();
     assert_eq!(second.collected.operations[0].status.as_ref(), "unknown");
     assert_eq!(first.collected.operations[0].status.as_ref(), "running");
-    assert_eq!(second.operations.unwrap().len(), 1);
     // An append forces the restarted parser to load its persisted facts.
     writeln!(
         fs::OpenOptions::new().append(true).open(path).unwrap(),

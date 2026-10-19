@@ -28,7 +28,9 @@ pub(super) fn order(event: &Event) -> (&str, u64, u32) {
 }
 
 pub(super) fn apply(facts: &mut Facts, event: &Event, report: &mut SourceReport) {
-    if let Some(input) = Replay::from_event(event) {
+    if let Some(input) = Replay::from_event(event)
+        && (!facts.external || !matches!(input, Replay::Measurement { .. }))
+    {
         input.apply(facts, report);
     }
     if association_input(event) {

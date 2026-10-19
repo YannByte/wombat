@@ -10,8 +10,20 @@ pub(super) struct Written {
     pub boundaries: Rows,
     pub association_count: usize,
 }
+/// Inputs for accounting, ownership, activity and canonical operation linking.
+/// Message content and unrelated safe observations stay solely in the archive.
+pub(super) fn projection_input(event: &Event) -> bool {
+    crate::operation_association::is_projection_input(event)
+        || matches!(
+            event.payload(),
+            crate::session_events::Payload::Thread { .. }
+                | crate::session_events::Payload::Turn { .. }
+                | crate::session_events::Payload::Ancestry { .. }
+                | crate::session_events::Payload::Measurement { .. }
+        )
+}
 pub(super) fn prepare(db: &Connection) -> Result<()> {
-    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS written_event_blocks(id INTEGER PRIMARY KEY,metadata TEXT NOT NULL); CREATE TEMP TABLE IF NOT EXISTS written_association_blocks(id INTEGER PRIMARY KEY,payload TEXT NOT NULL);")?;
+    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS written_event_blocks(id INTEGER PRIMARY KEY,metadata TEXT NOT NULL); CREATE TEMP TABLE IF NOT EXISTS written_association_blocks(id INTEGER PRIMARY KEY,payload BLOB NOT NULL,bytes INTEGER NOT NULL,digest TEXT NOT NULL,codec INTEGER NOT NULL);")?;
     Ok(())
 }
 pub(super) fn clear(db: &Connection) -> Result<()> {
@@ -43,8 +55,8 @@ pub(super) fn save(
     digest: String,
     bytes: u64,
     events: &[Arc<Event>],
-    associations: &[u8],
-    association_count: usize,
+    (associations, association_count): (&[u8], usize),
+    encoder: &mut codec::Encoder,
 ) -> Result<()> {
     let written = Written {
         target: crate::usage_store::EventTarget {
@@ -72,7 +84,8 @@ pub(super) fn save(
     if association_count == 0 {
         db.execute("DELETE FROM written_association_blocks WHERE id=?1", [id])?;
     } else {
-        db.prepare_cached("INSERT INTO written_association_blocks VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload")?.execute(params![id,std::str::from_utf8(associations)?])?;
+        let (payload, bytes, digest) = encoder.encode_raw(associations)?;
+        db.prepare_cached("INSERT INTO written_association_blocks VALUES(?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,bytes=excluded.bytes,digest=excluded.digest,codec=excluded.codec")?.execute(params![id,payload,bytes as i64,digest,codec::VERSION])?;
     }
     Ok(())
 }
@@ -80,16 +93,23 @@ pub(super) fn associations(db: &Connection, id: i64, written: &Written) -> Resul
     if written.association_count == 0 {
         return Ok(vec![]);
     }
-    let payload: String = db
-        .prepare_cached("SELECT payload FROM written_association_blocks WHERE id=?1")?
-        .query_row([id], |r| r.get(0))?;
-    let events: Rows = serde_json::from_str(&payload)?;
+    let (payload, bytes, digest, version) = db
+        .prepare_cached(
+            "SELECT payload,bytes,digest,codec FROM written_association_blocks WHERE id=?1",
+        )?
+        .query_row([id], |r| {
+            Ok((
+                r.get::<_, Vec<u8>>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, i64>(3)?,
+            ))
+        })?;
+    let events: Rows = codec::decode(&payload, bytes, &digest, version)?;
     require_index(
         events.len() == written.association_count
             && events.len() <= written.chunk.count
-            && events
-                .iter()
-                .all(|e| crate::operation_association::is_projection_input(e)),
+            && events.iter().all(|e| projection_input(e)),
         "written association count mismatch",
     )?;
     Ok(events)

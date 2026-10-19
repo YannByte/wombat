@@ -40,6 +40,9 @@ pub(super) fn decode<T: DeserializeOwned>(
             "Unsupported index block codec",
         ));
     }
+    if size > 0 && size <= MAX as i64 {
+        crate::usage_app::query_work::charge(0, size as usize)?;
+    }
     decode_current(data, size, digest).map_err(|error| {
         operation_error("INDEX_UNAVAILABLE", format!("Invalid index block: {error}"))
     })

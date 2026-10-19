@@ -386,7 +386,13 @@ mod tests {
                 > 0
         );
         let mut queries = vec![];
-        for timezone in ["UTC", "America/New_York", "Asia/Kathmandu"] {
+        for timezone in [
+            "UTC",
+            "America/New_York",
+            "Asia/Kathmandu",
+            "Pacific/Kiritimati",
+            "Pacific/Apia",
+        ] {
             for action in ["usage", "threads", "statistics"] {
                 for scope in [
                     json!({"allTime":true}),
@@ -394,6 +400,14 @@ mod tests {
                     json!({"project":"/synthetic/a","allTime":true}),
                     json!({"model":"unknown-model","allTime":true}),
                     json!({"undated":true}),
+                    json!({"projectUnknown":true,"allTime":true}),
+                    json!({"modelUnknown":true,"allTime":true}),
+                    json!({"effortUnknown":true,"allTime":true}),
+                    json!({"model":"gpt-5.4","since":"2026-10-11","until":"2026-10-12"}),
+                    json!({"project":"/synthetic/a","since":"2026-10-11","until":"2026-10-12"}),
+                    json!({"since":"2026-10-10"}),
+                    json!({"until":"2026-10-12"}),
+                    json!({"since":"1900-01-01","until":"1900-01-02"}),
                 ] {
                     let mut query = json!({"action":action,"scope":scope});
                     query["scope"]["timezone"] = json!(timezone);

@@ -2,7 +2,7 @@
 //! A timezone boundary reads only the members of that bounded canonical frame.
 use super::working_set::{Order, WorkingSet};
 use super::*;
-use crate::usage_store::ledger_projection::GroupKey;
+use crate::usage_store::ledger_projection::{GroupKey, Scan};
 use bitvec::{order::Lsb0, vec::BitVec};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -212,6 +212,66 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
             Ok(())
         })?;
     }
+    // Facets and available dates intentionally describe a wider population than
+    // the selected report. Read their catalogs without aggregate payloads.
+    let context_filter = crate::usage_store::ledger_projection::Filter::scope(
+        &Scope {
+            project: request.scope.project.clone(),
+            project_unknown: request.scope.project_unknown,
+            ..Default::default()
+        },
+        &projects,
+    );
+    let ambiguous = |group: &crate::usage_store::ledger_projection::LedgerGroup| {
+        group.single_date(tz).is_none()
+    };
+    snapshot.visit_ledger_filtered(
+        tz,
+        None,
+        None,
+        Scan::new(&context_filter, Some(&ambiguous)),
+        |group, read| {
+            let mut observe = |key: &GroupKey, date: Option<NaiveDate>| {
+                let project = key
+                    .thread
+                    .as_deref()
+                    .and_then(|id| projects.get(id))
+                    .copied()
+                    .flatten();
+                if request
+                    .scope
+                    .project
+                    .as_deref()
+                    .is_none_or(|p| project == Some(p))
+                    && (request.scope.project_unknown != Some(true) || project.is_none())
+                {
+                    if let Some(model) = &key.model {
+                        models.insert(model.clone());
+                    }
+                    if let Some(effort) = &key.effort {
+                        efforts.insert(effort.clone());
+                    }
+                    agents.insert(key.agent.clone());
+                    unassigned |= project.is_none();
+                }
+                if scope::matches_fields(fields(key), &range_scope, &projects, || date)
+                    && let Some(date) = date
+                {
+                    first = Some(first.map_or(date, |d: NaiveDate| d.min(date)));
+                    last = Some(last.map_or(date, |d: NaiveDate| d.max(date)));
+                }
+                Ok(())
+            };
+            if let Some(date) = group.single_date(tz) {
+                observe(&group.key, date)
+            } else {
+                for row in read()? {
+                    observe(&group.key, local_date(&row, tz))?;
+                }
+                Ok(())
+            }
+        },
+    )?;
     let mut consume = |key: &GroupKey,
                        aggregate: &Aggregate,
                        date: Option<NaiveDate>,
@@ -224,28 +284,6 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
             .and_then(|id| projects.get(id))
             .copied()
             .flatten();
-        if request
-            .scope
-            .project
-            .as_deref()
-            .is_none_or(|p| project == Some(p))
-            && (request.scope.project_unknown != Some(true) || project.is_none())
-        {
-            if let Some(model) = &key.model {
-                models.insert(model.clone());
-            }
-            if let Some(effort) = &key.effort {
-                efforts.insert(effort.clone());
-            }
-            agents.insert(key.agent.clone());
-            unassigned |= project.is_none();
-        }
-        if scope::matches_fields(fields(key), &range_scope, &projects, || date)
-            && let Some(date) = date
-        {
-            first = Some(first.map_or(date, |d: NaiveDate| d.min(date)));
-            last = Some(last.map_or(date, |d: NaiveDate| d.max(date)));
-        }
         let selected = scope::matches_fields(fields(key), &request.scope, &projects, || date)
             && search_ids
                 .as_ref()
@@ -344,33 +382,44 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
             scope::matches_fields(fields(&group.key), &request.scope, &projects, || date)
         })
     };
-    snapshot.visit_ledger_catalog(tz, None, None, Some(&select), |group, read| {
-        if let Some(a) = group.single_date(tz) {
-            consume(
-                &group.key,
-                &group.aggregate,
-                a,
-                &group.latest_text,
-                &group
-                    .members
-                    .iter()
-                    .map(|(id, _)| id.as_deref())
-                    .collect::<Vec<_>>(),
-            )
-        } else {
-            for row in read()? {
-                let value = Aggregate::new(&[&row])?;
+    let filter = if request.action == Action::Threads {
+        crate::usage_store::ledger_projection::Filter::tasks(candidate_tasks.clone())
+    } else {
+        crate::usage_store::ledger_projection::Filter::scope(&request.scope, &projects)
+    };
+    snapshot.visit_ledger_filtered(
+        tz,
+        None,
+        None,
+        Scan::new(&filter, Some(&select)),
+        |group, read| {
+            if let Some(a) = group.single_date(tz) {
                 consume(
                     &group.key,
-                    &value,
-                    local_date(&row, tz),
-                    &row.fact.timestamp,
-                    &[row.fact.turn_id.as_deref()],
-                )?;
+                    &group.aggregate,
+                    a,
+                    &group.latest_text,
+                    &group
+                        .members
+                        .iter()
+                        .map(|(id, _)| id.as_deref())
+                        .collect::<Vec<_>>(),
+                )
+            } else {
+                for row in read()? {
+                    let value = Aggregate::new(&[&row])?;
+                    consume(
+                        &group.key,
+                        &value,
+                        local_date(&row, tz),
+                        &row.fact.timestamp,
+                        &[row.fact.turn_id.as_deref()],
+                    )?;
+                }
+                Ok(())
             }
-            Ok(())
-        }
-    })?;
+        },
+    )?;
     if let Some((id, value)) = current_task {
         tasks.update(id, Task::new, |task| task.combine(&value))?;
     }

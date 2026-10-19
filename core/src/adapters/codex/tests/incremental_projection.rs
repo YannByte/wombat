@@ -1,4 +1,55 @@
 use super::*;
+
+#[test]
+fn canonical_selection_preserves_raw_candidates_and_reuses_unchanged_allocations() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "sessions/a.jsonl",
+        &[
+            meta("t"),
+            context("u", "model", "low"),
+            direct("t", "u", "r", "2026-09-29T00:00:01Z", 100, 60, 10),
+            json!({"type":"response_item","payload":{"type":"function_call","name":"read_file","call_id":"call","arguments":"{}"}}),
+        ],
+    );
+    let collected = collect(dir.path());
+    let mut facts = Facts::default();
+    let mut events = collected.events.clone();
+    events.sort_by_key(|event| {
+        (
+            event.position().file_id.clone(),
+            event.position().byte_offset,
+            event.position().ordinal,
+        )
+    });
+    for event in &events {
+        super::super::event_projection::apply(&mut facts, event, &mut collected.sources[0].clone());
+    }
+    facts.events = events
+        .into_iter()
+        .map(|event| (event.shared_id(), event))
+        .collect();
+    let mut report = collected.sources[0].clone();
+    let cancelled = std::sync::atomic::AtomicBool::new(false);
+    facts.resolve_operations(&mut report, &cancelled).unwrap();
+    let before = serde_json::to_value(&facts).unwrap();
+    let projected = projection::build(&mut facts, &mut report, &cancelled).unwrap();
+    assert_eq!(serde_json::to_value(&facts).unwrap(), before);
+    assert_eq!(projected.measurements.len(), 1);
+    assert_eq!(projected.operations.len(), 1);
+    assert!(Arc::ptr_eq(
+        &projected.measurements[0],
+        &facts.measurements[&projected.measurements[0].id].measurement
+    ));
+    assert!(Arc::ptr_eq(
+        &projected.operations[0],
+        &facts.operations[&projected.operations[0].id]
+    ));
+    assert!(projected.metadata.measurements.is_empty());
+    assert!(projected.metadata.operations.is_empty());
+}
+
 #[test]
 fn indexed_direct_coverage_preserves_owner_and_half_open_boundaries() {
     let dir = tempfile::tempdir().unwrap();
@@ -55,10 +106,14 @@ fn indexed_direct_coverage_preserves_owner_and_half_open_boundaries() {
                 fingerprint: String::new(),
             },
         );
-        facts
-            .reconcile_direct(&mut report, &std::sync::atomic::AtomicBool::new(false))
+        let excluded = facts
+            .direct_exclusions(
+                &BTreeSet::new(),
+                &mut report,
+                &std::sync::atomic::AtomicBool::new(false),
+            )
             .unwrap();
-        assert_eq!(!facts.measurements.contains_key("legacy"), removed);
+        assert_eq!(excluded.contains("legacy"), removed);
         assert_eq!(
             report.issues.iter().any(|i| i.code == "usageOverlap"),
             partial
@@ -92,8 +147,7 @@ fn live_cached_operations_keep_old_views_and_restart_equivalence() {
     let synced = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    let (first, dirty) = (synced.collected, synced.operations);
-    assert!(dirty.is_none());
+    let first = synced.collected;
     let old_status = first.operations[0].status.clone();
     let mut file = fs::OpenOptions::new().append(true).open(path).unwrap();
     writeln!(
@@ -105,18 +159,15 @@ fn live_cached_operations_keep_old_views_and_restart_equivalence() {
     let synced = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    let (second, dirty) = (synced.collected, synced.operations);
-    assert!(dirty.unwrap().is_empty());
-    assert!(Arc::ptr_eq(&first.operations[0], &second.operations[0]));
+    let second = synced.collected;
+    assert_eq!(first.operations[0], second.operations[0]);
     writeln!(file,"{}",json!({"type":"response_item","payload":{"type":"function_call_output","call_id":"call","output":{"isError":true,"content":"PRIVATE_OUTPUT"}}})).unwrap();
     let synced = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    let (third, dirty) = (synced.collected, synced.operations);
-    assert_eq!(dirty.unwrap().len(), 1);
+    let third = synced.collected;
     assert_eq!(third.operations[0].status.as_ref(), "failed");
     assert_eq!(first.operations[0].status, old_status);
-    drop(cache);
     writeln!(
         file,
         "{}",
@@ -124,12 +175,11 @@ fn live_cached_operations_keep_old_views_and_restart_equivalence() {
     )
     .unwrap();
     let mut restored = incremental::Cache::default();
-    restored.seed(third.measurements.clone(), third.operations.clone());
     let restart = incremental::sync_cached(&db, &source, false, &mut restored)
         .unwrap()
         .unwrap()
         .collected;
-    assert!(Arc::ptr_eq(&third.operations[0], &restart.operations[0]));
+    assert_eq!(third.operations[0], restart.operations[0]);
     let previous = third
         .measurements
         .iter()
@@ -140,7 +190,7 @@ fn live_cached_operations_keep_old_views_and_restart_equivalence() {
         .iter()
         .find(|r| r.id == previous.id)
         .unwrap();
-    assert!(Arc::ptr_eq(previous, resumed));
+    assert_eq!(previous, resumed);
     let full = collect(root.path());
     assert_eq!(
         serde_json::to_value(&restart.operations).unwrap(),
@@ -189,7 +239,6 @@ fn live_projection_delta_retracts_late_legacy_and_preserves_prior_facts() {
     let first = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    assert!(first.measurements.is_none());
     let old = first.collected.measurements[0].clone();
     let mut file = fs::OpenOptions::new().append(true).open(path).unwrap();
     writeln!(
@@ -201,9 +250,9 @@ fn live_projection_delta_retracts_late_legacy_and_preserves_prior_facts() {
     let second = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    let delta = second.measurements.unwrap();
-    assert_eq!(delta.remove, vec![old.id.clone()]);
-    assert_eq!(delta.upsert.len(), 1);
+    assert_ne!(second.collected.measurements[0].id, old.id);
+    let stored = crate::live_index::load_map(&db, &format!("projection:{}", source.id)).unwrap();
+    assert!(stored["measurements"].get(&old.id).is_none());
     assert_eq!(second.collected.measurements.len(), 1);
     let retained = second.collected.measurements[0].clone();
     writeln!(
@@ -215,11 +264,9 @@ fn live_projection_delta_retracts_late_legacy_and_preserves_prior_facts() {
     let third = incremental::sync_cached(&db, &source, false, &mut cache)
         .unwrap()
         .unwrap();
-    let delta = third.measurements.unwrap();
-    assert!(delta.remove.is_empty());
-    assert_eq!(delta.upsert.len(), 1);
+    assert_eq!(third.collected.measurements.len(), 1);
     assert_eq!(
-        delta.upsert[0].tokens.total, None,
+        third.collected.measurements[0].tokens.total, None,
         "conflicting evidence remains unknown"
     );
     assert_eq!(retained.tokens.total, Some(110));
@@ -256,7 +303,6 @@ fn canonical_and_alternate_operation_identities_survive_restart_and_turn_reuse()
         .collected;
     assert_eq!(before.operations.len(), 1);
     assert_eq!(before.operations[0].status.as_ref(), "completed");
-    drop(cache);
     let mut file = fs::OpenOptions::new().append(true).open(path).unwrap();
     writeln!(file, "{}", json!({"type":"response_item","payload":{"type":"function_call_output","item_id":"native-item","output":{"isError":true}}})).unwrap();
     let mut restored = incremental::Cache::default();
@@ -317,7 +363,9 @@ fn cancelled_accounting_checks_direct_fast_path_and_fork_reduction_without_mutat
             let mut report = collected.sources[0].clone();
             report.issues.clear();
             let cancelled = AtomicBool::new(true);
-            let error = facts.reconcile_direct(&mut report, &cancelled).unwrap_err();
+            let error = facts
+                .direct_exclusions(&BTreeSet::new(), &mut report, &cancelled)
+                .unwrap_err();
             assert_eq!(
                 error
                     .downcast_ref::<crate::dto::OperationError>()
@@ -327,7 +375,9 @@ fn cancelled_accounting_checks_direct_fast_path_and_fork_reduction_without_mutat
             );
             assert_eq!(serde_json::to_value(&facts.measurements).unwrap(), before);
             assert!(report.issues.is_empty());
-            let error = facts.remove_inherited(&forest, &cancelled).unwrap_err();
+            let error = facts
+                .inherited_measurements(&forest, &cancelled)
+                .unwrap_err();
             assert_eq!(
                 error
                     .downcast_ref::<crate::dto::OperationError>()

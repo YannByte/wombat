@@ -111,15 +111,18 @@ impl Facts {
                 .insert(candidate.measurement.id.clone(), candidate);
         }
     }
-    pub(super) fn remove_inherited(
-        &mut self,
+    pub(super) fn inherited_measurements(
+        &self,
         forest: &session_relations::SessionRelations<'_>,
         cancelled: &std::sync::atomic::AtomicBool,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<BTreeSet<&str>> {
         // Only byte-identical native counter events can be inherited. Direct response
         // records retain their explicit owner, even when their counts match an ancestor.
         let check = crate::operation_association::check;
         check(cancelled)?;
+        if self.parents.is_empty() {
+            return Ok(BTreeSet::new());
+        }
         let mut entries = Vec::new();
         for (id, candidate) in &self.measurements {
             check(cancelled)?;
@@ -127,29 +130,31 @@ impl Facts {
                 entries.push((candidate.fingerprint.as_str(), thread, id.as_str()));
             }
         }
-        let mut remove = Vec::new();
+        let mut remove = BTreeSet::new();
         for (id, _) in forest.replays_cancellable(entries.into_iter(), cancelled)? {
             check(cancelled)?;
             if !self.measurements[id].direct {
-                remove.push(id.to_owned());
+                remove.insert(id);
             }
         }
-        for id in remove {
-            crate::operation_association::check(cancelled)?;
-            self.measurements.remove(&id);
-        }
         check(cancelled)?;
-        Ok(())
+        Ok(remove)
     }
-    pub(super) fn reconcile_direct(
-        &mut self,
+    pub(super) fn direct_exclusions(
+        &self,
+        inherited: &BTreeSet<&str>,
         report: &mut SourceReport,
         cancelled: &std::sync::atomic::AtomicBool,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<BTreeSet<&str>> {
         let check = crate::operation_association::check;
         check(cancelled)?;
+        let selected = || {
+            self.measurements
+                .iter()
+                .filter(|(id, _)| !inherited.contains(id.as_str()))
+        };
         let mut direct_only = true;
-        for candidate in self.measurements.values() {
+        for candidate in selected().map(|(_, candidate)| candidate) {
             check(cancelled)?;
             if !candidate.direct {
                 direct_only = false;
@@ -158,13 +163,13 @@ impl Facts {
         }
         check(cancelled)?;
         if direct_only {
-            return Ok(());
+            return Ok(BTreeSet::new());
         }
         // Build coverage once per owner. Scanning every direct response for every
         // legacy counter is quadratic across unrelated historical conversations.
         let mut direct = BTreeMap::<Arc<str>, Vec<(u64, u64)>>::new();
         let mut unbounded = BTreeMap::<Option<Arc<str>>, BTreeSet<Option<Arc<str>>>>::new();
-        for candidate in self.measurements.values() {
+        for candidate in selected().map(|(_, candidate)| candidate) {
             check(cancelled)?;
             if !candidate.direct {
                 continue;
@@ -201,8 +206,8 @@ impl Facts {
             }
             *ranges = merged;
         }
-        let mut remove = Vec::new();
-        for (id, candidate) in &self.measurements {
+        let mut remove = BTreeSet::new();
+        for (id, candidate) in selected() {
             check(cancelled)?;
             if candidate.direct {
                 continue;
@@ -221,7 +226,7 @@ impl Facts {
                     "同轮存在逐响应用量，未叠加缺少覆盖依据的旧累计记录",
                     candidate.measurement.evidence.first().cloned(),
                 );
-                remove.push(id.clone());
+                remove.insert(id.as_str());
                 continue;
             }
             let (Some(thread), Some(start), Some(end)) = (
@@ -235,7 +240,7 @@ impl Facts {
             let next = ranges.get(ranges.partition_point(|(_, to)| *to <= start));
             let overlaps = next.is_some_and(|(from, _)| *from < end);
             if next.is_some_and(|(from, to)| *from <= start && *to >= end) && end > start {
-                remove.push(id.clone());
+                remove.insert(id.as_str());
             } else if overlaps {
                 issue(
                     report,
@@ -243,14 +248,10 @@ impl Facts {
                     "逐响应记录与累计区间部分重叠；该累计记录未重复计入",
                     candidate.measurement.evidence.first().cloned(),
                 );
-                remove.push(id.clone());
+                remove.insert(id.as_str());
             }
         }
-        for id in remove {
-            check(cancelled)?;
-            self.measurements.remove(&id);
-        }
         check(cancelled)?;
-        Ok(())
+        Ok(remove)
     }
 }

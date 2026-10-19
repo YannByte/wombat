@@ -140,20 +140,27 @@ fn publish_frame(
     }
     Ok(block)
 }
-pub(crate) fn upsert<'a, T: serde::Serialize + 'a>(
+/// Prepare writer relations before opening long-lived source cursors. Creating
+/// TEMP schema while a cursor is active can invalidate that cursor in SQLite.
+pub(crate) fn prepare_write(db: &Connection) -> Result<()> {
+    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS pending_facts(bucket INTEGER,id TEXT,payload TEXT,block INTEGER,slot INTEGER,PRIMARY KEY(bucket,id)); CREATE TEMP TABLE IF NOT EXISTS changed_fact_blocks(bucket INTEGER,block INTEGER,PRIMARY KEY(bucket,block)) WITHOUT ROWID;")?;
+    Ok(())
+}
+pub(crate) fn upsert<K: AsRef<str>, T: serde::Serialize>(
     db: &Connection,
     scope: &str,
     field: &str,
-    values: impl IntoIterator<Item = (&'a str, &'a T)>,
+    values: impl IntoIterator<Item = (K, T)>,
 ) -> Result<()> {
     let bucket = bucket(db, scope, field)?;
     // Keep just one decoded frame. The staging relation groups corrections without
     // retaining another complete set of serialized facts in process memory.
-    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS pending_facts(bucket INTEGER,id TEXT,payload TEXT,block INTEGER,slot INTEGER,PRIMARY KEY(bucket,id));")?;
+    prepare_write(db)?;
     db.execute("DELETE FROM pending_facts WHERE bucket=?1", [bucket])?;
     let mut stage=db.prepare_cached("INSERT INTO pending_facts SELECT ?1,?2,?3,r.block,r.slot FROM (SELECT 1) LEFT JOIN fact_rows r ON r.bucket=?1 AND r.id=(CASE WHEN length(?2)=64 AND ?2 NOT GLOB '*[^0-9a-f]*' THEN unhex(?2) ELSE ?2 END) ON CONFLICT(bucket,id) DO UPDATE SET payload=excluded.payload")?;
     for (id, value) in values {
-        stage.execute(params![bucket, id, serde_json::to_string(value)?])?;
+        let id = id.as_ref();
+        stage.execute(params![bucket, id, serde_json::to_string(&value)?])?;
     }
     drop(stage);
     // Physical locality is an optimization only: exact filters still use facts.
@@ -313,6 +320,7 @@ fn each_located_inner(
     Ok(found)
 }
 
+#[cfg(test)]
 pub(super) fn remove(db: &Connection, bucket: i64, id: &str) -> Result<()> {
     let location: Option<(i64, usize)> = db
         .prepare_cached("SELECT block,slot FROM fact_rows WHERE bucket=?1 AND id=(CASE WHEN length(?2)=64 AND ?2 NOT GLOB '*[^0-9a-f]*' THEN unhex(?2) ELSE ?2 END)")?
@@ -329,6 +337,7 @@ pub(super) fn remove(db: &Connection, bucket: i64, id: &str) -> Result<()> {
             params![bucket, id],
         )?;
         if rows.iter().all(Option::is_none) {
+            changed_block(db, bucket, block)?;
             db.execute("DELETE FROM fact_blocks WHERE id=?1", [block])?;
         } else {
             store(
@@ -359,9 +368,29 @@ pub(crate) fn retain_prefix<'a>(
 ) -> Result<()> {
     let bucket = bucket(db, scope, field)?;
     let wanted: HashSet<_> = ids.collect();
+    // A bound literal GLOB prefix uses the existing (bucket,id) range index.
+    // substr(id,...) scanned every association for each changed target.
+    let pattern = prefix.map(|prefix| {
+        let mut pattern = String::new();
+        for ch in prefix.chars() {
+            match ch {
+                '*' => pattern.push_str("[*]"),
+                '?' => pattern.push_str("[?]"),
+                '[' => pattern.push_str("[[]"),
+                _ => pattern.push(ch),
+            }
+        }
+        pattern.push('*');
+        pattern
+    });
+    let sql = if pattern.is_some() {
+        "SELECT CASE WHEN typeof(id)='blob' THEN lower(hex(id)) ELSE id END FROM fact_rows WHERE bucket=?1 AND id GLOB ?2"
+    } else {
+        "SELECT CASE WHEN typeof(id)='blob' THEN lower(hex(id)) ELSE id END FROM fact_rows WHERE bucket=?1 AND ?2 IS NULL"
+    };
     let obsolete = db
-        .prepare_cached("SELECT CASE WHEN typeof(id)='blob' THEN lower(hex(id)) ELSE id END FROM fact_rows WHERE bucket=?1 AND (?2 IS NULL OR substr(id,1,length(?2))=?2)")?
-        .query_map(params![bucket,prefix], |r| r.get::<_, String>(0))?
+        .prepare_cached(sql)?
+        .query_map(params![bucket, pattern], |r| r.get::<_, String>(0))?
         .filter_map(|r| match r {
             Ok(id) if wanted.contains(id.as_str()) => None,
             other => Some(other),
@@ -389,11 +418,55 @@ pub(crate) fn retain_prefix<'a>(
             )?;
         }
         if rows.iter().all(Option::is_none) {
+            changed_block(db, bucket, block)?;
             db.execute("DELETE FROM fact_blocks WHERE id=?1", [block])?;
         } else {
             store(db, bucket, Some(block), &rows, &mut encoder)?;
         }
     }
+    Ok(())
+}
+
+/// Replace membership from an external stream. Neither the wanted IDs nor the
+/// obsolete block directory is collected in a source-sized Rust container.
+pub(crate) fn retain_streamed(
+    db: &Connection,
+    scope: &str,
+    field: &str,
+    ids: impl IntoIterator<Item = Result<String>>,
+) -> Result<()> {
+    let bucket = bucket(db, scope, field)?;
+    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS wanted_facts(id PRIMARY KEY) WITHOUT ROWID; DELETE FROM wanted_facts;")?;
+    let mut insert = db.prepare_cached("INSERT INTO wanted_facts VALUES(CASE WHEN length(?1)=64 AND ?1 NOT GLOB '*[^0-9a-f]*' THEN unhex(?1) ELSE ?1 END)")?;
+    for id in ids {
+        insert.execute([id?])?;
+    }
+    drop(insert);
+    let mut query = db.prepare_cached("SELECT DISTINCT r.block FROM fact_rows r WHERE r.bucket=?1 AND NOT EXISTS(SELECT 1 FROM wanted_facts w WHERE w.id=r.id) ORDER BY r.block")?;
+    let mut cursor = query.query([bucket])?;
+    let mut encoder = codec::Encoder::default();
+    while let Some(row) = cursor.next()? {
+        let block: i64 = row.get(0)?;
+        let mut data = load(db, block)?;
+        let mut obsolete = db.prepare_cached("SELECT CASE WHEN typeof(r.id)='blob' THEN lower(hex(r.id)) ELSE r.id END,r.slot FROM fact_rows r WHERE r.bucket=?1 AND r.block=?2 AND NOT EXISTS(SELECT 1 FROM wanted_facts w WHERE w.id=r.id)")?;
+        let items = obsolete
+            .query_map(params![bucket, block], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)? as usize))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for (id, slot) in items {
+            ensure_slot(&data, slot, &id)?;
+            data[slot] = None;
+        }
+        db.execute("DELETE FROM fact_rows WHERE bucket=?1 AND block=?2 AND NOT EXISTS(SELECT 1 FROM wanted_facts w WHERE w.id=fact_rows.id)",params![bucket,block])?;
+        if data.iter().all(Option::is_none) {
+            changed_block(db, bucket, block)?;
+            db.execute("DELETE FROM fact_blocks WHERE id=?1", [block])?;
+        } else {
+            store(db, bucket, Some(block), &data, &mut encoder)?;
+        }
+    }
+    db.execute("DELETE FROM wanted_facts", [])?;
     Ok(())
 }
 
@@ -440,6 +513,57 @@ pub(crate) fn read_operations(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn target_retention_matches_literal_prefixes_and_uses_the_existing_range_index() {
+        let root = tempfile::tempdir().unwrap();
+        let db = open(&root.path().join("index.sqlite")).unwrap();
+        for prefix in ["a*", "a?", "a[", "a]", "任务:", ""] {
+            let keep = format!("{prefix}keep");
+            let remove = format!("{prefix}remove");
+            let other = "other";
+            upsert(
+                &db,
+                "literal",
+                "associations",
+                [keep.clone(), remove.clone(), other.into()]
+                    .into_iter()
+                    .map(|id| (id.clone(), json!({"id":id}))),
+            )
+            .unwrap();
+            let before = load_map(&db, "literal").unwrap();
+            retain_prefix(
+                &db,
+                "literal",
+                "associations",
+                Some(prefix),
+                [keep.as_str()].into_iter(),
+            )
+            .unwrap();
+            let after = load_map(&db, "literal").unwrap();
+            for (id, value) in before["associations"].as_object().unwrap() {
+                if id.starts_with(prefix) && id != &keep {
+                    assert!(after["associations"].get(id).is_none());
+                } else {
+                    assert_eq!(&after["associations"][id], value);
+                }
+            }
+            retain(&db, "literal", "associations", std::iter::empty()).unwrap();
+        }
+        let hash_prefix = format!("{}:", "a".repeat(64));
+        let detail: String = db
+            .query_row(
+                "EXPLAIN QUERY PLAN SELECT id FROM fact_rows WHERE bucket=?1 AND id GLOB ?2",
+                params![1, format!("{hash_prefix}*")],
+                |row| row.get(3),
+            )
+            .unwrap();
+        assert!(
+            detail.contains("id>?") && detail.contains("id<?"),
+            "{detail}"
+        );
+    }
+
     #[test]
     fn cold_operation_budget_stops_before_decoding_a_corrupt_frame() {
         let root = tempfile::tempdir().unwrap();
@@ -512,7 +636,25 @@ mod tests {
                 .unwrap(),
             2
         );
+        let removed: i64 = db
+            .query_row(
+                "SELECT block FROM fact_rows WHERE typeof(id)='text' AND id=?1",
+                [&b],
+                |r| r.get(0),
+            )
+            .unwrap();
+        db.execute("DELETE FROM changed_fact_blocks", []).unwrap();
         retain(&db, "scope", "operations", [a.as_str()].into_iter()).unwrap();
+        assert_eq!(
+            db.query_row(
+                "SELECT count(*) FROM changed_fact_blocks WHERE block=?1",
+                [removed],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            1,
+            "a fully removed frame must invalidate its aggregate"
+        );
         assert_eq!(
             load_map(&db, "scope").unwrap()["operations"]
                 .as_object()

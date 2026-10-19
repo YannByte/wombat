@@ -5,7 +5,9 @@ use rusqlite::Connection;
 
 use crate::file_metadata::FileMetadata;
 use std::time::UNIX_EPOCH;
+mod external;
 mod recent;
+#[cfg(test)]
 mod reduction;
 #[cfg(test)]
 mod reduction_tests;
@@ -112,86 +114,13 @@ fn prefix_checksums_from(
 
 #[derive(Default)]
 pub(crate) struct Cache {
-    facts: Option<Facts>,
-    projected: Option<Vec<Arc<Measurement>>>,
-    seed: Option<ReusableFacts>,
     pub(crate) encoded_bytes: u64,
-    resume_delta: Option<resume::Delta>,
 }
-
-struct ReusableFacts {
-    measurements: Vec<Arc<Measurement>>,
-    operations: Vec<Arc<Operation>>,
-}
-
 impl Cache {
-    pub(crate) fn persist_resume(
-        &self,
-        db: &Connection,
-        source: &SourceInstance,
-        projection: &Collected,
-    ) -> Result<()> {
-        if let Some(facts) = &self.facts {
-            resume::save(db, source, facts, projection, self.resume_delta.as_ref())?;
-        }
+    pub(crate) fn refresh_encoded_bytes(&mut self, _db: &Connection, _source: &str) -> Result<()> {
+        // Recovery bodies live in verified blocks and a file-backed work relation.
+        self.encoded_bytes = 0;
         Ok(())
-    }
-    pub(crate) fn refresh_encoded_bytes(&mut self, db: &Connection, source: &str) -> Result<()> {
-        self.encoded_bytes =
-            if self.facts.is_some() || self.seed.is_some() || self.projected.is_some() {
-                resume::weight(db, source)?
-            } else {
-                0
-            };
-        Ok(())
-    }
-    pub(crate) fn needs_seed(&self) -> bool {
-        self.facts.is_none() && self.seed.is_none()
-    }
-    pub(crate) fn seed(
-        &mut self,
-        measurements: Vec<Arc<Measurement>>,
-        mut operations: Vec<Arc<Operation>>,
-    ) {
-        operations.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        self.seed = Some(ReusableFacts {
-            measurements,
-            operations,
-        });
-    }
-    pub(crate) fn share_measurements<'a>(
-        &mut self,
-        rows: impl Iterator<Item = &'a Arc<Measurement>>,
-    ) {
-        // Candidates, projected facts and caller rows are ID-sorted. Merge
-        // them without a tree lookup and binary search for every ledger row.
-        let Some(facts) = &mut self.facts else {
-            return;
-        };
-        let mut rows = rows.peekable();
-        let projected = self.projected.as_deref_mut().unwrap_or_default();
-        let mut index = 0;
-        for (id, candidate) in &mut facts.measurements {
-            while rows.peek().is_some_and(|row| row.id < *id) {
-                rows.next();
-            }
-            let Some(row) = rows.peek().copied().filter(|row| row.id == *id) else {
-                continue;
-            };
-            if !Arc::ptr_eq(&candidate.measurement, row) && candidate.measurement == *row {
-                candidate.measurement = Arc::clone(row);
-            }
-            while projected.get(index).is_some_and(|value| value.id < *id) {
-                index += 1;
-            }
-            if let Some(value) = projected.get_mut(index)
-                && value.id == *id
-                && !Arc::ptr_eq(value, row)
-                && *value == *row
-            {
-                *value = Arc::clone(row);
-            }
-        }
     }
 }
 
@@ -225,108 +154,7 @@ pub(crate) fn expand_test_events(
     Ok(value)
 }
 
-fn load_facts(
-    db: &Connection,
-    scope: &str,
-    reuse: Option<&ReusableFacts>,
-    report: &SourceReport,
-    cancelled: &std::sync::atomic::AtomicBool,
-    retain_all: bool,
-) -> Result<Facts> {
-    let mut events = BTreeMap::new();
-    let mut event_strings = crate::session_events::EventStrings::default();
-    let mut title_observations = BTreeMap::new();
-    crate::live_index::each_without_events(db, scope, |field, id, payload| {
-        crate::operation_association::check(cancelled)?;
-        if field == "title_observations" {
-            let observation: crate::session_events::title_observations::TitleObservation =
-                serde_json::from_str(payload)?;
-            observation.validate()?;
-            anyhow::ensure!(
-                observation.thread_id == id && observation.source_instance_id == report.source.id,
-                "stored title scope mismatch"
-            );
-            title_observations.insert(id.into(), observation);
-        } else {
-            anyhow::ensure!(
-                matches!(
-                    field,
-                    "threads"
-                        | "turns"
-                        | "measurements"
-                        | "operations"
-                        | "aliases"
-                        | "parents"
-                        | "projects"
-                        | "measurement_conflicts"
-                ),
-                "unsupported fact field: {field}"
-            );
-        }
-        Ok(())
-    })?;
-    if retain_all {
-        crate::live_index::each_event(db, scope, |mut event| {
-            crate::operation_association::check(cancelled)?;
-            event_strings.share(Arc::make_mut(&mut event));
-            anyhow::ensure!(
-                event.position().source_instance_id.as_ref() == report.source.id,
-                "stored event source identity mismatch"
-            );
-            events.insert(event.shared_id(), event);
-            Ok(())
-        })?;
-    }
-    let mut facts = if retain_all {
-        replay_events(events, report, cancelled)?
-    } else {
-        reduction::load_streamed(db, scope, report, cancelled)?
-    };
-    facts.title_observations = title_observations;
-    for observation in facts.title_observations.values() {
-        crate::operation_association::check(cancelled)?;
-        anyhow::ensure!(
-            facts
-                .threads
-                .get(&observation.thread_id)
-                .is_some_and(|t| t.source_instance_id == observation.source_instance_id),
-            "stored title target mismatch"
-        );
-    }
-    titles::apply_titles(&mut facts);
-    // Read projections may share allocations, but never establish parser facts.
-    let mut paths = EvidencePaths::default();
-    for (id, candidate) in &mut facts.measurements {
-        crate::operation_association::check(cancelled)?;
-        if let Some(rows) = reuse.map(|r| &r.measurements)
-            && let Ok(index) = rows.binary_search_by(|r| r.id.as_str().cmp(id))
-            && rows[index] == candidate.measurement
-        {
-            candidate.measurement = Arc::clone(&rows[index]);
-        }
-        if Arc::strong_count(&candidate.measurement) == 1 {
-            let row = Arc::make_mut(&mut candidate.measurement);
-            paths.compact(&mut row.evidence);
-            facts.strings.measurement(row);
-        }
-    }
-    for (id, operation) in &mut facts.operations {
-        crate::operation_association::check(cancelled)?;
-        if let Some(rows) = reuse.map(|r| &r.operations)
-            && let Ok(index) = rows.binary_search_by(|r| r.id.as_str().cmp(id))
-            && rows[index] == *operation
-        {
-            *operation = Arc::clone(&rows[index]);
-        }
-        if Arc::strong_count(operation) == 1 {
-            let row = Arc::make_mut(operation);
-            paths.compact(&mut row.evidence);
-            facts.strings.operation(row);
-        }
-    }
-    Ok(facts)
-}
-
+#[cfg(test)]
 fn replay_events(
     events: BTreeMap<Arc<str>, Arc<crate::session_events::Event>>,
     report: &SourceReport,
@@ -356,53 +184,8 @@ fn replay_events(
     Ok(facts)
 }
 
-pub(crate) struct MeasurementDelta {
-    pub upsert: Vec<Arc<Measurement>>,
-    pub remove: Vec<String>,
-}
 pub(crate) struct Synced {
     pub collected: Collected,
-    pub operations: Option<BTreeSet<String>>,
-    pub measurements: Option<MeasurementDelta>,
-}
-// Both lists are ID-sorted; reconcile inserts, corrections and retractions in one pass.
-fn projection_delta(old: &[Arc<Measurement>], new: &[Arc<Measurement>]) -> MeasurementDelta {
-    let mut delta = MeasurementDelta {
-        upsert: vec![],
-        remove: vec![],
-    };
-    let (mut left, mut right) = (0, 0);
-    while left < old.len() || right < new.len() {
-        match (old.get(left), new.get(right)) {
-            (Some(a), Some(b)) => match a.id.cmp(&b.id) {
-                std::cmp::Ordering::Less => {
-                    delta.remove.push(a.id.clone());
-                    left += 1;
-                }
-                std::cmp::Ordering::Greater => {
-                    delta.upsert.push(Arc::clone(b));
-                    right += 1;
-                }
-                std::cmp::Ordering::Equal => {
-                    if !Arc::ptr_eq(a, b) && a != b {
-                        delta.upsert.push(Arc::clone(b));
-                    }
-                    left += 1;
-                    right += 1;
-                }
-            },
-            (Some(a), None) => {
-                delta.remove.push(a.id.clone());
-                left += 1;
-            }
-            (None, Some(b)) => {
-                delta.upsert.push(Arc::clone(b));
-                right += 1;
-            }
-            (None, None) => break,
-        }
-    }
-    delta
 }
 pub(crate) fn sync_cached(
     db: &Connection,
@@ -411,7 +194,52 @@ pub(crate) fn sync_cached(
     cache: &mut Cache,
 ) -> Result<Option<Synced>> {
     let context = RunContext::default();
-    sync_cached_with_context(db, source, verify, cache, &context)
+    let result = sync_cached_with_context(db, source, verify, cache, &context)?;
+    #[cfg(test)]
+    let result = expand_test_projection(db, source, result)?;
+    Ok(result)
+}
+#[cfg(test)]
+fn expand_test_projection(
+    db: &Connection,
+    source: &SourceInstance,
+    result: Option<Synced>,
+) -> Result<Option<Synced>> {
+    let result = result
+        .map(|mut result| {
+            for field in ["measurements", "operations"] {
+                crate::live_index::each_located(
+                    db,
+                    &format!("projection:{}", source.id),
+                    Some(field),
+                    |_, _, payload, _| {
+                        if field == "measurements" {
+                            result
+                                .collected
+                                .measurements
+                                .push(serde_json::from_str(payload)?);
+                        } else {
+                            result
+                                .collected
+                                .operations
+                                .push(serde_json::from_str(payload)?);
+                        }
+                        Ok(())
+                    },
+                )?;
+            }
+            result
+                .collected
+                .measurements
+                .sort_unstable_by(|a, b| a.id.cmp(&b.id));
+            result
+                .collected
+                .operations
+                .sort_unstable_by(|a, b| a.id.cmp(&b.id));
+            Ok::<_, anyhow::Error>(result)
+        })
+        .transpose()?;
+    Ok(result)
 }
 pub(crate) fn sync_cached_recent(
     db: &Connection,
@@ -419,7 +247,10 @@ pub(crate) fn sync_cached_recent(
     verify: bool,
     cache: &mut Cache,
 ) -> Result<Option<Synced>> {
-    sync_with_policy(db, source, verify, cache, &RunContext::default(), true)
+    let result = sync_with_policy(db, source, verify, cache, &RunContext::default(), true)?;
+    #[cfg(test)]
+    let result = expand_test_projection(db, source, result)?;
+    Ok(result)
 }
 fn sync_cached_with_context(
     db: &Connection,
@@ -609,30 +440,26 @@ fn sync_with_policy(
         return Ok(None);
     }
     let fact_scope = format!("{scope}:facts");
-    let restoring = cache.facts.is_none();
-    let mut facts = match cache.facts.take() {
-        Some(facts) => facts,
-        None => {
-            if !rebuild && let Some(facts) = resume::load(db, source)? {
-                facts
+    external::prepare(db)?;
+    let mut facts = if rebuild || previous.is_empty() {
+        Facts {
+            streaming: true,
+            external: true,
+            title_observations: if previous.is_empty() {
+                BTreeMap::new()
             } else {
-                load_facts(
-                    db,
-                    &fact_scope,
-                    cache.seed.as_ref(),
-                    &report,
-                    &context.cancelled,
-                    rebuild,
-                )?
-            }
+                resume::load(db, source)?
+                    .ok_or_else(|| anyhow::anyhow!("Parser recovery directory missing"))?
+                    .title_observations
+            },
+            ..Facts::default()
         }
+    } else {
+        let facts = resume::load(db, source)?
+            .ok_or_else(|| anyhow::anyhow!("Parser recovery directory missing"))?;
+        external::restore(db, source, &context.cancelled)?;
+        facts
     };
-    cache.seed = None;
-    facts.dirty_events.clear();
-    facts.association_dirty.clear();
-    facts.dirty_operations.clear();
-    facts.retired_operations.clear();
-    facts.dirty_measurements.clear();
     let generations: BTreeMap<_, _> = checkpoints
         .iter()
         .filter_map(|(path, cp)| {
@@ -651,43 +478,17 @@ fn sync_with_policy(
                 .map(|generation| (path.clone(), generation))
         })
         .collect();
-    if rebuild && facts.streaming {
-        facts = load_facts(db, &fact_scope, None, &report, &context.cancelled, true)?;
-    }
     if rebuild {
-        // Cross-file ownership and late direct measurements require source-wide
-        // reconciliation. Retain facts evidenced solely by now-missing files.
-        let retained_collection_times = facts
-            .events
-            .iter()
-            .map(|(id, e)| (id.clone(), e.collected_at().to_owned()))
-            .collect();
-        let title_observations = std::mem::take(&mut facts.title_observations);
-        let missing_files: BTreeSet<_> =
-            missing.iter().map(|p| crate::hash(p.as_bytes())).collect();
-        facts
-            .events
-            .retain(|_, event| missing_files.contains(event.position().file_id.as_ref()));
-        facts = replay_events(
-            std::mem::take(&mut facts.events),
-            &report,
-            &context.cancelled,
-        )?;
-        facts.retained_collection_times = retained_collection_times;
-        facts.title_observations = title_observations;
+        external::rebuild_archive(db, &fact_scope, source, &replaced, &context.cancelled)?;
         checkpoints.retain(|p, _| missing.contains(p));
         dirty = files
             .iter()
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
-    }
-    // Full writes already visit every event. Building a second ordered identity
-    // set adds no information and needlessly grows with the entire archive.
-    facts.full_event_write = rebuild || previous.is_empty() || restoring;
-    if previous.is_empty() {
-        facts.streaming = true;
+    } else if previous.is_empty() {
         crate::live_index::save_events(db, &fact_scope, [], true, &context.cancelled)?;
     }
+    facts.full_event_write = rebuild;
     for path in dirty {
         let checkpoint = checkpoints.entry(path.clone()).or_default();
         if checkpoint.state.event_generation.is_none() {
@@ -725,14 +526,7 @@ fn sync_with_policy(
             Some(&before),
             |facts, file_complete| {
                 if facts.streaming && (facts.pending_events.len() >= 1024 || file_complete) {
-                    crate::live_index::save_events(
-                        db,
-                        &fact_scope,
-                        &facts.pending_events,
-                        false,
-                        &context.cancelled,
-                    )?;
-                    facts.pending_events.clear();
+                    external::flush(db, &fact_scope, facts, &context.cancelled)?;
                 }
                 Ok(())
             },
@@ -768,28 +562,18 @@ fn sync_with_policy(
         watermark.validate()?;
         checkpoint.watermark = Some(watermark);
     }
-    if rebuild && !facts.streaming {
-        // Missing files were retained before existing files were parsed. Restore
-        // their combined source order before publishing or saving projections.
-        // Checkpoints already own diagnostics; replay must not append them again.
-        let title_observations = std::mem::take(&mut facts.title_observations);
-        facts = replay_events(
-            std::mem::take(&mut facts.events),
-            &report,
-            &context.cancelled,
-        )?;
-        facts.title_observations = title_observations;
-    }
-    if facts.streaming {
-        reduction::resolve_streamed(db, &fact_scope, &mut facts, &mut report, &context.cancelled)?;
-    } else {
-        facts.resolve_operations(&mut report, &context.cancelled)?;
-    }
+    external::refresh(
+        db,
+        &fact_scope,
+        &mut facts,
+        &mut report,
+        rebuild || previous.is_empty(),
+        rebuild,
+        &context.cancelled,
+    )?;
+    external::resolve_operations(db, &mut report, &context.cancelled)?;
     read_titles(root, &mut facts, &mut report);
     titles::apply_titles(&mut facts);
-    for cp in checkpoints.values() {
-        report.issues.extend(cp.issues.iter().cloned());
-    }
     if let Some(versions) = previous.get("sourceVersions") {
         for v in serde_json::from_value::<Vec<String>>(versions.clone())? {
             if !report.source_versions.contains(&v) {
@@ -797,16 +581,22 @@ fn sync_with_policy(
             }
         }
     }
-    // Events restore parser truth; refresh canonical query facts after replay.
-    let full = rebuild || previous.is_empty() || restoring;
-    let replace_operations = full || !facts.retired_operations.is_empty();
-    let changed_operations = if replace_operations || !facts.parents.is_empty() {
-        None
-    } else {
-        Some(facts.dirty_operations.clone())
-    };
-    // Complete source-derived calculations before any parser writes. Errors or
-    // cancellation then leave publication to the caller's source transaction.
+    facts.watermarks.clear();
+    resume::save(db, source, &facts)?;
+    // Operation association issues precede checkpoint diagnostics, as in source
+    // replay. Reconciliation then streams scalar ownership and coverage keys.
+    let mut measurement_issues = external::measurement_issues(db)?;
+    for (path, cp) in &checkpoints {
+        let mut diagnostics = cp.issues.clone();
+        diagnostics.extend(measurement_issues.remove(path).unwrap_or_default());
+        diagnostics.sort_by_key(|i| i.evidence.as_ref().map_or(0, |e| e.line));
+        report.issues.extend(diagnostics);
+    }
+    report
+        .issues
+        .extend(measurement_issues.into_values().flatten());
+    external::project(db, &mut facts, &mut report, &context.cancelled)?;
+    external::save(db, source)?;
     let mut result = Collected::default();
     for checkpoint in checkpoints.values() {
         crate::operation_association::check(&context.cancelled)?;
@@ -815,74 +605,22 @@ fn sync_with_policy(
         }
     }
     facts.watermarks.clear();
-    let mut direct_only = facts.parents.is_empty();
-    if direct_only {
-        for candidate in facts.measurements.values() {
-            crate::operation_association::check(&context.cancelled)?;
-            if !candidate.direct {
-                direct_only = false;
-                break;
-            }
-        }
-    }
-    crate::operation_association::check(&context.cancelled)?;
-    let derived = facts.fork_derived(!direct_only);
-    let mut derived = finish_projection(derived, &mut report, &context.cancelled)?;
-    titles::apply_titles(&mut derived);
-    crate::operation_association::check(&context.cancelled)?;
+    titles::apply_titles(&mut facts);
+    let derived = projection::Projection {
+        metadata: facts,
+        measurements: vec![],
+        operations: vec![],
+        events: vec![],
+    };
     emit_facts(derived, &mut result, &context.cancelled)?;
-    if !facts.streaming {
-        for event in facts.events.values() {
-            crate::operation_association::check(&context.cancelled)?;
-            result.events.push(Arc::clone(event));
-        }
-    }
-    if direct_only {
-        for candidate in facts.measurements.values() {
-            crate::operation_association::check(&context.cancelled)?;
-            result.measurements.push(Arc::clone(&candidate.measurement));
-        }
-        for operation in facts.operations.values() {
-            crate::operation_association::check(&context.cancelled)?;
-            result.operations.push(Arc::clone(operation));
-        }
-    }
-    crate::operation_association::check(&context.cancelled)?;
-    if facts.streaming {
-        crate::live_index::save_events(
-            db,
-            &fact_scope,
-            &facts.pending_events,
-            false,
-            &context.cancelled,
-        )?;
-        facts.pending_events.clear();
-    } else if full {
-        crate::live_index::save_events(
-            db,
-            &fact_scope,
-            facts.events.values(),
-            true,
-            &context.cancelled,
-        )?;
-    } else {
-        crate::live_index::save_events(
-            db,
-            &fact_scope,
-            facts.dirty_events.iter().map(|id| &facts.events[id]),
-            false,
-            &context.cancelled,
-        )?;
-    }
-    facts.dirty_events.clear();
     crate::live_index::replace_field(
         db,
         &fact_scope,
         "title_observations",
-        facts
+        result
             .title_observations
             .iter()
-            .map(|(id, value)| (id.as_str(), value)),
+            .map(|value| (value.thread_id.as_str(), value)),
     )?;
     // Parser facts are reconstructed from authoritative observations. Query facts
     // are stored once in their canonical projection, never copied into this scope.
@@ -897,34 +635,8 @@ fn sync_with_policy(
     crate::observation_versions::ObservationHeaderSet::Parser
         .write_json(metadata.as_object_mut().expect("metadata is an object"));
     crate::live_index::save_map(db, &scope, metadata.as_object().unwrap())?;
-    cache.resume_delta = if rebuild || previous.is_empty() {
-        None
-    } else {
-        Some(resume::Delta {
-            measurements: facts.dirty_measurements.clone(),
-            operations: facts.dirty_operations.clone(),
-            retired: !facts.retired_operations.is_empty(),
-            targets: crate::live_index::changed_event_targets(db)?
-                .into_iter()
-                .chain(facts.association_dirty.iter().cloned())
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect(),
-            raw: !direct_only,
-        })
-    };
-    facts.dirty_measurements.clear();
-    facts.dirty_operations.clear();
-    facts.retired_operations.clear();
-    crate::operation_association::check(&context.cancelled)?;
-    // Verification may temporarily own all observations. Ordinary appends use
-    // canonical components and affected archive scopes; evidence stays durable.
-    facts.events.clear();
-    if !facts.streaming {
-        facts.association_groups = None;
-    }
-    facts.streaming = true;
-    cache.facts = Some(facts);
+    external::clear(db)?;
+    cache.encoded_bytes = 0;
     if !root.exists() && checkpoints.is_empty() {
         report.status = "notFound".into();
     } else if !report.issues.is_empty() {
@@ -943,17 +655,7 @@ fn sync_with_policy(
     }
     result.issues.extend(report.issues.iter().cloned());
     result.sources.push(report);
-    result.measurements.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-    let measurements = cache
-        .projected
-        .as_ref()
-        .map(|old| projection_delta(old, &result.measurements));
-    cache.projected = Some(result.measurements.clone());
-    Ok(Some(Synced {
-        collected: result,
-        operations: changed_operations,
-        measurements,
-    }))
+    Ok(Some(Synced { collected: result }))
 }
 
 fn facts_empty_marker(result: &Collected) -> bool {
@@ -989,7 +691,7 @@ mod sharing_tests {
             .unwrap();
         let scope = format!("parser:{}:{VERSION}:1", source.id);
         let before = crate::live_index::load_map(&db, &scope).unwrap();
-        let retained = cache.facts.as_ref().unwrap().events.clone();
+        let retained = crate::live_index::load_map(&db, &fact_scope(&source)).unwrap();
         fs::OpenOptions::new()
             .append(true)
             .open(path)
@@ -1012,14 +714,8 @@ mod sharing_tests {
         );
         assert_eq!(crate::live_index::load_map(&db, &scope).unwrap(), before);
         assert_eq!(
-            cache
-                .facts
-                .as_ref()
-                .unwrap()
-                .events
-                .keys()
-                .collect::<Vec<_>>(),
-            retained.keys().collect::<Vec<_>>()
+            crate::live_index::load_map(&db, &fact_scope(&source)).unwrap(),
+            retained
         );
     }
     #[test]
@@ -1173,73 +869,6 @@ mod sharing_tests {
         fs::write(&path, b"original\n").unwrap();
         assert!(prefix_checksums(&path, 0, &capture).is_err());
         drop(original);
-    }
-
-    fn row(id: &str, total: u64) -> Arc<Measurement> {
-        Arc::new(serde_json::from_value(serde_json::json!({"id":id,"agentKind":"synthetic","sourceInstanceId":"s","grain":"response","timePrecision":"unknown","model":{},"tokens":{"total":total},"tokenUnavailableReasons":{"input":"missing","cacheRead":"missing","cacheCreate":"missing","output":"missing","reasoning":"missing","total":null,"rawInput":"missing"},"pricingContextConflict":false,"requestScoped":true,"sequence":0,"evidence":[]})).unwrap())
-    }
-    #[test]
-    fn ordered_sharing_preserves_corrections_missing_and_foreign_facts() {
-        let b = row("b", 1);
-        let d = row("d", 2);
-        let f = row("f", 1);
-        let z = row("z", 1);
-        let facts = Facts {
-            measurements: [b.clone(), d.clone(), f.clone(), z.clone()]
-                .into_iter()
-                .map(|measurement| {
-                    (
-                        measurement.id.clone(),
-                        Candidate {
-                            measurement,
-                            direct: true,
-                            cumulative: None,
-                            interval_start: None,
-                            fingerprint: String::new(),
-                        },
-                    )
-                })
-                .collect(),
-            ..Facts::default()
-        };
-        let orphan = row("c", 1);
-        let mut cache = Cache {
-            facts: Some(facts),
-            projected: Some(vec![
-                b.clone(),
-                orphan.clone(),
-                d.clone(),
-                f.clone(),
-                z.clone(),
-            ]),
-            seed: None,
-            encoded_bytes: 0,
-            resume_delta: None,
-        };
-        let rows = [
-            row("a", 1),
-            row("b", 1),
-            row("d", 3),
-            row("e", 1),
-            row("f", 1),
-            row("g", 1),
-        ];
-        cache.share_measurements(rows.iter());
-        let facts = &cache.facts.as_ref().unwrap().measurements;
-        let projected = cache.projected.as_ref().unwrap();
-        assert!(Arc::ptr_eq(&facts["b"].measurement, &rows[1]));
-        assert!(Arc::ptr_eq(&projected[0], &rows[1]));
-        assert!(Arc::ptr_eq(&facts["d"].measurement, &d));
-        assert!(Arc::ptr_eq(&projected[2], &d));
-        assert!(Arc::ptr_eq(&facts["f"].measurement, &rows[4]));
-        assert!(Arc::ptr_eq(&projected[3], &rows[4]));
-        assert!(Arc::ptr_eq(&facts["z"].measurement, &z));
-        assert!(Arc::ptr_eq(&projected[4], &z));
-        assert!(Arc::ptr_eq(&projected[1], &orphan));
-        cache.share_measurements(rows.iter());
-        assert_eq!(cache.facts.as_ref().unwrap().measurements.len(), 4);
-        let mut empty = Cache::default();
-        empty.share_measurements(rows.iter());
     }
 }
 
