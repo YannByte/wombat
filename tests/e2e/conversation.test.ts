@@ -9,7 +9,9 @@ import { withLocalProduct, row } from '../helpers/local-product.js';
 test('message reads skip control facts and hide only declared interface context without changing usage', { timeout: 120_000 }, async () => {
   await withLocalProduct(async f => {
     const rows = [row('session_meta', { id: 'task', cwd: f.project }, '2026-10-14T00:00:00Z'), row('turn_context', { turn_id: 'turn', cwd: f.project }, '2026-10-14T00:00:01Z')];
-    for (let i = 0; i < 4000; i++) rows.push(row('event_msg', { type: 'item_completed', turn_id: 'turn', item: { type: 'CommandExecution', id: `control-${i}` } }, '2026-10-14T00:00:02Z'));
+    // Cross-host correctness needs control facts, not thousands of incomplete
+    // operations. The core's 6,000-event fixture covers skipped frame boundaries.
+    for (let i = 0; i < 256; i++) rows.push(row('event_msg', { type: 'item_completed', turn_id: 'turn', item: { type: 'CommandExecution', id: `control-${i}` } }, '2026-10-14T00:00:02Z'));
     const marker = '<external_codex_apps_open_page>{"page_id":null}</external_codex_apps_open_page>';
     const message = (id: string, text: string, kinds?: string[]) => row('response_item', { type: 'message', role: 'user', id, content: [{ type: 'input_text', text }], internal_chat_message_metadata_passthrough: { turn_id: 'turn', ...(kinds ? { content_item_kinds: kinds } : {}) } }, '2026-10-14T00:00:03Z');
     rows.push(message('ui', marker, ['additional_content.codex_apps_open_page']), message('quoted', `Explain this literal: ${marker}`), message('mixed', 'Keep this user request', ['additional_content.codex_apps_open_page', 'user.text']));

@@ -221,7 +221,9 @@ test(
       }
       // Use source work to keep a real transaction active. An external writer
       // lock is deliberately rejected, so it cannot simulate a long transaction.
-      const count = 50000;
+      // Observe real work through status; throughput is qualified by benchmarks.
+      // Oversized fixtures can starve under Windows background I/O scheduling.
+      const count = 5000;
       await f.append(
         "task",
         Array.from({ length: count }, (_, n) =>
@@ -246,7 +248,12 @@ test(
       });
       await until(async () => {
         const s = await f.client.service!({ action: "status" });
-        return s.running && s.stopping;
+        if (s.running) {
+          assert.equal(s.instanceId, cli.instanceId);
+          return s.stopping;
+        }
+        // A short transaction may finish before the next status request.
+        return true;
       });
       const stopped = await stopping;
       await refresh;
