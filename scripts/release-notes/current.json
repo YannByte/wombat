@@ -1,10 +1,10 @@
 {
-  "summary": "This release keeps local indexing ready in the background and makes focused usage reviews and original-evidence reads faster.",
+  "summary": "This release adds focused daily, task and configuration review Skills and makes original conversation evidence faster to find.",
   "highlights": [
-    "Managed installation starts a resident local indexer. Recent activity is prepared in the background, then file notifications and periodic discovery keep committed views current. Pause, resume and inspect the service through the CLI or Web.",
-    "Prepare the recent 30 days by default and load older history when requested. Persist parser recovery state and bound reusable caches to reduce repeated work after restart.",
-    "Reuse committed usage views for compact daily, model, project and task summaries. Combine related queries against one fixed view, then inspect only the selected tasks or turns.",
-    "Locate or search conversation evidence, then read selected text in bounded batches. The Codex Skill now carries filters and continuation details through the workflow and bases improvement suggestions on specific recorded evidence."
+    "Use three task Skills for daily usage and improvement reviews, selected-task retrospectives, and configuration reviews. Each keeps the selected scope and connects recommendations to recorded evidence.",
+    "Find and locate historical conversation messages with less repeated decoding and lazy history loading. Interface-injected context is excluded from normal message results while explicitly requested evidence remains accessible.",
+    "Read selected original text before recommending changes. Task reviews distinguish required validation and expected failures from accidental repetition; configuration reviews retain the original suggestion for authorized follow-up checks.",
+    "Plugin installation verifies every packaged Skill and reports concrete installation or discovery failures with the appropriate recovery step, avoiding unnecessary full reinstalls."
   ],
   "knownLimitations": [
     "Codex is the only production data source in this release; support for other agents is planned.",
