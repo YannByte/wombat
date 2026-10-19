@@ -5,13 +5,13 @@
   </picture>
 </p>
 
-# Wombat — Codex Token 用量分析与配置检查
+# Wombat — 复盘 Codex 工作与用量
 
 中文 | [English](README.md)
 
-Wombat 分析本机 Codex 记录，找出推高 Token 用量的任务，查看已记录的耗时。根据本机记录中的证据，检查 AGENTS.md、Skills、MCP 和 Hooks。
+看清做了什么工作、Token 用在哪里，以及哪些地方可以改善。
 
-通过 Codex 插件提问。需要图表和详细记录时，打开本机 Web 面板。
+Wombat 根据本机 Codex 记录计算用量、定位历史对话。通过配套 Skills，Codex 可以按需读取原文，复盘每日工作、调查指定任务并检查配置。
 
 ## 开始使用
 
@@ -35,25 +35,37 @@ Windows PowerShell：
 2. 新建对话。
 3. 提问：
 
-> $wombat:wombat 这周的 Token 用量增加在哪里？找出主要任务和轮次。
+> $wombat:wombat-daily-review 复盘这个项目今天的工作和 Token 用量，结合原文给出一项具体改进建议。
 
-回答会列出主要贡献，以及输入、缓存和输出的变化。需要核对记录时，可以让 Skill 打开对应的 Web 详情。
+复盘会结合已记录的用量和选定原文，区分请求、已记录的工作与已验证的交付，并说明证据缺口。
 
-已有采集插件使用 `$wombat-collection:wombat`。存在多个实例时，选择该项目实际发现的调用名称。详见[插件指南](docs/guides/plugin.md)。
+## 按任务选择 Skill
 
-插件安装失败时，Wombat 会保留。请按[安装恢复步骤](docs/guides/installation.md)处理。仅使用 Web 时，安装命令省略 `--plugin` 或 `-Plugin`。
+| 任务 | Skill | 提问示例 |
+|---|---|---|
+| 复盘每日或每周工作与用量 | `$wombat:wombat-daily-review` | 这周做了什么工作？用量增加在哪里，有哪些具体改进？ |
+| 调查指定任务 | `$wombat:wombat-task-retro` | 复盘这项任务的重复工作、失败和耗时，给出原文依据。 |
+| 检查项目配置 | `$wombat:wombat-config-review` | 检查这个项目的 AGENTS.md、Skills、MCP 和 Hooks，指出具体文件并给出修改建议。 |
 
-## 主要用途
+直接查询用量、费用、耗时、账户额度或 Token 预算时，使用 `$wombat:wombat`。例如：「这个项目今天用了多少 Token？」
 
-- 比较任务用量和周期增长，查看变化涉及的任务与轮次。
-- 查找已记录的活动和历史消息，让 Codex 按需读取原文，用于每日工作报告和后续追问。
-- 查看已记录的时长、活动区间、重叠和覆盖缺口。
-- 找出跨任务的重复操作，供 Codex 判断是否适合整理为脚本或 Skill。
-- 检查项目指令与扩展，审阅具体位置、依据和建议操作。
-- 保存配置检查的用户决定。完成授权修改后，使用相同规则复查。
-- 设置日／周／月 Token 预算，复盘最近结束的周期。
+复盘和检查从只读开始。Codex 仅在获得授权后执行修改。配置修改完成后，可以要求复查原问题。请求一份报告不会自动创建定期报告任务。
 
-持续预算检查需要运行 `wombat monitor watch`，或在打开的 Web 预算面板中启用定期检查。
+回答使用提问所用的语言。采集插件及其他调用名称见[插件指南](docs/guides/plugin.md)，持续预算检查见 [CLI 指南](docs/guides/cli.md)。
+
+## 首次准备与查询结果
+
+安装器会启用后台索引和当前用户的自动启动。首次准备优先处理最近 30 天的数据。查询更早的历史记录时，可能需要额外准备。
+
+安装成功不代表数据已经就绪。首次查询可能返回不完整结果。查看准备状态：
+
+```sh
+wombat service status --json
+```
+
+缺失或部分数据不能当作零用量。高用量本身不能证明浪费，没有使用记录也不能证明配置闲置。
+
+插件阶段失败时，Wombat 和数据会保留。请按报错中的恢复步骤和[安装指南](docs/guides/installation.md)处理。服务控制方式也见该指南。仅使用 Web 时，安装命令省略 `--plugin` 或 `-Plugin`。
 
 ## 打开 Web
 
@@ -77,7 +89,8 @@ wombat update
 ## 范围与限制
 
 - 分析本机 Codex 记录。发行包支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。
-- 本机分析不上传日志、不调用模型。缺价时可能下载官方价表，见[隐私说明](docs/reference/privacy.md)。
+- Wombat 本机查询不上传日志、不调用模型。在 Codex 中使用这些 Skills 会消耗模型 Token。
+- 缺价时可能下载官方价表。网络行为和原文访问边界见[隐私说明](docs/reference/privacy.md)。
 - Token、API 等价估算金额和账户额度分别展示。估算金额不是订阅账单，见[计价说明](docs/reference/pricing.md)。
 
 不受支持的数据格式如何处理，见[格式恢复说明](docs/reference/cli.md)。
