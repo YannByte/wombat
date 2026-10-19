@@ -17,6 +17,7 @@ import {toolCommand} from './run-tool.ts';
 import {previousReleaseTag, readPublishedReleaseTags} from './release-history.ts';
 import {updateInstalled} from '../cli/src/update-cli.ts';
 import {prepareFirstInstall} from './first-install-state.ts';
+import {installSourceArgs} from './release-installation.ts';
 
 const {values} = parseArgs({args: process.argv.slice(2).filter(arg => arg !== '--'), options: {set: {type: 'string'}}});
 assert(values.set, '--set is required');
@@ -91,6 +92,12 @@ try {
   const prefix = path.join(scratch, 'first-install-prefix');
   const dataHome = path.join(scratch, 'data');
   const preparation = prepareFirstInstall(scratch, [prefix, dataHome]);
+  const installEnv: NodeJS.ProcessEnv = {
+    ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: dataHome,
+    CODEX_HOME: path.join(scratch, 'source'), NO_COLOR: '1',
+  };
+  delete installEnv.WOMBAT_CORE_BIN; delete installEnv.NODE_OPTIONS; delete installEnv.NODE_PATH;
+  delete installEnv.WOMBAT_INSTALL_ROOT; delete installEnv.WOMBAT_ENDPOINT_FILE;
   stage('archive identity and extraction');
   const releaseDirectory = path.dirname(setFile);
   const unpackedAt = performance.now();
@@ -105,14 +112,15 @@ try {
   const installAt = performance.now();
   const firstInstall = process.platform === 'win32'
     ? spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('scripts/install/install.ps1'),
-      '-Version', set.version, '-Prefix', prefix, '-BaseUrl', pathToFileURL(releaseDirectory).href, '-NoModifyPath', '-NoService'],
-      {encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true})
-    : spawnSync('sh', [path.resolve('scripts/install/install.sh'), '--version', set.version, '--prefix', prefix,
-      '--base-url', pathToFileURL(releaseDirectory).href, '--no-modify-path', '--no-service'],
-      {encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024});
+      '-Prefix', prefix, '-NoModifyPath', ...installSourceArgs(set.version, pathToFileURL(releaseDirectory).href, false, true)],
+      {env: installEnv, encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true})
+    : spawnSync('sh', [path.resolve('scripts/install/install.sh'), '--prefix', prefix, '--no-modify-path',
+      ...installSourceArgs(set.version, pathToFileURL(releaseDirectory).href, false, false)],
+      {env: installEnv, encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024});
   assert.ifError(firstInstall.error); assert.equal(firstInstall.status, 0, firstInstall.stderr + firstInstall.stdout);
   const firstInstallMs = Math.round(performance.now() - installAt);
   const managedRoot = path.join(prefix, 'lib', 'wombat');
+  assert(!existsSync(path.join(managedRoot, 'service-registration.json')), 'First-install fixture registered a native service');
   const currentId = readFileSync(path.join(managedRoot, 'current.txt'), 'utf8').trim();
   assert.deepEqual(readdirSync(path.join(managedRoot, 'versions')), [currentId], 'First install contains historical versions');
   const installed = path.join(managedRoot, 'versions', currentId);
@@ -124,11 +132,7 @@ try {
   assert(existsSync(cli)); assert(existsSync(core)); assert(existsSync(runtime)); assert(existsSync(launcher));
 
   stage('offline doctor and product queries');
-  const env: NodeJS.ProcessEnv = {
-    ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: dataHome,
-    CODEX_HOME: path.join(scratch, 'source'), NO_COLOR: '1', PATH: '',
-  };
-  delete env.WOMBAT_CORE_BIN; delete env.NODE_OPTIONS; delete env.NODE_PATH;
+  const env: NodeJS.ProcessEnv = {...installEnv, PATH: ''};
   const run = (program: string, args: string[], status = 0, runEnv = env) => {
     const result = spawnSync(program, args, {cwd: scratch, env: runEnv, encoding: 'utf8', timeout: 120_000, maxBuffer: 8 * 1024 * 1024,
       windowsVerbatimArguments: process.platform === 'win32' && /cmd\.exe$/i.test(program)});
@@ -172,13 +176,15 @@ try {
   const previousBaseUrl = downloadPublishedRelease(previousTag, previousArchive);
   const upgradePrefix = path.join(scratch, 'upgrade-prefix');
   const installer = process.platform === 'win32'
-    ? spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('scripts/install/install.ps1'), '-Version', previousTag,
-      '-Prefix', upgradePrefix, '-BaseUrl', previousBaseUrl],
-      {cwd: path.resolve('.'), encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true})
-    : spawnSync('sh', [path.resolve('scripts/install/install.sh'), '--version', previousTag, '--prefix', upgradePrefix, '--base-url', previousBaseUrl],
-      {cwd: path.resolve('.'), encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024});
+    ? spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.resolve('scripts/install/install.ps1'),
+      '-Prefix', upgradePrefix, '-NoModifyPath', ...installSourceArgs(previousTag, previousBaseUrl, false, true)],
+      {cwd: path.resolve('.'), env: installEnv, encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true})
+    : spawnSync('sh', [path.resolve('scripts/install/install.sh'), '--prefix', upgradePrefix, '--no-modify-path',
+      ...installSourceArgs(previousTag, previousBaseUrl, false, false)],
+      {cwd: path.resolve('.'), env: installEnv, encoding: 'utf8', timeout: 300_000, maxBuffer: 8 * 1024 * 1024});
   assert.ifError(installer.error); assert.equal(installer.status, 0, installer.stderr + installer.stdout);
   const upgradeRoot = path.join(upgradePrefix, 'lib', 'wombat');
+  assert(!existsSync(path.join(upgradeRoot, 'service-registration.json')), 'Previous-release fixture registered a native service');
   const previousId = readFileSync(path.join(upgradeRoot, 'current.txt'), 'utf8').trim();
   const previousEntry = path.join(upgradeRoot, 'versions', previousId, 'lib', 'wombat.js');
   stage('managed installation upgrade');
@@ -186,6 +192,7 @@ try {
     180_000, 'Managed installation upgrade');
   assert.deepEqual({currentVersion: updated.currentVersion, availableVersion: updated.availableVersion, updateAvailable: updated.updateAvailable, updated: updated.updated},
     {currentVersion: previousTag.slice(1), availableVersion: set.version, updateAvailable: true, updated: true});
+  assert.equal(updated.serviceRestart, undefined, 'Isolated upgrade unexpectedly restarted a native service');
   const upgradedId = readFileSync(path.join(upgradeRoot, 'current.txt'), 'utf8').trim();
   assert.notEqual(upgradedId, previousId); assert(existsSync(path.join(upgradeRoot, 'versions', previousId)));
   const upgradedLauncher = path.join(upgradePrefix, 'bin', process.platform === 'win32' ? 'wombat.cmd' : 'wombat');

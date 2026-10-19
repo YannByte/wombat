@@ -12,9 +12,12 @@ import { readReleaseNotesInput } from './generate-release-notes.ts';
 import { readCiCandidate } from './ci-release-candidate.ts';
 import { verifyReleaseAssets } from './check-release-assets.ts';
 import { cacheReleaseAssets, releaseCacheDirectory, type PublishedAsset } from './release-cache.ts';
+import { installSourceArgs } from './release-installation.ts';
 import { repositorySlug } from './release-policy.ts';
 import { readRemoteRef } from './github-release-ref.ts';
 import { toolCommand } from './run-tool.ts';
+
+export { installSourceArgs } from './release-installation.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const apiVersion = '2026-03-10';
@@ -287,14 +290,6 @@ function optionalReleaseView(repository: string, tag: string): ReleaseView | und
   if (lookup.status === 0 && !lookup.error) return releaseView(repository, tag);
   if (!lookup.error && /HTTP 404/.test(String(lookup.stderr))) return undefined;
   throw new Error(`Cannot determine remote Release state: ${failure('gh', [], lookup)}`);
-}
-
-export function installSourceArgs(version: string, baseUrl: string, publicDownload: boolean, windows: boolean): string[] {
-  // Isolated archive acceptance must not register a user-session service that
-  // outlives its temporary prefix or competes with the active installation.
-  const isolated = windows ? ['-NoService'] : ['--no-service'];
-  if (!publicDownload) return [...(windows ? ['-Version', version, '-BaseUrl', baseUrl] : ['--version', version, '--base-url', baseUrl]), ...isolated];
-  return [...(version.includes('-') ? (windows ? ['-Version', version] : ['--version', version]) : []), ...isolated];
 }
 
 export async function readPublicInstaller(repository: string, installer: 'install.sh' | 'install.ps1', expected: string, fetcher = fetch): Promise<string> {
