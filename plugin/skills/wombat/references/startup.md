@@ -33,6 +33,8 @@ Examine returned freshness and coverage:
 
 `LOCAL_ACCESS_DENIED` identifies a local process or service permission failure, including account/setup section errors. Keep the executable, environment and scope of the same read-only command. Request only the access that command needs. After access is granted, run the command once more.
 
+If several methods need that same inaccessible service, do not probe them one by one. Keep the known failure until access changes; report the dependent gaps together.
+
 Do not restart scanning, reinstall, read credentials, broaden permissions for the whole task or substitute raw-log scans. A generic `CODEX_DISCONNECTED` is not proof of a permission failure. Keep the verified data directory on every isolated command when shell environments do not persist.
 
 Call `api --json` once. Use its runtime version and method list for later requests. Read `api --method METHOD --json` only for a needed input Schema. Request `--output-schema` only for unfamiliar response fields.

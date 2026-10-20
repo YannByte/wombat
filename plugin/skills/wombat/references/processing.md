@@ -6,13 +6,13 @@ Process within the user's authorization in the receiving conversation. Keep purp
 
 Codex owns file edits, review and recovery. Wombat has no apply/recover job API. Do not send another handoff to yourself.
 
-After editing a configuration suggestion, call `optimize recheck --suggestion ID --project-root PATH --project PATH --json` with current evidence. Examine per-rule outcomes. A passing static recheck is not proof of actual adoption, better task quality or financial savings. Show remaining findings and rules that cannot be checked. Keep user decisions separate from checks.
+After editing an existing configuration suggestion, call `optimize recheck --suggestion ID --project-root PATH --project PATH --json` with current evidence. Examine per-rule outcomes. For a direct file review without a Wombat suggestion ID, check the original target and issue with an appropriate parser, reference check or behavior test. Do not create a suggestion merely to report a fix. A passing static recheck is not proof of actual adoption, better task quality or financial savings. Show remaining findings and unavailable checks. Keep user decisions separate from checks.
 
 Use the recheck response directly. A resolved suggestion may leave the pending list. If more history is needed, query `optimize history --suggestion ID` with the original scope and ID. Do not query the old suggestion as a new pending detail. Do not select a replacement or run the recheck again to retrieve the same facts.
 
 For changes prompted by a usage investigation, keep the original task, scope and baseline metrics. Give details of the actual change. If later observations are available, compare them with `compare` or the original analysis. Do not invent a configuration suggestion ID or require a static recheck for an unrelated workflow change.
 
-Show observed improvement separately from a possible cause. Missing follow-up data does not block a useful change summary. Do not run extra model tasks just to manufacture a benefit measurement.
+Before an authorized edit, retain the original evidence, target version and success criterion. Afterward, state what changed, which original check passed or failed, and which effects remain unmeasured. A controlled replay can verify a mechanism without proving that a complete task improved. Use later comparable work to assess behavior, quality or usage; do not infer these from fewer errors or a shorter file. Missing follow-up data does not block a useful change summary. Do not run extra model tasks just to manufacture a benefit measurement.
 
 If the user explicitly chooses “keep” or “not applicable”, use `optimize keep|not-applicable --suggestion ID --reason necessary|object_changed|incorrect_evidence` with the reviewed readView/decisionRevision and scope. Read current help for exact arguments. Rechecks must not revoke those decisions. Do not create consuming tasks just to test adoption.
 

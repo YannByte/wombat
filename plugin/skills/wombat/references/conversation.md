@@ -1,6 +1,6 @@
 # Activity and original conversation evidence
 
-Use this reference for daily work reports, earlier discussions, or content around an investigation finding. Discover `conversation` through `wombat api --method conversation --output-schema`. If the installed API lacks it, explain the version limit. Do not invent positions or parse an entire log as a fallback.
+Use this reference for daily work reports, earlier discussions, or content around an investigation finding. Discover the `conversation` input through `wombat api --method conversation --json` only if it is not already known. Request `--output-schema` only for unfamiliar response fields. If the installed API lacks the method, explain the version limit. Do not invent positions or parse an entire log as a fallback.
 
 Prepare one usage view through the existing usage flow. Keep its snapshot ID, authorized sources and requested dates/timezone. Activity comes from recorded events, including tasks with no Token records. It is not a list of verified completed work. Several observations can come from one source record.
 
