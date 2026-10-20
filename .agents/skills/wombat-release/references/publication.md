@@ -12,7 +12,7 @@ After publication download only the installers, manifests, and operator-platform
 
 ## Finish
 
-Read supported targets and runtime prerequisites from the versioned source; do not infer musl, Windows ARM64, or old-system acceptance. Report version, commit, platforms, gates, archive hashes, installation/update evidence, whether publication actually occurred, and the user's installation command. Candidates in dist/github are not externally installable Releases. Clean isolated workspaces only when no longer needed and required ignored files are saved.
+Read supported targets and runtime prerequisites from the versioned source; do not infer musl, Windows ARM64, or old-system acceptance. Report version, commit, platforms, gates, archive hashes, installation/update evidence, whether publication actually occurred, and the user's installation command. Candidates in dist/github are not externally installable Releases. Finish with [artifact cleanup](../../wombat-verify/references/cleanup.md).
 
 The preflight follows GitHub's secure-use guidance: third-party Actions remain pinned to full commit SHAs, job permissions stay minimal, and verified assets are attached before a draft becomes public. GitHub artifact attestations bind archives to the hosted build, while SLSA recommends publishing and verifying provenance alongside release artifacts. Repository settings should enable immutable Releases and protect release tags when available; those server-side controls are inspected separately because the local preflight does not change GitHub settings.
 
