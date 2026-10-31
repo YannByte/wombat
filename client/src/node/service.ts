@@ -20,7 +20,7 @@ import {
   invokeOperation,
   type CoreProcessOptions,
 } from "./core.js";
-import { queryLive, runtimeMatches, serviceProcessId } from "./live.js";
+import { queryLive, runtimeMatches } from "./live.js";
 import { managedInstallationRoot } from "./installation.js";
 import { validate as validateResponse } from "../generated/validate-service-response.js";
 
@@ -386,17 +386,6 @@ async function stopService(
 ): Promise<ServiceResult> {
   const result = await probe({ action: "stop" }, options, config);
   if (!result.running) return result;
-  const pid = serviceProcessId(config, result.instanceId);
-  const alive = () => {
-    if (pid === undefined) return false;
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
-      throw error;
-    }
-  };
   const deadline = Date.now() + 25_000;
   while (Date.now() < deadline) {
     await delay(100, undefined, { signal: options.signal });

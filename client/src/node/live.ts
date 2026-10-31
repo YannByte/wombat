@@ -131,7 +131,6 @@ function exchange(
   });
 }
 interface Endpoint {
-  pid?: number;
   protocolVersion: number;
   socket: string;
   instanceId?: string;
@@ -238,11 +237,6 @@ function installedEndpoint(
       );
     return {
       protocolVersion: 2,
-      ...("pid" in value &&
-      Number.isSafeInteger(value.pid) &&
-      Number(value.pid) > 0
-        ? { pid: Number(value.pid) }
-        : {}),
       socket: value.socket,
       instanceId: value.instanceId,
     };
@@ -250,15 +244,6 @@ function installedEndpoint(
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
     throw error;
   }
-}
-/** Only an owner-checked endpoint for this exact instance can identify its process. */
-export function serviceProcessId(
-  config: CoreProcessOptions,
-  instanceId: string | null | undefined,
-): number | undefined {
-  if (!instanceId) return;
-  const endpoint = installedEndpoint(config, true);
-  return endpoint?.instanceId === instanceId ? endpoint.pid : undefined;
 }
 export async function queryLive(
   request: ProductRequest,
