@@ -1,23 +1,19 @@
 {
-  "summary": "This release adds focused daily, task and configuration review Skills and makes original conversation evidence faster to find.",
+  "summary": "Use one task-oriented Codex Skill and a local CLI to investigate project obstacles, make targeted changes and recheck the original problem. Data preparation now runs when a query needs it.",
   "highlights": [
-    "Use three task Skills for daily usage and improvement reviews, selected-task retrospectives, and configuration reviews. Each keeps the selected scope and connects recommendations to recorded evidence.",
-    "Find and locate historical conversation messages with less repeated decoding and lazy history loading. Interface-injected context is excluded from normal message results while explicitly requested evidence remains accessible.",
-    "Read selected original text before recommending changes. Task reviews distinguish required validation and expected failures from accidental repetition; configuration reviews retain the original suggestion for authorized follow-up checks.",
-    "Plugin installation verifies every packaged Skill and reports concrete installation or discovery failures with the appropriate recovery step, avoiding unnecessary full reinstalls."
+    "Use the single $wombat:wombat entry to resume work, investigate an obstacle, verify a delivery, review work and usage, or improve a project workflow. Each task loads only its relevant guidance; static project reviews need no initialization or history scan.",
+    "Project reviews inspect actual execution and validation paths, examine counterevidence and identify a concrete owner, smallest change and original check to rerun. Reviews distinguish a verified fix from later adoption or improved outcomes.",
+    "Installation and source notifications no longer trigger background indexing. Queries prepare the data they need and reuse persistent accounting facts and bounded history views. Explicit monitoring and optional resident process lifetime remain available.",
+    "The shipped product is CLI and Skill only. The Web interface, browser transport and separate task Skills are removed. Refresh the Codex plugin with the documented installer --plugin option and use the main Skill for all task flows.",
+    "Resumed development acceptance now invalidates old results when shared test helpers change, while unchanged inputs remain reusable. Clean installed-runtime acceptance uses only the required CLI and Skill assets, without depending on removed Web files."
   ],
   "knownLimitations": [
-    "Codex is the only production data source in this release; support for other agents is planned.",
-    "Recent preparation covers the default 30-day window. Historical requests can require additional preparation. Missing, deferred, partial and unpriced results remain explicit.",
-    "Background indexing and cache limits do not impose a hard process-memory ceiling. Initial preparation, large source catch-up and detail requests can still use substantial memory and temporary disk space.",
-    "Measured warm complete CLI requests met a 100 ms P95 target on the local acceptance corpus. Cold requests and individual outliers can exceed 100 ms; this is not a per-request latency guarantee.",
-    "The 24-hour resident workload qualification and native user-session manager acceptance on Linux and Windows remain separate acceptance work. macOS crash recovery and pause/resume were tested locally; generated service definitions alone do not prove login-startup behavior.",
-    "Original-text access supports selected message mappings and text parts. Unknown mappings, non-text content and delta-stream assembly remain explicit gaps; there is no transcript panel in the Web dashboard.",
+    "Codex is the only production data source. Native plugin discovery requires a compatible local Codex. Windows Hook collection and native user-session manager behavior on Linux and Windows remain separately qualified capabilities.",
+    "Recent preparation prioritizes the default 30-day window; historical requests can require more work. On-demand execution and cache budgets are not hard latency or process-memory limits. Initial preparation and large detail requests can still use substantial resources.",
+    "Original-text access supports selected message mappings and text parts. Unknown mappings, non-text content and delta-stream assembly remain explicit gaps.",
     "Conversation reads verify selected source text blocks and reject changed, replaced, missing or unavailable sources. A successful snippet does not prove that the complete source file is unchanged. Changes require a valid fixed baseline and do not establish additional work or savings.",
     "API costs are estimates. Unpriced or partial data stays explicit and is separate from subscription allowance.",
     "Unsupported derived index and parser-cache formats require a rebuild. Existing data is not migrated or automatically deleted. Follow the documented format recovery and preserve user decisions; a different WOMBAT_DATA_HOME does not transfer them.",
-    "Timing describes recorded activity and can be partial or provisional. It does not establish why work was slow, code quality, token savings, or model performance.",
-    "A sharing summary removes direct identifiers but does not guarantee anonymity. Preview it before sharing.",
-    "Native Codex plugin discovery and Hook registration require a compatible local Codex. Windows Hook collection remains unverified."
+    "Missing, deferred and partial source coverage remains explicit. Timing and usage observations do not establish cause, code quality or savings, and a controlled repair does not prove later improvement."
   ]
 }

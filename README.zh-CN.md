@@ -15,7 +15,7 @@ Wombat 结合高效的本地工作历史检索与准确的用量计算。一个�
 
 ## 开始使用
 
-**正式版：[`v0.3.7`](https://github.com/YannByte/wombat/releases/tag/v0.3.7)。**
+**正式版：[`v0.4.0`](https://github.com/YannByte/wombat/releases/tag/v0.4.0)。**
 
 本机分析无需 API Key 或开发工具。使用插件前，先安装兼容的本机 Codex。
 

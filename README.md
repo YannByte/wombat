@@ -15,7 +15,7 @@ Wombat combines efficient local work-history retrieval with exact usage calculat
 
 ## Get started
 
-**Stable: [`v0.3.7`](https://github.com/YannByte/wombat/releases/tag/v0.3.7).**
+**Stable: [`v0.4.0`](https://github.com/YannByte/wombat/releases/tag/v0.4.0).**
 
 Local analysis needs no API key or development tools. Install a compatible local Codex before using the plugin.
 
