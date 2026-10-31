@@ -2,12 +2,16 @@
   "version": 2,
   "sections": {
     "/wombat-user-plugin": {
-      "zh": "2687f77ee016634be2bf231c01b9109aa9d9bc800e4aa47621cafc95bb91b942",
-      "en": "f433db801058a25b3155d34651cf196b3bf66b3cd3b8abd3fc49249397d061b7"
+      "zh": "7d66b336299455751d831b66752919e530db3438cfda8ac7f7bf748340ac1e14",
+      "en": "510d4723845aab5a3b65f0a9d4786edcc1695626a243ec5b6d7884d80c00ebcc"
     },
-    "/wombat-user-plugin/local-collection-package": {
-      "zh": "4f0b5bf651e4e61c749bb06e13a17c378fed46e8cf3ec36ac8e190ad5357f352",
-      "en": "8cf2e5aa0e68277b44f21ee46a7f7cfda6ba1cae3d8dafebf88db7686d71c461"
+    "/wombat-user-plugin/build-and-install": {
+      "zh": "504f69ed632c62109a758bb4e5543c13c7309bd6a93e18c2d3cdc5a634ea9737",
+      "en": "1daf65722ebdf11c500f8d8ac405f804c1360ca0b77300ede253a97f651eadb5"
+    },
+    "/wombat-user-plugin/verification-boundaries": {
+      "zh": "f2a9462353ea689159231059b4ac87eece7ff9740726e5befeb2f3b2f5211295",
+      "en": "94f74e566791b51955e7d86672a259f3948beb872b1a7e2f53db1a7d1b1049fa"
     }
   }
 }

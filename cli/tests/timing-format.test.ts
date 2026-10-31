@@ -138,7 +138,7 @@ test('object and record pages preserve missing counts, use outcomes and safe dis
 
 
 test('partial object counts retain observed associations including zero without presenting a full total', () => {
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try {for(const language of ['zh','en'] as const){locale.setLocale(language);
   for(const count of [0,2]){
    const metric={value:count,status:'observed' as const,basis:'canonical_use_identity' as const,evidenceRefs:[]};
@@ -155,7 +155,7 @@ test('partial object counts retain observed associations including zero without 
 });
 
 test('MCP timing and four-way overlap use core measurements without summing categories in either locale',()=>{
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  const fixture=structuredClone(local);
  const measure=(value:number)=>({value,status:'derived' as const,basis:'interval_mask' as const,evidenceRefs:[]});
  fixture.time.mcp.unionMs=measure(5000);fixture.time.mcp.sumMs=measure(7000);
@@ -171,7 +171,7 @@ test('MCP timing and four-way overlap use core measurements without summing cate
 
 
 test('timing evidence retains native scalars without timestamps and preserves explicit zero',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{for(const language of ['zh','en'] as const){locale.setLocale(language);
   for(const duration of [0,25]){
    const base={outputVersion: 6 as const,action:'evidence' as const,methodVersion:local.methodVersion,profile:'local' as const,snapshotId:local.readView.snapshotId,scope:local.scope,total:{value:1,status:'observed' as const,basis:'safe_event_count' as const,evidenceRefs:[]},nextCursor:null};
@@ -196,13 +196,13 @@ test('operation residual renders supplied durations and coverage reasons in both
  c.residualMs={value:30,status:'derived',basis:'operation_residual',evidenceRefs:[]};
  c.residualRangeCount={value:1,status:'derived',basis:'operation_residual',evidenceRefs:[]};
  c.residualRanges=[{startMs:0,endMs:30}];c.reasonCodes=['no_paired_operations','identity_gaps','source_partial','detail_limit'];
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try {for(const language of ['en','zh'] as const){locale.setLocale(language);const text=renderTimingResult(fixture);assert.match(text,/0 ms/);assert.match(text,/30 ms/);assert.match(text,/0–30 ms/);assert.doesNotMatch(text,/execution\.operations\.|undefined/);assert.match(text,language==='en'?/no operation duration was subtracted/:/没有从轮次窗口减去操作时长/);}}
  finally {locale.setLocale(previous);}
 });
 
 test('repeat text distinguishes confirmed counts, request observations, subtotals and missing durations in both locales',()=>{
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try {for(const language of ['en','zh'] as const){
   locale.setLocale(language);const fixture=structuredClone(local),r=fixture.time.repeatedBehavior;
   const m=(value:number)=>({value,status:'derived' as const,basis:'repeat_after_failure' as const,evidenceRefs:[]});
@@ -226,14 +226,14 @@ test('local text shows paired evidence aliases and detail limits without changin
  const count=(value:number)=>({value,status:'derived' as const,basis:'exact_event_page' as const,evidenceRefs:[]});
  navigation.detail={support:'supported',reason:'exact_event_page'};navigation.locatedOperationCount=count(1);
  navigation.entries=[{later:{operationAlias:'repeat:0:later',pages:[{limit:200,evidenceRefs:['event:later']}]},afterFailure:{operationAlias:'repeat:0:failure',pages:[{limit:200,evidenceRefs:['event:failure']}]},successfulReads:[{operationAlias:'repeat:0:read:0',pages:[{limit:200,evidenceRefs:['event:read']}]}],repeatedReadTargetCount:1,laterDurationMs:count(40),recoverySpanMs:count(80)}];
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try{for(const language of ['en','zh'] as const){locale.setLocale(language);const text=renderTimingResult(response);assert.match(text,/repeat:0:later/);assert.match(text,/repeat:0:failure/);assert.match(text,language==='en'?/Earlier successful read 1/:/前次成功读取 1/);assert.doesNotMatch(text,/execution\.repeats\.|undefined|NaN|未知/);const limited=structuredClone(response);limited.evidence.repeatPages.entries=[];limited.evidence.repeatPages.detail={support:'unavailable',reason:'resource_limit'};assert.match(renderTimingResult(limited),language==='en'?/aggregate counts and duration subtotals remain/:/完整次数与耗时小计仍保留/);assert.doesNotMatch(renderTimingResult(share),/repeat:0|event:later|event:failure/);}}finally{locale.setLocale(previous);}
 });
 
 
 test('CLI outcome text uses the shared subset, exclusions and zero-denominator explanation',async()=>{
  const {outcomeStatistics}=await import('../../tests/fixtures/outcomes.js');
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try{for(const language of ['en','zh'] as const){
   locale.setLocale(language);const fixture=structuredClone(local);fixture.work.outcomes=outcomeStatistics();
   const text=renderTimingResult(fixture);assert.match(text,/33\.3/);assert.match(text,language==='en'?/Failed 1 of 3/:/3 次操作中，失败 1 次/);
@@ -247,7 +247,7 @@ test('CLI outcome text uses the shared subset, exclusions and zero-denominator e
 
 test('input change text retains observed comparison without timing and translates exclusions',async()=>{
  const {inputChangeFixture}=await import('../../tests/fixtures/input-change.js');
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try{for(const language of ['zh','en'] as const){
   locale.setLocale(language);const fixture=structuredClone(local);fixture.context.inputChange=inputChangeFixture();
   fixture.context.inputChange.statistics!.candidates=3;fixture.context.inputChange.statistics!.missingInput=1;fixture.context.inputChange.statistics!.partial=true;

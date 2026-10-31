@@ -324,6 +324,11 @@
       "zh": "docs/decisions/implemented/architecture/2026-10-31-cli-task-skill.md",
       "en": "docs/decisions/implemented/architecture/2026-10-31-cli-task-skill.en.md",
       "record": "docs/decisions/implemented/architecture/2026-10-31-cli-task-skill.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/implemented/architecture/2026-10-31-on-demand-checks.md",
+      "en": "docs/decisions/implemented/architecture/2026-10-31-on-demand-checks.en.md",
+      "record": "docs/decisions/implemented/architecture/2026-10-31-on-demand-checks.i18n.json"
     }
   ],
   "legacyUnpaired": [],

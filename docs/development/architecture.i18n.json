@@ -10,8 +10,8 @@
       "en": "28a598b035fcef6728d9b87dab8fe37d1d5bb1264f7b5ece72420c53628ed6fa"
     },
     "/wombat-architecture/modules": {
-      "zh": "9c23506f33f07e37c07d2726142da3e5620bc4b74794aae0234ad54044f0b0f8",
-      "en": "8d8b3029fd697c5a7285564e5d4b89e9f1c987d4916eeca00dab7189e6699808"
+      "zh": "67a5b6c57e1538f25daf233a0dfd65ebbd6f43dee5fe8bd59127613e0c300900",
+      "en": "0f6dacec498b1189e27baffd1fead419825da09de4e6ce822ebd61b56823de34"
     },
     "/wombat-architecture/host-and-service-responsibilities": {
       "zh": "e4174ee8369cbbab5999b77b352c51ebdc1e8d0d32fee79a71110cfad605a5b9",
@@ -22,16 +22,16 @@
       "en": "e54122a1691b681cbf4c55d66bd74d14a8c662474ae0181bc55f480f47ceef26"
     },
     "/wombat-architecture/domain-and-persistence/domain-map": {
-      "zh": "c59d3fdc3aae9430b2d06940d0f8232d73b01505a5cb6af96a6896a29d694bf0",
-      "en": "3062d89836932a742a036cd3849ca7dd694f5017843dbe9fee335ce2f498756d"
+      "zh": "1b60df773f7c0572076a42ee8de6fd9a4a5311bf8885bb12321dcfa4c41936f7",
+      "en": "07b0421a4484965b72bfbc0000c1d990d431861837f46646927cb794b524bb35"
     },
     "/wombat-architecture/domain-and-persistence/usage-facts-and-derived-results": {
       "zh": "648bef661c234306b107ff5c52cace6aad6913cc2b55d24819a3c9040b7295fa",
       "en": "c0c2b977f4c64c4e1e5382733fe0c97fc54d5d10d075f3ba2059c8c0bae0bf5b"
     },
-    "/wombat-architecture/domain-and-persistence/configuration-checks-and-handoffs": {
-      "zh": "a99cde56d7e75e2dd58a5aadc5451eb55bff292306bc31ae9c476343793c867c",
-      "en": "a84c5d62a4e7195d0b88d673e40827c80de17e08b3c184d5a48498353b1fd777"
+    "/wombat-architecture/domain-and-persistence/configuration-checks-and-rechecks": {
+      "zh": "a8049bce5b8a48b70878bb875802c9fa3891b5ffde9aed565112003cd738b062",
+      "en": "b03d59fad193183534b352686a29718b7a1f2923632c81dbb930146c763abc27"
     },
     "/wombat-architecture/domain-and-persistence/persistence-boundaries-and-current-model-limits": {
       "zh": "8041e13f856fc2f29033e811148f0b7ecfd63dd8293d76c44c4bb8bfeb955ec6",

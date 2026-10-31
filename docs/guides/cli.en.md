@@ -88,21 +88,13 @@ Review does not accept pagination. Without dates, it selects the fixed view cuto
 
 ## Codex Skill
 
-The [main Skill](plugin.en.md) starts with the requested task. It reuses CLI JSON only when evidence requires it. Static project checks have no initialization step. Account reads do not wait for logs.
-
-Codex manages the formal plugin, whose invocation name on verified Codex 0.160.0 is $wombat:wombat. Standalone local trials use $wombat:
+Install the single plugin through the [installation guide](installation.en.md), then invoke `$wombat:wombat` in a new project conversation. Check discovery and runtime with:
 
 ```sh
-wombat skill install --json
-wombat skill status --cwd /path/to/project --json
-wombat skill install --replace --json
-wombat skill uninstall --json
+wombat setup --project /path/to/project --json
 ```
 
-Standalone installation copies only reviewed local product assets, defaulting to ~/.agents/skills/wombat. --directory selects a directory ending in wombat; --cwd selects the native discovery project. Only unchanged managed copies can be explicitly replaced or removed; custom directories, links, and user changes are protected. Independent v1 JSON separates file state, discovery/enablement, runtime capabilities, and data not requested. Installation does not scan logs. Unconfirmed native discovery exits2 without rolling back completed file installation. These commands do not manage plugins.
-
-
-For a separate Codex task, CLI handoff checks actually enabled Skills per project, rechecks names/paths, and sends text plus a skill item to the persistent queue. Use --skill PROJECT_ID=PATH. Missing, disabled, or conflicting instances require selection or explicit --without-skill to use existing handoff behavior. Unknown delivery is never retried automatically; acceptance does not establish completed changes or rechecks.  See the [product plan](../decisions/proposed/product/2026-10-04-codex-skill.en.md).
+Default setup does not query optional Hooks. Add `--hooks` when needed.
 
 ## Language
 
@@ -200,45 +192,28 @@ Responses use configuration v1 JSON. Incomplete historical coverage currently re
 
 ## Static suggestions and manual rechecks
 
-To inspect one turn, first obtain its snapshot/thread/turn IDs from the task list or timing summary. Run `wombat optimize activity --snapshot SNAPSHOT_ID --thread THREAD_ID --turn TURN_ID --json`, retaining the same `--root` and optional `--source` as the selected view. Text output shows three check results and applicable inspection advice. This read collects no configuration and saves no handling decisions. Use timing evidence with the same selection to inspect records. If the view expires, reopen the list and select a new view; do not combine results from different snapshots.
-
-Run `wombat optimize list --json` with the same `--root` / `--project-root` as configuration. Suggestions merge by object in repair/trim/organize/space categories; the latter two explicitly remain unavailable without adapters. Checks accept no usage dates/models, and static reminders do not establish configuration health.
-
 ```sh
 wombat optimize list --project-root /path/to/project --json
-wombat optimize detail --suggestion SUGGESTION_ID --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize keep --reason necessary --suggestion SUGGESTION_ID --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize history --read-view READ_VIEW --json
-wombat optimize redisplay --suggestion SUGGESTION_ID --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize not-applicable --reason incorrect_evidence --suggestion SUGGESTION_ID --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize recheck --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize capabilities --json
+wombat optimize detail --suggestion SUGGESTION_ID --read-view READ_VIEW --json
+wombat optimize checks --item ITEM_ID --read-view READ_VIEW --json
+wombat optimize keep --suggestion SUGGESTION_ID --reason necessary --read-view READ_VIEW --decision-revision REVISION --json
+wombat optimize recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /path/to/project --json
 ```
 
-Retain original roots and project/source scope, using the returned decisionRevision after each operation. Reload on conflicts. detail/keep/not-applicable/redisplay require suggestion identity; keep/not-applicable also require a reason. Lists support category, offset and limit 1..200 (default 50). Edit outside Wombat, then recheck directly; --suggestion optionally limits rechecks to one problem. Rechecks do not write sources or revoke decisions; redisplay does not restore files. Configuration/review results use v1, exit 2 for evidence gaps, 1 for errors and 130 for cancellation. Capabilities do not scan. Index rebuilds retain product-data records.
+Retain the original authorized roots, project/source scope, rule parameters, returned `readView` and suggestion `baselineId`. Codex edits files after authorization. Recheck returns independent `checks` for the original problem. Only `miss` with `comparison.status=comparable` establishes that check passed. Missing or incomparable evidence cannot establish repair. An expired view requires a new inspection; it cannot reconstruct the original baseline.
 
-Adjust product reminders with `--agents-bytes 16384 --description-characters 500`, retaining the same flags in subsequent operations. Values apply to authorized current configuration and stay in records. The body5,000 reference line and description1,024 specification maximum are immutable. Full/body estimates are separate; see [contracts](../development/contracts.en.md).
+Checks and rechecks write no review history. Only explicit `keep` or `not-applicable` saves a user decision; the latter uses `object_changed` or `incorrect_evidence`. Decisions bind the original problem and evidence version and survive index rebuilds. Lists support `repair`/`trim` and pages up to 200, default 50. There is no history, redisplay, adoption tracking or handoff send interface.
 
-CLI/Agent first obtain item.id/readView from optimize, then use inventory --action evidence --item ID --read-view VERSION with date/timezone flags; returned usageRevision/threadId/turnId locate turns. Keep authorized roots and avoid mixing read versions. Explicit rechecks expose before/after text measurements through reviewBaseline/item; unknown or mismatched methods are incomparable, and changes do not establish savings.
+Read configuration evidence with `optimize inventory --action evidence --item ITEM_ID --read-view READ_VIEW`. Its `usageRevision` and task/turn locators support subsequent queries. Related-turn usage is not configuration-owned cost. Optimize response version is 5; configuration remains version 1. Evidence gaps exit 2, errors 1 and cancellation 130. The rule catalog lists implemented checks only.
 
-## Local Codex handoff and account
-
-Handoff requires a runnable local Codex; the native interface is verified on0.160.0. Codex owns sign-in, model review, execution and restoration. The CLI binds the reviewed selection; sign-in credentials are not copied.
+## Local account observations
 
 ```sh
-wombat optimize handoff preview --project-root /path/to/project --json
-wombat optimize handoff send --project-root /path/to/project --selection-version SELECTION_VERSION --read-view READ_VIEW --decision-revision REVISION --json
-wombat account read --json
-wombat account refresh --json
+wombat account --json
+wombat account history --json
 ```
 
-Review project working directories, files and evidence in preview, then send using its selectionVersion; retain the same source, project grants and filters. Omitting `--suggestion` selects all pending items independently of list pagination or category; repeat the flag for a single item/subset. Shared files appear once and same-file rules merge; changing projects requires a new confirmation. Changes to files/evidence before sending are explicitly rejected.
-
-Delivery returns accepted, failed or unknown and an available Codex task ID; accepted establishes request acceptance only. Inspect with `codex resume TASK_ID`. After disconnection inspect Codex before deciding to resend; resending is manual, without execution receipts or historical lookup. Repeated manual sends may create new tasks; closing Wombat does not cancel accepted tasks. Use `optimize recheck` after handling to determine whether a problem remains.
-
-Low allowance only warns; a reliable native restriction on the current task prevents sending. Expired, unknown or other-model restrictions do not establish exhaustion for this task or trigger automatic retries. Sending checks the actual task again; a final restriction may leave an empty Codex task with no queued request.
-
-The account v1 response has independent identity, allowance and activity status/read times, with masked email only. Actual window names, models, periods and resets come from Codex, without fixed five-hour/seven-day periods or legacy single-bucket fallback. Failures retain previous data/read times; account changes clear old facts. A past reset does not establish restored allowance. Balances and spending limits retain native decimal strings without guessing units. Reset credits are read-only; missing details and an empty list differ, and the 128-row detail limit never replaces the native count. Overview and account details share observations independently of project/date scope. Allowances are not added to or converted from project tokens/API estimates. Partial reads or unconfirmed delivery exit2, errors1 and cancellation130. `turns --sort recent` orders by reliable activity times, with unknown times last.
+Account allowance, API-equivalent amounts and local Tokens remain separate. They cannot establish project-owned allowance consumption. Wombat does not create Codex tasks; Codex uses its native task tools with selected evidence when requested.
 
 ## Setup and collection
 

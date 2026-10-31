@@ -143,31 +143,6 @@ pub struct Response {
     pub summary: Option<Summary>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum AllowanceStatus {
-    #[default]
-    Unknown,
-    Available,
-    Low,
-    Blocked,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AllowanceAssessment {
-    pub status: AllowanceStatus,
-    pub model: Option<String>,
-    pub provider: Option<String>,
-    pub checked_at: Option<String>,
-    /// An observation deadline, not a prediction that allowance recovers then.
-    pub valid_until: Option<String>,
-    pub bucket_id: Option<String>,
-    pub window_id: Option<String>,
-    pub reason: String,
-}
-
-/// Stored native observations, independent of the local usage ledger.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AllowanceHistory {

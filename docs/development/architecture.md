@@ -23,7 +23,7 @@ flowchart LR
 | `core/` | 适配器、计量、计价、存储、实时服务和查询；独立 Rust library 与可执行入口，不依赖界面框架 |
 | `client/` | Rust 生成 DTO、Schema 校验、`UsageClient`、稳定错误、取消与进度；通用入口不导入 Node 或终端库 |
 | `client/src/node/` | 受限内核通信、子进程、实时连接、官方价格下载、超时及输出上限；公开为 `@wombat/client/node` |
-| `client/src/locale/` | 共享类型化中英字典、语言订阅与纯展示格式化；原始内容和协议值不翻译 |
+| `client/src/locale/` | 共享类型化中英字典、语言选择与纯展示格式化；原始内容和协议值不翻译 |
 | `cli/` | 参数、JSON/文本、退出码与本地查询生命周期；默认命令输出用量文本 |
 | `plugin/` | 用户插件 |
 
@@ -42,15 +42,7 @@ CLI 提供明确的来源与项目范围。内核负责绑定版本的证据、�
 
 ### 领域地图
 
-| 领域 | 主要类型与职责 | 边界 |
-|---|---|---|
-| 用量与活动 | `Thread`、`Turn` 组织对话与轮次；`Measurement` 保存计量；`Operation` 保存操作 | 计量归属可缺失；操作不分摊费用 |
-| 来源与观察 | `SourceInstance` 标识来源；`Event`、`Position` 保存观察与位置；`SourceWatermark` 保存覆盖 | 观察、业务对象、派生状态分别表达 |
-| 计价 | `ModelRef`、`PriceResult`、`PriceBasis` 表达模型、金额和依据 | 来源报告金额与官方标准 API 等价金额分别保留 |
-| 配置与使用证据 | 配置 `Item`、`SourceContext` 表达当前对象和来源清单；`UseBasis` 表达使用计数依据 | 当前配置、历史加载、使用和可达性需要不同证据 |
-| 检查与用户决策 | `RuleAssessment`、`Finding`、`Suggestion`、`UserDecision` 表达检查、问题、建议和用户决定 | 检查事实与用户决定分别维护；决定绑定问题或明确的对象版本 |
-| 账户观测 | 账户 `Identity`、`Window`、`Bucket` 表达原生账户、额度窗口和余额 | 账户观测与本机项目用量、价格估算分别维护 |
-| 读视图与交接 | `Snapshot`、`Manifest` 固定查询依据；交接 `Target`、`Delivery` 表达版本绑定目标和发送结果 | 交接接受不证明执行或解决；可重建数据与处理记录分别保存 |
+| 读视图 | `Snapshot` 与 `Manifest` 固定查询证据 | 可重建索引与用户决定分别存储；Codex 原生工具负责创建任务 |
 
 ### 用量事实与派生结果
 
@@ -77,13 +69,13 @@ flowchart LR
 
 计价为计量附加金额与依据，不改变原始 Token 事实。推理 Token 是输出的子集；缓存读取与缓存创建分别保存。缺失、冲突、不确定、零和未计价分别表达。[价格口径](../reference/pricing.md)维护公式、价表版本与更新语义。
 
-### 配置、检查与交接
+### 配置、检查与复查
 
-配置 `Item` 汇合当前物理对象及其来源清单关系；`UseBasis` 绑定使用计数的方法、范围、读视图和覆盖。关联轮次的用量用于查看上下文，不代表配置对象独占的费用。当前内容不能证明历史内容或实际加载。类型见 [config_dto.rs](../../core/src/config_dto.rs)。
+配置 `Item` 结合当前物理对象和来源成员，`UseBasis` 保留计数范围、方法、视图和覆盖。当前配置不能证明历史加载；关联轮次用量不是配置独占费用。见 [config_dto.rs](../../core/src/config_dto.rs)。
 
-`RuleAssessment` 保存规则、方法、内容版本、范围、依据和检查结果；`Finding` 保存具体问题，`Suggestion` 组织对象与检查。`UserDecision` 通过 `DecisionBinding` 绑定稳定问题或完整建议版本；复查产生新事实，不能代替或撤销用户决定。处理记录区分观察、决定、复查与再次展示。类型见 [optimize_dto.rs](../../core/src/optimize_dto.rs)。
+`RuleAssessment` 与 `Finding` 保留独立检查及具体问题；`Suggestion` 提供原视图绑定的基线 ID。检查与复查只读，只有显式 `UserDecision` 写入独立用户存储。复查必须使用原范围和规则；视图过期或证据不足不能当作修复。见 [optimize_dto.rs](../../core/src/optimize_dto.rs)。
 
-交接选择绑定读视图、决策与目标内容版本。Wombat 提供授权目标及证据，Codex 负责审阅、执行与恢复；`Delivery` 仅表达发送结果。账户额度观测供展示与交接检查使用，不能反推项目额度消耗。接口见 [handoff_dto.rs](../../core/src/handoff_dto.rs) 与 [account_dto.rs](../../core/src/account_dto.rs)。
+Codex 负责授权编辑、测试、任务创建和恢复，Wombat 只提供选定证据。账户观察独立展示，不能推断项目额度消耗。见 [account_dto.rs](../../core/src/account_dto.rs)。
 
 ### 持久化边界与当前表达限制
 

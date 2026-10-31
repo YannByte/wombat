@@ -478,43 +478,6 @@ fn run(resident: bool) -> Result<()> {
                                 &std::sync::atomic::AtomicBool::new(false),
                             )?)?);
                         }
-                        if value.get("handoff").is_some() {
-                            #[derive(Deserialize)]
-                            #[serde(deny_unknown_fields)]
-                            struct HandoffMessage {
-                                handoff: crate::handoff_dto::Request,
-                                #[serde(default, rename = "nativeHooks")]
-                                native_hooks: Option<crate::config::hooks::Capture>,
-                            }
-                            let r: HandoffMessage =
-                                serde_json::from_value(value).map_err(|_| {
-                                    operation_error("INVALID_ARGUMENT", "Invalid handoff request")
-                                })?;
-                            let mut cfg = crate::config_dto::Request {
-                                roots: r.handoff.roots.clone(),
-                                project_roots: r.handoff.project_roots.clone(),
-                                read_view: r.handoff.read_view.clone(),
-                                ..Default::default()
-                            };
-                            if r.handoff.action == crate::handoff_dto::Action::Send {
-                                if cfg.read_view.is_some() {
-                                    config_query(cfg.clone(), None, &state, &jobs, &configs)?;
-                                }
-                                cfg.read_view = None;
-                            }
-                            let response = config_query(
-                                cfg,
-                                r.native_hooks.as_ref(),
-                                &state,
-                                &jobs,
-                                &configs,
-                            )?;
-                            let id = response.read_view.unwrap();
-                            let view = configs.lock().unwrap().get(&id)?;
-                            return Ok(encode_success(&crate::handoff::prepare(
-                                r.handoff, id, &view,
-                            )?)?);
-                        }
                         if value.get("optimize").is_some() {
                             #[derive(Deserialize)]
                             #[serde(deny_unknown_fields)]
@@ -557,12 +520,25 @@ fn run(resident: bool) -> Result<()> {
                                 read_view: r.optimize.read_view.clone(),
                                 ..Default::default()
                             };
-                            if r.optimize.action == crate::optimize_dto::Action::Recheck {
-                                if cfg.read_view.is_some() {
+                            let baseline =
+                                if r.optimize.action == crate::optimize_dto::Action::Recheck {
+                                    let key = cfg
+                                        .read_view
+                                        .as_ref()
+                                        .ok_or_else(|| {
+                                            operation_error(
+                                                "INVALID_ARGUMENT",
+                                                "Recheck requires its original read view",
+                                            )
+                                        })?
+                                        .clone();
                                     config_query(cfg.clone(), None, &state, &jobs, &configs)?;
-                                }
-                                cfg.read_view = None;
-                            }
+                                    let baseline = configs.lock().unwrap().get(&key)?;
+                                    cfg.read_view = None;
+                                    Some(baseline)
+                                } else {
+                                    None
+                                };
                             let response = config_query(
                                 cfg,
                                 r.native_hooks.as_ref(),
@@ -573,7 +549,10 @@ fn run(resident: bool) -> Result<()> {
                             let id = response.read_view.unwrap();
                             let view = configs.lock().unwrap().get(&id)?;
                             return Ok(encode_success(&crate::optimize::execute(
-                                r.optimize, id, &view,
+                                r.optimize,
+                                id,
+                                &view,
+                                baseline.as_deref(),
                             )?)?);
                         }
                         if value.get("config").is_some() {
@@ -825,7 +804,7 @@ mod timing_tests {
     fn timing_envelope_rejects_other_product_inputs_and_hooks() {
         let request = json!({"action":"capabilities"});
         assert!(serde_json::from_value::<TimingMessage>(json!({"timing":request})).is_ok());
-        for field in ["query", "config", "optimize", "nativeHooks", "handoff"] {
+        for field in ["query", "config", "optimize", "nativeHooks"] {
             let mut value = json!({"timing":request});
             value[field] = json!({});
             assert!(serde_json::from_value::<TimingMessage>(value).is_err());

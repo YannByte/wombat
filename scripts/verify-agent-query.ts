@@ -48,7 +48,7 @@ async function qualify(outputDir:string,agentBin?:string,language:'zh'|'en'='en'
   const dist=path.join(root,'dist');
   for(const name of readdirSync(dist).filter(name=>/^wombat(?:-.*)?\.js$/.test(name)))cpSync(path.join(dist,name),path.join(runtime,name));
   for(const name of [process.platform==='win32'?'wombat-core.exe':'wombat-core','web','skill'])cpSync(path.join(dist,name),path.join(runtime,name),{recursive:true});
-  cpSync(path.join(runtime,'skill/wombat'),installed,{recursive:true});
+  cpSync(path.join(runtime,'skill/plugin/skills/wombat'),installed,{recursive:true});
   const cli=path.join(runtime,'wombat.js');
   const env={...process.env,WOMBAT_DATA_HOME:path.join(sandbox,'data'),WOMBAT_AUTO_PRICES:'0',WOMBAT_CORE_BIN:''};
   service=spawn(path.join(runtime,process.platform==='win32'?'wombat-core.exe':'wombat-core'),['--serve-usage'],{cwd:sandbox,env,detached:process.platform!=='win32',stdio:'ignore'});await once(service,'spawn');await delay(100);

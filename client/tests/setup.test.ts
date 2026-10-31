@@ -22,7 +22,11 @@ let buffer='';process.stdin.on('data',chunk=>{buffer+=chunk;let end;while((end=b
 `);
   // An unrelated configuration probe remains pending beyond setup's deadline.
   await writeFile(core, 'process.stdin.resume();setInterval(()=>{},1000);', {mode: 0o700});
-  const result = await checkSetup({project: root}, {}, {codexBinaryPath: native, binaryPath: core});
+  const basic = await checkSetup({project: root}, {}, {codexBinaryPath: native, binaryPath: path.join(root,'MUST_NOT_START_CORE')});
+  assert.equal(basic.hooks,null);
+  assert.equal(basic.discovery.status,'available');
+  assert.ok(!basic.errorCodes.includes('SETUP_TIMEOUT'));
+  const result = await checkSetup({project: root, includeHooks: true}, {}, {codexBinaryPath: native, binaryPath: core});
   assert.equal(result.discovery.status, 'available');
   assert.equal(result.runtimeChecks.length, 1);
   assert.equal(result.runtimeChecks[0].status, 'compatible');
@@ -30,7 +34,7 @@ let buffer='';process.stdin.on('data',chunk=>{buffer+=chunk;let end;while((end=b
   assert.ok(result.errorCodes.includes('SETUP_TIMEOUT'));
   assert.ok(!result.errorCodes.includes('CANCELLED'), 'an internal deadline is not user cancellation');
   const controller = new AbortController();
-  const cancelled = checkSetup({project: root}, {signal: controller.signal}, {codexBinaryPath: native, binaryPath: core});
+  const cancelled = checkSetup({project: root, includeHooks: true}, {signal: controller.signal}, {codexBinaryPath: native, binaryPath: core});
   const timer = setTimeout(() => controller.abort(), 100);
   try {await assert.rejects(cancelled, {code: 'CANCELLED'});} finally {clearTimeout(timer);}
 });

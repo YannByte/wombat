@@ -27,9 +27,6 @@ fn set(values: &[String]) -> Vec<&str> {
 }
 pub(super) fn key(rule: Rule, input: &Input<'_>, prepared: &RuleInput<'_>) -> Option<String> {
     let dependencies = rule.dependencies();
-    if matches!(dependencies.evidence, Evidence::Unsupported) {
-        return None;
-    }
     let max_rows = dependencies.max_dependency_rows;
     let view = input.view;
     let item = input.item;
@@ -110,7 +107,6 @@ pub(super) fn key(rule: Rule, input: &Input<'_>, prepared: &RuleInput<'_>) -> Op
                 dependencies.max_key_bytes / 2,
             )?)
         }
-        Evidence::Unsupported => return None,
     };
     let mut sources: Vec<_> = item
         .source_contexts
@@ -270,7 +266,6 @@ pub(super) enum RuleInput<'a> {
         complete: Option<bool>,
         unsupported_reason: &'static str,
     },
-    Unsupported(&'static str),
 }
 pub(super) fn prepare<'a>(rule: Rule, input: &'a Input<'_>) -> RuleInput<'a> {
     let item = input.item;
@@ -331,13 +326,6 @@ pub(super) fn prepare<'a>(rule: Rule, input: &'a Input<'_>) -> RuleInput<'a> {
         | Rule::ExactInstructionBlocks
         | Rule::DeclaredCopyDrift
         | Rule::HookTarget => prepare_static(rule, input),
-        Rule::SkillInactivity | Rule::McpInactivity => {
-            RuleInput::Unsupported("continuousCoverageUnavailable")
-        }
-        Rule::RuntimeDuplicateInjection => RuleInput::Unsupported("runtimeInjectionUnavailable"),
-        Rule::InstructionSelection | Rule::SkillDependency | Rule::McpFault => {
-            RuleInput::Unsupported("verifiedHostAdapterUnavailable")
-        }
     }
 }
 fn prepare_static<'a>(rule: Rule, input: &'a Input<'_>) -> RuleInput<'a> {

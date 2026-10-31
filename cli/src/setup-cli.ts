@@ -7,6 +7,7 @@ export async function runSetupCli(argv:string[]):Promise<number>{
   const r:SetupRequest={project:process.cwd()};let json=false;const seen=new Set<string>();
   const invalid=(value:string):never=>{throw new CoreError('INVALID_ARGUMENT',t('cli.config.invalid',{value}));};
   for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split(/=(.*)/s);if(seen.has(flag)&&flag!=='--root')invalid(flag);seen.add(flag);
+    if(flag==='--hooks'){if(inline!==undefined)invalid(flag);r.includeHooks=true;continue;}
     if(flag==='--help'||flag==='-h'){process.stdout.write(t('setup.help')+'\n');return 0;}if(flag==='--json'){if(inline!==undefined)invalid(flag);json=true;continue;}
     if(!['--root','--project'].includes(flag))invalid(flag);const value=inline??argv[++i];if(!value||value.startsWith('--'))invalid(flag);if(flag==='--root')(r.roots??=[]).push(path.resolve(value));else r.project=path.resolve(value);
   }

@@ -8,7 +8,7 @@ export function unavailableCapture(error?: unknown) {
   return { checkedAt: new Date().toISOString(), before: null as unknown, after: null as unknown, rates: null as unknown, activity: null as unknown,
     accountError: error ? code(error) : null as string | null, ratesError: null as string | null, activityError: null as string | null };
 }
-/** Read identity on both sides; a handoff never reuses the display cache. */
+/** Read identity on both sides; a capture never reuses the display cache. */
 export async function captureAccount(rpc: CodexConnection, activity: boolean, query: QueryOptions) {
   const capture = unavailableCapture();
   try {

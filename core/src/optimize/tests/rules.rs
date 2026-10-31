@@ -21,11 +21,6 @@ fn rule_outcomes_do_not_turn_absent_findings_into_global_success() {
     assert_eq!(outcome("descriptionStandard"), RuleOutcome::Miss);
     assert_eq!(outcome("bodyTokens"), RuleOutcome::Insufficient);
     assert_eq!(outcome("localReference"), RuleOutcome::Insufficient);
-    assert_eq!(outcome("skillInactivity"), RuleOutcome::Unsupported);
-    assert_eq!(
-        outcome("runtimeDuplicateInjection"),
-        RuleOutcome::Unsupported
-    );
     assert!(
         checks
             .iter()

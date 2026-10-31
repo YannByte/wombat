@@ -15,7 +15,7 @@ export function createAccountTransport(options:CoreProcessOptions & CodexOptions
     let version:string|undefined,capture=unavailableCapture();
     try{
       version=await nativeVersion(query,options);
-      const rpc=await connectCodex(false,query,options);
+      const rpc=await connectCodex(query,options);
       try{capture=await captureAccount(rpc,true,query);}finally{rpc.close();}
     }catch(error){if(query.signal?.aborted)throw new CoreError('CANCELLED','Cancelled');capture=unavailableCapture(error);}
     if(turn!==generation)throw new CoreError('ACCOUNT_CHANGED','A newer account observation is active');

@@ -71,9 +71,9 @@ function catalog(directory: string): void {
   const value: unknown = JSON.parse(readFileSync(file, 'utf8'));
   if (!object(value) || value.name !== 'wombat-local' || !Array.isArray(value.plugins)) throw new Error('Invalid bundled plugin marketplace.');
   const plugins = value.plugins;
-  if (!['wombat', 'wombat-collection'].every(name => plugins.some((plugin: unknown) => object(plugin) && plugin.name === name && object(plugin.source) && plugin.source.source === 'local' && plugin.source.path === (name === 'wombat' ? './plugin' : './collection-plugin')))) throw new Error('Invalid bundled plugin marketplace.');
+  if (plugins.length!==1 || !['wombat'].every(name => plugins.some((plugin: unknown) => object(plugin) && plugin.name === name && object(plugin.source) && plugin.source.source === 'local' && plugin.source.path === './plugin'))) throw new Error('Invalid bundled plugin marketplace.');
 }
-export async function installBundledPlugin(marketplace: string, options: {binary?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; signal?: AbortSignal} = {}): Promise<'wombat' | 'wombat-collection'> {
+export async function installBundledPlugin(marketplace: string, options: {binary?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; signal?: AbortSignal} = {}): Promise<'wombat'> {
   const directory = path.resolve(marketplace);
   catalog(directory);
   const env = options.env ?? process.env, binary = options.binary ?? env.WOMBAT_CODEX_BIN ?? 'codex';
@@ -99,11 +99,11 @@ export async function installBundledPlugin(marketplace: string, options: {binary
     };
     const installed: unknown = JSON.parse(await run('list', ['plugin', 'list', '--marketplace', 'wombat-local', '--json']));
     if (!object(installed) || !Array.isArray(installed.installed)) throw new Error('Unrecognized Codex plugin list. Wombat is installed.');
-    const active = installed.installed.filter((entry: unknown) => object(entry) && entry.enabled === true && typeof entry.pluginId === 'string' && ['wombat@wombat-local', 'wombat-collection@wombat-local'].includes(entry.pluginId));
+    const active = installed.installed.filter((entry: unknown) => object(entry) && entry.enabled === true && typeof entry.pluginId === 'string' && entry.pluginId === 'wombat@wombat-local');
     if (active.length > 1) throw new Error('Multiple Wombat plugins are enabled. Choose one in Codex, then rerun the installer.');
-    const name = active.some((entry: unknown) => object(entry) && entry.pluginId === 'wombat-collection@wombat-local') ? 'wombat-collection' : 'wombat';
+    const name = 'wombat' as const;
     stage = 'requirements';
-    const requirementsFile=path.join(directory,name==='wombat'?'plugin':'collection-plugin','wombat-runtime.json');
+    const requirementsFile=path.join(directory,'plugin','wombat-runtime.json');
     const requirementsInfo=lstatSync(requirementsFile);
     if(!requirementsInfo.isFile()||requirementsInfo.isSymbolicLink()||requirementsInfo.size>65536)throw new Error('Invalid bundled runtime requirements.');
     const requirements:unknown=JSON.parse(readFileSync(requirementsFile,'utf8'));

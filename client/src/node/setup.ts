@@ -8,7 +8,7 @@ import {discoverWombatSkill} from './codex/skills.js';
 import {nativeVersion,type CodexOptions} from './codex/process.js';
 import {queryLive} from './live.js';
 import type {CoreProcessOptions} from './core.js';
-import {skillCapabilities,skillMarketplace,skillRuntimeChecks} from './skill-installation.js';
+import {skillCapabilities,skillMarketplace,skillRuntimeChecks} from './skill-runtime.js';
 import packageMetadata from '../../package.json' with {type:'json'};
 /** Read-only checks, bounded independently; failures never hide usable stages. */
 export async function checkSetup(r:Request,q:QueryOptions,options:CoreProcessOptions&CodexOptions):Promise<Response> {
@@ -24,7 +24,7 @@ export async function checkSetup(r:Request,q:QueryOptions,options:CoreProcessOpt
       nativeVersion(query,options),
       skillMarketplace(),
       discoveryTask,
-      r.project?queryLive({config:{action:'list',kind:'hook',cachedUsage:true,roots:r.roots,projectRoots:[r.project],scope:{project:r.project},limit:1}},query,options):Promise.resolve(null),
+      r.includeHooks&&r.project?queryLive({config:{action:'list',kind:'hook',cachedUsage:true,roots:r.roots,projectRoots:[r.project],scope:{project:r.project},limit:1}},query,options):Promise.resolve(null),
       runtimeTask,
     ]);
     if(q.signal?.aborted)throw new CoreError('CANCELLED','Cancelled');

@@ -12,7 +12,6 @@ Agent 通过 `api` 发现本机方法与 Schema，通过 `call` 从标准输入�
 - `refresh`、`usage`、`threads`、`turns`、`steps`、`prices`、`optimize`、`timing` 经 `@wombat/client/node` 调用共享内核。
 - 无子命令时输出用量文本，与 `usage` 一致。
 
-- `skill install/status/uninstall` 管理独立本机副本；正式插件由 Codex 管理。
 
 - 展示语言使用 `@wombat/client/locale`，详见[产品语言与文案](../i18n/product.md)。
 

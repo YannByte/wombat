@@ -6,7 +6,7 @@
   },
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
-    "pnpm-lock.yaml": "d4f9866a5a62a930879b7017a55e039317ceaa08359d10c9bda43ee027e644d2",
+    "pnpm-lock.yaml": "c8ae7991ad3bf3dc50b6403e0a97e4da7ef3dfb099ad7f58b8ae8dfbcdd4f1ba",
     "core/Cargo.lock": "97372e609bf09ab0dd9786b09881bdc59556fb8b6f849f6ad51ad45f2732758f"
   },
   "node": [
@@ -1340,7 +1340,7 @@
       "name": "ws",
       "version": "8.22.0",
       "license": "MIT",
-      "role": "runtime",
+      "role": "development",
       "licenseSource": "installed package",
       "files": [
         {

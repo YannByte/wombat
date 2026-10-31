@@ -4,6 +4,8 @@
 
 Status: proposed
 
+The current simplification supersedes task sending, alternate installation modes, automatic review history and adoption tracking described here. Other evidence constraints and unfinished items remain. See [read-only checks and one plugin](../../implemented/architecture/2026-10-31-on-demand-checks.en.md).
+
 The [CLI and task Skill decision](../../implemented/architecture/2026-10-31-cli-task-skill.en.md) supersedes this proposal’s Web, multiple-entry and mandatory setup flows. Retain the collection and evidence requirements below only where they have a current CLI consumer.
 
 ## Problem

@@ -16,7 +16,7 @@ const bases = [
 ] as const satisfies readonly Basis[];
 
 test('every timing basis has localized provenance text, while null values only use gap explanations', () => {
-  const previous = locale.getSnapshot().locale;
+  const previous = locale.getLocale();
   try {
     for (const language of ['zh', 'en'] as const) {
       locale.setLocale(language);
@@ -37,7 +37,7 @@ test('every timing basis has localized provenance text, while null values only u
 });
 
 test('timing explanations follow the active locale for each call', () => {
-  const previous = locale.getSnapshot().locale;
+  const previous = locale.getLocale();
   try {
     locale.setLocale('en');
     const english = timingMissingValueText('missing_time');
@@ -52,7 +52,7 @@ test('timing explanations follow the active locale for each call', () => {
 });
 
 test('conflicting targets and outcomes retain usable timing in both languages', () => {
-  const previous = locale.getSnapshot().locale;
+  const previous = locale.getLocale();
   try {
     for (const language of ['zh', 'en'] as const) {
       locale.setLocale(language);

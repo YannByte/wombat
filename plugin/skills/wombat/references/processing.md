@@ -1,27 +1,13 @@
-# Process and recheck
+# Change and recheck
 
-Before editing, retain the selected project and work item, original issue, evidence references, target content version, success criterion and baseline measures when relevant. Check that current target content still matches the reviewed version. A changed target requires renewed review within the authorized scope.
+Keep the selected project, original problem, target version, evidence, and success criterion. Codex owns authorized file edits, tests and recovery. Export selected check JSON and source locations when the user requests a handoff; use Codex's native task tools to create a separate conversation only when requested.
 
-Process within the user's authorization in the receiving conversation. Keep purpose, triggers, necessary constraints, tests, references and shared projects. For a narrowly authorized edit, keep other source files. Do not rewrite them just to restate the result.
+For an existing configuration finding, retain its `baselineId`, the response's `readView`, source/project roots, filters and rule overrides before editing. After the edit, run `optimize recheck --read-view VIEW --baseline BASELINE --project-root PATH --project PATH --json` with those same inputs. The baseline binds the original view, scope, finding and rule parameters. An expired view requires a fresh inspection; do not claim a before/after verification from a replacement baseline.
 
-Codex owns file edits, review and recovery. Wombat has no apply/recover job API.
+Read each returned check's outcome and comparison. A comparable miss verifies that the selected problem is absent under that check. A hit means it remains. Unknown, insufficient or incomparable evidence cannot establish a fix. Recheck is read-only and never changes a user decision.
 
-After editing an existing configuration suggestion, call `optimize recheck --suggestion ID --project-root PATH --project PATH --json` with current evidence. Examine per-rule outcomes. For a direct file review without a Wombat suggestion ID, check the original target and issue with an appropriate parser, reference check or behavior test. Do not create a suggestion merely to report a fix. A passing static recheck is not proof of actual adoption, better task quality or financial savings. Show remaining findings and unavailable checks. Keep user decisions separate from checks.
+For a direct project review, retain a reproducing case and rerun that case after the authorized change. Use the relevant parser, reference check or behavior test. Do not create a configuration finding for an unrelated workflow improvement.
 
-Use the recheck response directly. A resolved suggestion may leave the pending list. If more history is needed, query `optimize history --suggestion ID` with the original scope and ID. Do not query the old suggestion as a new pending detail. Do not select a replacement or run the recheck again to retrieve the same facts.
+For a usage-driven change, retain the original scope and fixed usage baseline. Use `compare` on later comparable observations when available. Describe workload and model changes; lower usage alone does not establish savings or causality. Missing later evidence does not block a useful change report.
 
-For changes prompted by a usage investigation, keep the original task, scope and baseline metrics. Give details of the actual change. If later observations are available, compare them with `compare` or the original analysis. Do not invent a configuration suggestion ID or require a static recheck for an unrelated workflow change.
-
-For a confirmed defect, retain a reproducing case before editing when it can be exercised safely. After the final edit, run that same case and the relevant regressions; check both rejection of invalid work and continued acceptance of valid work. Report the actual final version and outcomes. A controlled replay verifies a mechanism without proving that a complete task improved. Use later comparable work to assess behavior, quality or usage. Missing follow-up data does not block a useful change summary; do not create tasks just to manufacture adoption or savings.
-
-If the user explicitly chooses “keep” or “not applicable”, use `optimize keep|not-applicable --suggestion ID --reason necessary|object_changed|incorrect_evidence` with the reviewed readView/decisionRevision and scope. Read current help for exact arguments. Rechecks must not revoke those decisions. Do not create consuming tasks just to test adoption.
-
-If the user asks to send to a separate Codex task, use `optimize handoff`. Preview the handoff. Bind the reviewed selection version. Then send the handoff.
-
-Accepted, failed and unknown delivery are distinct. Never automatically resend an unknown delivery. Native allowance checks apply at send time.
-
-Follow-up `read_content_matched` means that a reliably targeted native read result matches the saved recheck's content hash. `loaded_content_matched` means that a supported native instruction-load record matches that hash. Keep those distinct from identity-only use, successful MCP use and effective behavioral adoption. `usageComparison` compares equal elapsed windows before and after the recheck in its exact source/project scope.
-
-The comparison includes task distributions, ledger totals and missing-date coverage. Present it as descriptive before/after evidence. Changed workloads or model mixes can cause differences. Neither version matches nor lower usage establish causality or savings.
-
-Missing comparison evidence does not block reporting the edit and static recheck.
+Only when explicitly requested, record `optimize keep|not-applicable` with the selected finding ID, reason and current decision revision. Ordinary inspection and rechecks do not create handling records. Existing applicable user decisions remain in effect; index rebuilds do not delete them.

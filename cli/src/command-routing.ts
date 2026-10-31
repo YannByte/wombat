@@ -11,7 +11,6 @@ export const commandRoutes = new Map<string, CommandRoute>([
   ['directories', [async args => (await import('./directories-cli.js')).runDirectoriesCli(args), 3]],
   ['prices', [async args => (await import('./prices-cli.js')).runPricingCli(args), 1]],
   ['optimize', [async args => (await import('./config-cli.js')).runConfigCli(args), 1]],
-  ['skill', [async args => (await import('./skill-cli.js')).runSkillCli(args), 1]],
   ['update', [async args => (await import('./update-cli.js')).runUpdateCli(args), 1]],
   ['doctor', [async args => (await import('./doctor-cli.js')).runDoctorCli(args), 1]],
 ]);

@@ -8,7 +8,7 @@ const complete:UsageSummary=withTokenAnalysis({measurementCount:2,inputTotal:100
 const partial = (subtotal:number|null):UsageSummary => ({...complete,tokens:{...complete.tokens,total:null},tokenAnalysis:{...complete.tokenAnalysis,fields:{...complete.tokenAnalysis.fields,total:{observedSubtotal:subtotal,coveredRecords:subtotal==null?0:1,missingRecords:subtotal==null?2:1,conflictingRecords:0,invalidRecords:0,indeterminateRecords:0}}}});
 
 test('shared token presentation preserves complete, partial, partial zero, unavailable and empty fields',()=>{
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try{for(const language of ['zh','en'] as const){locale.setLocale(language);
   assert.equal(tokenSummaryPresentation(complete).value,112);
   assert.equal(tokenSummaryPresentation(complete).state,'complete');
@@ -30,7 +30,7 @@ test('shared token presentation preserves complete, partial, partial zero, unava
 });
 
 test('token coverage retains separate absence reasons and does not rebuild native input from parts',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{for(const language of ['zh','en'] as const){locale.setLocale(language);
  const fixture:UsageSummary={...complete,inputTotal:null,tokens:{...complete.tokens,rawInput:null},tokenAnalysis:{...complete.tokenAnalysis,fields:{...complete.tokenAnalysis.fields,rawInput:{observedSubtotal:null,coveredRecords:0,missingRecords:1,conflictingRecords:2,invalidRecords:3,indeterminateRecords:4}}}};
  const value=tokenSummaryPresentation(fixture,'rawInput');assert.equal(value.value,null);assert.equal(value.state,'unavailable');
@@ -39,7 +39,7 @@ test('token coverage retains separate absence reasons and does not rebuild nativ
 });
 
 test('analyzed totals label calculations and keep native gaps, zero and historical captures',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{for(const language of ['zh','en'] as const){locale.setLocale(language);
   const fixture:UsageSummary={...partial(null),tokenAnalysis:{...partial(null).tokenAnalysis,totalAnalysis:{methodVersion:1,subtotal:120,coveredRecords:2,recordedRecords:0,calculatedRecords:2,unavailableRecords:0,overflowRecords:0}}};
   const before=JSON.stringify(fixture),value=tokenSummaryPresentation(fixture);

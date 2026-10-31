@@ -19,6 +19,10 @@ test('delivery rejects removed hosts, transport exports and extra Skills without
     writeFileSync(path.join(root,'client/package.json'),JSON.stringify({exports:{'./http':'./http.js'}}));
     assert.match(deliveryErrors(root).join('\n'),/removed host dependency/);
     writeFileSync(path.join(root,'client/package.json'),'{}');
+    mkdirSync(path.join(root,'plugin/hooks'));
+    assert.match(deliveryErrors(root).join('\n'),/plugin\/hooks/);
+    rmSync(path.join(root,'plugin/hooks'),{recursive:true});
+    assert.deepEqual(deliveryErrors(root),[]);
     writeFileSync(metadata,JSON.stringify({skills:['wombat','another']}));
     assert.match(deliveryErrors(root).join('\n'),/exactly one/);
   } finally { rmSync(root,{recursive:true,force:true}); }

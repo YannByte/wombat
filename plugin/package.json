@@ -9,14 +9,11 @@
     "usage-compact-v1",
     "inspection-json-v5",
     "config-json-v1",
-    "account-json-v1",
-    "handoff-json-v1",
-    "collection-json-v1",
     "setup-json-v1",
     "agent-api-v1",
     "usage-statistics-v1",
-    "monitor-v1",
-    "config-content-hashes-v1"
+    "config-content-hashes-v1",
+    "config-checks-v1"
   ],
   "skills": [
     "wombat"

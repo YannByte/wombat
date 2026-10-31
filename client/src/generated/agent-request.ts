@@ -54,12 +54,8 @@ export type Request =
       params: Request13;
     }
   | {
-      method: "handoff";
-      params: Request14;
-    }
-  | {
       method: "monitor";
-      params: Request15;
+      params: Request14;
     };
 export type Action = "status" | "start" | "pause" | "resume" | "stop" | "enable" | "disable";
 export type Action2 = "activity" | "locate" | "read" | "search" | "changes";
@@ -114,10 +110,9 @@ export type Kind = "rule" | "skill" | "mcp" | "hook";
 export type Observation = "used" | "loaded_only" | "unknown";
 export type Sort2 = "tokens" | "activity" | "size" | "name" | "content_tokens" | "characters" | "recent";
 export type Action5 =
-  "list" | "detail" | "keep" | "not_applicable" | "redisplay" | "recheck" | "capabilities" | "checks" | "activity";
+  "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type DecisionReason = "necessary" | "object_changed" | "incorrect_evidence";
-export type Group2 = "pending" | "history";
-export type Category = "repair" | "trim" | "organize" | "space";
+export type Category = "repair" | "trim";
 export type Request7 =
   | {
       threadId: string;
@@ -157,8 +152,7 @@ export type Language = "zh" | "en";
 export type Action9 = "status" | "update" | "auto_update";
 export type Action10 = "status" | "events" | "configure" | "pause" | "resume";
 export type Mode3 = "logs" | "hooks";
-export type Action11 = "preview" | "send";
-export type Request15 =
+export type Request14 =
   | {
       action: "list";
     }
@@ -338,13 +332,13 @@ export interface Request6 {
   roots?: string[] | null;
   projectRoots?: string[] | null;
   readView?: string | null;
+  baselineId?: string | null;
   decisionRevision?: string | null;
   project?: string | null;
   sourceInstanceId?: string | null;
   suggestionId?: string | null;
   itemId?: string | null;
   decisionReason?: DecisionReason | null;
-  group?: Group2 & string;
   category?: Category | null;
   offset?: number | null;
   limit?: number | null;
@@ -373,6 +367,7 @@ export interface Cursor {
 export interface Request8 {
   project?: string | null;
   roots?: string[] | null;
+  includeHooks?: boolean;
 }
 export interface Request9 {
   action?: Action6 & string;
@@ -398,25 +393,6 @@ export interface Request13 {
   sourceInstanceId?: string | null;
   after?: number | null;
   limit?: number | null;
-}
-export interface Request14 {
-  action?: Action11 & string;
-  roots?: string[] | null;
-  projectRoots?: string[] | null;
-  project?: string | null;
-  sourceInstanceId?: string | null;
-  readView?: string | null;
-  decisionRevision?: string | null;
-  ruleOverrides?: RuleOverrides | null;
-  suggestionIds?: string[] | null;
-  selectionVersion?: string | null;
-  language?: string | null;
-  withoutSkill?: boolean | null;
-  skillSelections?: Selection2[] | null;
-}
-export interface Selection2 {
-  projectId: string;
-  path: string;
 }
 export interface Plan {
   id: string;

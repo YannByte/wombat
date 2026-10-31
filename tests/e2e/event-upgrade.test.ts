@@ -381,7 +381,7 @@ test('fixed native events have independent token/time/work/use truth through Nod
         await env.close();
     }
 });
-test('service restart and derived-index rebuild preserve decisions, reasons and the original immutable review baseline', { timeout: 60000 }, async () => {
+test('service restart and derived-index rebuild preserve explicit decisions without rewriting user storage', { timeout: 60000 }, async () => {
     const env = await environment();
     try {
         const large = `---\nname: synthetic-example\ndescription: ${'字'.repeat(501)}\n---\n${'x '.repeat(4999)}x`;
@@ -390,65 +390,26 @@ test('service restart and derived-index rebuild preserve decisions, reasons and 
         const suggestion = initial.suggestions.find(item => item.item.path === env.skill);
         assert.ok(suggestion);
         assert.deepEqual(suggestion.findings.map(finding => finding.rule), ['descriptionSize', 'bodyTokens']);
-        assert.ok(suggestion.reviewBaseline);
-        assert.equal(suggestion.reviewBaseline.item.contentHash, suggestion.item.contentHash);
-        const kept = await env.nativeTransport.optimize!({ action: 'keep', suggestionId: suggestion.id, decisionReason: 'necessary', readView: initial.readView, decisionRevision: initial.decisionRevision });
-        assert.equal(kept.pending, initial.pending - 1, 'keeping this Skill leaves unrelated findings pending');
-        const history = await env.nativeTransport.optimize!({ action: 'list', group: 'history' });
-        const decided = history.suggestions.find(item => item.id === suggestion.id);
-        assert.ok(decided?.decision);
-        assert.ok(decided.reviewBaseline);
-        assert.equal(decided.decision.kind, 'keep');
-        assert.equal(decided.decision.reason, 'necessary');
-        assert.deepEqual(decided.reviewBaseline, suggestion.reviewBaseline);
-        const originalBaseline = decided.reviewBaseline, originalDecision = decided.decision, originalRevision = history.decisionRevision;
-        const userFile = path.join(env.data, 'user-v1', 'reviews.sqlite3');
-        assert.ok((await stat(userFile)).size > 0);
+        assert.ok(suggestion.baselineId);
+        const kept = await env.nativeTransport.optimize!({ action:'keep',suggestionId:suggestion.id,decisionReason:'necessary',readView:initial.readView,decisionRevision:initial.decisionRevision });
+        assert.equal(kept.pending,initial.pending-1);
+        const userFile=path.join(env.data,'user-v1/reviews.sqlite3');
+        const saved=await readFile(userFile), revision=kept.decisionRevision;
         await env.restart();
-        const restarted = await env.nativeTransport.optimize!({ action: 'list', group: 'history' });
-        const restored = restarted.suggestions.find(item => item.id === suggestion.id);
-        assert.ok(restored);
-        assert.deepEqual(restored.decision, originalDecision);
-        assert.deepEqual(restored.reviewBaseline, originalBaseline);
-        assert.equal(restarted.decisionRevision, originalRevision);
-        assert.equal(restarted.history, history.history);
-        // Only these explicitly named, test-owned derived directories are removed.
-        // The user-v1 database is never part of the deletion target or source move.
+        assert.equal((await env.nativeTransport.optimize!({})).pending,kept.pending);
+        assert.deepEqual(await readFile(userFile),saved,'inspection after restart cannot write user decisions');
         await env.stopService();
-        const userBytes = await readFile(userFile);
-        for (const index of ['live-v2', 'config-v2'])
-            await rm(path.join(env.data, index), { recursive: true, force: true });
-        assert.deepEqual(await readFile(userFile), userBytes, 'derived-index removal must not touch user storage');
+        for(const index of ['live-v2','config-v2']) await rm(path.join(env.data,index),{recursive:true,force:true});
         await env.startService();
-        const rebuilt = await env.nativeTransport.optimize!({ action: 'list' });
-        assert.equal(rebuilt.pending, kept.pending);
-        const rebuiltHistory = await env.nativeTransport.optimize!({ action: 'list', group: 'history' });
-        const preserved = rebuiltHistory.suggestions.find(item => item.id === suggestion.id);
-        assert.ok(preserved);
-        assert.deepEqual(preserved.decision, originalDecision);
-        assert.deepEqual(preserved.reviewBaseline, originalBaseline);
-        assert.equal(rebuiltHistory.decisionRevision, originalRevision);
-        assert.equal(rebuiltHistory.history, history.history);
-        const cliHistory = cli(['optimize', 'history', '--root', env.root, '--project-root', env.project]);
-        assert.ok(cliHistory && typeof cliHistory === 'object' && 'suggestions' in cliHistory && 'decisionRevision' in cliHistory);
-        assert.deepEqual(cliHistory.suggestions, rebuiltHistory.suggestions);
-        assert.equal(cliHistory.decisionRevision, originalRevision);
-        await writeFile(env.skill, '---\nname: synthetic-example\ndescription: Fixed synthetic fixture\n---\nUse evidence.\n');
-        const rechecked = await env.nativeTransport.optimize!({ action: 'recheck', group: 'history' });
-        const checked = rechecked.suggestions.find(item => item.id === suggestion.id);
-        assert.ok(checked);
-        assert.equal(checked.status, 'verified');
-        assert.ok(checked.checks.every(check => check.outcome === 'miss' && check.comparison.status === 'comparable'));
-        assert.deepEqual(checked.reviewBaseline, originalBaseline);
-        assert.deepEqual(checked.decision, originalDecision);
-        assert.notEqual(checked.item.contentHash, originalBaseline.item.contentHash);
-        await env.restart();
-        const finalHistory = await env.nativeTransport.optimize!({ action: 'list', group: 'history' });
-        const final = finalHistory.suggestions.find(item => item.id === suggestion.id);
-        assert.ok(final);
-        assert.equal(final.status, 'verified');
-        assert.deepEqual(final.decision, originalDecision);
-        assert.deepEqual(final.reviewBaseline, originalBaseline);
+        const rebuilt=await env.nativeTransport.optimize!({});
+        assert.equal(rebuilt.pending,kept.pending);
+        assert.equal(rebuilt.decisionRevision,revision);
+        assert.deepEqual(await readFile(userFile),saved);
+        await writeFile(env.skill,'---\nname: synthetic-example\ndescription: Fixed synthetic fixture\n---\nUse evidence.\n');
+        const current=await env.nativeTransport.optimize!({});
+        assert.ok(!current.suggestions.some(s=>s.item.path===env.skill));
+        assert.deepEqual(await readFile(userFile),saved,'file edits do not erase or rewrite user decisions');
+
     }
     finally {
         await env.close();

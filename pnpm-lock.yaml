@@ -17,6 +17,9 @@ importers:
       '@types/node':
         specifier: 26.0.0
         version: 26.0.0
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
       '@wombat/cli':
         specifier: workspace:*
         version: link:cli
@@ -50,6 +53,9 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+      ws:
+        specifier: 8.22.0
+        version: 8.22.0
 
   cli:
     dependencies:
@@ -71,17 +77,10 @@ importers:
         version: 5.9.3
 
   client:
-    dependencies:
-      ws:
-        specifier: 8.22.0
-        version: 8.22.0
     devDependencies:
       '@types/node':
         specifier: 22.20.4
         version: 22.20.4
-      '@types/ws':
-        specifier: 8.18.2
-        version: 8.18.2
       tsx:
         specifier: 4.23.15
         version: 4.23.15

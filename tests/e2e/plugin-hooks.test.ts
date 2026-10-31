@@ -64,21 +64,18 @@ test('plugin Hook identity, project coverage, retained declarations and rechecks
         assert.ok(original);
         assert.equal(original.findings[0].rule, 'hookTarget');
         assert.equal(original.findings[0].evidence?.hook?.nativeKey, metadata.key);
-        const preview = await nativeTransport.handoff!({ action: 'preview', readView: suggestions.readView, project: a, suggestionIds: [original.id] });
-        assert.deepEqual(preview.projects[0].targets.find(t => t.itemId === item.id)!.sharedProjects, [a]);
-        await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', readView: suggestions.readView, decisionRevision: preview.decisionRevision, project: a });
+        await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', readView: suggestions.readView, decisionRevision: suggestions.decisionRevision, project: a });
         await setMode({ hooksError: true });
         const unavailable = await nativeTransport.config!({ kind: 'hook' });
         assert.equal(unavailable.hookRegistry.status, 'unavailable');
         assert.equal(unavailable.items[0].current, true);
         assert.equal(unavailable.items[0].stale, true);
-        const uncertain = await nativeTransport.optimize!({ action: 'recheck', group: 'history', suggestionId: original.id, project: a });
-        assert.equal(uncertain.suggestions.find(s => s.id === original.id)?.status, 'recheckUnavailable');
+        const uncertain = await nativeTransport.optimize!({ action: 'recheck', readView: suggestions.readView, baselineId: original.baselineId, suggestionId: original.id, project: a });
+        assert.ok(uncertain.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
         await setMode();
         await writeFile(path.join(a, '工具 script.py'), `from pathlib import Path\nPath(${JSON.stringify(marker)}).touch()\n`);
-        const resolved = await nativeTransport.optimize!({ action: 'recheck', group: 'history', suggestionId: original.id, project: a });
-        assert.equal(resolved.suggestions.find(s => s.id === original.id)?.status, 'verified');
-        assert.equal(resolved.suggestions.find(s => s.id === original.id)?.decision?.kind, 'keep');
+        const resolved = await nativeTransport.optimize!({ action: 'recheck', readView: suggestions.readView, baselineId: original.baselineId, suggestionId: original.id, project: a });
+        assert.ok(resolved.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'));
         for (const change of [{ pluginId: null }, { pluginId: 'other@test' }, { key: 'sample.tools@test:hooks/../hooks/声明.json:session_start:0:0' }, { key: 'sample.tools@test:wrong/声明.json:session_start:0:0' }]) {
             await setMode({ hooks: { data: [{ ...hooks.data[0], hooks: [{ ...metadata, ...change }] }] } });
             const bad = await nativeTransport.config!({ kind: 'hook' });

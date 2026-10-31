@@ -2,18 +2,16 @@
 
 English | [中文](README.zh-CN.md)
 
-This directory contains the user plugin source. Each Skill serves Chinese and English. Codex manages installed plugins.
+This directory contains the user plugin source. One main Skill serves Chinese and English. Codex manages installed plugins.
 
 ## Source entries
 
 - `skills/` contains the [query and task entries](../docs/guides/plugin.en.md) and shared runtime references.
-- `hooks/` contains collection declarations.
-- `scripts/` contains the POSIX collection bridge.
 - `package.json` defines plugin metadata, shipped Skill names and required capabilities. The root manifest owns the version.
 
 ## Limits
 
-Build the source before local plugin installation. Plugin installation, discovery, Hook trust, event receipt, and data readiness require separate evidence. Windows Hook collection remains unverified.
+Build the source before local plugin installation. Plugin discovery, runtime compatibility and data readiness require separate evidence. Optional user-managed Hook observations are independent.
 
 ## Read next
 

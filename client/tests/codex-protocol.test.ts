@@ -50,7 +50,7 @@ test('native initialization identifies the current packaged product version', as
   await fixture(
     `if(message.method==='initialize'){if(message.params.clientInfo.version!==${JSON.stringify(packageMetadata.version)}){console.log(JSON.stringify({id:message.id,error:{}}));continue;}console.log(JSON.stringify({id:message.id,result:{}}));}`,
     async (binary) => {
-      const rpc = await connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 });
+      const rpc = await connectCodex({}, { codexBinaryPath: binary, codexTimeoutMs: 1000 });
       rpc.close();
     },
   );
@@ -60,7 +60,7 @@ test('native responses preserve split UTF-8 and sanitize rejected requests', asy
   await fixture(
     String.raw`if(message.method==='initialize'){console.log(JSON.stringify({id:message.id,result:{}}));continue;}if(message.method==='account/read'){const bytes=Buffer.from(JSON.stringify({id:message.id,result:{label:'合成🙂'}})+'\n');const split=bytes.indexOf(Buffer.from('成'))+1;process.stdout.write(bytes.subarray(0,split));setImmediate(()=>process.stdout.write(bytes.subarray(split)));}else console.log(JSON.stringify({id:message.id,error:{message:'Synthetic private native output'}}));`,
     async (binary) => {
-      const rpc = await connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 });
+      const rpc = await connectCodex({}, { codexBinaryPath: binary, codexTimeoutMs: 1000 });
       try {
         assert.deepEqual(await rpc.request('account/read', {}), { label: '合成🙂' });
         await assert.rejects(rpc.request('account/usage/read', {}), (error) => {
@@ -77,12 +77,11 @@ test('native responses preserve split UTF-8 and sanitize rejected requests', asy
 
 test('native handshake cancellation and timeout stop waiting with explicit outcomes', async () => {
   await fixture('', async (binary) => {
-    await assert.rejects(connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 50 }), {
+    await assert.rejects(connectCodex({}, { codexBinaryPath: binary, codexTimeoutMs: 50 }), {
       code: 'CODEX_TIMEOUT',
     });
     const controller = new AbortController();
     const pending = connectCodex(
-      false,
       { signal: controller.signal },
       { codexBinaryPath: binary, codexTimeoutMs: 1000 },
     );
@@ -98,7 +97,7 @@ test('malformed native responses and disconnects never look like acceptance', as
   ] as const) {
     await fixture(body, async (binary) => {
       await assert.rejects(
-        connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
+        connectCodex({}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
         { code },
       );
     });
@@ -111,7 +110,7 @@ test('local access denials have a recoverable code without leaking native diagno
   try {
     await writeFile(binary, String.raw`process.stderr.write('Error: listen EP');setTimeout(()=>{process.stderr.write('ERM: operation not permitted PRIVATE_SYNTHETIC_PATH\n');process.exit(1);},20);`);
     for (const run of [
-      () => connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
+      () => connectCodex({}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
       () => runCodex(['--version'], {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }),
     ]) await assert.rejects(run(), error => {
       assert.equal((error as { code: string }).code, 'LOCAL_ACCESS_DENIED');
@@ -119,7 +118,7 @@ test('local access denials have a recoverable code without leaking native diagno
       return true;
     });
     await writeFile(binary, `process.stderr.write('Synthetic private output mentions EPERM and permission denied');process.exit(1);`);
-    await assert.rejects(connectCodex(false, {}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }), {code:'CODEX_DISCONNECTED'});
+    await assert.rejects(connectCodex({}, { codexBinaryPath: binary, codexTimeoutMs: 1000 }), {code:'CODEX_DISCONNECTED'});
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

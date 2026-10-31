@@ -23,7 +23,7 @@ export function onboardingOptions(args: string[]) {
   };
   const optional = (key: string) => values.has(key) ? required(key) : undefined;
   const agentBin = optional('agent-bin'), agentSkill = values.get('agent-skill');
-  if (Boolean(agentBin) !== Boolean(agentSkill) || agentSkill && !/^wombat(?:-collection)?:wombat$/.test(agentSkill))
+  if (Boolean(agentBin) !== Boolean(agentSkill) || agentSkill && !/^wombat:wombat$/.test(agentSkill))
     throw new Error('Supply both --agent-bin and --agent-skill with an installed Wombat invocation');
   return {output: required('output-dir'), release: required('release-dir'), codex: required('codex-bin'),
     agentBin, agentSkill};

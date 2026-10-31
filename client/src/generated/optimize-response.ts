@@ -1,7 +1,6 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action =
-  "list" | "detail" | "keep" | "not_applicable" | "redisplay" | "recheck" | "capabilities" | "checks" | "activity";
+export type Action = "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type HookSupportStatus = "no_verified_adapter" | "registry_observed" | "registry_partial";
 export type Kind = "rule" | "skill" | "mcp" | "hook";
 export type Observation = "used" | "loaded_only" | "unknown";
@@ -16,17 +15,13 @@ export type UseWindow =
       until: string;
       timezone: string;
       kind: "date_window";
-    }
-  | {
-      after: string;
-      through: string;
-      kind: "follow_up";
     };
 export type UseTimeBasis = "source_operation_time";
 export type UseSourceCompleteness = "complete" | "partial" | "unknown";
 export type TokenAnalysisScope = "selected_canonical_measurements";
-export type Category = "repair" | "trim" | "organize" | "space";
+export type Category = "repair" | "trim";
 /**
+ * Captured before the first persisted observation; never replaced by later checks.
  * Missing problem location permits only the exact complete suggestion/content version.
  */
 export type DecisionIdentityBasis = "stable_problems" | "exact_suggestion_version" | "unavailable";
@@ -60,18 +55,11 @@ export type RuleMeasurement =
       complete?: boolean | null;
       findings: number;
       kind: "static";
-    }
-  | {
-      reason: string;
-      kind: "unsupported";
     };
 export type ComparisonStatus = "not_requested" | "comparable" | "incomparable" | "unknown";
 export type RuleOutcome = "hit" | "miss" | "insufficient" | "unsupported" | "error";
 export type RelationKind = "chain" | "copy";
 export type HookTrust = "managed" | "untrusted" | "trusted" | "modified";
-export type RecordKind = "observation" | "decision" | "recheck" | "redisplay";
-export type FollowUpStatus =
-  "no_observed_records" | "version_unknown" | "unavailable" | "read_content_matched" | "loaded_content_matched";
 export type MetricStatus = "observed" | "derived" | "proxy" | "unavailable";
 export type Basis =
   | "native_record"
@@ -162,27 +150,18 @@ export interface Response {
   checkedAt: string;
   suggestions: Suggestion[];
   pending: number;
-  history: number;
   page: Page;
   issues: Issue[];
   resultStatus: string;
   ruleParameters: RuleParameters;
   ruleCatalog: RuleDefinition[];
   checks: RuleAssessment[];
-  /**
-   * Derived from the selected usage view; never stored as a user decision or receipt.
-   */
-  followUps: FollowUpObservation[];
   activity?: ActivityResult | null;
 }
 export interface Capabilities {
   staticChecks: boolean;
   manualEditReview: boolean;
   decisions: boolean;
-  inactivity: boolean;
-  mcpFaults: boolean;
-  spaceCleanup: boolean;
-  loadingBudgetDiagnosis: boolean;
   exactInstructionBlocks: boolean;
   declaredCopyDrift: boolean;
   hookSupport: HookSupport;
@@ -194,12 +173,12 @@ export interface HookSupport {
   status: HookSupportStatus;
 }
 export interface Suggestion {
+  baselineId?: string | null;
   reviewFormatVersion: number;
   scopeProject?: string | null;
   id: string;
   item: Item;
   category: Category;
-  status: string;
   decision?: UserDecision | null;
   /**
    * Current rule facts; user decisions never stand in for check outcomes.
@@ -209,14 +188,6 @@ export interface Suggestion {
   checkedAt: string;
   ruleVersion: string;
   ruleParameters?: RuleParameters | null;
-  recheckRuleParameters?: RuleParameters | null;
-  /**
-   * Exact metadata before rechecking; source bodies are never retained.
-   */
-  reviewBaseline?: ReviewBaseline | null;
-  recordId?: string | null;
-  recordedAt?: string | null;
-  recordKind?: RecordKind | null;
 }
 export interface Item {
   id: string;
@@ -611,15 +582,6 @@ export interface RuleOverrides {
   agentsBytes?: number | null;
   descriptionCharacters?: number | null;
 }
-/**
- * Captured before the first persisted observation; never replaced by later checks.
- */
-export interface ReviewBaseline {
-  version: number;
-  item: Item;
-  scope: AssessmentScope;
-  assessments: RuleAssessment[];
-}
 export interface Page {
   offset: number;
   limit: number;
@@ -635,69 +597,6 @@ export interface RuleDefinition {
   version: string;
   kinds: Kind[];
   basis: string;
-}
-export interface FollowUpObservation {
-  matchingReadRecords?: number | null;
-  matchingLoadRecords?: number | null;
-  usageComparison?: FollowUpUsage | null;
-  usageComparisonUnavailable?: string | null;
-  recordId: string;
-  suggestionId: string;
-  status: FollowUpStatus;
-  after: string;
-  observedAt: string;
-  observedRecords?: number | null;
-  useBasis?: UseBasis | null;
-  lastRecordAt?: string | null;
-  usageRevision?: string | null;
-  absenceObservable: boolean;
-}
-export interface FollowUpUsage {
-  /**
-   * Exact authorized sources shared by the compared windows.
-   */
-  sourceInstanceIds: string[];
-  methodVersion: number;
-  scope: Scope;
-  baselineStart: string;
-  changeAt: string;
-  observedThrough: string;
-  baseline: TaskPopulation;
-  current: TaskPopulation;
-  baselineUsage: UsageSummary;
-  currentUsage: UsageSummary;
-  undatedRecords: number;
-  partial: boolean;
-}
-export interface Scope {
-  allTime?: boolean | null;
-  timezone?: string | null;
-  since?: string | null;
-  until?: string | null;
-  agentKind?: string | null;
-  sourceInstanceId?: string | null;
-  model?: string | null;
-  modelUnknown?: boolean | null;
-  effortUnknown?: boolean | null;
-  undated?: boolean | null;
-  reasoningEffort?: string | null;
-  project?: string | null;
-  projectUnknown?: boolean | null;
-  threadId?: string | null;
-  /**
-   * Exact turn inspection, always bound to a selected thread.
-   */
-  turnId?: string | null;
-}
-export interface TaskPopulation {
-  measuredTasks: number;
-  completeTasks: number;
-  incompleteTasks: number;
-  completeTaskTokens?: number | null;
-  meanTokens?: number | null;
-  medianTokens?: number | null;
-  p90Tokens?: number | null;
-  unassignedUsage: UsageSummary;
 }
 export interface ActivityResult {
   formatVersion: number;

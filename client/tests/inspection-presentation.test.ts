@@ -5,7 +5,7 @@ import type {UsageResult} from '../src/index.js';
 import {activityResult} from '../../tests/fixtures/activity.js';
 
 test('concrete findings use published values, retain unknowns and follow locale changes',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  const candidate={signals:['low_cache_reuse','input_jump','failure_share','repeated_request'] as const,cacheShare:0.2,largestUncachedJump:100_000,failedOperations:2,determinateOperations:5,repeatedRequests:3};
  const input={...candidate,signals:[...candidate.signals]};
  const before=JSON.stringify(input);
@@ -26,7 +26,7 @@ test('concrete findings use published values, retain unknowns and follow locale 
 });
 
 test('workflow findings present all published signals with localized advice and missing baselines',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  const stats={operations:7,tasks:2,determinateOperations:5,failedOperations:3,rejectedOperations:2,failureShare:0.6,outcomeGaps:0,durationSamples:7,slowOperations:7,maximumDurationMs:30000,medianDurationMs:30000,maximumFailuresInTask:3,maximumRejectionsInTask:2};
  const finding:NonNullable<NonNullable<UsageResult['inspection']>['activity']>['findings'][number]={id:'safe',sourceInstanceId:'synthetic',project:'/synthetic',tool:'exec_command',current:stats,baseline:{...stats,operations:20,determinateOperations:20,failedOperations:0,failureShare:0,durationSamples:20,medianDurationMs:3000},evidence:[],baselineEvidence:[],signals:['repeated_slow_request','failure_spike','duration_spike','recurring_workflow','repeated_failure','repeated_rejection']};
  const before=JSON.stringify(finding);
@@ -40,7 +40,7 @@ test('workflow findings present all published signals with localized advice and 
 });
 
 test('opportunity copy keeps safety categories and unknown measurements explicit',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{locale.setLocale('en');
  const text=inspectionOpportunityFindingText({id:'safe',object:null,metrics:[{name:'interval_ms',value:null,unit:'milliseconds'}],safetyLabels:['broad_deletion'],evidence:[],baselineEvidence:[]});
  assert.ok(text.includes('Root or home deletion request'));assert.ok(text.some(s=>s.includes('Unknown')));

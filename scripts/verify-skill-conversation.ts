@@ -137,18 +137,16 @@ try {
                         assert.ok(suggestion);
                         const session = nativeSessionId(response.events), answerFile = path.join(temp, 'config-recheck.answer.json');
                         const instruction = lang === 'zh' ? '现在只授权精简刚才选定合成 Skill 的 description，其余内容与文件不变。改成 Synthetic review helper for this fixture.，然后按原建议复查，说明结果和限制。' : 'You may now change only the selected synthetic Skill description to Synthetic review helper for this fixture. Preserve all other content and files. Recheck the original suggestion and explain the result and limits.';
-                        const next = await run('recheck', ['exec', 'resume', session, '--config', 'mcp_servers={}', '--skip-git-repo-check', '--json', '--output-schema', focusedSchema, '--output-last-message', answerFile, instruction + ` Target ${sample}; original suggestion ${suggestion.id}. Use the same runtime prefix ${prefix}, roots, project and original decision scope. Do not create or change keep/not-applicable decisions, scan raw logs or write other files. Answer in ${lang === 'zh' ? 'Chinese' : 'English'}.`], answerFile);
+                        const next = await run('recheck', ['exec', 'resume', session, '--config', 'mcp_servers={}', '--skip-git-repo-check', '--json', '--output-schema', focusedSchema, '--output-last-message', answerFile, instruction + ` Target ${sample}; original suggestion ${suggestion.id}, readView ${suggestions.readView}, baseline ${suggestion.baselineId}. Use the same runtime prefix ${prefix}, roots, project and original decision scope. Do not create or change keep/not-applicable decisions, scan raw logs or write other files. Answer in ${lang === 'zh' ? 'Chinese' : 'English'}.`], answerFile);
                         assertConfiguration(expected);
                         assert.equal(readFileSync(sourceFile, 'utf8'), sourceBody);
-                        const history = query<OptimizeResult>(['optimize', 'history', '--suggestion', suggestion.id, ...configArgs]);
-                        const checked = history.suggestions.find(s => s.id === suggestion.id);
-                        assert.ok(checked);
-                        assert.equal(checked.status, 'verified');
-                        assert.equal(checked.decision, null);
+                        const recheck = query<OptimizeResult>(['optimize','recheck','--read-view',suggestions.readView!,'--baseline',suggestion.baselineId!,...configArgs]);
+                        assert.ok(recheck.checks.some(c=>c.rule==='descriptionSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
+                        assert.equal(recheck.decisionRevision,suggestions.decisionRevision);
                         assert.equal(query<UsageResult>(['usage', '--snapshot', snapshot, '--all-time']).summary.tokens.total, 1100000);
                         result.followup = { answer: next.answer, metrics: next.metrics, originalSuggestionVerified: true, descriptionOnly: true };
                     }
-                    const decisions = query<OptimizeResult>(['optimize', 'history', '--root', source, '--project-root', project, '--project', project]);
+                    const decisions = query<OptimizeResult>(['optimize', 'list', '--root', source, '--project-root', project, '--project', project]);
                     assert.ok(decisions.suggestions.every(s => s.decision === null));
                     const plansRun = spawnSync(process.execPath, [cli, 'monitor', 'list', '--json'], { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' });
                     assert.equal(plansRun.status, 0);

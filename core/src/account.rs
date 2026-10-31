@@ -5,7 +5,6 @@ use chrono::DateTime;
 use serde::Deserialize;
 use serde_json::Value;
 mod allowance;
-pub(crate) mod gate;
 pub(crate) mod history;
 
 #[derive(Deserialize)]

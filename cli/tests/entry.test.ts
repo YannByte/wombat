@@ -14,17 +14,17 @@ test('help discovers every supported command without duplicates or removed hosts
   try {
     assert.equal(await runUsageCli(['--lang', 'en', '--help', '--json']), 0);
     const result = JSON.parse(chunks.join(''));
-    const expected = ['service','refresh','usage','threads','turns','steps','prices','optimize','directories','account','update','doctor','timing','compare','investigate','trajectory','resources','review','context','skill','collection','hook','setup','api','call','statistics','monitor'];
+    const expected = ['service','refresh','usage','threads','turns','steps','prices','optimize','directories','account','update','doctor','timing','compare','investigate','trajectory','resources','review','context','collection','hook','setup','api','call','statistics','monitor'];
     assert.deepEqual([...result.commands].sort(), expected.sort());
     assert.match(result.help, /^Wombat\n\nUsage/);
-    for (const command of ['update', 'skill', 'setup', 'collection', 'doctor', 'timing']) assert.match(result.help, new RegExp('wombat '+command+'\\b'));
+    for (const command of ['update', 'setup', 'collection', 'doctor', 'timing']) assert.match(result.help, new RegExp('wombat '+command+'\\b'));
   } finally { process.stdout.write = write; }
 });
 
 test('removed and unknown commands use the ordinary invalid-argument envelope', async () => {
   const write = process.stdout.write;
   try {
-    for (const command of ['web', '__proto__']) {
+    for (const command of ['web', 'skill', '__proto__']) {
       const chunks: string[] = [];
       process.stdout.write = ((text: string) => { chunks.push(String(text)); return true; }) as typeof process.stdout.write;
       assert.equal(await runUsageCli([command, '--json']), 1);

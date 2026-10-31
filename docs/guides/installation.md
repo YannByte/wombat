@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/instal
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/YannByte/wombat/main/scripts/install/install.ps1))) -Plugin
 ```
 
-使用插件前需先安装兼容的本机 Codex。安装器先安装 Wombat，再通过 Codex 注册本地 marketplace 并安装插件，最后检查当前项目的发现状态和运行时兼容性。在新的 Codex 项目对话中调用 `$wombat:wombat`；已有已启用的采集插件时，安装器保留该模式，调用 `$wombat-collection:wombat`。安装不改变采集模式或 Hooks 信任。之后可以直接使用 `wombat` 命令。
+先安装兼容的本机 Codex。安装器安装 Wombat，通过 Codex 注册单条本地 marketplace、安装唯一插件，再检查当前项目的发现状态与运行时兼容性。在新项目对话中调用 `$wombat:wombat`。默认不探测可选 Hooks，不改变采集模式或信任。之后可直接使用 `wombat`。
 
 插件阶段失败时，已安装的 Wombat 和数据会保留。错误提示会给出失败阶段、错误码、恢复操作和私有诊断摘要的路径。发现检查遇到权限不足、连接断开或超时时，先处理提示中的问题，再只运行 `wombat setup --project PATH --json`，无需重装。Skill 被禁用或存在冲突时，先检查 Codex 中该项目的插件设置，再执行同一只读检查。只有插件安装失败或已确认版本、内容不匹配时，才使用安装器的 `--plugin-only`（macOS/Linux）或 `-PluginOnly`（PowerShell）；保留自定义安装目录选项。此模式复用当前运行时，不重复下载，也不修改 PATH；不要附加版本或下载源选项。向 [Issues](https://github.com/YannByte/wombat/issues) 附加诊断摘要前，请先检查其内容：摘要包含本机项目和 Skill 路径，但不包含原始命令输出或 Hook 配置。
 

@@ -11,11 +11,6 @@ export type UseWindow =
       until: string;
       timezone: string;
       kind: "date_window";
-    }
-  | {
-      after: string;
-      through: string;
-      kind: "follow_up";
     };
 export type UseTimeBasis = "source_operation_time";
 export type UseSourceCompleteness = "complete" | "partial" | "unknown";

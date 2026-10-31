@@ -7,9 +7,9 @@ import type {CodexOptions} from './process.js';
 export type {Discovery, Instance};
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 
-export async function discoverWombatSkill(cwd:string,query:QueryOptions={},options:CodexOptions={},managed=false):Promise<Discovery>{
+export async function discoverWombatSkill(cwd:string,query:QueryOptions={},options:CodexOptions={}):Promise<Discovery>{
   try{
-    const rpc=await connectCodex(managed,query,options);
+    const rpc=await connectCodex(query,options);
     try{
       const response=await rpc.request('skills/list',{cwds:[cwd],forceReload:true});
       if(!object(response)||!Array.isArray(response.data))throw new CoreError('NATIVE_PROTOCOL_ERROR','Invalid Skill discovery');
@@ -18,7 +18,7 @@ export async function discoverWombatSkill(cwd:string,query:QueryOptions={},optio
       const instances:Instance[]=[];
       for(const raw of entries[0].skills){
         if(!object(raw)||typeof raw.name!=='string')throw new CoreError('NATIVE_PROTOCOL_ERROR','Invalid Skill metadata');
-        if(!['wombat','wombat:wombat','wombat-collection:wombat'].includes(raw.name))continue;
+        if(raw.name!=='wombat:wombat')continue;
         if(typeof raw.path!=='string'||!path.isAbsolute(raw.path)||typeof raw.enabled!=='boolean')throw new CoreError('NATIVE_PROTOCOL_ERROR','Invalid Wombat Skill');
         const existing=instances.find(s=>s.path===raw.path);
         if(existing&&(existing.name!==raw.name||existing.enabled!==raw.enabled))throw new CoreError('NATIVE_PROTOCOL_ERROR','Conflicting Wombat Skill metadata');

@@ -26,10 +26,10 @@ test('monthly CLI buckets use natural names and unknown API cost remains a compl
  const {itemLines}=await import('../src/format.js');
  const result={snapshotRef:{createdAt:'2026-10-02T00:00:00Z'},scope:{timezone:'America/Los_Angeles'},distribution:{}} as any;
  const item={kind:'usage',isSubtotal:true,date:'2026-09-01',scope:{since:'2026-09-01',until:'2026-10-01'},usage:withTokenAnalysis({measurementCount:1,tokens:{total:110},price:{status:'unknown'}})} as any;
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{locale.setLocale('en');assert.match(itemLines(item,result,120,'month').join('\n'),/Sep 2026/);assert.match(itemLines(item,result,120,'month').join('\n'),/Not priced/);locale.setLocale('zh');assert.match(itemLines(item,result,120,'month').join('\n'),/2026年9月/);}finally{locale.setLocale(saved);}
 });
 test('human help uses Tasks consistently and explains the undated restriction',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{locale.setLocale('en');assert.match(usageHelp(),/View tasks/);assert.doesNotMatch(usageHelp(),/conversation/i);assert.match(usageHelp(),/excludes --all-time and date ranges/);locale.setLocale('zh');assert.match(usageHelp(),/查看任务/);assert.doesNotMatch(usageHelp(),/对话/);assert.match(usageHelp(),/不能同时使用 --all-time/);}finally{locale.setLocale(saved);}
 });

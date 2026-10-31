@@ -29,9 +29,6 @@ export interface Response {
   modelRestriction?: ModelRestriction | null;
   summary?: Summary | null;
 }
-/**
- * Stored native observations, independent of the local usage ledger.
- */
 export interface AllowanceHistory {
   methodVersion: number;
   totalObservations: number;

@@ -244,10 +244,6 @@ fn invalid_ranges_and_unknown_evidence_never_become_cached_misses() {
         cached(Rule::LocalReference, &view, &rules, &cache),
         Assessment::Insufficient(_)
     ));
-    assert!(matches!(
-        cached(Rule::RuntimeDuplicateInjection, &view, &rules, &cache),
-        Assessment::Unsupported(_)
-    ));
     assert_eq!(cache.lock().unwrap().stats().0, 0);
     let mut finding = finding("localReference");
     finding.rule = "localReference".into();

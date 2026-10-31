@@ -32,11 +32,7 @@ test('source states and finding quantities stay distinct and natural in both lan
       const format = { ...f, rule: 'skillFormat', evidenceCodes: Array.from({ length: count }, (_, i) => String(i)) };
       assert.equal(reviewFindingCount(format), language === 'zh' ? `${count} 处格式错误` : `${count} format error${count === 1 ? '' : 's'}`);
     }
-    const idle = { item: { name: 'synthetic', kind: 'skill' }, findings: [{ rule: 'skillInactivity', observed: 41, evidenceCodes: [] }] } as unknown as OptimizeSuggestion;
-    const rendered = reviewPresentation(idle);
-    assert.ok(!rendered.value.includes('41')); assert.ok(rendered.metricText?.includes('41'));
-    assert.match(reviewFindingNote('mcpInactivity', 'synthetic'), /synthetic/);
-    assert.ok(!reviewFindingNote('mcpInactivity').includes('Wombat'));
+
   }
 });
 
@@ -44,7 +40,7 @@ test('source states and finding quantities stay distinct and natural in both lan
 test('a partial zero remains an observed count without becoming an absence label', async () => {
   const { useBasisCount } = await import('../src/locale/index.js');
   const basis: NonNullable<ConfigItem['useBasis']> = { methodVersion: 3, status: 'partial', unit: 'object_use', capturedAt: '2026-10-05T00:00:00Z', snapshotId: 'synthetic', scope: { sourceInstanceIds: ['synthetic'], project: null, threadId: null, agentKind: null, window: { kind: 'all_history' } }, timeBasis: 'source_operation_time', coverage: { targetGaps: 1 }, sourceCompleteness: 'complete' };
-  const saved = locale.getSnapshot().locale;
+  const saved = locale.getLocale();
   try { for (const language of ['zh', 'en'] as const) {
     locale.setLocale(language);
     const row = { ...item('mcp'), useBasis: { ...basis, status: 'partial' as const } };

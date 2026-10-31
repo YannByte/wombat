@@ -21,8 +21,8 @@ export function inspectionActivityText(activity:Activity):string[]{
 
 export function inspectionActivityFindingText(finding:Finding):Array<{title:string;observed:string;advice:string}>{
  const c=finding.current,b=finding.baseline;
- const number=(v:number|null|undefined)=>v==null?t('webui.unknown'):new Intl.NumberFormat(locale.getSnapshot().locale,{maximumFractionDigits:1}).format(v);
- const share=(v:number|null|undefined)=>v==null?t('webui.unknown'):new Intl.NumberFormat(locale.getSnapshot().locale,{style:'percent',maximumFractionDigits:1}).format(v);
+ const number=(v:number|null|undefined)=>v==null?t('webui.unknown'):new Intl.NumberFormat(locale.getLocale(),{maximumFractionDigits:1}).format(v);
+ const share=(v:number|null|undefined)=>v==null?t('webui.unknown'):new Intl.NumberFormat(locale.getLocale(),{style:'percent',maximumFractionDigits:1}).format(v);
  return finding.signals.map(signal=>{
   let observed:string;
   switch(signal){
@@ -38,14 +38,14 @@ export function inspectionActivityFindingText(finding:Finding):Array<{title:stri
 }
 
 export function inspectionCandidateText(candidate:Pick<Candidate,'signals'|'cacheShare'|'largestUncachedJump'|'failedOperations'|'determinateOperations'|'repeatedRequests'>):Array<{title:string;observed:string;advice:string}>{
- const number=(value:number|null|undefined)=>value==null?t('webui.unknown'):new Intl.NumberFormat(locale.getSnapshot().locale).format(value);
+ const number=(value:number|null|undefined)=>value==null?t('webui.unknown'):new Intl.NumberFormat(locale.getLocale()).format(value);
  return candidate.signals.map(signal=>{
   let observed:string,advice:string;
   switch(signal){
    case 'high_usage':
     observed=t('inspection.observed.high_usage');advice=t('inspection.advice.high_usage');break;
    case 'low_cache_reuse':
-    observed=t('inspection.observed.low_cache_reuse',{share:candidate.cacheShare==null?t('webui.unknown'):new Intl.NumberFormat(locale.getSnapshot().locale,{style:'percent',maximumFractionDigits:1}).format(candidate.cacheShare)});
+    observed=t('inspection.observed.low_cache_reuse',{share:candidate.cacheShare==null?t('webui.unknown'):new Intl.NumberFormat(locale.getLocale(),{style:'percent',maximumFractionDigits:1}).format(candidate.cacheShare)});
     advice=t('inspection.advice.low_cache_reuse');break;
    case 'input_jump':
     observed=t('inspection.observed.input_jump',{tokens:number(candidate.largestUncachedJump)});advice=t('inspection.advice.input_jump');break;

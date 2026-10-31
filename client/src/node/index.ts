@@ -1,5 +1,5 @@
 import { withAutomaticPrices } from './auto-prices.js';
-import { createUsageClient, type UsageClient, type AccountTransport, type HandoffTransport } from '../client.js';
+import { createUsageClient, type UsageClient, type AccountTransport } from '../client.js';
 import { invokeCore, invokeOperation, type CoreProcessOptions } from './core.js';
 import { queryLive } from './live.js';
 import type {CodexOptions} from './codex/process.js';
@@ -10,7 +10,7 @@ export interface NodeClientOptions extends CoreProcessOptions,CodexOptions { aut
 
 /** The CLI supplies a packaged binary path; source use can locate the root build. */
 export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
-  let account: Promise<AccountTransport> | undefined, handoff: Promise<HandoffTransport> | undefined;
+  let account: Promise<AccountTransport> | undefined;
   const client = createUsageClient({
     service:async(r,q)=>(await import('./service.js')).manageService(r,q,options),
     monitor: (r,q) => r.action==='check' && r.snapshotId.startsWith('live:') ? queryLive({monitor:r},q,options) : invokeOperation('monitor',r,q,options),
@@ -29,10 +29,9 @@ export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
       ? invokeOperation('timing', request, queryOptions, options)
       : queryLive({ timing: request }, queryOptions, options),
     account: async (r, q) => (await (account ??= import('./codex/account.js').then(m => m.createAccountTransport(options))))(r, q),
-    handoff: async (r, q) => (await (handoff ??= import('./codex/handoff.js').then(m => m.createHandoffTransport(options))))(r, q),
   });
   return options.automaticPrices === false ? client : withAutomaticPrices(client);
 }
 
-export {manageSkill,skillCapabilities,type SkillInstallationOptions} from './skill-installation.js';
+export {skillCapabilities} from './skill-runtime.js';
 export {discoverWombatSkill} from './codex/skills.js';

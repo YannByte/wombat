@@ -40,7 +40,7 @@ export function invokeCore(request: Request, options: QueryOptions, processOptio
 export function invokePricesCore(request: PricingRequest & { document?: string; attempt_id?: string; error_code?: string }, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
   return invokeOperation('prices', request, options, processOptions);
 }
-export function invokeOperation(op: 'service_offline' | 'conversation' | 'collection' | 'monitor' | 'collection_ingest' | 'timing' | 'usage_app' | 'prices' | 'live_endpoint' | 'preferences' | 'directories' | 'account_history' | 'native_account' | 'native_allowance_gate' | 'native_hook_context', request: ServiceRequest | ConversationRequest | CollectionRequest | TimingRequest | Request | PricingRequest | PreferencesRequest | DirectoriesRequest | Record<string, unknown>, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
+export function invokeOperation(op: 'service_offline' | 'conversation' | 'collection' | 'monitor' | 'collection_ingest' | 'timing' | 'usage_app' | 'prices' | 'live_endpoint' | 'preferences' | 'directories' | 'account_history' | 'native_account' | 'native_hook_context', request: ServiceRequest | ConversationRequest | CollectionRequest | TimingRequest | Request | PricingRequest | PreferencesRequest | DirectoriesRequest | Record<string, unknown>, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
   if (options.signal?.aborted) return Promise.reject(new CoreError('CANCELLED', '已取消'));
   const binary = binaryPath(processOptions.binaryPath);
   const maxResponseBytes = processOptions.maxResponseBytes ?? MAX_RESPONSE;

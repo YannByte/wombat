@@ -4,7 +4,6 @@ import type {
   OptimizeResult,
   AccountResult,
   DirectoriesResult,
-  HandoffResult,
   SetupResult,
   CollectionResult,
 } from "@wombat/client";
@@ -20,8 +19,6 @@ export const accountExitCode = (r: AccountResult) =>
     : 0;
 export const directoriesExitCode = (r: DirectoriesResult) =>
   r.grants.some((g) => g.status !== "authorized") ? 2 : 0;
-export const handoffExitCode = (r: HandoffResult) =>
-  r.deliveries.some((d) => d.status !== "accepted") ? 2 : 0;
 export const setupExitCode = (r: SetupResult) =>
   r.errorCodes.length ||
   r.discovery.status !== "available" ||

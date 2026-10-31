@@ -15,23 +15,19 @@
     },
     "/public-contracts/read-only-configuration-contract-v1": {
       "zh": "26618e997d66cc09cdde152fc04eca7b3a9cdc07c280a1b0f964c2f1556631c5",
-      "en": "983c3583f0c0e684ef8bae00d64733d19f17273783c4da5fbb64af817e7dc6da"
+      "en": "31d144da9db75d4eaee314f73c729b577d3ed6eeeb29188d5c69a77290028236"
     },
-    "/public-contracts/optimize-and-preference-contracts-v1": {
-      "zh": "836f8255b28fbd40dd5e06fe4f806bfb00b3940476d85ffd5b2747694879a3bc",
-      "en": "590df9aefe7d015a73d7c04307d1fb65a00817de58bb1e72db5cf1c6e3d04e24"
+    "/public-contracts/optimize-and-preference-contracts": {
+      "zh": "869e7834de86697568962cf98a3875a180013dbc736ddfc7abc99e129336eb75",
+      "en": "9d7aa36b822f592b868131ac9b99eee56c5fbf33903cba49f8e1f871e13d6012"
     },
     "/public-contracts/account-contract-v1": {
       "zh": "68849c40edb27eb0c45924a5674068ca3b51ada6faefed605f6c0f047431df9c",
       "en": "78913de5992e72aa16ab7c897d9be63095fd6b4d82622a3058eff1bb3db98960"
     },
-    "/public-contracts/handoff-allowance-assessment": {
-      "zh": "4e56797b55c6068ad099263cb4a8b1ef26510ab2408a9aa07bb4f9cb6568efdf",
-      "en": "049a651653bb1abf9a253150919bc8ee92acbb6fea7f7076a1b7fa84d7e85ed9"
-    },
-    "/public-contracts/skill-contracts-v1": {
-      "zh": "48363c2ca750888a39973e124beacca3ad1a3d68db7cced7aea330045ab46910",
-      "en": "955decf358326467910ac976ef1ca36b5fb50c3051d31ded6bb865b6eb00e9a8"
+    "/public-contracts/skill-contracts": {
+      "zh": "d1b45cd48a631cb3b01d90cefa2b0712a04754301090d36d76c252f23dfeff30",
+      "en": "3647d155b27eb8305deb818e89d195c8f56bd6a3f71f9679e857eccc055b428c"
     }
   }
 }

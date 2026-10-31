@@ -19,7 +19,6 @@ pub(super) fn catalog() -> Vec<RuleDefinition> {
 pub(super) enum Rule {
     MissingInstruction,
     FileSize,
-    InstructionSelection,
     SkillFormat,
     DescriptionStandard,
     DescriptionSize,
@@ -27,15 +26,10 @@ pub(super) enum Rule {
     LocalReference,
     ExactInstructionBlocks,
     DeclaredCopyDrift,
-    SkillDependency,
     HookTarget,
-    RuntimeDuplicateInjection,
-    SkillInactivity,
-    McpInactivity,
-    McpFault,
 }
 impl Rule {
-    /// Independent algorithm declarations; runtime rules remain unsupported.
+    /// Only implemented checks are exposed.
     pub(super) fn dependencies(self) -> Dependencies {
         let (evidence, method) = match self {
             Self::MissingInstruction => (Evidence::Existence, "authorized-existence-v1"),
@@ -51,13 +45,9 @@ impl Rule {
             Self::ExactInstructionBlocks => (Evidence::Blocks, "exact-instruction-block-v1"),
             Self::DeclaredCopyDrift => (Evidence::Relations, "raw-utf8/identity-v1"),
             Self::HookTarget => (Evidence::HostTargets, "trusted-enabled-hook-target-v1"),
-            _ => (Evidence::Unsupported, "unavailable-v1"),
         };
         Dependencies {
-            semantics_version: if matches!(
-                evidence,
-                Evidence::FileMeasurement | Evidence::Unsupported
-            ) {
+            semantics_version: if matches!(evidence, Evidence::FileMeasurement) {
                 2
             } else {
                 1
@@ -69,10 +59,9 @@ impl Rule {
             max_candidate_rows: 4096,
         }
     }
-    pub(super) const ALL: [Self; 16] = [
+    pub(super) const ALL: [Self; 10] = [
         Self::MissingInstruction,
         Self::FileSize,
-        Self::InstructionSelection,
         Self::SkillFormat,
         Self::DescriptionStandard,
         Self::DescriptionSize,
@@ -80,18 +69,12 @@ impl Rule {
         Self::LocalReference,
         Self::ExactInstructionBlocks,
         Self::DeclaredCopyDrift,
-        Self::SkillDependency,
         Self::HookTarget,
-        Self::RuntimeDuplicateInjection,
-        Self::SkillInactivity,
-        Self::McpInactivity,
-        Self::McpFault,
     ];
     pub(super) fn id(self) -> &'static str {
         match self {
             Self::MissingInstruction => "missingInstruction",
             Self::FileSize => "fileSize",
-            Self::InstructionSelection => "instructionSelection",
             Self::SkillFormat => "skillFormat",
             Self::DescriptionStandard => "descriptionStandard",
             Self::DescriptionSize => "descriptionSize",
@@ -99,46 +82,32 @@ impl Rule {
             Self::LocalReference => "localReference",
             Self::ExactInstructionBlocks => "exactInstructionBlocks",
             Self::DeclaredCopyDrift => "declaredCopyDrift",
-            Self::SkillDependency => "skillDependency",
             Self::HookTarget => "hookTarget",
-            Self::RuntimeDuplicateInjection => "runtimeDuplicateInjection",
-            Self::SkillInactivity => "skillInactivity",
-            Self::McpInactivity => "mcpInactivity",
-            Self::McpFault => "mcpFault",
         }
     }
     fn kinds(self) -> &'static [Kind] {
         match self {
-            Self::MissingInstruction | Self::FileSize | Self::InstructionSelection => &[Kind::Rule],
+            Self::MissingInstruction | Self::FileSize => &[Kind::Rule],
             Self::SkillFormat
             | Self::DescriptionStandard
             | Self::DescriptionSize
-            | Self::BodyTokens
-            | Self::SkillDependency
-            | Self::SkillInactivity => &[Kind::Skill],
-            Self::LocalReference
-            | Self::ExactInstructionBlocks
-            | Self::DeclaredCopyDrift
-            | Self::RuntimeDuplicateInjection => &[Kind::Rule, Kind::Skill],
+            | Self::BodyTokens => &[Kind::Skill],
+            Self::LocalReference | Self::ExactInstructionBlocks | Self::DeclaredCopyDrift => {
+                &[Kind::Rule, Kind::Skill]
+            }
             Self::HookTarget => &[Kind::Hook],
-            Self::McpInactivity | Self::McpFault => &[Kind::Mcp],
         }
     }
     fn basis(self) -> &'static str {
         match self {
             Self::MissingInstruction => "authorizedExistenceCheck",
             Self::FileSize | Self::DescriptionSize => "productReminder",
-            Self::InstructionSelection => "effectiveHostConfiguration",
             Self::SkillFormat | Self::DescriptionStandard => "agentSkillsSpecification",
             Self::BodyTokens => "referenceEncodingOnly",
             Self::LocalReference => "authorizedMarkdownResources",
             Self::ExactInstructionBlocks => "staticExactBlocks",
             Self::DeclaredCopyDrift => "explicitSourceCopyRelation",
-            Self::SkillDependency => "effectiveHostDependencyResolution",
             Self::HookTarget => "effectiveTrustedEnabledHookRegistry",
-            Self::RuntimeDuplicateInjection => "requestContextGenerationPositions",
-            Self::SkillInactivity | Self::McpInactivity => "continuousEnabledCoverage30Days",
-            Self::McpFault => "verifiedRuntimeConnection",
         }
     }
     pub(super) fn applies(self, kind: &Kind) -> bool {
@@ -156,7 +125,6 @@ pub(super) enum Evidence {
     Blocks,
     Relations,
     HostTargets,
-    Unsupported,
 }
 impl Evidence {
     /// Each check consumes its own observation. A failed content read does not
@@ -176,7 +144,7 @@ impl Evidence {
             | Self::References
             | Self::Blocks
             | Self::Relations => item.measurement_status == "complete",
-            Self::HostTargets | Self::Unsupported => true,
+            Self::HostTargets => true,
         }
     }
 }

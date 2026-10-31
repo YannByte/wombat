@@ -7,7 +7,7 @@ import {usageLabel,itemLines,summaryDetails} from '../src/format.js';
 const base:UsageSummary=withTokenAnalysis({measurementCount:2,tokens:{total:null,input:100,cacheRead:0,cacheCreate:0,output:20,reasoning:0},price:{status:'unknown',currency:'USD',policy:'synthetic',priceRevision:'synthetic',cost:null,knownCost:'0',components:[],basis:[],issues:[]}});
 const usage:UsageSummary={...base,tokenAnalysis:{...base.tokenAnalysis,fields:{...base.tokenAnalysis.fields,total:{observedSubtotal:100,coveredRecords:1,missingRecords:1,conflictingRecords:0,invalidRecords:0,indeterminateRecords:0}}}};
 test('CLI token summaries and narrow or wide rows show the core subtotal with coverage',()=>{
- const previous=locale.getSnapshot().locale;
+ const previous=locale.getLocale();
  try{for(const language of ['zh','en'] as const){locale.setLocale(language);
  const marker=language==='en'?'Known subtotal':'已知小计';
  assert.ok(usageLabel(usage).includes(marker));assert.match(usageLabel(usage),/100/);
@@ -21,7 +21,7 @@ test('CLI token summaries and narrow or wide rows show the core subtotal with co
 });
 
 test('CLI labels complete and partial calculated totals at narrow and wide widths',()=>{
- const saved=locale.getSnapshot().locale;
+ const saved=locale.getLocale();
  try{for(const language of ['zh','en'] as const){locale.setLocale(language);
   for(const unavailableRecords of [0,1]){
    const calculated:UsageSummary={...base,tokenAnalysis:{...base.tokenAnalysis,totalAnalysis:{methodVersion:1,subtotal:120,coveredRecords:2-unavailableRecords,recordedRecords:0,calculatedRecords:2-unavailableRecords,unavailableRecords,overflowRecords:0}}};

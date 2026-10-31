@@ -4,6 +4,8 @@
 
 Status: proposed
 
+当前精简范围替代本页的任务发送、多安装模式、自动检查历史与采用跟踪；保留其余证据约束和未完成事项。见[只读检查与单插件](../../implemented/architecture/2026-10-31-on-demand-checks.md)。
+
 [CLI 与任务主 Skill 决策](../../implemented/architecture/2026-10-31-cli-task-skill.md)已取代此方案中的 Web、多入口和强制准备流程。下文采集与证据要求仅在存在当前 CLI 消费者时保留。
 
 ## 问题

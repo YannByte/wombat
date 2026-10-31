@@ -3,7 +3,7 @@ import type {TimingLocalResult} from '../index.js';
 import {locale,t,type MessageKey} from './index.js';
 export function operationOutcomeText(o:TimingLocalResult['work']['outcomes']):{headline:string;details:string[];note:string}{
  const headline=o.failureRatio.value!=null&&o.determinateOperations.value!=null&&o.failed.value!=null
-  ?t('execution.outcomes.ratio',{failed:o.failed.value,total:o.determinateOperations.value,ratio:new Intl.NumberFormat(locale.getSnapshot().locale,{style:'percent',maximumFractionDigits:1}).format(o.failureRatio.value)})
+  ?t('execution.outcomes.ratio',{failed:o.failed.value,total:o.determinateOperations.value,ratio:new Intl.NumberFormat(locale.getLocale(),{style:'percent',maximumFractionDigits:1}).format(o.failureRatio.value)})
   :o.determinateOperations.value===0?t('execution.outcomes.empty'):t('execution.outcomes.unavailable');
  const rows:Array<[Extract<MessageKey,'execution.outcomes.interrupted'|'execution.outcomes.rejected'|'execution.outcomes.nonterminal'|'execution.outcomes.indeterminate'|'execution.outcomes.conflicting'|'execution.outcomes.identity'|'execution.outcomes.unclassified'>,TimingLocalResult['work']['outcomes']['failed']]>=[
   ['execution.outcomes.interrupted',o.interrupted],['execution.outcomes.rejected',o.rejected],['execution.outcomes.nonterminal',o.nonterminal],

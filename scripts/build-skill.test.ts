@@ -1,20 +1,17 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,rmSync,readFileSync,existsSync,writeFileSync} from 'node:fs';import os from 'node:os';import path from 'node:path';import {fileURLToPath} from 'node:url';
 import {buildSkill,skillPresentation,skillNames} from './build-skill.ts';import {inventory,hash} from './artifact-files.ts';
-test('plugin and standalone resources derive from declared Skill sources with matching inventory and version',()=>{
+test('one formal plugin derives from declared Skill sources with matching inventory and version',()=>{
   const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),dir=mkdtempSync(path.join(os.tmpdir(),'wombat-skill-package-'));
   try{
     buildSkill(root,path.join(dir,'skill'));const output=path.join(dir,'skill');
     const metadata=JSON.parse(readFileSync(path.join(output,'manifest.json'),'utf8'));
-    assert.deepEqual(metadata.files,inventory(path.join(root,'plugin/skills/wombat')));
-    assert.deepEqual(metadata.files,inventory(path.join(output,'wombat')));
-    assert.deepEqual(inventory(path.join(output,'wombat')),inventory(path.join(output,'plugin/skills/wombat')));
+    assert.equal(existsSync(path.join(output,'wombat')),false);
     const names=skillNames(root);
     assert.equal(names.length,1);
     for(const name of names){
       const source=inventory(path.join(root,'plugin/skills',name));
       assert.deepEqual(inventory(path.join(output,'plugin/skills',name)),source);
-      assert.deepEqual(inventory(path.join(output,'collection-plugin/skills',name)),source);
       assert.deepEqual(metadata.pluginSkills.find((s:{name:string})=>s.name===name),{name,contentHash:hash(JSON.stringify(source))});
     }
     assert.equal(metadata.pluginSkillContentHash,hash(JSON.stringify(metadata.pluginSkills)));
@@ -34,21 +31,7 @@ test('plugin and standalone resources derive from declared Skill sources with ma
     assert.ok(!JSON.stringify(portable).includes(root));
     assert.equal(portable.extensions['com.openai'].hooks,undefined);
     for(const directory of ['hooks','scripts'])assert.equal(existsSync(path.join(output,'plugin',directory)),false);
-    const collected=path.join(output,'collection-plugin');
-    const collectionManifest=JSON.parse(readFileSync(path.join(collected,'.codex-plugin/plugin.json'),'utf8'));
-    assert.equal(collectionManifest.name,'wombat-collection');
-    assert.equal(collectionManifest.hooks,'./hooks/hooks.json');
-    assert.equal(collectionManifest.interface.defaultPrompt[0],entry.default_prompt.replace('$wombat','$wombat-collection:wombat'));
-    assert.equal(existsSync(path.join(collected,'plugin.json')),false);
-    assert.deepEqual(inventory(path.join(collected,'skills/wombat')),metadata.files);
-    for(const directory of ['hooks','scripts'])assert.deepEqual(inventory(path.join(collected,directory)),inventory(path.join(root,'plugin',directory)));
-    const hooks=JSON.parse(readFileSync(path.join(collected,'hooks/hooks.json'),'utf8'));
-    assert.equal(Object.keys(hooks.hooks).length,10);
-    for(const definitions of Object.values(hooks.hooks))for(const definition of definitions as {hooks:{async:boolean;timeout:number;command:string}[]}[]) {
-      assert.equal(definition.hooks[0].async,true);assert.equal(definition.hooks[0].timeout,5);
-      assert.equal(definition.hooks[0].command,'sh "${PLUGIN_ROOT}/scripts/collect.sh"');
-    }
-    assert.equal(catalog.plugins[1].source.path,'./collection-plugin');
+    assert.equal(existsSync(path.join(output,'collection-plugin')),false);assert.equal(catalog.plugins.length,1);
     const runtime=JSON.parse(readFileSync(path.join(output,'plugin/wombat-runtime.json'),'utf8'));assert.deepEqual(runtime.requiredCapabilities,metadata.requiredCapabilities);assert.equal(runtime.skillContentHash,metadata.pluginSkillContentHash);assert.deepEqual(runtime.skills,metadata.pluginSkills);assert.equal(runtime.version,portable.version);
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
@@ -71,7 +54,7 @@ test('Skill presentation follows source changes and rejects unusable invocation 
   try {
     assert.equal(read().defaultPrompt[0],'Use $wombat:wombat to answer the selected question.');
     assert.equal(read({default_prompt:'Use $wombat to inspect timing.'}).defaultPrompt[0],'Use $wombat:wombat to inspect timing.');
-    assert.equal(skillPresentation(file,'$wombat-collection:wombat').defaultPrompt[0],'Use $wombat-collection:wombat to inspect timing.');
+    assert.throws(()=>skillPresentation(file,'$wombat-collection:wombat'));
     assert.equal(read({default_prompt:'Compare $wombat-collection:wombat, then use $wombat.'}).defaultPrompt[0],'Compare $wombat-collection:wombat, then use $wombat:wombat.');
     for(const change of [{display_name:''},{short_description:'short'},{short_description:'x'.repeat(65)},{default_prompt:'Inspect usage.'},{default_prompt:'Use $wombat:wombat.'},{default_prompt:'Use $wombat and $wombat.'},{default_prompt:5}])assert.throws(()=>read(change));
     writeFileSync(file,JSON.stringify({interface:null}));assert.throws(()=>skillPresentation(file,'$wombat:wombat'));

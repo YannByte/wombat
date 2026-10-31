@@ -19,19 +19,36 @@ pub(crate) fn parameters(overrides: Option<RuleOverrides>) -> Result<RuleParamet
 pub(crate) fn detect(view: &View, rules: &RuleParameters) -> Vec<Suggestion> {
     detect_for(view, rules, None, None)
 }
+#[cfg(test)]
 pub(crate) fn detect_for(
     view: &View,
     rules: &RuleParameters,
     project: Option<&str>,
     source: Option<&str>,
 ) -> Vec<Suggestion> {
+    inspect_for(view, rules, project, source).0
+}
+pub(super) fn inspect_for(
+    view: &View,
+    rules: &RuleParameters,
+    project: Option<&str>,
+    source: Option<&str>,
+) -> (Vec<Suggestion>, bool) {
+    let mut partial = !view.issues.is_empty();
     let mut suggestions: Vec<_> = view
         .items
         .iter()
+        .filter(|item| item.applies(source, project))
         .filter_map(|item| {
             let input =
                 super::evaluation::Input::initial(view, item, rules, project).with_source(source);
             let checks = super::evaluation::evaluate(&input);
+            partial |= checks.iter().any(|c| {
+                matches!(
+                    c.outcome,
+                    RuleOutcome::Insufficient | RuleOutcome::Unsupported | RuleOutcome::Error
+                )
+            });
             let mut findings: Vec<_> = checks
                 .iter()
                 .filter(|c| c.outcome == RuleOutcome::Hit)
@@ -106,26 +123,20 @@ pub(crate) fn detect_for(
                 ))
                 .ok()?,
             );
-            let mut suggestion = Suggestion {
+            let suggestion = Suggestion {
+                baseline_id: None,
                 review_format_version: 1,
                 scope_project: None,
                 id,
                 item: item.clone(),
                 category,
-                status: "pending".into(),
                 decision: None,
                 checks,
                 findings,
                 checked_at: view.checked.clone(),
                 rule_version: rules.version.clone(),
                 rule_parameters: Some(rules.clone()),
-                recheck_rule_parameters: None,
-                review_baseline: None,
-                record_id: None,
-                recorded_at: None,
-                record_kind: None,
             };
-            super::identity::capture(&mut suggestion);
             Some(suggestion)
         })
         .collect();
@@ -162,7 +173,7 @@ pub(crate) fn detect_for(
             })
             .then_with(|| a.id.cmp(&b.id))
     });
-    suggestions
+    (suggestions, partial)
 }
 
 // Group/version keys do not depend on the new problem identity representation.

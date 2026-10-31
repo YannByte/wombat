@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct Request {
     pub project: Option<String>,
     pub roots: Option<Vec<String>>,
+    #[serde(default)]
+    pub include_hooks: bool,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

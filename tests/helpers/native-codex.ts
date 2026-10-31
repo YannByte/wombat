@@ -36,7 +36,7 @@ function fixtureAlive(port: number, identity: string, remainingMs: number): Prom
 /** Synthetic native protocol only: no login, model work, or source-file execution. */
 export async function nativeCodexFixture(dir: string) {
   const binary=path.join(dir,'codex.cjs'),mode=path.join(dir,'native-mode.json'),calls=path.join(dir,'native-calls.jsonl'),lifecycle=path.join(dir,'native-lifecycle.jsonl');
-  const ws=createRequire(path.resolve('client/package.json')).resolve('ws');
+  const ws=createRequire(path.resolve('package.json')).resolve('ws');
   await writeFile(mode,JSON.stringify({kind:'blocked'}));await writeFile(calls,'');await writeFile(lifecycle,'');
   await writeFile(binary,`const {readFileSync,appendFileSync,writeFileSync}=require('node:fs');
 const mode=JSON.parse(readFileSync(${JSON.stringify(mode)},'utf8'));let accountReads=0,hookReads=0;

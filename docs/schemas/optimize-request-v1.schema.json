@@ -35,6 +35,12 @@
         "null"
       ]
     },
+    "baselineId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "decisionRevision": {
       "type": [
         "string",
@@ -72,14 +78,6 @@
         },
         {
           "type": "null"
-        }
-      ]
-    },
-    "group": {
-      "default": "pending",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Group"
         }
       ]
     },
@@ -139,7 +137,6 @@
         "detail",
         "keep",
         "not_applicable",
-        "redisplay",
         "recheck",
         "capabilities",
         "checks",
@@ -154,20 +151,11 @@
         "incorrect_evidence"
       ]
     },
-    "Group": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "history"
-      ]
-    },
     "Category": {
       "type": "string",
       "enum": [
         "repair",
-        "trim",
-        "organize",
-        "space"
+        "trim"
       ]
     },
     "RuleOverrides": {

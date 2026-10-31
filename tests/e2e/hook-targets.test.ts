@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createNodeClient } from '@wombat/client/node';
 import { nativeCodexFixture } from '../helpers/native-codex.js';
-test('Hook script findings, project scope, independent rechecks and handoff share version-bound evidence', { timeout: 60000, skip: process.platform === 'win32' }, async () => {
+test('Hook script findings, project scope, independent rechecks share version-bound evidence', { timeout: 60000, skip: process.platform === 'win32' }, async () => {
     const dir = realpathSync.native(await mkdtemp(path.join(tmpdir(), 'wombat-hook-target-'))), root = path.join(dir, 'source'), a = path.join(dir, 'a'), b = path.join(dir, 'b');
     await mkdir(path.join(root, 'sessions'), { recursive: true });
     await mkdir(a);
@@ -54,16 +54,11 @@ test('Hook script findings, project scope, independent rechecks and handoff shar
         const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'list', '--root', root, '--project-root', a, '--project-root', b, '--read-view', first.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr);
         assert.deepEqual(JSON.parse(cli.stdout).suggestions, first.suggestions);
-        const handoff = await nativeTransport.handoff!({ action: 'preview', readView: first.readView });
-        assert.equal(handoff.projects[0].cwd, a);
-        assert.deepEqual(handoff.projects[0].targets[0].sharedProjects, [a]);
-        await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', readView: first.readView, decisionRevision: handoff.decisionRevision });
+        await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision });
         await writeFile(path.join(a, filename), script);
         await rm(path.join(b, filename));
-        const rechecked = await nativeTransport.optimize!({ action: 'recheck', group: 'history' });
-        const resolved = rechecked.suggestions.find(s => s.id === original.id)!;
-        assert.equal(resolved.status, 'verified');
-        assert.equal(resolved.decision?.kind, 'keep');
+        const rechecked = await nativeTransport.optimize!({ action: 'recheck', readView: first.readView, baselineId: original.baselineId });
+        assert.ok(rechecked.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
         const current = await nativeTransport.optimize!({ action: 'list' });
         assert.equal(current.pending, 1);
         assert.equal(current.suggestions[0].findings[0].evidence?.hook?.project, b);
@@ -71,13 +66,13 @@ test('Hook script findings, project scope, independent rechecks and handoff shar
         assert.notEqual(second.id, original.id);
         omitted = true;
         await update();
-        const unknown = await nativeTransport.optimize!({ action: 'recheck', group: 'history', suggestionId: second.id });
-        assert.equal(unknown.suggestions.find(s => s.id === second.id)!.status, 'recheckUnavailable');
+        const unknown = await nativeTransport.optimize!({ action: 'recheck', readView: current.readView, baselineId: second.baselineId, suggestionId: second.id });
+        assert.ok(unknown.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
         omitted = false;
         enabled = false;
         await update();
-        const disabled = await nativeTransport.optimize!({ action: 'recheck', group: 'history', suggestionId: second.id });
-        assert.equal(disabled.suggestions.find(s => s.id === second.id)!.status, 'verified');
+        const disabled = await nativeTransport.optimize!({ action: 'recheck', readView: current.readView, baselineId: second.baselineId, suggestionId: second.id });
+        assert.ok(disabled.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'));
         enabled = true;
         trust = 'untrusted';
         await update();
@@ -108,7 +103,7 @@ test('Hook script findings, project scope, independent rechecks and handoff shar
         await rm(dir, { recursive: true, force: true });
     }
 });
-test('native project inheritance is observed per view and unavailable registration retains scoped history', { timeout: 45000, skip: process.platform === 'win32' }, async () => {
+test('native project inheritance is observed per view and unavailable registration retains scoped evidence', { timeout: 45000, skip: process.platform === 'win32' }, async () => {
     const dir = realpathSync.native(await mkdtemp(path.join(tmpdir(), 'wombat-hook-inherited-'))), root = path.join(dir, 'source'), parent = path.join(dir, 'parent'), child = path.join(parent, 'child'), config = path.join(parent, '.codex/config.toml');
     await mkdir(path.join(root, 'sessions'), { recursive: true });
     await mkdir(path.dirname(config), { recursive: true });
@@ -131,19 +126,14 @@ test('native project inheritance is observed per view and unavailable registrati
         const inventory = await client.config!({ roots: [root], projectRoots: [parent, child], readView: first.readView, kind: 'hook', scope: { project: child } });
         assert.equal(inventory.items[0].id, finding.item.id);
         assert.equal(finding.item.measurementStatus, 'declarationUnavailable');
-        const preview = await client.handoff!({ ...scope, action: 'preview', readView: first.readView });
-        assert.equal(preview.projects[0].cwd, child);
-        assert.deepEqual(preview.projects[0].targets.find(t => t.itemId === finding.item.id)!.sharedProjects, [child]);
         await client.optimize!({ ...scope, action: 'keep', suggestionId: finding.id, decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision });
         await writeFile(native.mode, JSON.stringify({ hooksError: true }));
-        const unavailable = await client.optimize!({ ...scope, action: 'recheck', group: 'history', suggestionId: finding.id });
-        const oldFinding = unavailable.suggestions.find(s => s.id === finding.id)!;
-        assert.equal(oldFinding.status, 'recheckUnavailable');
-        assert.equal(oldFinding.decision?.kind, 'keep');
+        const unavailable = await client.optimize!({ ...scope, action: 'recheck', readView: first.readView, baselineId: finding.baselineId, suggestionId: finding.id });
+        assert.ok(unavailable.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
         await writeFile(path.join(child, 'local.py'), 'MUST_NOT_EXECUTE');
         await writeFile(native.mode, JSON.stringify(good));
-        const repaired = await client.optimize!({ ...scope, action: 'recheck', group: 'history', suggestionId: finding.id });
-        assert.equal(repaired.suggestions.find(s => s.id === finding.id)?.status, 'verified');
+        const repaired = await client.optimize!({ ...scope, action: 'recheck', readView: first.readView, baselineId: finding.baselineId, suggestionId: finding.id });
+        assert.ok(repaired.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
     }
     finally {
         service.kill('SIGTERM');

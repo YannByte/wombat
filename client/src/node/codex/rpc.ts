@@ -1,6 +1,4 @@
-import { Duplex } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
-import WebSocket from 'ws';
 import packageMetadata from '../../../package.json' with { type: 'json' };
 import { CoreError } from '../../errors.js';
 import type { QueryOptions } from '../../client.js';
@@ -13,10 +11,7 @@ type Method =
   | 'config/read'
   | 'account/read'
   | 'account/rateLimits/read'
-  | 'account/usage/read'
-  | 'thread/start'
-  | 'thread/queue/add'
-  | 'thread/read';
+  | 'account/usage/read';
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -25,23 +20,15 @@ type Pending = {
 const MAX_BYTES = 8 * 1024 * 1024;
 
 /** Native JSON-RPC only. No generic RPC method crosses the product boundary. */
-export async function connectCodex(managed: boolean, query: QueryOptions, options: CodexOptions) {
+export async function connectCodex(query: QueryOptions, options: CodexOptions) {
   if (query.signal?.aborted) throw new CoreError('CANCELLED', 'Cancelled');
-  const child = spawnCodex(managed ? ['app-server', 'proxy'] : ['app-server'], options);
+  const child = spawnCodex(['app-server'], options);
   const pending = new Map<number, Pending>();
   const diagnostics = new NativeDiagnostics();
   let terminalError: Error | undefined;
   let sequence = 0,
     bytes = 0,
     closed = false;
-  const socket = managed
-    ? new WebSocket('ws://localhost', {
-        createConnection: () => Duplex.from({ readable: child.stdout, writable: child.stdin }),
-        perMessageDeflate: false,
-        maxPayload: MAX_BYTES,
-        handshakeTimeout: options.codexTimeoutMs ?? 20_000,
-      })
-    : undefined;
   const fail = (error: Error) => {
     if (closed) return;
     closed = true;
@@ -51,7 +38,6 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
       w.reject(error);
     }
     pending.clear();
-    socket?.terminate();
     stopCodex(child);
     cleanup();
   };
@@ -108,14 +94,6 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
   child.on('close', close);
   let text = '';
   const decoder = new StringDecoder('utf8');
-  if (socket) {
-    socket.on('message', (data) => {
-      const raw = data.toString();
-      if (count(raw)) receive(raw);
-    });
-    socket.on('error', streamError);
-    socket.on('close', close);
-  } else
     child.stdout.on('data', (chunk: Buffer) => {
       if (!count(chunk)) return;
       text += decoder.write(chunk);
@@ -131,8 +109,7 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
     const json = JSON.stringify(value);
     if (Buffer.byteLength(json) > MAX_BYTES)
       throw new CoreError('OUTPUT_LIMIT', 'Native request too large');
-    if (socket) socket.send(json);
-    else child.stdin.write(json + '\n');
+    child.stdin.write(json + '\n');
   };
   const request = (method: string, params: unknown) =>
     new Promise<unknown>((resolve, reject) => {
@@ -159,25 +136,6 @@ export async function connectCodex(managed: boolean, query: QueryOptions, option
       abort();
       throw new CoreError('CANCELLED', 'Cancelled');
     }
-    if (socket)
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new CoreError('CODEX_TIMEOUT', 'Codex connection timed out')),
-          options.codexTimeoutMs ?? 20_000,
-        );
-        socket.once('open', () => {
-          clearTimeout(timer);
-          resolve();
-        });
-        socket.once('error', () => {
-          clearTimeout(timer);
-          reject(terminalError ?? diagnostics.error('CODEX_UNAVAILABLE', 'Codex unavailable'));
-        });
-        socket.once('close', () => {
-          clearTimeout(timer);
-          reject(disconnected());
-        });
-      });
     await request('initialize', {
       clientInfo: { name: 'wombat', version: packageMetadata.version },
       capabilities: { experimentalApi: true },

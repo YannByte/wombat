@@ -31,27 +31,17 @@ export function resolveLocale(options: { explicit?: string; environment?: string
   return 'zh';
 }
 export class LocaleRuntime {
-  private snapshot: Readonly<{ locale: Locale; revision: number }>;
-  private listeners = new Set<() => void>();
-  constructor(locale: Locale = 'zh') { this.snapshot = Object.freeze({ locale, revision: 0 }); }
-  getSnapshot = () => this.snapshot;
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
-  };
+  private language: Locale;
+  constructor(locale: Locale = 'zh') { this.language = locale; }
+  getLocale = (): Locale => this.language;
   setLocale(locale: Locale): void {
     if (locale !== 'zh' && locale !== 'en') throw new RangeError(`Unsupported language: ${locale}`);
-    if (locale === this.snapshot.locale) return;
-    this.snapshot = Object.freeze({ locale, revision: this.snapshot.revision + 1 });
-    // Complete notification even if one subscriber fails; report the first failure to the caller.
-    let failure: unknown;
-    for (const listener of [...this.listeners]) { try { listener(); } catch (error) { failure ??= error; } }
-    if (failure !== undefined) throw failure;
+    this.language = locale;
   }
   /** Stable function identity; reads the active locale on every invocation. */
   t: Translate = (key, ...args) => {
     const params = args[0] as Record<string, string | number> | undefined;
-    const language = this.snapshot.locale;
+    const language = this.language;
     const dictionary: Readonly<Record<string, string>> = dictionaries[language];
     // Full-sentence variants keep interpolation literal and unknown counts distinct.
     const variant = typeof params?.count === 'number' ? `${key}.${(plurals[language] ??= new Intl.PluralRules(language === 'zh' ? 'zh-CN' : 'en-US')).select(params.count)}` : key;
@@ -64,7 +54,7 @@ export const locale = new LocaleRuntime();
 export const t = locale.t;
 /** Presentation numbers follow the active language, independent of the host locale. */
 export function numberLabel(value: number | null | undefined, options?: Intl.NumberFormatOptions): string {
-  return value == null ? '—' : new Intl.NumberFormat(locale.getSnapshot().locale === 'zh' ? 'zh-CN' : 'en-US', options).format(value);
+  return value == null ? '—' : new Intl.NumberFormat(locale.getLocale() === 'zh' ? 'zh-CN' : 'en-US', options).format(value);
 }
 export function compactNumberLabel(value: number | null | undefined): string {
   return numberLabel(value, { notation: 'compact', maximumFractionDigits: 2 });
@@ -76,7 +66,7 @@ export function relatedActivityText(turns: number | string, count: number | stri
 /** Format calendar buckets without applying the host time zone to date-only evidence. */
 export function monthLabel(value: string): string {
   if (!/^\d{4}-(0[1-9]|1[0-2])(?:-\d{2})?$/.test(value)) return value;
-  const language = locale.getSnapshot().locale;
+  const language = locale.getLocale();
   const date = new Date(`${value.slice(0, 7)}-01T00:00:00Z`);
   const month = language === 'zh' ? Number(value.slice(5, 7)) : new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' }).format(date);
   return t('date.month', { year: value.slice(0, 4), month });
@@ -89,7 +79,7 @@ export function bytesLabel(value: number | null | undefined): string {
 }
 /** One finding supplies the headline and key metric; all findings remain in the detail. */
 export function reviewPresentation(s: import('../generated/optimize-response.js').Suggestion): {title:string;value:string;metric:number|null|undefined;label:string;metricText?:string} {
-  const finding = ['skillFormat','hookTarget','localReference','descriptionStandard','declaredCopyDrift','exactInstructionBlocks','descriptionSize','bodyTokens','fileSize','missingInstruction','skillInactivity','mcpInactivity']
+  const finding = ['skillFormat','hookTarget','localReference','descriptionStandard','declaredCopyDrift','exactInstructionBlocks','descriptionSize','bodyTokens','fileSize','missingInstruction']
     .map(rule => s.findings.find(f => f.rule === rule)).find(Boolean);
   const name = s.item.name;
   switch (finding?.rule) {
@@ -99,7 +89,6 @@ export function reviewPresentation(s: import('../generated/optimize-response.js'
     case 'localReference':return {title:t('optimize.referenceTitle',{name}),value:t('optimize.referenceValue'),metric:finding.observed,label:t('optimize.referenceCount'),metricText:finding.observed==null?undefined:t('optimize.referenceCountFull',{count:finding.observed})};
     case 'bodyTokens': return {title:t('optimize.bodyTitle',{name}),value:t('optimize.bodyValue'),metric:finding.observed,label:t('config.bodyTokens')};
     case 'declaredCopyDrift': {const count=s.findings.filter(f=>f.rule==='declaredCopyDrift').length;return {title:t('optimize.copyTitle',{name}),value:t('optimize.copyValue'),metric:count,label:t('optimize.copyDrift'),metricText:t('optimize.copyCountFull',{count})};}
-    case 'skillInactivity':case 'mcpInactivity':return {title:t('optimize.idleTitle',{name}),value:t('optimize.idleValue'),metric:finding.observed,label:t('optimize.organize'),metricText:finding.observed==null?undefined:t('optimize.idleDays',{count:finding.observed})};
     case 'exactInstructionBlocks': return {title:t('optimize.blocksTitle',{name}),value:t('optimize.blocksValue'),metric:finding.observed,label:t('optimize.blockPositions')};
     case 'hookTarget': return {title:t('optimize.hookTargetTitle',{name}),value:t('optimize.hookTargetValue'),metric:undefined,label:t('optimize.repair')};
     case 'fileSize': return {title:t('optimize.fileTitle',{name}),value:t('optimize.fileValue'),metric:finding.observed,label:t('config.size')+' · B'};
@@ -107,14 +96,12 @@ export function reviewPresentation(s: import('../generated/optimize-response.js'
   }
 }
 export function reviewFindingLabel(rule:string):string {
-  const messages = labels({localReference:'optimize.localReference',instructionSelection:'optimize.instructionSelection',skillDependency:'optimize.skillDependency',hookTarget:'optimize.hookTarget',runtimeDuplicateInjection:'optimize.runtimeDuplicateInjection',skillInactivity:'optimize.skillInactivity',mcpInactivity:'optimize.mcpInactivity',mcpFault:'optimize.mcpFault'});
+  const messages = labels({localReference:'optimize.localReference',hookTarget:'optimize.hookTarget'});
   if(Object.hasOwn(messages,rule))return messages[rule as keyof typeof messages];
   if(rule==='missingInstruction')return t('optimize.missingInstruction');
   switch(rule){case 'exactInstructionBlocks':return t('optimize.exactBlocks');case 'declaredCopyDrift':return t('optimize.copyDrift');case 'fileSize':return t('optimize.fileSize');case 'descriptionSize':return t('optimize.descriptionSize');case 'descriptionStandard':return t('optimize.descriptionStandard');case 'bodyTokens':return t('config.bodyTokens');case 'skillFormat':return t('optimize.skillFormat');default:return t('optimize.genericRule');}
 }
 export function reviewFindingNote(rule:string,project?:string):string {
-  if(rule==='skillInactivity')return t('optimize.idleSkillNote');
-  if(rule==='mcpInactivity')return project?t('optimize.idleMcpNote',{project}):t('optimize.idleMcpScope');
   if(rule==='hookTarget')return t('optimize.hookTargetNote');
   if(rule==='localReference')return t('optimize.referenceValue');
   if(rule==='missingInstruction')return t('optimize.missingValue');
@@ -130,7 +117,7 @@ export function reviewFindingCount(f: import('../generated/optimize-response.js'
 type PlainMessageKey = { [K in MessageKey]: Slots<(typeof zh)[K]> extends never ? K : never }[MessageKey];
 export function labels<K extends string>(keys: Record<K, PlainMessageKey>): Record<K, string> {
   return Object.defineProperties({}, Object.fromEntries(Object.entries(keys).map(([name, key]) => [name, {
-    enumerable: true, get: () => dictionaries[locale.getSnapshot().locale][key as MessageKey],
+    enumerable: true, get: () => dictionaries[locale.getLocale()][key as MessageKey],
   }]))) as Record<K, string>;
 }
 
@@ -152,16 +139,7 @@ export function automaticPriceText(result: import('../generated/usage-app.js').R
 export function eventStatusLabel(status: string): string {
   switch(status){case 'completed':case 'succeeded':return t('event.completed');case 'observed':return t('config.skillUsed');case 'failed':return t('event.failed');case 'cancelled':case 'canceled':return t('event.cancelled');case 'running':return t('common.running');case 'interrupted':return t('common.interrupted');case 'unknown':return t('webui.unknown');default:return status;}
 }
-export function followUpText(observation: import('../client.js').OptimizeResult['followUps'][number]): string {
-  if(observation.status!=='read_content_matched'&&observation.status!=='loaded_content_matched'&&observation.useBasis?.status==='partial'&&observation.observedRecords!=null)return t('optimize.followUp.partialRecords',{count:observation.observedRecords});
-  switch(observation.status){
-    case 'no_observed_records':return t('optimize.followUp.noRecords');
-    case 'loaded_content_matched':return t('optimize.followUp.loadedContentMatched',{count:observation.matchingLoadRecords??0});
-    case 'read_content_matched':return t('optimize.followUp.readContentMatched',{count:observation.matchingReadRecords??0});
-    case 'version_unknown':return observation.observedRecords!=null&&observation.observedRecords>0?t('optimize.followUp.versionUnknown',{count:observation.observedRecords}):t('optimize.followUp.unavailable');
-    case 'unavailable':return t('optimize.followUp.unavailable');
-  }
-}
+
 export function operationTypeLabel(kind: string): string {
   switch(kind){case 'instructionLoad':return t('event.instructionLoad');case 'skillCatalog':return t('event.skillCatalog');case 'skillAvailable':return t('event.skillAvailable');case 'skillUse':return t('event.skillUse');case 'skillRead':return t('event.skillRead');case 'mcp':case 'mcpTool':return t('event.mcp');case 'mcpResource':return t('event.mcpResource');case 'mcpDiscovery':return t('event.mcpDiscovery');case 'mcpUnclassified':return t('event.mcpUnclassified');case 'mcpConflict':return t('event.mcpConflict');case 'tool':return t('event.tool');default:return kind;}
 }
@@ -202,17 +180,6 @@ export function assessmentReason(code: string): string {
 export { timingBasisText, timingMissingValueText, timingSourceStatusText } from './timing-basis.js';
 export { pricingIssueText } from './pricing.js';
 
-/** Display the recorded review state without deriving it from decisions or measurements. */
-export function reviewStatusLabel(status: string): string {
-  switch (status) {
-    case 'pending': return t('optimize.pending');
-    case 'verified': return t('optimize.verified');
-    case 'stillNeedsReview': return t('optimize.stillNeedsReview');
-    case 'recheckUnavailable': return t('optimize.recheckUnavailable');
-    default: return t('optimize.statusUnavailable');
-  }
-}
-
 export { timingCategories, timingCategoryText, timingIntersectionText } from './timing-categories.js';
 
 export { tokenSummaryPresentation, tokenSummaryText, analyzedTokenSubtotal, type SummaryTokenField } from './token-summary.js';
@@ -250,7 +217,7 @@ export function activityCheckText(check:ActivityCheck):string {
   }
   if(check.rule==='inspect_failure_share'&&check.outcomes&&check.failurePolicy){
     const policy=check.failurePolicy;
-    return [operationOutcomeText(check.outcomes).headline,t('activity.failureSharePolicy',{minimum:policy.minimumDeterminate,failures:policy.minimumFailures,ratio:new Intl.NumberFormat(locale.getSnapshot().locale,{style:'percent',maximumFractionDigits:1}).format(policy.minimumRatio)}),
+    return [operationOutcomeText(check.outcomes).headline,t('activity.failureSharePolicy',{minimum:policy.minimumDeterminate,failures:policy.minimumFailures,ratio:new Intl.NumberFormat(locale.getLocale(),{style:'percent',maximumFractionDigits:1}).format(policy.minimumRatio)}),
       check.reason==='activitySampleTooSmall'?t('activity.sampleSmall'):check.reason==='activityMeasureUnavailable'?timingMissingValueText(check.observed.basis):check.outcome==='miss'?t('activity.belowThreshold'):'',check.partial?t('execution.outcomes.partial'):''].filter(Boolean).join(' ');
   }
   if(check.outcome==='hit'&&check.observed.value!=null)return t('activity.observed',{count:check.observed.value})+(check.partial?` · ${t('activity.partial')}`:'');

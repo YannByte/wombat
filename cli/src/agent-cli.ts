@@ -17,7 +17,6 @@ import {
   optimizeExitCode,
   accountExitCode,
   directoriesExitCode,
-  handoffExitCode,
   setupExitCode,
   collectionExitCode,
 } from "./exit-codes.js";
@@ -188,11 +187,6 @@ async function call(
       const r = await (client.collection?.(request.params, options) ??
         unavailable());
       return { result: r, exitCode: collectionExitCode(r) };
-    }
-    case "handoff": {
-      const r = await (client.handoff?.(request.params, options) ??
-        unavailable());
-      return { result: r, exitCode: handoffExitCode(r) };
     }
     case "prices":
       return {

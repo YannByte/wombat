@@ -37,19 +37,9 @@ try {
  assert.ok(base.runtimeChecks);
  assert.equal(base.discovery.status,'available');assert.equal(base.discovery.instances[0]?.name,'wombat:wombat');assert.equal(base.runtimeChecks[0]?.status,'compatible');
  report.installer={stage:'verified',plugin:'wombat',runtimeStatus:base.runtimeChecks[0].status};
- await run('remove-base',['plugin','remove','wombat@wombat-local']);
- await run('install',['plugin','add','wombat-collection@wombat-local','--json']);
- const setup=await client.setup!({project,roots:[home]},{signal:AbortSignal.timeout(10000)});
- assert.equal(setup.discovery.status,'available');assert.equal(setup.discovery.instances.length,1);assert.equal(setup.discovery.instances[0].name,'wombat-collection:wombat');
- assert.ok(setup.hooks);assert.equal(setup.hooks.status,'observed');
- const registrations=setup.hooks.contexts.flatMap(c=>c.registrations).filter(r=>r.pluginId==='wombat-collection@wombat-local');
- assert.equal(registrations.length,10);assert.ok(registrations.every(r=>r.enabled));
- assert.ok(registrations.every(r=>r.trust==='untrusted'),'Fresh collection Hooks must await native human trust');
- assert.equal((await client.collection!({roots:[home]})).received,0);
- report.discovery={status:setup.discovery.status,invocation:'$'+setup.discovery.instances[0].name};report.hooks={status:setup.hooks.status,registrations:registrations.length,trust:'untrusted',received:0};
- await run('remove',['plugin','remove','wombat-collection@wombat-local']);
+ assert.equal(base.hooks,null);report.discovery={status:base.discovery.status,invocation:'$wombat:wombat'};
+ await run('remove',['plugin','remove','wombat@wombat-local']);
  const removed=await client.setup!({project,roots:[home]},{signal:AbortSignal.timeout(10000)});assert.equal(removed.discovery.status,'missing');
- assert.equal((await client.collection!({roots:[home]})).received,0);
  report.removal={discovery:'missing',productDataPreserved:true};checkBuild(root);report.status='passed';
 } catch(error) {report.status='failed';report.failure=error instanceof Error?error.message:String(error);process.exitCode=1;}
 finally {if(service&&service.exitCode===null&&service.signalCode===null&&!await terminateTree(service)){report.status='failed';report.failure='Native qualification service cleanup failed';process.exitCode=1;}

@@ -31,7 +31,7 @@ Use these rules to write and review pages, dialogs, forms, notices, CLI help, an
 
 ## Module boundaries
 
-- `@wombat/client/locale` is a separate public entry written in portable TypeScript, with no Node, React, or Rust dependency. It provides `LocaleRuntime`, `resolveLocale`, typed `t`, immutable state, and subscriptions; each CLI process uses its own presentation instance.
+- `@wombat/client/locale` is a separate public entry written in portable TypeScript, with no Node, React, or Rust dependency. It provides `LocaleRuntime`, `resolveLocale`, typed `t`, locale reads and changes; each CLI process uses its own presentation instance.
 - `client/src/locale/zh.ts` and `en.ts` contain complete messages with feature-prefixed keys; the Chinese key set constrains the English keys. Parameter names are derived from Chinese templates, and a separate check verifies bilingual parameter parity. Values are inserted verbatim without recursive parsing or translation.
 - The CLI interprets language arguments and environment variables. Module-level labels resolve lazily to avoid capturing an old language at startup. UI operations use stable identifiers and must not infer business actions from translated text.
 - Language affects help, notices, labels, dates, and compact number display. JSON fields, error codes, model identifiers, source titles, user content, usage, and amounts are not translated. Known core and host progress signals are mapped at the presentation layer; unknown core diagnostics and source issues remain verbatim.

@@ -121,9 +121,10 @@ fn metadata_size_is_independent_of_content_read_failures_and_runtime_support() {
         check(&v, &rules, "localReference").outcome,
         RuleOutcome::Insufficient
     );
-    assert_eq!(
-        check(&v, &rules, "instructionSelection").outcome,
-        RuleOutcome::Unsupported
+    assert!(
+        !evaluation::evaluate(&Input::initial(&v, &v.items[0], &rules, None))
+            .iter()
+            .any(|c| c.rule == "instructionSelection")
     );
     for bytes in [Some(0), Some(16_384), Some(16_385), None] {
         v.items[0].bytes = bytes;
@@ -149,42 +150,6 @@ fn metadata_size_is_independent_of_content_read_failures_and_runtime_support() {
     assert_eq!(
         check(&v, &rules, "fileSize").outcome,
         RuleOutcome::Insufficient
-    );
-}
-#[test]
-fn unsupported_rules_ignore_unrelated_static_findings_instead_of_passing_or_hitting() {
-    let rules = RuleParameters::default();
-    let mut v = clean_skill();
-    v.analysis
-        .findings
-        .insert("object".into(), vec![static_finding("skillInactivity")]);
-    for rule in [
-        "skillInactivity",
-        "skillDependency",
-        "runtimeDuplicateInjection",
-        "declaredCopyDrift",
-    ] {
-        assert_eq!(check(&v, &rules, rule).outcome, RuleOutcome::Unsupported);
-    }
-    assert!(detect(&v, &rules).is_empty());
-    v.items[0].kind = Kind::Mcp;
-    assert_eq!(
-        check(&v, &rules, "mcpInactivity").outcome,
-        RuleOutcome::Unsupported
-    );
-    assert_eq!(
-        check(&v, &rules, "mcpFault").outcome,
-        RuleOutcome::Unsupported
-    );
-    v.items[0].kind = Kind::Rule;
-    assert_eq!(
-        check(&v, &rules, "instructionSelection").outcome,
-        RuleOutcome::Unsupported
-    );
-    v.items[0].kind = Kind::Hook;
-    assert_eq!(
-        check(&v, &rules, "hookTarget").outcome,
-        RuleOutcome::Unsupported
     );
 }
 #[test]
@@ -490,50 +455,5 @@ fn checks_entry_exposes_the_same_facts_as_suggestions_without_requiring_a_sugges
             .iter()
             .any(|c| c.rule == "skillFormat" && c.outcome == RuleOutcome::Miss)
     );
-    assert!(
-        checks
-            .checks
-            .iter()
-            .any(|c| c.rule == "skillInactivity" && c.outcome == RuleOutcome::Unsupported)
-    );
-}
-#[test]
-fn recheck_cannot_resolve_an_original_rule_that_no_longer_applies_to_the_current_object() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("reviews.sqlite3");
-    let mut v = view();
-    v.items[0]
-        .skill_metadata
-        .as_mut()
-        .unwrap()
-        .description_characters = Some(100);
-    v.analysis
-        .findings
-        .insert("object".into(), vec![static_finding("localReference")]);
-    let id = query(&path, &v, Request::default()).suggestions[0]
-        .id
-        .clone();
-    v.items[0].kind = Kind::Rule;
-    v.items[0].bytes = Some(1);
-    v.items[0].skill_metadata = None;
-    v.analysis.findings.clear();
-    v.analysis
-        .reference_checks
-        .entry("object".into())
-        .or_default()
-        .complete = true;
-    let result = query(
-        &path,
-        &v,
-        Request {
-            action: Action::Recheck,
-            suggestion_id: Some(id),
-            group: Group::History,
-            ..Default::default()
-        },
-    );
-    let rechecked = &result.suggestions[0];
-    assert_eq!(rechecked.checks.len(), 1);
-    assert_eq!(rechecked.checks[0].outcome, RuleOutcome::Miss);
-    assert_eq!(rechecked.status, "recheckUnavailable");
+    assert!(!checks.checks.iter().any(|c| c.rule == "skillInactivity"));
 }

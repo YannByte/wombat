@@ -16,10 +16,10 @@ export function skillNames(root:string):string[] {
   return result;
 }
 
-/** JSON-form YAML keeps standalone and plugin presentation on one native JSON reader. */
+/** JSON-form YAML keeps plugin presentation on one native JSON reader. */
 export function skillPresentation(file:string,reference:string) {
   const name=reference.slice(reference.lastIndexOf(':')+1);
-  if(!/^\$(?:wombat|wombat-collection):wombat$/.test(reference))throw new Error('Invalid plugin Skill invocation');
+  if(!/^\$wombat:wombat$/.test(reference))throw new Error('Invalid plugin Skill invocation');
   const invocation=new RegExp('\\$'+name+'(?![\\w:-])','g');
   const source:unknown=JSON.parse(readFileSync(file,'utf8'));
   const object=(value:unknown):value is Record<string,unknown>=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -35,14 +35,12 @@ export function buildSkill(root:string, output=path.join(root,'dist','skill')) {
   const names=skillNames(root);
   const skills=names.map(name=>({name,contentHash:hash(JSON.stringify(inventory(path.join(root,'plugin/skills',name))))}));
   const pluginSkillContentHash=hash(JSON.stringify(skills));
-  const files=inventory(path.join(root,'plugin/skills/wombat'));
-  if(!files.some(f=>f.path==='SKILL.md'))throw new Error('Missing Wombat Skill entry');
+  if(!inventory(path.join(root,'plugin/skills/wombat')).some(f=>f.path==='SKILL.md'))throw new Error('Missing Wombat Skill entry');
   mkdirSync(path.dirname(output),{recursive:true});
   const stage=mkdtempSync(path.join(path.dirname(output),'.skill-build-'));
   try{
-    cpSync(path.join(root,'plugin/skills/wombat'),path.join(stage,'wombat'),{recursive:true});
     const source=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',timeout:5000,maxBuffer:4096}).trim();
-    writeFileSync(path.join(stage,'manifest.json'),JSON.stringify({format:1,name:'wombat',version,source,requiredCapabilities:metadata.requiredCapabilities,files,contentHash:hash(JSON.stringify(files)),pluginSkills:skills,pluginSkillContentHash},null,2)+'\n');
+    writeFileSync(path.join(stage,'manifest.json'),JSON.stringify({format:1,name:'wombat',version,source,requiredCapabilities:metadata.requiredCapabilities,pluginSkills:skills,pluginSkillContentHash},null,2)+'\n');
     const plugin=path.join(stage,'plugin');mkdirSync(path.join(plugin,'.codex-plugin'),{recursive:true});
     for(const name of names)cpSync(path.join(root,'plugin/skills',name),path.join(plugin,'skills',name),{recursive:true});
     cpSync(path.join(root,'LICENSE'),path.join(plugin,'LICENSE'));
@@ -55,18 +53,8 @@ export function buildSkill(root:string, output=path.join(root,'dist','skill')) {
     const presentation=presentationFor('wombat');
     writeFileSync(path.join(plugin,'plugin.json'),JSON.stringify({$schema:'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',...identity,extensions:{'com.openai':{interface:presentation}}},null,2)+'\n');
     writeFileSync(path.join(plugin,'.codex-plugin/plugin.json'),JSON.stringify({...identity,skills:'./skills/',interface:presentation},null,2)+'\n');
-    const collection=path.join(stage,'collection-plugin');
-    cpSync(plugin,collection,{recursive:true});
-    for(const directory of ['hooks','scripts'])cpSync(path.join(root,'plugin',directory),path.join(collection,directory),{recursive:true});
-    const collectionIdentity={...identity,name:'wombat-collection'};
-    const collectionPresentation=presentationFor('wombat-collection');
-    const collectionInterface={...collectionPresentation,displayName:collectionPresentation.displayName+' collection'};
-    // Codex 0.160.1 skips lifecycle Hooks when a root manifest is present.
-    // Keep this local-only package on its native compatibility manifest.
-    rmSync(path.join(collection,'plugin.json'));
-    writeFileSync(path.join(collection,'.codex-plugin/plugin.json'),JSON.stringify({...collectionIdentity,skills:'./skills/',hooks:'./hooks/hooks.json',interface:collectionInterface},null,2)+'\n');
     mkdirSync(path.join(stage,'.agents/plugins'),{recursive:true});
-    writeFileSync(path.join(stage,'.agents/plugins/marketplace.json'),JSON.stringify({name:'wombat-local',interface:{displayName:'Wombat Local'},plugins:[{name:'wombat',source:{source:'local',path:'./plugin'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'}},{name:'wombat-collection',source:{source:'local',path:'./collection-plugin'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'}}]},null,2)+'\n');
+    writeFileSync(path.join(stage,'.agents/plugins/marketplace.json'),JSON.stringify({name:'wombat-local',interface:{displayName:'Wombat Local'},plugins:[{name:'wombat',source:{source:'local',path:'./plugin'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'}}]},null,2)+'\n');
     rmSync(output,{recursive:true,force:true});renameSync(stage,output);
   }finally{rmSync(stage,{recursive:true,force:true});}
 }

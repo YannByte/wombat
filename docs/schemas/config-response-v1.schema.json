@@ -417,28 +417,6 @@
             "until",
             "timezone"
           ]
-        },
-        {
-          "description": "Exclusive source-operation time after, inclusive captured observer time through.",
-          "type": "object",
-          "properties": {
-            "after": {
-              "type": "string"
-            },
-            "through": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string",
-              "const": "follow_up"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "after",
-            "through"
-          ]
         }
       ]
     },

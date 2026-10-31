@@ -42,14 +42,8 @@ import type { Response as AccountResult } from './generated/account-response.js'
 export type { Request as AccountRequest } from './generated/account-request.js';
 export type { Response as AccountResult } from './generated/account-response.js';
 export type AccountTransport = (request: AccountRequest, options: QueryOptions) => Promise<unknown>;
-import type { Request as HandoffRequest } from './generated/handoff-request.js';
-import type { Response as HandoffResult } from './generated/handoff-response.js';
-export type { Request as HandoffRequest } from './generated/handoff-request.js';
-export type { Response as HandoffResult } from './generated/handoff-response.js';
-export type HandoffTransport = (request: HandoffRequest, options: QueryOptions) => Promise<unknown>;
 export interface HostTransports {
   account?: AccountTransport;
-  handoff?: HandoffTransport;
 }
 export type { Request as LiveRequest } from './generated/live-request.js';
 export type { Response as LiveResult } from './generated/live-response.js';
@@ -119,7 +113,6 @@ export interface UsageClient {
   setup?(request: SetupRequest, options?: QueryOptions): Promise<SetupResult>;
   collection?(request: CollectionRequest, options?: QueryOptions): Promise<CollectionResult>;
   timing?(request: TimingRequest, options?: QueryOptions): Promise<TimingResult>;
-  handoff?(request: HandoffRequest, options?: QueryOptions): Promise<HandoffResult>;
   account?(request: AccountRequest, options?: QueryOptions): Promise<AccountResult>;
   directories?(request: DirectoriesRequest, options?: QueryOptions): Promise<DirectoriesResult>;
   preferences?(request: PreferencesRequest, options?: QueryOptions): Promise<PreferencesResult>;
@@ -280,30 +273,6 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
           },
         }
       : {}),
-    ...(hosts.handoff
-      ? {
-          async handoff(
-            request: HandoffRequest,
-            options: QueryOptions = {},
-          ): Promise<HandoffResult> {
-            const [{ validate: input }, { validate: output }] = await Promise.all([
-              import('./generated/validate-handoff-request.js'),
-              import('./generated/validate-handoff-response.js'),
-            ]);
-            throwIfCancelled(options);
-            if (!input(request)) throw new CoreError('INVALID_ARGUMENT', 'Invalid handoff request');
-            const result = await hosts.handoff!(request, options);
-            if (request.action !== 'send') throwIfCancelled(options);
-            if (
-              !output(result) ||
-              result.outputVersion !== 1 ||
-              result.action !== (request.action ?? 'preview')
-            )
-              throw new CoreError('PROTOCOL_ERROR', 'Invalid handoff response');
-            return result;
-          },
-        }
-      : {}),
     ...(hosts.account
       ? {
           async account(
@@ -404,7 +373,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
             throwIfCancelled(options);
             if (
               !validateOptimizeResult(result) ||
-              result.outputVersion !== 4 ||
+              result.outputVersion !== 5 ||
               result.action !== (request.action ?? 'list') ||
               !matchesActivity(request, result)
             )
@@ -733,6 +702,7 @@ function validActivityRequest(request: OptimizeRequest): boolean {
     request.activity != null &&
     [
       request.readView,
+      request.baselineId,
       request.projectRoots,
       request.project,
       request.decisionRevision,
@@ -743,8 +713,7 @@ function validActivityRequest(request: OptimizeRequest): boolean {
       request.offset,
       request.limit,
       request.ruleOverrides,
-    ].every((value) => value == null) &&
-    (request.group == null || request.group === 'pending')
+    ].every((value) => value == null)
   );
 }
 /** Validate Rust's published subset relationships; do not choose or reconstruct a denominator. */
@@ -876,8 +845,7 @@ function matchesActivity(request: OptimizeRequest, result: OptimizeResult): bool
     result.usageRevision !== selected.snapshotId ||
     result.readView != null ||
     result.suggestions.length ||
-    result.checks.length ||
-    result.followUps.length
+    result.checks.length
   )
     return false;
   const definitions = [

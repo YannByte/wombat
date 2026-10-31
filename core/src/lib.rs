@@ -27,8 +27,6 @@ pub mod conversation_source;
 pub mod directories;
 pub mod dto;
 mod file_metadata;
-mod handoff;
-pub mod handoff_dto;
 pub mod host_environment;
 pub mod live;
 mod live_index;
@@ -207,25 +205,10 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
                 .into_generator()
                 .into_root_schema_for::<timing_dto::ShareResponse>(),
         )?),
-        "schema_skill_installation" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<skill_dto::Installation>(),
-        )?),
         "schema_skill_discovery" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<skill_dto::Discovery>(),
-        )?),
-        "schema_handoff_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<handoff_dto::Request>(),
-        )?),
-        "schema_handoff_response" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<handoff_dto::Response>(),
         )?),
         "native_hook_context" => Ok(serde_json::to_value(config::hooks::context(
             serde_json::from_value(args.clone())?,
@@ -234,9 +217,6 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
             serde_json::from_value(args.clone())?,
         )?)?),
         "account_history" => Ok(serde_json::to_value(account::history::read(
-            serde_json::from_value(args.clone())?,
-        )?)?),
-        "native_allowance_gate" => Ok(serde_json::to_value(account::gate::evaluate(
             serde_json::from_value(args.clone())?,
         )?)?),
         "schema_account_request" => Ok(serde_json::to_value(

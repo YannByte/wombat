@@ -53,7 +53,6 @@ export function parseConfigArgs(argv: string[]): { request: ConfigRequest; json:
 }
 
 export async function runConfigCli(argv: string[]): Promise<number> {
-  if (argv[0] === 'handoff') return (await import('./handoff-cli.js')).runHandoffCli(argv.slice(1));
   if (argv[0] !== 'inventory') return (await import('./optimize-cli.js')).runOptimizeCli(argv);
   const { request, json, help } = parseConfigArgs(argv.slice(1));
   if (help) { process.stdout.write(t('cli.config.help')); return 0; }

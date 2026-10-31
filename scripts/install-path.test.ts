@@ -75,7 +75,7 @@ test('plugin-only reuses a managed custom-prefix runtime without downloading or 
   mkdirSync(path.join(destination,'lib/skill/plugin'),{recursive:true});
   writeFileSync(path.join(installRoot,'.managed-by-wombat'),'managed GitHub installation');writeFileSync(path.join(installRoot,'current.txt'),id+'\n');
   writeFileSync(path.join(destination,'release.json'),JSON.stringify({format:1,version:'1.2.3',source:'a'.repeat(40),sourceSha256:'b'.repeat(64)}));
-  writeFileSync(path.join(destination,'lib/skill/.agents/plugins/marketplace.json'),JSON.stringify({name:'wombat-local',plugins:['wombat','wombat-collection'].map(name=>({name,source:{source:'local',path:name==='wombat'?'./plugin':'./collection-plugin'}}))}));
+  writeFileSync(path.join(destination,'lib/skill/.agents/plugins/marketplace.json'),JSON.stringify({name:'wombat-local',plugins:['wombat'].map(name=>({name,source:{source:'local',path:'./plugin'}}))}));
   writeFileSync(path.join(destination,'lib/skill/plugin/wombat-runtime.json'),JSON.stringify({format:1,version:'1.2.3',skillContentHash:'a'.repeat(64)}));
   const installed=path.join(root,'installed'),native=path.join(root,'codex.mjs');
   writeFileSync(native,`const a=process.argv.slice(2);console.log(JSON.stringify(a[1]==='list'?{installed:[]}:a[2]==='list'?{marketplaces:[]}:{pluginId:a[2],installedPath:process.env.INSTALLED}));`);

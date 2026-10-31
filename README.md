@@ -51,7 +51,7 @@ Use the same `$wombat:wombat` entry for every task:
 
 Simple usage, cost and timing questions use the same entry. Reviews start read-only. After an authorized change, recheck the original issue. A static check, later adoption and improved outcomes are separate results. A report request does not schedule future reports.
 
-Answers follow your language. See the [plugin guide](docs/guides/plugin.en.md) for collection or standalone invocation, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
+Answers follow your language. See the [plugin guide](docs/guides/plugin.en.md) for invocation and optional observations, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
 
 ## First preparation and results
 

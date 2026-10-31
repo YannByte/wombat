@@ -4,6 +4,8 @@
 
 Status: proposed
 
+The current simplification supersedes task sending, alternate installation modes, automatic review history and adoption tracking described here. Other evidence constraints and unfinished items remain. See [read-only checks and one plugin](../../implemented/architecture/2026-10-31-on-demand-checks.en.md).
+
 ## Problem
 
 Static configuration facts and focused UI tests do not establish a complete optimization lifecycle. Runtime events, continuous coverage, reliable historical versions, and complete platform journeys remain incomplete. Unknowns are not absence of problems, and related usage or text reduction is not savings. This proposal owns remaining requirements from the former five-entry specification and status ledger. Consolidation neither reduces agreed scope nor restarts product implementation.

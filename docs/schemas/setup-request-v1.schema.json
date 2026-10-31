@@ -17,6 +17,10 @@
       "items": {
         "type": "string"
       }
+    },
+    "includeHooks": {
+      "type": "boolean",
+      "default": false
     }
   },
   "additionalProperties": false

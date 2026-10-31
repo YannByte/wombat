@@ -112,7 +112,6 @@
   ],
   "definitions": {
     "AllowanceHistory": {
-      "description": "Stored native observations, independent of the local usage ledger.",
       "type": "object",
       "properties": {
         "methodVersion": {

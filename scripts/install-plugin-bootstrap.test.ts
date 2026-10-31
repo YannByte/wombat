@@ -12,16 +12,16 @@ function fixture(t: {after: (fn: () => void) => void}, scenario = 'fresh') {
   t.after(() => rmSync(root, {recursive: true, force: true}));
   const marketplace = path.join(root, '插件 & catalog'), binary = path.join(root, 'native.mjs'), trace = path.join(root, 'calls.jsonl');
   mkdirSync(path.join(marketplace, '.agents/plugins'), {recursive: true});
-  writeFileSync(path.join(marketplace, '.agents/plugins/marketplace.json'), JSON.stringify({name: 'wombat-local', plugins: ['wombat', 'wombat-collection'].map(name => ({name, source: {source: 'local', path: name === 'wombat' ? './plugin' : './collection-plugin'}}))}));
+  writeFileSync(path.join(marketplace, '.agents/plugins/marketplace.json'), JSON.stringify({name: 'wombat-local', plugins: ['wombat'].map(name => ({name, source: {source: 'local', path: './plugin'}}))}));
   const contentHash='a'.repeat(64);
-  for(const name of ['plugin','collection-plugin']){
+  for(const name of ['plugin']){
     mkdirSync(path.join(marketplace,name),{recursive:true});
     writeFileSync(path.join(marketplace,name,'wombat-runtime.json'),JSON.stringify({format:1,version:'1.2.3',skillContentHash:contentHash}));
   }
   writeFileSync(path.join(marketplace,'../wombat.js'),`
 import {writeFileSync} from 'node:fs';
 writeFileSync(process.env.TRACE+'.verify',JSON.stringify({args:process.argv.slice(2),binary:process.env.WOMBAT_CODEX_BIN}));
-const scenario=process.env.SCENARIO,name=scenario==='collection'||scenario.startsWith('upgrade')?'wombat-collection':'wombat',p=process.env.INSTALLED+'/skills/wombat/SKILL.md';
+const scenario=process.env.SCENARIO,name='wombat',p=process.env.INSTALLED+'/skills/wombat/SKILL.md';
 const status={'verify-missing':'missing','verify-disabled':'disabled','verify-ambiguous':'ambiguous','verify-denied':'unavailable','verify-disconnected':'unavailable','verify-parse':'unavailable'}[scenario]||'available';
 const errorCode={'verify-denied':'LOCAL_ACCESS_DENIED','verify-disconnected':'CODEX_DISCONNECTED','verify-parse':'SKILL_PARSE_ERROR'}[scenario]||null;
 const check={path:p,status:scenario==='verify-incompatible'?'incompatible':'compatible',pluginVersion:scenario==='verify-version'?'0.1.0':'1.2.3',skillContentHash:scenario==='verify-hash'?'b'.repeat(64):'a'.repeat(64)};
@@ -32,7 +32,7 @@ if(scenario==='timeout')setInterval(()=>{},1000);
 else if(scenario==='failure')process.exit(9);
 else if(scenario==='large')console.log('x'.repeat(1100000));
 else if(scenario==='invalid')console.log('{}');
-else if(args[1]==='list')console.log(JSON.stringify({installed:scenario==='collection'||scenario.startsWith('upgrade')?[{enabled:true,pluginId:'wombat-collection@wombat-local'}]:scenario==='conflict'?['wombat','wombat-collection'].map(name=>({enabled:true,pluginId:name+'@wombat-local'})):[]}));
+else if(args[1]==='list')console.log(JSON.stringify({installed:scenario==='conflict'?['wombat','wombat'].map(name=>({enabled:true,pluginId:name+'@wombat-local'})):[]}));
 else if(args[1]==='marketplace'&&args[2]==='list')console.log(JSON.stringify({marketplaces:scenario.startsWith('upgrade')?[{name:'wombat-local',marketplaceSource:{sourceType:'local',source:process.env.OLD_SOURCE}}]:scenario==='foreign'?[{name:'wombat-local',marketplaceSource:{sourceType:'remote',source:'https://example.test'}}]:[]}));
 else if(scenario==='upgrade-failure'&&args[1]==='add')process.exit(9);
 else if(args[1]==='add')console.log(JSON.stringify({pluginId:args[2],installedPath:process.env.INSTALLED}));
@@ -83,9 +83,9 @@ test('installer notices reject missing files, directories and unreviewed license
   assert.throws(() => installerDependencyNotice(root), /Review installer dependency license/);
 });
 
-for (const scenario of ['fresh', 'collection', 'upgrade', 'slow-hooks']) test('plugin installer uses native management: ' + scenario, async t => {
+for (const scenario of ['fresh', 'upgrade', 'slow-hooks']) test('plugin installer uses native management: ' + scenario, async t => {
   const f = fixture(t, scenario);
-  const name = scenario === 'collection' || scenario === 'upgrade' ? 'wombat-collection' : 'wombat';
+  const name = 'wombat';
   assert.equal(await installBundledPlugin(f.marketplace, f), name);
   const trace = calls(f.trace);
   assert.deepEqual(trace[0], ['plugin', 'list', '--marketplace', 'wombat-local', '--json']);

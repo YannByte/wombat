@@ -10,9 +10,8 @@ export function useBasisCount(count: number | null | undefined, basis: Item['use
 export function useBasisPresentation(basis: Item['useBasis']) {
   if (!basis) return { summary: t('useBasis.unavailable'), notes: [], details: [] as string[] };
   const window = basis.scope.window;
-  const range = window.kind === 'all_history' ? t('useBasis.allHistory') : window.kind === 'date_window'
-    ? t('useBasis.dateWindow', { since: window.since, until: window.until, timezone: window.timezone })
-    : t('useBasis.followUpWindow', { after: window.after, through: window.through });
+  const range = window.kind === 'all_history' ? t('useBasis.allHistory')
+    : t('useBasis.dateWindow', { since: window.since, until: window.until, timezone: window.timezone });
   const coverage = basis.coverage;
   const gap = (value: number | null | undefined) => value == null ? t('useBasis.gapUnknown') : numberLabel(value);
   return {

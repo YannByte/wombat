@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 /** The shipped surface has one owner; removed hosts must not silently re-enter assembly. */
 export function deliveryErrors(root: string): string[] {
   const errors: string[] = [];
-  for (const removed of ['ui', 'web', 'client/src/http', 'cli/src/web-cli.ts']) {
+  for (const removed of ['ui', 'web', 'client/src/http', 'cli/src/web-cli.ts', 'cli/src/handoff-cli.ts', 'cli/src/skill-cli.ts', 'client/src/node/skill-installation.ts', 'plugin/hooks', 'plugin/scripts']) {
     if (existsSync(path.join(root, removed))) errors.push(`Removed delivery surface: ${removed}`);
   }
   for (const file of ['package.json', 'client/package.json', 'cli/package.json']) {

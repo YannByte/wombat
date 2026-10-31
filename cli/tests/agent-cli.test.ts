@@ -39,7 +39,6 @@ const requests = [
   { method: 'prices', params: { action: 'status' } },
   { method: 'monitor', params: { action: 'list' } },
   { method: 'collection', params: { action: 'status' } },
-  { method: 'handoff', params: { action: 'preview' } },
   { method: 'service', params: { action: 'status' } },
   {
     method: 'conversation',
@@ -79,6 +78,8 @@ test('local discovery exposes only reachable method schemas and current product 
     assert.equal(validateAgentRequest(request), true, request.method);
   }
   assert.throws(() => describeAgentApi('arbitrary_shell'));
+  assert.throws(() => describeAgentApi('handoff'));
+  assert.equal(validateAgentRequest({method:'handoff',params:{action:'preview'}}),false);
 });
 test('API discovery and argument failures never construct a runtime client', async () => {
   for (const [args, expected] of [

@@ -31,7 +31,7 @@ WOMBAT_LANG=en wombat --help
 
 ## 模块边界
 
-- `@wombat/client/locale` 是独立的纯 TypeScript 公开入口，不依赖 Node、React 或 Rust。它提供 `LocaleRuntime`、`resolveLocale`、类型化 `t`、不可变状态及订阅；每个 CLI 进程使用独立展示实例。
+- `@wombat/client/locale` 是独立的纯 TypeScript 公开入口，不依赖 Node、React 或 Rust。它提供 `LocaleRuntime`、`resolveLocale`、类型化 `t`、语言读取与切换；每个 CLI 进程使用独立展示实例。
 - `client/src/locale/zh.ts` 与 `en.ts` 保存完整消息，以功能前缀划分键；英文键集合由中文键集合约束。参数名从中文模板推导，双语参数一致性另由检查脚本验证。正文参数按原值插入，不递归解析或翻译。
 - CLI 负责解析语言参数和环境变量。模块级标签使用延迟读取，避免启动时捕获旧语言。界面操作使用稳定标识，不能根据翻译后的文字判断业务动作。
 - 语言影响帮助、提示、标签、日期和紧凑数字展示。JSON 字段、错误码、模型标识、来源标题、用户内容及用量/金额不翻译。已知内核与宿主进度在展示层映射；未知内核诊断与来源问题原样保留。

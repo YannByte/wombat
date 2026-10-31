@@ -81,8 +81,6 @@ test('portable read interfaces share late cancellation semantics', async () => {
         { signal },
       ),
     (signal: AbortSignal, late: () => Promise<unknown>) =>
-      createUsageClient({ query: late, handoff: late }).handoff!({ action: 'preview' }, { signal }),
-    (signal: AbortSignal, late: () => Promise<unknown>) =>
       createUsageClient({ query: late, preferences: late }).preferences!(
         { action: 'get' },
         { signal },

@@ -237,24 +237,6 @@
       "additionalProperties": false
     },
     {
-      "description": "Review selected targets or explicitly send an authorized native Codex request.",
-      "type": "object",
-      "properties": {
-        "method": {
-          "type": "string",
-          "const": "handoff"
-        },
-        "params": {
-          "$ref": "#/definitions/Request14"
-        }
-      },
-      "required": [
-        "method",
-        "params"
-      ],
-      "additionalProperties": false
-    },
-    {
       "description": "Save token budgets and review schedules, inspect notifications, or check selected plans at a recent usage view.",
       "type": "object",
       "properties": {
@@ -263,7 +245,7 @@
           "const": "monitor"
         },
         "params": {
-          "$ref": "#/definitions/Request15"
+          "$ref": "#/definitions/Request14"
         }
       },
       "required": [
@@ -1273,6 +1255,12 @@
             "null"
           ]
         },
+        "baselineId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "decisionRevision": {
           "type": [
             "string",
@@ -1310,14 +1298,6 @@
             },
             {
               "type": "null"
-            }
-          ]
-        },
-        "group": {
-          "default": "pending",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Group2"
             }
           ]
         },
@@ -1377,7 +1357,6 @@
         "detail",
         "keep",
         "not_applicable",
-        "redisplay",
         "recheck",
         "capabilities",
         "checks",
@@ -1392,20 +1371,11 @@
         "incorrect_evidence"
       ]
     },
-    "Group2": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "history"
-      ]
-    },
     "Category": {
       "type": "string",
       "enum": [
         "repair",
-        "trim",
-        "organize",
-        "space"
+        "trim"
       ]
     },
     "RuleOverrides": {
@@ -1693,6 +1663,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "includeHooks": {
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false
@@ -1905,131 +1879,6 @@
       ]
     },
     "Request14": {
-      "type": "object",
-      "properties": {
-        "action": {
-          "default": "preview",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Action11"
-            }
-          ]
-        },
-        "roots": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "projectRoots": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "project": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "sourceInstanceId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "readView": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "decisionRevision": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ruleOverrides": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/RuleOverrides"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "suggestionIds": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "selectionVersion": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "language": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "withoutSkill": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "skillSelections": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "$ref": "#/definitions/Selection2"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "Action11": {
-      "type": "string",
-      "enum": [
-        "preview",
-        "send"
-      ]
-    },
-    "Selection2": {
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "projectId",
-        "path"
-      ]
-    },
-    "Request15": {
       "oneOf": [
         {
           "type": "object",

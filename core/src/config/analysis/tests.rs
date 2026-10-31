@@ -83,21 +83,16 @@ fn review(result: &Analysis, items: &[Item]) -> Suggestion {
     Suggestion {
         review_format_version: 1,
         decision: None,
-        record_kind: None,
+        baseline_id: None,
         checks: vec![],
         id: "review".into(),
         scope_project: None,
         item: items.iter().find(|i| &i.id == id).unwrap().clone(),
         category: Category::Trim,
-        status: "awaitingRecheck".into(),
         findings: findings.clone(),
         checked_at: "now".into(),
         rule_version: RuleParameters::default().version,
         rule_parameters: None,
-        recheck_rule_parameters: None,
-        review_baseline: None,
-        record_id: None,
-        recorded_at: None,
     }
 }
 #[test]

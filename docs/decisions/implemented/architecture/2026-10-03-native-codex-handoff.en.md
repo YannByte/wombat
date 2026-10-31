@@ -4,6 +4,8 @@
 
 Status: implemented
 
+The current simplification supersedes task sending, alternate installation modes, automatic review history and adoption tracking described here. Other evidence constraints and unfinished items remain. See [read-only checks and one plugin](2026-10-31-on-demand-checks.en.md).
+
 ## Problem
 
 Wombat must hand deterministic recommendations to local Codex. The user explicitly considers duplicate sends low-impact, requests a simple integration and uses rechecks to establish resolution. Recreating proposals, execution, recovery and persistent task deduplication would form a second execution system; account facts cannot be inferred from project usage or fixed allowance periods.

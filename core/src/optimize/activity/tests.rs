@@ -105,7 +105,7 @@ fn activity_selection_requires_fixed_scope_and_cannot_enter_configuration_or_han
             ..valid.clone()
         },
         Request {
-            group: Group::History,
+            baseline_id: Some("not-an-activity-input".into()),
             ..valid.clone()
         },
         Request {

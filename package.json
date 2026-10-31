@@ -60,7 +60,6 @@
     "verify:query-flow": "node --import tsx --test tests/e2e/query-flow.test.ts",
     "skill:build": "node scripts/build-skill.ts",
     "verify:skill-conversation": "node --import tsx scripts/verify-skill-conversation.ts",
-    "verify:skill-native-events": "node --import tsx scripts/verify-skill-native-events.ts",
     "installers:generate": "node scripts/generate-installers.ts",
     "installers:check": "node scripts/generate-installers.ts --check",
     "plugin:install": "node scripts/install-plugin-bootstrap.ts"
@@ -78,7 +77,9 @@
     "mdast-util-gfm": "3.1.0",
     "micromark-extension-gfm": "3.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "ws": "8.22.0",
+    "@types/ws": "8.18.2"
   },
   "pnpm": {
     "overrides": {

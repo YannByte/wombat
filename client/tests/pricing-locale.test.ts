@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { locale, pricingIssueText } from '../src/locale/index.js';
 
 test('pricing explanations distinguish count conflicts, unmatched models, tiers and missing rates in both languages', () => {
-  const previous = locale.getSnapshot().locale;
+  const previous = locale.getLocale();
   try {
     for (const language of ['zh', 'en'] as const) {
       locale.setLocale(language);

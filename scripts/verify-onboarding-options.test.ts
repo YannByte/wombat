@@ -5,7 +5,7 @@ import {onboardingOptions, commandMentionsExecutable} from './verify-onboarding-
 const base = ['output-dir', 'release-dir', 'codex-bin'].flatMap(k => ['--'+k, path.resolve(k)]);
 test('onboarding accepts complete native paths and an optional installed plugin conversation', () => {
   assert.equal(onboardingOptions(['--', ...base]).agentBin, undefined);
-  assert.equal(onboardingOptions([...base, '--agent-bin', path.resolve('codex'), '--agent-skill', 'wombat-collection:wombat']).agentSkill, 'wombat-collection:wombat');
+  assert.throws(()=>onboardingOptions([...base, '--agent-bin', path.resolve('codex'), '--agent-skill', 'wombat-collection:wombat']));
 });
 test('onboarding rejects missing, relative, duplicate, unknown and incomplete agent options', () => {
   for (const args of [[], base.slice(0, -2), [...base, '--unknown', 'x'], [...base, '--codex-bin', path.resolve('other')],

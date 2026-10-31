@@ -23,7 +23,7 @@ flowchart LR
 | `core/` | Adapters, accounting, pricing, storage, live service, and queries; an independent Rust library and executable, without UI framework dependencies |
 | `client/` | Rust-generated DTOs, schema validation, `UsageClient`, stable errors, cancellation, and progress; the generic entry imports neither Node nor terminal libraries |
 | `client/src/node/` | Restricted core communication, subprocesses, live connections, official price downloads, timeouts, and output limits; exported as `@wombat/client/node` |
-| `client/src/locale/` | Shared typed Chinese/English dictionaries, language subscriptions, and presentation formatting; source content and protocol values stay untranslated |
+| `client/src/locale/` | Shared typed Chinese/English dictionaries, language selection, and presentation formatting; source content and protocol values stay untranslated |
 | `cli/` | Arguments, JSON/text, exit codes and local query lifecycle; the default command prints usage text |
 | `plugin/` | User plugins |
 
@@ -42,15 +42,7 @@ The following model describes current domain relationships. Rust owns rules and 
 
 ### Domain map
 
-| Domain | Main types and responsibilities | Boundary |
-|---|---|---|
-| Usage and activity | `Thread` and `Turn` organize conversations and turns; `Measurement` stores measurements; `Operation` stores operations | Measurement attribution can be absent; operations receive no cost allocation |
-| Sources and observations | `SourceInstance` identifies a source; `Event` and `Position` store observations and positions; `SourceWatermark` stores coverage | Observations, business objects, and derived states remain separate |
-| Pricing | `ModelRef`, `PriceResult`, and `PriceBasis` express models, amounts, and their basis | Source-reported amounts and official-standard API-equivalent amounts remain separate |
-| Configuration and use evidence | Configuration `Item` and `SourceContext` express current objects and source inventories; `UseBasis` expresses the basis of use counts | Current configuration, historical loading, use, and reachability need different evidence |
-| Checks and user decisions | `RuleAssessment`, `Finding`, `Suggestion`, and `UserDecision` express checks, problems, suggestions, and user decisions | Check facts and user decisions remain separate; decisions bind to problems or an explicit object version |
-| Account observations | Account `Identity`, `Window`, and `Bucket` express native accounts, allowance windows, and balances | Account observations remain separate from local project usage and price estimates |
-| Read views and handoffs | `Snapshot` and `Manifest` fix query evidence; handoff `Target` and `Delivery` express version-bound targets and send results | Handoff acceptance proves neither execution nor resolution; rebuildable data and handling records have separate storage |
+| Read views | `Snapshot` and `Manifest` fix query evidence | Rebuildable indexes and user decisions stay separate; native Codex tools own task creation |
 
 ### Usage facts and derived results
 
@@ -77,13 +69,13 @@ flowchart LR
 
 Pricing adds amounts and their basis to measurements without changing raw Token facts. Reasoning Tokens are a subset of output. Cache reads and cache creation remain separate. Missing, conflicting, indeterminate, zero, and unpriced values have distinct meanings. [Pricing](../reference/pricing.en.md) owns formulas, catalog versions, and update semantics.
 
-### Configuration, checks, and handoffs
+### Configuration, checks, and rechecks
 
-Configuration `Item` combines a current physical object with its source inventory memberships. `UseBasis` binds the counting method, scope, read view, and coverage. Usage from related turns provides context; it is not a cost owned exclusively by that configuration object. Current content cannot prove historical content or actual loading. See [config_dto.rs](../../core/src/config_dto.rs).
+Configuration `Item` combines a physical current object and source memberships. `UseBasis` retains counting scope, method, view and coverage. Current configuration cannot establish historical loading. Related-turn usage is not configuration-owned cost. See [config_dto.rs](../../core/src/config_dto.rs).
 
-`RuleAssessment` retains the rule, methods, content version, scope, basis, and check outcome. `Finding` retains a specific problem, and `Suggestion` assembles the object and checks. `UserDecision` uses `DecisionBinding` to bind stable problems or a complete suggestion version. Rechecks produce new facts; they cannot replace or revoke user decisions. Handling records distinguish observations, decisions, rechecks, and redisplays. See [optimize_dto.rs](../../core/src/optimize_dto.rs).
+`RuleAssessment` and `Finding` retain independent checks and specific problems. `Suggestion` supplies an original-view-bound baseline ID. Checks and rechecks are read-only; only explicit `UserDecision` writes to separate user storage. Rechecks require original scope and rules. Expired views and missing evidence cannot establish repair. See [optimize_dto.rs](../../core/src/optimize_dto.rs).
 
-Handoff selection binds the read view, decision revision, and target content versions. Wombat supplies authorized targets and evidence; Codex owns review, execution, and recovery. `Delivery` expresses only the send result. Account allowance observations support display and handoff checks. They cannot establish project allowance consumption. See [handoff_dto.rs](../../core/src/handoff_dto.rs) and [account_dto.rs](../../core/src/account_dto.rs).
+Codex owns authorized edits, tests, task creation and recovery. Wombat supplies selected evidence. Account observations remain independent and cannot establish project allowance consumption. See [account_dto.rs](../../core/src/account_dto.rs).
 
 ### Persistence boundaries and current model limits
 

@@ -44,11 +44,6 @@ pub enum UseWindow {
         until: String,
         timezone: String,
     },
-    /// Exclusive source-operation time after, inclusive captured observer time through.
-    FollowUp {
-        after: String,
-        through: String,
-    },
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

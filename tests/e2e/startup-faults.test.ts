@@ -43,21 +43,11 @@ test('index initialization faults return actual errors, retain unsupported recor
         assert.ok(suggestion.findings.some(f => f.rule === 'fileSize'));
         const checks = await nativeApi.optimize!({ project, action: 'checks', itemId: item.id });
         assert.equal(checks.checks.find(c => c.rule === 'fileSize')?.outcome, 'hit');
-        assert.equal(checks.checks.find(c => c.rule === 'runtimeDuplicateInjection')?.outcome, 'unsupported');
+        assert.ok(!checks.checks.some(c => c.rule === 'runtimeDuplicateInjection'));
         await writeFile(instructions, 'Short synthetic instructions.');
-        await nativeApi.optimize!({ project, action: 'recheck', suggestionId: suggestion.id });
-        const history = await nativeApi.optimize!({ project, group: 'history', suggestionId: suggestion.id });
-        assert.equal(history.suggestions[0].status, 'verified');
-        assert.equal(history.followUps[0].status, 'unavailable');
-        assert.equal(history.followUps[0].observedRecords, null);
-        assert.equal(history.suggestions[0].decision, null);
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'history', '--root', root, '--project-root', project, '--project', project, '--suggestion', suggestion.id, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
-        assert.ifError(cli.error);
-        assert.equal(cli.status, 2, cli.stderr + cli.stdout);
-        const record = JSON.parse(cli.stdout);
-        assert.equal(record.suggestions[0].status, 'verified');
-        assert.equal(record.followUps[0].status, 'unavailable');
-        assert.equal(record.followUps[0].observedRecords, null);
+        const recheck = await nativeApi.optimize!({ project, action: 'recheck', readView: pending.readView, baselineId: suggestion.baselineId });
+        assert.ok(recheck.checks.some(c=>c.rule==='fileSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
+        assert.equal(recheck.decisionRevision,'0');
         const retained = new DatabaseSync(database);
         assert.equal(retained.prepare('SELECT count(*) AS n FROM sample').get()!.n, 1);
         assert.equal(retained.prepare('PRAGMA user_version').get()!.user_version, 99);
@@ -77,9 +67,7 @@ test('index initialization faults return actual errors, retain unsupported recor
         assert.equal(original.prepare('PRAGMA user_version').get()!.user_version, 99);
         assert.equal(original.prepare('SELECT value FROM sample').get()!.value, 'retained');
         original.close();
-        const reviewed = await nativeApi.optimize!({ project, group: 'history', suggestionId: suggestion.id });
-        assert.equal(reviewed.suggestions[0].status, 'verified');
-        assert.equal(reviewed.decisionRevision, history.decisionRevision);
+        assert.equal((await nativeApi.optimize!({ project })).decisionRevision,'0');
     }
     finally {
         service.kill('SIGTERM');

@@ -22,8 +22,8 @@
       "en": "c1b12424b00b4a0b82bf8f93763709a1a80528502fe8b23fd94abbc6c4c5ba0c"
     },
     "/cli-and-automation/codex-skill": {
-      "zh": "5d4d5a8cd93fb9c8105af05678e630d0f011333ba780ed2a459673da99c85481",
-      "en": "540254db2da140fe01ce81f1c809aa7c9db2539cbe1f13062c8763e1fdd17301"
+      "zh": "421c85fd8ccddf950dff598201df2aa829069ea729ffc37299ac55bf8adf2ea1",
+      "en": "1c86efb77183836e208842413643ad19ff3455cec587d26cea564ef43e4a4723"
     },
     "/cli-and-automation/language": {
       "zh": "cfeb3518580569b9e18e81faff0c4e1c5c22c77d25820978f49c8948d44e0b14",
@@ -62,12 +62,12 @@
       "en": "c77d95a0b34dadd533f33f1621b6c27ea13d29c0bc11d25045cbaf1bc1d43996"
     },
     "/cli-and-automation/static-suggestions-and-manual-rechecks": {
-      "zh": "3b20bd6d34c45f43e872ea84b152d222ce2aadb868f460eb2a9fd6e4670faf5e",
-      "en": "5ddabd287968d0d79448a63e35f11d90140cad26180bcdbc37c2378c882b20b2"
+      "zh": "b5f54a3d67402248fdd508ec5cb504bf5b0405ee2ff723225ce656614529a9de",
+      "en": "63e8a271d7797491f91a3e1b85d96f515ef249a2e0ffdfaa4c5e9b5d56560551"
     },
-    "/cli-and-automation/local-codex-handoff-and-account": {
-      "zh": "2da38191a1390c68b25a1707af517bde372153a336474a0dd50057ce3fc58fca",
-      "en": "7f4aca0dc4adb064328c87e79a3b7f0fb4a9c219fde1cfa3446909c3696a3963"
+    "/cli-and-automation/local-account-observations": {
+      "zh": "ec1bcd0025a31c4bb9e3c0aeb2c4a318039d5cf5614c9a276c9e3e4f09d216b4",
+      "en": "da6e2a71632afae2813677bfc4c1aca43385ec3489111d02fbeb0d8097c5264e"
     },
     "/cli-and-automation/setup-and-collection": {
       "zh": "daea5f9fb44d82048e6b7aac17659ef05d5097c38ed6051650176f8a23e321df",

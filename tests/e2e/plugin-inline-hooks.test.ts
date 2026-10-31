@@ -66,17 +66,13 @@ for (const array of [false, true])
             assert.equal(finding.evidence?.hook?.target, path.join(a, '工具 script.py'));
             assert.equal(finding.evidence?.hook?.nativeKey, key(0));
             assert.ok(!(await nativeTransport.optimize!({ action: 'list', project: b })).suggestions.some(s => s.findings.some(f => f.rule === 'hookTarget')));
-            const preview = await nativeTransport.handoff!({ action: 'preview', readView: suggestions.readView, project: a, suggestionIds: [suggestion.id] });
-            assert.deepEqual(preview.projects[0].targets.find(t => t.itemId === item.id)!.sharedProjects, [a]);
-            await nativeTransport.optimize!({ action: 'keep', suggestionId: suggestion.id, decisionReason: 'necessary', readView: suggestions.readView, decisionRevision: preview.decisionRevision, project: a });
+            await nativeTransport.optimize!({ action: 'keep', suggestionId: suggestion.id, decisionReason: 'necessary', readView: suggestions.readView, decisionRevision: suggestions.decisionRevision, project: a });
             await writeFile(path.join(a, '工具 script.py'), `from pathlib import Path\nPath(${JSON.stringify(marker)}).touch()\n`);
-            const resolved = await nativeTransport.optimize!({ action: 'recheck', group: 'history', suggestionId: suggestion.id, project: a });
-            assert.equal(resolved.suggestions.find(s => s.id === suggestion.id)?.status, 'verified');
-            assert.equal(resolved.suggestions.find(s => s.id === suggestion.id)?.decision?.kind, 'keep');
+            const resolved = await nativeTransport.optimize!({ action: 'recheck', readView: suggestions.readView, baselineId: suggestion.baselineId, suggestionId: suggestion.id, project: a });
+            assert.ok(resolved.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'));
             await setMode({ hooks: { data: hooks.data.map(c => ({ ...c, hooks: c.hooks.map(h => ({ ...h, command: 'python3 "${UNKNOWN}/tool.py"' })) })) } });
-            const uncertain = await nativeTransport.optimize!({ action: 'recheck', group: 'history', suggestionId: suggestion.id, project: a });
-            assert.equal(uncertain.suggestions.find(s => s.id === suggestion.id)?.status, 'recheckUnavailable');
-            assert.equal(uncertain.suggestions.find(s => s.id === suggestion.id)?.decision?.kind, 'keep');
+            const uncertain = await nativeTransport.optimize!({ action: 'recheck', readView: suggestions.readView, baselineId: suggestion.baselineId, suggestionId: suggestion.id, project: a });
+            assert.ok(uncertain.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
             await setMode({ hooksAfter: { data: hooks.data.map(c => ({ ...c, hooks: c.hooks.map(h => ({ ...h, command: 'python3 changed.py' })) })) } });
             assert.equal((await nativeTransport.config!({ kind: 'hook' })).hookRegistry.status, 'unavailable');
             for (const entry of await readdir(path.join(dir, 'data/config-v2'))) {

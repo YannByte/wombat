@@ -1,23 +1,21 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action =
-  "list" | "detail" | "keep" | "not_applicable" | "redisplay" | "recheck" | "capabilities" | "checks" | "activity";
+export type Action = "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type DecisionReason = "necessary" | "object_changed" | "incorrect_evidence";
-export type Group = "pending" | "history";
-export type Category = "repair" | "trim" | "organize" | "space";
+export type Category = "repair" | "trim";
 
 export interface Request {
   action?: Action & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
   readView?: string | null;
+  baselineId?: string | null;
   decisionRevision?: string | null;
   project?: string | null;
   sourceInstanceId?: string | null;
   suggestionId?: string | null;
   itemId?: string | null;
   decisionReason?: DecisionReason | null;
-  group?: Group & string;
   category?: Category | null;
   offset?: number | null;
   limit?: number | null;

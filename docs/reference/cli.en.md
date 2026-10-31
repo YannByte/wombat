@@ -12,7 +12,6 @@ Agent calls use `api` for local method/Schema discovery and `call` for one bound
 - `refresh`, `usage`, `threads`, `turns`, `steps`, `prices`, `optimize`, and `timing` call the shared core through `@wombat/client/node`.
 - With no subcommand, the CLI prints usage text, just like `usage`.
 
-- `skill install/status/uninstall` manages independent local copies; Codex owns formal plugins.
 
 - Presentation language uses `@wombat/client/locale`; see [product language and copy](../i18n/product.en.md).
 

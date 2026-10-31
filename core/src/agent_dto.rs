@@ -37,8 +37,6 @@ pub enum Request {
     Prices(crate::pricing_sync::Request),
     /// Read safe collection facts or explicitly configure, pause or resume receipt.
     Collection(crate::collection::Request),
-    /// Review selected targets or explicitly send an authorized native Codex request.
-    Handoff(crate::handoff_dto::Request),
     /// Save token budgets and review schedules, inspect notifications, or check selected plans at a recent usage view.
     Monitor(crate::monitor::Request),
 }

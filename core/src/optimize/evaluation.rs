@@ -243,7 +243,6 @@ fn assess_prepared(rule: Rule, input: RuleInput<'_>) -> Result<Assessment, Evalu
             ..
         } => Assessment::Miss,
         RuleInput::Format { .. } => Assessment::Insufficient("checkEvidenceIncomplete"),
-        RuleInput::Unsupported(reason) => Assessment::Unsupported(reason),
         RuleInput::Static {
             findings,
             complete,

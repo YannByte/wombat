@@ -144,21 +144,11 @@ pub(super) fn basis(
             complete: *complete,
             findings: findings.len(),
         },
-        RuleInput::Unsupported(reason) => RuleMeasurement::Unsupported {
-            reason: (*reason).into(),
-        },
     };
     let scope = scope(input);
     let mut gaps = vec![];
     if revision.is_none() {
-        gaps.push(
-            if matches!(prepared, RuleInput::Unsupported(_)) {
-                "unsupportedEvidence"
-            } else {
-                "dependencyIdentityBudgetExceeded"
-            }
-            .into(),
-        );
+        gaps.push("dependencyIdentityBudgetExceeded".into());
     }
     if !input.item.applies(input.source, input.project)
         || input
@@ -382,18 +372,6 @@ fn same_measurement_parameters(old: &RuleMeasurement, current: &RuleMeasurement)
         | (RuleMeasurement::SkillMetadata { .. }, RuleMeasurement::SkillMetadata { .. })
         | (RuleMeasurement::Static { .. }, RuleMeasurement::Static { .. }) => true,
         _ => false,
-    }
-}
-pub(super) fn capture(s: &mut Suggestion) {
-    if s.review_baseline.is_none()
-        && let Some(check) = s.checks.first()
-    {
-        s.review_baseline = Some(ReviewBaseline {
-            version: VERSION,
-            item: s.item.clone(),
-            scope: check.basis.scope.clone(),
-            assessments: s.checks.clone(),
-        });
     }
 }
 pub(super) fn binding(s: &Suggestion) -> DecisionBinding {

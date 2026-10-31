@@ -20,7 +20,7 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
     ];
     await writeFile(path.join(source, 'sessions/log.jsonl'), records.map(r => JSON.stringify(r)).join('\n') + '\n');
     const native = await nativeCodexFixture(dir);
-    await writeFile(native.mode, JSON.stringify({ version: '0.160.1', skills: [{ name: 'wombat-collection:wombat', path: path.join(project, 'skills/wombat/SKILL.md'), enabled: true }] }));
+    await writeFile(native.mode, JSON.stringify({ version: '0.160.1', skills: [{ name: 'wombat:wombat', path: path.join(project, 'skills/wombat/SKILL.md'), enabled: true }] }));
     const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES, WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_CORE_BIN: process.env.WOMBAT_CORE_BIN };
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), entry = path.resolve('dist/wombat.js');
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: source, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN: native.binary, WOMBAT_CORE_BIN: binary });
@@ -76,8 +76,9 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
         const setup = await nativeApi.setup!({ project });
         assert.equal(setup.nativeVersion, '0.160.1');
         assert.ok(path.isAbsolute(setup.marketplacePath!));
-        assert.equal(setup.discovery.instances[0].name, 'wombat-collection:wombat');
+        assert.equal(setup.discovery.instances[0].name, 'wombat:wombat');
         assert.equal(setup.discovery.status, 'available');
+        assert.equal(setup.hooks,null);
         assert.ok(setup.runtimeCapabilities.includes('collection-json-v1'));
         const calls = (await readFile(native.calls, 'utf8')).trim().split('\n').map(l => JSON.parse(l).method);
         assert.ok(!calls.some(m => m.startsWith('thread/')));

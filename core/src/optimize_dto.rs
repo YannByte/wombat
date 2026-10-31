@@ -3,7 +3,7 @@ use crate::config_dto::{Issue, Item};
 use crate::usage_app_dto::Page;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-pub const OUTPUT_VERSION: u32 = 4;
+pub const OUTPUT_VERSION: u32 = 5;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
@@ -12,18 +12,10 @@ pub enum Action {
     Detail,
     Keep,
     NotApplicable,
-    Redisplay,
     Recheck,
     Capabilities,
     Checks,
     Activity,
-}
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Group {
-    #[default]
-    Pending,
-    History,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -33,14 +25,13 @@ pub struct Request {
     pub roots: Option<Vec<String>>,
     pub project_roots: Option<Vec<String>>,
     pub read_view: Option<String>,
+    pub baseline_id: Option<String>,
     pub decision_revision: Option<String>,
     pub project: Option<String>,
     pub source_instance_id: Option<String>,
     pub suggestion_id: Option<String>,
     pub item_id: Option<String>,
     pub decision_reason: Option<DecisionReason>,
-    #[serde(default)]
-    pub group: Group,
     pub category: Option<Category>,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
@@ -82,8 +73,6 @@ impl Default for RuleParameters {
 pub enum Category {
     Repair,
     Trim,
-    Organize,
-    Space,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -226,9 +215,6 @@ pub enum RuleMeasurement {
         complete: Option<bool>,
         findings: usize,
     },
-    Unsupported {
-        reason: String,
-    },
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -339,12 +325,12 @@ pub struct DeclaredCopy {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Suggestion {
+    pub baseline_id: Option<String>,
     pub review_format_version: u32,
     pub scope_project: Option<String>,
     pub id: String,
     pub item: Item,
     pub category: Category,
-    pub status: String,
     pub decision: Option<UserDecision>,
     /// Current rule facts; user decisions never stand in for check outcomes.
     pub checks: Vec<RuleAssessment>,
@@ -352,22 +338,8 @@ pub struct Suggestion {
     pub checked_at: String,
     pub rule_version: String,
     pub rule_parameters: Option<RuleParameters>,
-    pub recheck_rule_parameters: Option<RuleParameters>,
-    /// Exact metadata before rechecking; source bodies are never retained.
-    pub review_baseline: Option<ReviewBaseline>,
-    pub record_id: Option<String>,
-    pub recorded_at: Option<String>,
-    pub record_kind: Option<RecordKind>,
 }
 /// Captured before the first persisted observation; never replaced by later checks.
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ReviewBaseline {
-    pub version: u32,
-    pub item: Item,
-    pub scope: AssessmentScope,
-    pub assessments: Vec<RuleAssessment>,
-}
 /// Missing problem location permits only the exact complete suggestion/content version.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -389,14 +361,6 @@ pub struct DecisionBinding {
     /// Includes relevant dependencies, methods and parameters, but no check cutoff or log revision.
     pub applicability_id: Option<String>,
     pub gap: Option<String>,
-}
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum RecordKind {
-    Observation,
-    Decision,
-    Recheck,
-    Redisplay,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -425,10 +389,6 @@ pub struct Capabilities {
     pub static_checks: bool,
     pub manual_edit_review: bool,
     pub decisions: bool,
-    pub inactivity: bool,
-    pub mcp_faults: bool,
-    pub space_cleanup: bool,
-    pub loading_budget_diagnosis: bool,
     pub exact_instruction_blocks: bool,
     pub declared_copy_drift: bool,
     pub hook_support: HookSupport,
@@ -455,10 +415,6 @@ impl Default for Capabilities {
             static_checks: true,
             manual_edit_review: true,
             decisions: true,
-            inactivity: false,
-            mcp_faults: false,
-            space_cleanup: false,
-            loading_budget_diagnosis: false,
             exact_instruction_blocks: true,
             declared_copy_drift: true,
             hook_support: HookSupport::default(),
@@ -468,7 +424,7 @@ impl Default for Capabilities {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Response {
-    #[schemars(range(min = 4, max = 4))]
+    #[schemars(range(min = 5, max = 5))]
     pub output_version: u32,
     pub action: Action,
     pub capabilities: Capabilities,
@@ -479,63 +435,13 @@ pub struct Response {
     pub checked_at: String,
     pub suggestions: Vec<Suggestion>,
     pub pending: usize,
-    pub history: usize,
     pub page: Page,
     pub issues: Vec<Issue>,
     pub result_status: String,
     pub rule_parameters: RuleParameters,
     pub rule_catalog: Vec<RuleDefinition>,
     pub checks: Vec<RuleAssessment>,
-    /// Derived from the selected usage view; never stored as a user decision or receipt.
-    pub follow_ups: Vec<FollowUpObservation>,
     pub activity: Option<ActivityResult>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum FollowUpStatus {
-    NoObservedRecords,
-    VersionUnknown,
-    Unavailable,
-    ReadContentMatched,
-    LoadedContentMatched,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FollowUpObservation {
-    pub matching_read_records: Option<u64>,
-    pub matching_load_records: Option<u64>,
-    pub usage_comparison: Option<FollowUpUsage>,
-    pub usage_comparison_unavailable: Option<String>,
-    pub record_id: String,
-    pub suggestion_id: String,
-    pub status: FollowUpStatus,
-    pub after: String,
-    pub observed_at: String,
-    pub observed_records: Option<u64>,
-    pub use_basis: Option<crate::config_dto::UseBasis>,
-    pub last_record_at: Option<String>,
-    pub usage_revision: Option<String>,
-    pub absence_observable: bool,
-}
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FollowUpUsage {
-    /// Exact authorized sources shared by the compared windows.
-    pub source_instance_ids: Vec<String>,
-    #[schemars(range(min = 1, max = 1))]
-    pub method_version: u32,
-    pub scope: crate::usage_app_dto::Scope,
-    pub baseline_start: String,
-    pub change_at: String,
-    pub observed_through: String,
-    pub baseline: crate::usage_app_dto::TaskPopulation,
-    pub current: crate::usage_app_dto::TaskPopulation,
-    pub baseline_usage: crate::usage_app_dto::UsageSummary,
-    pub current_usage: crate::usage_app_dto::UsageSummary,
-    pub undated_records: usize,
-    pub partial: bool,
 }
 
 /// Fixed turn analysis, separate from configuration identities and durable handling decisions.

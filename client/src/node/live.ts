@@ -10,7 +10,6 @@ import type {
   OptimizeRequest,
   LiveRequest,
   QueryOptions,
-  HandoffRequest,
   TimingRequest,
   MonitorRequest,
   ConversationRequest,
@@ -34,8 +33,7 @@ type ProductRequest =
   | { timing: TimingRequest }
   | LiveRequest
   | { config: ConfigRequest }
-  | { optimize: OptimizeRequest }
-  | { handoff: HandoffRequest };
+  | { optimize: OptimizeRequest };
 type NativeRequest = ProductRequest & {
   nativeHooks?: Awaited<ReturnType<typeof captureHooks>>;
 };
@@ -258,16 +256,12 @@ export async function queryLive(
       ? request.config
       : "optimize" in request
         ? request.optimize
-        : "handoff" in request
-          ? request.handoff
           : undefined;
   const fresh =
     product &&
     product.action !== "capabilities" &&
     product.action !== "activity" &&
-    (!product.readView ||
-      product.action === "recheck" ||
-      product.action === "send");
+    (!product.readView || product.action === "recheck");
   if (fresh) {
     const { captureHooks } = await import("./codex/hooks.js");
     observed = {

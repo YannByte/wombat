@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-note-read-only-checks-and-one-plugin": {
+      "zh": "8bbfc9d9c23ec6158d6211404d1465591c85b14df55cdd6da699d091e7a5f504",
+      "en": "2e081aa9725333debf9bd755d2ae1c0bd9ee55a31e2c9b20c5d7e17eabd2cb7b"
+    },
+    "/decision-note-read-only-checks-and-one-plugin/problem": {
+      "zh": "462fb018c37ebec6b7a22498cab6918dd16053043c0e430d78d309c7e42aeb2c",
+      "en": "f807e10920a75964aca9f632333f1a7e22602b59f926b824f5857d05818e9776"
+    },
+    "/decision-note-read-only-checks-and-one-plugin/decision": {
+      "zh": "920c48c8cc743a883976d27573c338244af2a834c60724be0971d2a91b9f5619",
+      "en": "3298a733b9160180c28654b19ab2eba7e84e9a3dc693e510db4ee78998db022c"
+    },
+    "/decision-note-read-only-checks-and-one-plugin/alternatives-considered": {
+      "zh": "79b131d4c6c397bca16fe429ea13508896b17c2bfe5dbe282c28896404f09969",
+      "en": "4b6bc728f3f9fa8981091f08f4b32ef1bbe3688b59881ca811b8e520a87d499e"
+    },
+    "/decision-note-read-only-checks-and-one-plugin/consequences-and-verification": {
+      "zh": "c4d80ec4eb5769946a86a052ebb2f974d0a54f3b3cde248c31918233e9b28382",
+      "en": "fd97dabdf46b63aad6853287d432e3e0c909761d8c4a4db077eadf7000004432"
+    }
+  }
+}

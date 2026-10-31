@@ -2,16 +2,16 @@
   "version": 2,
   "sections": {
     "/wombat-plugin-source": {
-      "zh": "73469c23dcac73ba928c268b3269ea03c34c4a9f6bc998a9990a725a9d2d8e6e",
-      "en": "64bbceac2b6b3f493b7f5982c0f524f1c8693c76e251d7e62f898c0bdebef36e"
+      "zh": "0aace6371dcf8c36f45bc0603e396a8f2bb5f0f4776e42b08db12d64ddf308b5",
+      "en": "c6a7023d8a848e8ad9af7e4b34a85de277da7366e536b10a996e47c7181393ef"
     },
     "/wombat-plugin-source/source-entries": {
-      "zh": "37b1143a8b1fcba3e19a1c230d5e23d1470c8f9bab82ed0843facb2afc3f151d",
-      "en": "aecc070806da3f68fb37a48c44e43e32a3aa32cf2629f4ccecb606524151c869"
+      "zh": "81c7ca24508160e48c9e52f1dc4ccac627af81317e69d14474d90b2f6871d579",
+      "en": "fc6903640d71b0a0a6d729fef5741c8b79a89fcc512b26dca33deac90a086900"
     },
     "/wombat-plugin-source/limits": {
-      "zh": "ea58007309edd86879aa85aef2542248f54523c64ff381a883084da92be956c9",
-      "en": "d63096bcd343962803f40c55cb98eb6eb00bf0974554462ea122bb3f1290095a"
+      "zh": "e32e82851c37311454493f615a6aa61ade3011eb3907c65e4a14aae9d62a9b42",
+      "en": "41d9ed224563b5398443b044201438febe6c9ff45366ea7fadf94156734c7106"
     },
     "/wombat-plugin-source/read-next": {
       "zh": "cd383ed469840a8ace160f48d722f63f2f8441f091ffd9fbc7e6206d69636d57",

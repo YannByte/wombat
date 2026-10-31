@@ -15,6 +15,7 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
         };
     }
     if request.activity.is_none()
+        || request.baseline_id.is_some()
         || request.read_view.is_some()
         || request.project_roots.is_some()
         || request.project.is_some()
@@ -22,7 +23,6 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
         || request.suggestion_id.is_some()
         || request.item_id.is_some()
         || request.decision_reason.is_some()
-        || request.group != Group::Pending
         || request.category.is_some()
         || request.offset.is_some()
         || request.limit.is_some()
