@@ -731,7 +731,6 @@ export const zh = {
   "config.empty": "没有符合条件的配置",
   "config.emptyHint": "检查项目目录、类型与搜索条件。历史中已识别的项目会自动加入；额外目录可从来源页添加。",
   "config.authorized": "当前配置目录",
-  "config.authorizeHint": "历史中已识别的项目可直接读取；使用来源页或 wombat web --project-root <目录> 添加额外目录。有界发现准确命名的 AGENTS.md、.agents/skills 和 .codex/config.toml。",
   "config.stale": "最近成功读取，当前无法确认",
   "config.tokenizerUnavailable": "内容 Token 暂不可估算；下方为实际 UTF-8 字节数。",
   "config.schemaUnavailable": "没有可验证的工具 Schema，内容大小未知。",

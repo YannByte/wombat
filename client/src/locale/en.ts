@@ -731,7 +731,6 @@ export const en = {
   "config.empty": "No matching configuration",
   "config.emptyHint": "Check project directories, type and search filters. Projects identified in history are added automatically; extra directories can be added from Sources.",
   "config.authorized": "Current configuration directories",
-  "config.authorizeHint": "Projects identified in history can be read directly. Add extra directories from Sources or with wombat web --project-root <directory>. Bounded discovery includes exact AGENTS.md names, .agents/skills and .codex/config.toml.",
   "config.stale": "Last successful read; current state unconfirmed",
   "config.tokenizerUnavailable": "Content tokens cannot yet be estimated. The value below is actual UTF-8 bytes.",
   "config.schemaUnavailable": "No verified tool schema is available; content size is unknown.",
