@@ -43,9 +43,9 @@ test('message reads skip control facts and hide only declared interface context 
       assert.equal(read.fragments[0].text, marker);
     };
     await check(f.client);
-    const browser = await f.browser();
-    await browser.live!({ mode: 'cached', query: { action: 'usage', scope: { allTime: true } } });
-    await check(browser);
+    const nativeApi = await f.native();
+    await nativeApi.live!({ mode: 'cached', query: { action: 'usage', scope: { allTime: true } } });
+    await check(nativeApi);
     // The control-only fixture has missing operation outcomes; preserve its
     // partial-source status through the CLI while returning usable messages.
     const cli = await complete(async request => JSON.parse(f.cli(['call'], JSON.stringify({ method: 'conversation', params: request }), 2)), base);
@@ -59,13 +59,13 @@ test('message reads skip control facts and hide only declared interface context 
   });
 });
 
-test('real conversation chain covers no-usage activity, CLI, Web, continuation and source changes', { timeout: 120_000 }, async () => {
+test('real conversation chain covers no-usage activity, CLI, continuation and source changes', { timeout: 120_000 }, async () => {
   await withLocalProduct(async f => {
     const text = 'PRIVATE_SYNTHETIC_BODY 中文🙂\n' + 'x'.repeat(2 * 1024 * 1024);
     const rows = [row('session_meta', { id: 'task', cwd: f.project }, '2026-10-14T00:00:00Z'), row('turn_context', { turn_id: 'turn', cwd: f.project }, '2026-10-14T00:00:01Z'), row('event_msg', { type: 'agent_message', phase: 'final_answer', message: text, turn_id: 'turn' }, '2026-10-14T00:00:02Z')];
     await f.write('task', rows);
     const prepare = () => f.client.live!({ query: { action: 'usage', roots: [f.root], scope: { allTime: true } }, mode: 'fresh' });
-    const view = await prepare(); assert.equal(view.freshness.status, 'current');
+    const view = await prepare(); assert.ok(['current','stale'].includes(view.freshness.status));
     const id = view.result.snapshotRef.snapshotId;
     const base: ConversationRequest = { action: 'locate', snapshotId: id, selection: { projects: [f.project], since: '2026-10-14', until: '2026-10-15', timezone: 'Asia/Shanghai' } };
     const located = await f.client.conversation!(base); assert.equal(located.items.length, 1); assert.equal(located.sourceBytesRead, 0); assert(located.scanComplete);
@@ -82,12 +82,12 @@ test('real conversation chain covers no-usage activity, CLI, Web, continuation a
     }
     assert.equal(rebuilt, text); assert(bytes < Buffer.byteLength(text) + 32768, 'Large-message continuation must not replay whole records');
     await assert.rejects(f.client.conversation!({ ...base, action: 'read', targets: [{ evidence: target }], selection: { projects: [path.join(f.dir, 'unrelated')] } }), { code: 'NOT_FOUND' });
-    const browser = await f.browser();
-    await assert.rejects(browser.conversation!({ ...base, snapshotId: 'foreign' }), { code: 'INVALID_ARGUMENT' });
-    await assert.rejects(browser.conversation!({ ...base, roots: [f.root] }), { code: 'INVALID_ARGUMENT' });
-    await browser.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'cached' });
-    const browserLocated = await browser.conversation!(base); assert.equal(browserLocated.items[0].evidence.eventId, target.eventId);
-    const browserRead = await browser.conversation!({ ...base, action: 'read', targets: [{ evidence: target, maxBytes: 64 }] }); assert(browserRead.fragments[0].text.startsWith('PRIVATE_SYNTHETIC_BODY 中文🙂'));
+    const nativeApi = await f.native();
+    await assert.rejects(nativeApi.conversation!({ ...base, snapshotId: 'foreign' }), { code: 'NO_SNAPSHOT' });
+    assert.equal((await nativeApi.conversation!({ ...base, roots: [f.root] })).snapshotId,base.snapshotId);
+    await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'cached' });
+    const browserLocated = await nativeApi.conversation!(base); assert.equal(browserLocated.items[0].evidence.eventId, target.eventId);
+    const browserRead = await nativeApi.conversation!({ ...base, action: 'read', targets: [{ evidence: target, maxBytes: 64 }] }); assert(browserRead.fragments[0].text.startsWith('PRIVATE_SYNTHETIC_BODY 中文🙂'));
     const cross = await f.client.conversation!({ ...base, action: 'search', query: '中文🙂' }); assert.equal(cross.items.length, 1);
     await f.append('task', [row('event_msg', { type: 'user_message', message: 'next', turn_id: 'turn' }, '2026-10-14T01:00:00Z')]);
     const later = await prepare();

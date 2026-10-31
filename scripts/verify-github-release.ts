@@ -201,13 +201,9 @@ try {
     assert.equal(JSON.parse(run(command, ['/d', '/s', '/c', `""${upgradedLauncher}" --version --json"`])).version, set.version);
   } else assert.equal(JSON.parse(run(upgradedLauncher, ['--version', '--json'])).version, set.version);
 
-  stage('Web startup and browser flow');
-  await stopService(); service = undefined;
-  run(process.execPath, ['--test', fileURLToPath(new URL('../tests/e2e/web.test.ts', import.meta.url))], 0,
-    {...env, WOMBAT_WEB_TEST_ENTRY: cli, WOMBAT_WEB_TEST_CORE: core, WOMBAT_WEB_TEST_NODE: runtime});
   console.log(JSON.stringify({version: set.version, source: set.source, target, runtime: run(runtime, ['--version']).trim(),
     archive: asset.archive, archiveBytes: asset.bytes, installedBytes: inventory(installed).reduce((total, file) => total + file.size, 0),
-    extractMs: installMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, web: true}));
+    extractMs: installMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, cliOnly: true}));
 } finally {
   await stopService();
   rmSync(scratch, {recursive: true, force: true, maxRetries: 20, retryDelay: 500});

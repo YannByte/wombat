@@ -49,7 +49,7 @@ function walk(directory) {
   return found;
 }
 
-for (const directory of ['docs', 'core', 'client', 'cli', 'ui', 'web']) {
+for (const directory of ['docs', 'core', 'client', 'cli']) {
   for (const file of walk(directory)) {
     if (!known.has(file)) errors.push(`${file}: add a complete bilingual pair to the manifest or justify an exclusion`);
   }

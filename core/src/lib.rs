@@ -58,7 +58,6 @@ pub mod usage_app;
 pub mod usage_app_dto;
 pub(crate) mod usage_observations;
 pub mod usage_store;
-pub mod web_view_dto;
 use anyhow::Result;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -207,11 +206,6 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<timing_dto::ShareResponse>(),
-        )?),
-        "schema_web_view_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<web_view_dto::Request>(),
         )?),
         "schema_skill_installation" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()

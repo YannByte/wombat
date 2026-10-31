@@ -58,21 +58,15 @@ fn run(resident: bool) -> Result<()> {
     let (jobs, receiver) = mpsc::sync_channel::<Job>(32);
     let control = Arc::new(service::Control::new(resident)?);
     service::publish_endpoint(&control)?;
-    if resident {
-        service::prepare(&shared, &jobs)?;
-    }
     let worker_control = Arc::clone(&control);
-    let worker_jobs = jobs.clone();
     let worker_state = Arc::clone(&shared);
     let worker_configs = Arc::clone(&configs);
     let worker = std::thread::spawn(move || -> Result<Option<rusqlite::Connection>> {
         let mut lifecycle = scheduling::WorkerLifecycle::new(Arc::clone(&worker_state));
-        let mut db = generation::index_path(&root)
-            .and_then(|path| crate::live_index::open(&path))
-            .ok();
+        // Status, startup and controls do not open or restore the derived index.
+        let mut db = None;
         let mut caches = BTreeMap::new();
-        let mut watch = service::Watch::new(Arc::clone(&worker_control), worker_jobs.clone());
-        let mut changed_at: Option<Instant> = None;
+        let mut watch: Option<service::Watch> = None;
         let mut last_checkpoint = Instant::now();
         loop {
             if worker_control
@@ -81,50 +75,28 @@ fn run(resident: bool) -> Result<()> {
             {
                 break;
             }
-            if worker_control
-                .resident
-                .load(std::sync::atomic::Ordering::Relaxed)
-            {
-                let key = source_key(&[]);
-                if !worker_control
-                    .paused
-                    .load(std::sync::atomic::Ordering::Relaxed)
-                    && !worker_state.0.lock().unwrap().contains_key(&key)
-                {
-                    service::prepare(&worker_state, &worker_jobs)?;
-                }
-                watch.update(&worker_state, &worker_control, false);
-            }
             let job = match receiver.recv_timeout(Duration::from_millis(500)) {
                 Ok(job) => Some(job),
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 Err(_) => None,
             };
-            if worker_control
-                .changed
-                .swap(false, std::sync::atomic::Ordering::Relaxed)
-            {
-                changed_at.get_or_insert_with(Instant::now);
-            }
-            let changed_due =
-                changed_at.is_some_and(|at| at.elapsed() >= Duration::from_millis(500));
-            if changed_due {
-                changed_at = None;
-                watch.update(&worker_state, &worker_control, true);
-                for entry in worker_state.0.lock().unwrap().values_mut() {
-                    if entry.following {
-                        entry.changed = true;
-                    }
-                }
+            if job.is_some() {
+                watch
+                    .get_or_insert_with(|| {
+                        service::Watch::new(Arc::clone(&worker_control), Arc::clone(&worker_state))
+                    })
+                    .update(&worker_state, &worker_control);
             }
             if let Some(job) = &job
                 && job.restore_only
             {
                 let roots = worker_state.0.lock().unwrap()[&job.key].roots.clone();
-                let outcome = match db.as_ref() {
-                    Some(db) => restore_into(db, &job.key, &roots, &worker_state),
-                    None => Err(operation_error("INDEX_UNAVAILABLE", "索引暂不可读取")),
-                };
+                let outcome = (|| {
+                    if db.is_none() {
+                        db = Some(crate::live_index::open(&generation::index_path(&root)?)?);
+                    }
+                    restore_into(db.as_ref().unwrap(), &job.key, &roots, &worker_state)
+                })();
                 let mut entries = worker_state.0.lock().unwrap();
                 let entry = entries.get_mut(&job.key).unwrap();
                 entry.restoring = false;
@@ -135,46 +107,14 @@ fn run(resident: bool) -> Result<()> {
                 worker_state.1.notify_all();
                 continue;
             }
-            let work: Vec<_> = {
-                let entries = worker_state.0.lock().unwrap();
-                let default_key = source_key(&[]);
-                entries
-                    .iter()
-                    .filter(|(key, e)| {
-                        job.as_ref().is_some_and(|j| &j.key == *key)
-                            || !e.paused
-                                && e.pending.is_none()
-                                && e.following
-                                && (worker_control
-                                    .resident
-                                    .load(std::sync::atomic::Ordering::Relaxed)
-                                    && *key == &default_key
-                                    || e.touched.elapsed() < Duration::from_secs(15))
-                                && ((e.changed
-                                    && e.last_sync.elapsed()
-                                        >= e.last_cost.saturating_mul(4).clamp(
-                                            Duration::from_secs(1),
-                                            Duration::from_secs(60),
-                                        ))
-                                    || scheduling::auto_due(e)
-                                    || e.views
-                                        .back()
-                                        .is_some_and(|(_, v)| v.expired_detail_lease()))
-                    })
-                    .map(|(key, e)| {
-                        (
-                            key.clone(),
-                            e.roots.clone(),
-                            job.as_ref().is_some_and(|j| j.key == *key),
-                        )
-                    })
-                    .collect()
-            };
-            for (key, roots, queued) in work {
+            // Only caller-enqueued jobs run. Notifications and elapsed time are
+            // freshness evidence for the next query, never a reason to scan now.
+            if let Some(Job { key, .. }) = job {
+                let roots = worker_state.0.lock().unwrap()[&key].roots.clone();
                 if source_key(&roots) != key {
                     let mut entries = worker_state.0.lock().unwrap();
                     let entry = entries.get_mut(&key).unwrap();
-                    if let Some(work) = scheduling::begin(entry, queued) {
+                    if let Some(work) = scheduling::begin(entry) {
                         scheduling::finish(entry, work);
                     }
                     entry.error = Some("Source scope changed; reacquire the default view".into());
@@ -184,10 +124,9 @@ fn run(resident: bool) -> Result<()> {
                 }
                 let work = {
                     let mut entries = worker_state.0.lock().unwrap();
-                    scheduling::begin(entries.get_mut(&key).unwrap(), queued)
+                    scheduling::begin(entries.get_mut(&key).unwrap())
                 };
                 let Some(work) = work else { continue };
-                let began = Instant::now();
                 worker_state
                     .0
                     .lock()
@@ -206,32 +145,15 @@ fn run(resident: bool) -> Result<()> {
                 }
                 let verify = work.verify;
                 if work.rebuild {
-                    let resident = worker_control
-                        .resident
-                        .load(std::sync::atomic::Ordering::Relaxed);
                     let outcome = resources::index_batch(|| {
                         let (next, view) = generation::rebuild(&root, &key, &roots)?;
-                        Ok((
-                            next,
-                            if resident {
-                                drop(view);
-                                None
-                            } else {
-                                Some(view)
-                            },
-                        ))
+                        drop(view);
+                        Ok(next)
                     })
-                    .and_then(|(next, view)| {
-                        let view = match view {
-                            Some(view) => view,
-                            None => restore_projects(&next, &key, &roots, || None, |_| {})?
-                                .ok_or_else(|| {
-                                    operation_error(
-                                        "INDEX_UNAVAILABLE",
-                                        "Rebuilt header unavailable",
-                                    )
-                                })?,
-                        };
+                    .and_then(|next| {
+                        let view = restore_view(&next, &key, &roots)?.ok_or_else(|| {
+                            operation_error("INDEX_UNAVAILABLE", "Rebuilt header unavailable")
+                        })?;
                         Ok((next, view))
                     });
                     let mut entries = worker_state.0.lock().unwrap();
@@ -287,34 +209,16 @@ fn run(resident: bool) -> Result<()> {
                     }
                 }
                 let db = db.as_mut().unwrap();
-                let needs_restore = {
+                let needs_restore = worker_state.0.lock().unwrap()[&key].views.is_empty();
+                if needs_restore && let Err(error) = restore_into(db, &key, &roots, &worker_state) {
+                    // Unsupported/corrupt committed facts must not silently fall back to source collection.
                     let mut entries = worker_state.0.lock().unwrap();
                     let entry = entries.get_mut(&key).unwrap();
-                    entry.syncing = true;
-                    entry.views.is_empty()
-                };
-                if needs_restore {
-                    if let Ok(Some(view)) = preview::prepare(&key, &roots) {
-                        worker_state
-                            .0
-                            .lock()
-                            .unwrap()
-                            .get_mut(&key)
-                            .unwrap()
-                            .views
-                            .push_back((Instant::now(), view));
-                        worker_state.1.notify_all();
-                    }
-                    if let Err(error) = restore_into(db, &key, &roots, &worker_state) {
-                        // Unsupported/corrupt committed facts must not silently fall back to source collection.
-                        let mut entries = worker_state.0.lock().unwrap();
-                        let entry = entries.get_mut(&key).unwrap();
-                        entry.error_code = Some(crate::live_index::failure_code(&error));
-                        entry.error = Some(error.to_string());
-                        scheduling::finish(entry, work);
-                        worker_state.1.notify_all();
-                        continue;
-                    }
+                    entry.error_code = Some(crate::live_index::failure_code(&error));
+                    entry.error = Some(error.to_string());
+                    scheduling::finish(entry, work);
+                    worker_state.1.notify_all();
+                    continue;
                 }
                 let prior_view = worker_state.0.lock().unwrap()[&key]
                     .views
@@ -344,10 +248,7 @@ fn run(resident: bool) -> Result<()> {
                             &mut caches,
                             !work.include_history,
                         );
-                        let compact = worker_control
-                            .resident
-                            .load(std::sync::atomic::Ordering::Relaxed)
-                            && outcome.as_ref().is_ok_and(|view| view.is_some());
+                        let compact = outcome.as_ref().is_ok_and(|view| view.is_some());
                         if compact {
                             outcome = Ok(None);
                         }
@@ -366,7 +267,7 @@ fn run(resident: bool) -> Result<()> {
                         Ok((outcome, compact, resident_bytes, evicted))
                     })?;
                 if compact {
-                    outcome = restore_projects(db, &key, &roots, || None, |_| {});
+                    outcome = restore_view(db, &key, &roots);
                 }
                 if outcome.is_err() {
                     caches.clear();
@@ -377,13 +278,7 @@ fn run(resident: bool) -> Result<()> {
                     .store(resident_bytes, std::sync::atomic::Ordering::Relaxed);
                 let mut entries = worker_state.0.lock().unwrap();
                 let entry = entries.get_mut(&key).unwrap();
-                entry.attempt += 1;
                 entry.last_sync = Instant::now();
-                entry.last_cost = if prior_view.is_some() {
-                    began.elapsed()
-                } else {
-                    Duration::ZERO
-                };
                 scheduling::finish(entry, work);
                 match outcome {
                     Ok(view) => {
@@ -432,9 +327,8 @@ fn run(resident: bool) -> Result<()> {
                         entry.views.pop_front();
                     }
                 }
-                let default_key = source_key(&[]);
-                entries.retain(|key, entry| {
-                    key == &default_key
+                entries.retain(|_, entry| {
+                    entry.roots.is_empty()
                         || entry.syncing
                         || entry.restoring
                         || entry.touched.elapsed() < Duration::from_secs(600)
@@ -529,7 +423,6 @@ fn run(resident: bool) -> Result<()> {
                                 request.service,
                                 &control,
                                 &state,
-                                &jobs,
                             )?)?);
                         }
                         if control.stopping.load(std::sync::atomic::Ordering::Relaxed) {
@@ -873,25 +766,18 @@ fn restore_into(
     key: &str,
     roots: &[String],
     shared: &Shared,
-) -> Result<Option<Arc<Snapshot>>> {
-    restore_projects(
-        db,
-        key,
-        roots,
-        || shared.0.lock().unwrap()[key].preferred_project.clone(),
-        |view| {
-            let mut entries = shared.0.lock().unwrap();
-            let entry = entries.get_mut(key).unwrap();
-            if view.project_loads.is_empty() {
-                entry.restoring = false;
-            }
-            entry.views.push_back((Instant::now(), view));
-            while entry.views.len() > 8 {
-                entry.views.pop_front();
-            }
-            shared.1.notify_all();
-        },
-    )
+) -> Result<()> {
+    if let Some(view) = restore_view(db, key, roots)? {
+        let mut entries = shared.0.lock().unwrap();
+        let entry = entries.get_mut(key).unwrap();
+        entry.restoring = false;
+        entry.views.push_back((Instant::now(), view));
+        while entry.views.len() > 8 {
+            entry.views.pop_front();
+        }
+        shared.1.notify_all();
+    }
+    Ok(())
 }
 
 /// Readiness wakes immediately for a request; the timeout only bounds lifecycle checks.

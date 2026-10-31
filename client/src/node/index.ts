@@ -2,12 +2,11 @@ import { withAutomaticPrices } from './auto-prices.js';
 import { createUsageClient, type UsageClient, type AccountTransport, type HandoffTransport } from '../client.js';
 import { invokeCore, invokeOperation, type CoreProcessOptions } from './core.js';
 import { queryLive } from './live.js';
-import { createDirectoryTransport } from './directories.js';
 import type {CodexOptions} from './codex/process.js';
 export {receiveCodexHook} from './collection.js';
 export {binaryPath as resolveCoreBinary} from './core.js';
 
-export interface NodeClientOptions extends CoreProcessOptions,CodexOptions { automaticPrices?: boolean; directoryPicker?:(signal?:AbortSignal)=>Promise<string> }
+export interface NodeClientOptions extends CoreProcessOptions,CodexOptions { automaticPrices?: boolean }
 
 /** The CLI supplies a packaged binary path; source use can locate the root build. */
 export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
@@ -23,7 +22,7 @@ export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
     config: (request, queryOptions) => queryLive({ config: request }, queryOptions, options),
     optimize: (request, queryOptions) => queryLive({ optimize: request }, queryOptions, options),
     preferences: (request, queryOptions) => invokeOperation('preferences', request, queryOptions, options),
-    directories: createDirectoryTransport(options, options.directoryPicker),
+    directories: (r,q) => invokeOperation('directories',r,q,options),
     conversation: (r, q) => !r.snapshotId.startsWith('live:') && !(r.baselineSnapshotId?.startsWith('live:')) ? invokeOperation('conversation', r, q, options) : queryLive({conversation:r},q,options),
     timing: (request, queryOptions) => request.action === 'capabilities'
       || (request.snapshotId != null && !request.snapshotId.startsWith('live:'))

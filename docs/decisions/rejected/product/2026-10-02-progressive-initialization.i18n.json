@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-note-progressive-project-initialization-and-failure-acceptance": {
+      "zh": "49ae5d7aa39d57615b045d4dd52637442d377f86225927d93e51c398d9a4d5c6",
+      "en": "d3e2432939ff136bf60147592b25eb19bcb30699d0bca101f5279c5f0cf1826c"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/problem": {
+      "zh": "47c9051f433fa46a7489081557916b2b34c04b6cefb36c54b39ddaa722ed72bd",
+      "en": "cb2c06dea9f563088f1cb281bd738ab16381c1b72bf9fe0f69a5303649f8313d"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/proposal": {
+      "zh": "3c29b595c132707cffbac51f4234716a4d592b1a5d8b8ad42fd34aafdd7166b3",
+      "en": "e728493078f806c966b3360ab12f84203857ff7f255c1396c9f989720a96fcfe"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/proposal/real-events-and-project-identity": {
+      "zh": "7dd872beda35a8ee7f3eea087b9432ee87944ab6905e1adf9d8aebdb56bc0819",
+      "en": "008b4c9b01a10389859bd2952811f3e197414d427a751c399e007c633625ff8a"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/proposal/progressive-availability-and-interaction": {
+      "zh": "7134417fe114fe227ce1c78575257ad8ffddcfe6fad729ba71f1a80cdff80793",
+      "en": "f562d1a237c3c828facf3ae1eb8c4270baa9d88f18ac6112031c941fbe174381"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/alternatives-considered": {
+      "zh": "08198450f209bcd20e2de67e8d4c903b071289e41884308d350d3e7f236a91ef",
+      "en": "75d34f0da3761c0dc89a030cff94700f1865b4fa855a46606421e46cbe6031cb"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/acceptance-criteria": {
+      "zh": "c7c25f1deadb4a0badeb2cf35b33f33c486759cd43ab3d63d3cc5ec6a29ea161",
+      "en": "d4e61de94edff3921f58b9e06a975ba77b378e580e5490e444f6df041fe89704"
+    },
+    "/decision-note-progressive-project-initialization-and-failure-acceptance/risks": {
+      "zh": "163138ad3bcab3aac78de010ceed093e9e4c507b71391bd84ad7adf83246042e",
+      "en": "224ffbb0ca6261b97f85587aaa29152432f3a338e1224958e0ea8a5188e3868b"
+    }
+  }
+}

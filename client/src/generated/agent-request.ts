@@ -150,7 +150,7 @@ export type Mode2 = "auto" | "fresh" | "cached";
 export type PrivacyProfile = "local" | "share-v1";
 export type EvidenceSet = "turn_events" | "use_objects" | "use_records";
 export type Action6 = "read" | "refresh" | "history";
-export type Action7 = "list" | "choose" | "confirm" | "authorize" | "revoke";
+export type Action7 = "list" | "authorize" | "revoke";
 export type Purpose = "source" | "project";
 export type Action8 = "get" | "set";
 export type Language = "zh" | "en";
@@ -381,7 +381,6 @@ export interface Request10 {
   action?: Action7 & string;
   purpose?: Purpose | null;
   path?: string | null;
-  choiceToken?: string | null;
   grantId?: string | null;
 }
 export interface Request11 {

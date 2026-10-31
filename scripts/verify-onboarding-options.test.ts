@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
 import {onboardingOptions, commandMentionsExecutable} from './verify-onboarding-options.ts';
-const base = ['output-dir', 'release-dir', 'codex-bin', 'playwright-module'].flatMap(k => ['--'+k, path.resolve(k)]);
-test('onboarding accepts complete native/browser paths and an optional installed plugin conversation', () => {
+const base = ['output-dir', 'release-dir', 'codex-bin'].flatMap(k => ['--'+k, path.resolve(k)]);
+test('onboarding accepts complete native paths and an optional installed plugin conversation', () => {
   assert.equal(onboardingOptions(['--', ...base]).agentBin, undefined);
   assert.equal(onboardingOptions([...base, '--agent-bin', path.resolve('codex'), '--agent-skill', 'wombat-collection:wombat']).agentSkill, 'wombat-collection:wombat');
 });

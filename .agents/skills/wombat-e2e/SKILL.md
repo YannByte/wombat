@@ -1,6 +1,6 @@
 ---
 name: wombat-e2e
-description: Run and interpret Wombat's real-core integration, end-to-end, and browser acceptance checks through the unified verifier.
+description: Run and interpret Wombat's real-core integration, end-to-end, and CLI acceptance checks through the unified verifier.
 ---
 
 # Wombat E2E acceptance
@@ -14,11 +14,11 @@ Prepare first-install runs before building, installing, or querying:
 
 The unified verifier clears its disposable product-data path during preparation. Archive verification separately clears candidate installation/data paths and invokes the real installer before product queries. These steps do not flush operating-system file caches or establish physical-cache-cold performance.
 
-Use the real verifier for acceptance. From the repository root, run `corepack pnpm verify:e2e -- --output-dir /tmp/wombat-e2e --playwright-module /absolute/path/to/playwright/index.js`; the default `all` scope runs integration, CLI/Web E2E, and the event-upgrade browser checks. Pass `--scope api` or `--scope browser` for a focused rerun. Browser runs require `--playwright-module PATH` or `WOMBAT_PLAYWRIGHT_MODULE`; pass `--browser-executable PATH` when needed. Reports and bounded per-stage logs stay in the required repository-external output directory.
+Use `corepack pnpm verify:e2e -- --output-dir /tmp/wombat-e2e`. The default `all` scope runs integration and CLI/core E2E checks. Use `--scope integration` or `--scope e2e` for a focused rerun. Reports and bounded per-stage logs stay in the required repository-external output directory.
 
-The verifier checks the current build and runs the standard build when stale. It stops on the first failed stage. Inspect `e2e-report.json` and that stage's log, fix the responsible implementation or fixture, then rerun the narrowest scope that covers the change. Use `--resume` only to reuse successful stages with matching source, acceptance fixtures, workspace artifacts, parameters, and external browser identities; failed or mismatched evidence is rerun.
+The verifier checks the current build and runs the standard build when stale. It stops on the first failed stage. Inspect `e2e-report.json` and that stage's log, fix the responsible implementation or fixture, then rerun the narrowest scope that covers the change. Use `--resume` only to reuse successful stages with matching source, acceptance fixtures, workspace artifacts, parameters; failed or mismatched evidence is rerun.
 
-Do not substitute UI preview checks for E2E acceptance. Preview journeys use typed synthetic transports and validate UI behavior only; they do not establish real-core behavior. The browser acceptance runner uses synthetic source and data, records no screenshots, and covers only the selected platform. A human must still review product claims, privacy implications, and any platform or visual behavior outside the automated checks. Do not use real Agent logs or treat a passing synthetic run as evidence about an individual user's data.
+Use synthetic sources for the unified suite. A passing run covers only the selected scope and platform. It does not establish individual real-history behavior, semantic recommendation quality or later adoption. Verify authorized real sources separately in a fresh isolated product home, without changing the original logs.
 
 This entry does not run core/unit suites, benchmarks, or installation checks. Select those separately with [wombat-verify](../wombat-verify/SKILL.md) when the change requires them; reuse unaffected passing evidence.
 

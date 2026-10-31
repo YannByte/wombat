@@ -2,24 +2,24 @@
   "version": 2,
   "sections": {
     "/typed-client": {
-      "zh": "7971a5649497d7e21d2fa2d084fd8b687df95d6d739f900ef8c99b32b9af5a47",
-      "en": "57a9da5a516393c01960ba68561ac49da95a8053460346309a974b6ebd136e34"
+      "zh": "4f383def9854ef348a1578b4e28d5ab34c6bfbecb94eebf5131c9411f471c093",
+      "en": "a00b58c1f0d79e001f951058eec9c451363be96787c6d2367e2096f960cddcbf"
     },
     "/typed-client/public-entries": {
       "zh": "ee394e0dd2eae67ad0328be1c41f043beabbe97f28ac71063c63b3f3b497eca1",
       "en": "300ddeb70397ca6096127fb520474ee4c58ac18d688fcc5757c23b00fb00ebb6"
     },
     "/typed-client/limits-and-verification": {
-      "zh": "911d5eebca213fd20657223b7e6fdd18e7502cfac0cf5b0daf5ae5780121c33c",
-      "en": "bc2b1ed89ae66f313617ff944586c921f5f14fbc88f5744023b46ce076663318"
+      "zh": "2269aef4dcb0f6917c2e2e71b36e3b738888009c4889826fce77d78cb870687d",
+      "en": "6078360c7303def58483e4c2e8abfbd4a89030ad737d5c89f57d38598c5c62dc"
     },
-    "/typed-client/http-transport": {
-      "zh": "dfd00e9357f0f83b25214bd092535bc141400ff93530d76f9f0708c3fc232429",
-      "en": "74b16d072b1c342e6fd504aab67023fa45c0f695a7be24141ac484853698370b"
+    "/typed-client/configuration-and-timing": {
+      "zh": "533f477c9f252d1bf57e850dfd940e4419053eaadfdb0bbe43643b92921cff2c",
+      "en": "f29af026172e5bcbd48d508a2e9fba4fe0410b0d7bd3b2d71099ae74128c4ec8"
     },
     "/typed-client/setup-and-runtime-observations": {
-      "zh": "330ca3283a2822d7a19c9bee6185ea25e40455a9749ed78ecf3579359cf3dd42",
-      "en": "29f14003eaf3713961ca6faf1fa66ba6ad27bb21d17e23c4dd8ed508928c4962"
+      "zh": "3560cfef19dee503bf90aeab87f6fd42d4f68ac20385a8386198998e28959dae",
+      "en": "ab2129b3ddb95bcb4959e845e5a23c6cea278c29d6501e9843bdeb34d9284576"
     }
   }
 }

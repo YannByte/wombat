@@ -346,7 +346,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
             if (!validateDirectoriesRequest(request))
               throw new CoreError('INVALID_ARGUMENT', 'Invalid directory request');
             const result = await directoriesTransport(request, options);
-            if (request.action == null || ['list', 'choose'].includes(request.action))
+            if (request.action == null || request.action === 'list')
               throwIfCancelled(options);
             if (
               !validateDirectoriesResult(result) ||

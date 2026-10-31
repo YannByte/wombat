@@ -29,7 +29,7 @@ pub enum Request {
     Setup(crate::setup_dto::Request),
     /// Read or refresh native account observations, or read saved history.
     Account(crate::account_dto::Request),
-    /// List directory grants or explicitly choose, authorize or revoke a grant.
+    /// List directory grants or explicitly authorize or revoke a selected path.
     Directories(crate::directories::Request),
     /// Read or set local presentation preferences.
     Preferences(crate::preferences::Request),

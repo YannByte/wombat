@@ -12,14 +12,14 @@ export function skillNames(root:string):string[] {
     if(typeof name!=='string'||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)||name.length>64)throw new Error('Invalid shipped Skill name');
     return name;
   });
-  if(result[0]!=='wombat'||new Set(result).size!==result.length)throw new Error('Ship the Wombat query entry first, without duplicate Skills');
+  if(result.length!==1||result[0]!=='wombat')throw new Error('Ship exactly one main Wombat Skill');
   return result;
 }
 
 /** JSON-form YAML keeps standalone and plugin presentation on one native JSON reader. */
 export function skillPresentation(file:string,reference:string) {
   const name=reference.slice(reference.lastIndexOf(':')+1);
-  if(!/^\$(?:wombat|wombat-collection):[a-z0-9]+(?:-[a-z0-9]+)*$/.test(reference))throw new Error('Invalid plugin Skill invocation');
+  if(!/^\$(?:wombat|wombat-collection):wombat$/.test(reference))throw new Error('Invalid plugin Skill invocation');
   const invocation=new RegExp('\\$'+name+'(?![\\w:-])','g');
   const source:unknown=JSON.parse(readFileSync(file,'utf8'));
   const object=(value:unknown):value is Record<string,unknown>=>value!==null&&typeof value==='object'&&!Array.isArray(value);

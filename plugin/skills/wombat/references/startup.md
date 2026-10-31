@@ -22,14 +22,14 @@ Examine returned freshness and coverage:
 
 - Complete current/fixed results support the requested conclusion and pinned drill-down.
 - initialScan or provisional history: tell the user that totals are incomplete. Examine existing tasks. Do not claim complete rankings or unused resources.
-- SYNC_PENDING without data: explain that preparation is in progress. If the discovered usage Schema supports `waitMs`, use one bounded fresh wait for the same scope (up to 600000 ms). Keep progress visible while waiting. Otherwise use the same query with `--fresh` at most once more. A timeout or cancellation does not stop shared scanning; do not start another scan or alternate repeated cached and fresh calls.
+- SYNC_PENDING without data: explain that preparation is in progress. Use one bounded fresh wait with `waitMs` for the same scope (up to 600000 ms). Keep progress visible while waiting. A timeout or cancellation does not stop shared scanning; do not start another scan or alternate repeated cached and fresh calls.
 - syncing/stale with committed results: give the data time. Answer what the evidence supports. Wait only if latest data is needed.
 - failed/partial: keep usable facts. Show failed sources or incomplete coverage.
 - Completed empty results: distinguish absent supported logs from filters matching nothing.
 - Expired view: read the same scope again. Tell the user about the version change.
-- Unknown formats: keep the data and show the format error. If the user asks to rebuild or repair the index and the discovered Schema supports `rebuild`, use that explicit rebuild on the same source roots. It preserves separate user records and publishes a new generation only after success. A usage question alone does not authorize rebuild. Never delete or migrate data as a query workaround.
+- Unknown formats: keep the data and show the format error. If the user asks to rebuild or repair the index, use the explicit `rebuild` option on the same source roots. It preserves separate user records and publishes a new generation only after success. A usage question alone does not authorize rebuild. Never delete or migrate data as a query workaround.
 
-`--cached` and fixed snapshots stay offline. Missing cache returns NO_SNAPSHOT, not zero usage. If the user requests offline use, set `WOMBAT_AUTO_PRICES=0`. Do not invent a readiness flag, database query, project percentage or ETA. The existing Web may display ongoing preparation. Opening it must not create another index.
+`--cached` and fixed snapshots stay offline. Missing cache returns NO_SNAPSHOT, not zero usage. If the user requests offline use, set `WOMBAT_AUTO_PRICES=0`. Do not invent a readiness flag, database query, project percentage or ETA.
 
 `LOCAL_ACCESS_DENIED` identifies a local process or service permission failure, including account/setup section errors. Keep the executable, environment and scope of the same read-only command. Request only the access that command needs. After access is granted, run the command once more.
 
@@ -37,12 +37,10 @@ If several methods need that same inaccessible service, do not probe them one by
 
 Do not restart scanning, reinstall, read credentials, broaden permissions for the whole task or substitute raw-log scans. A generic `CODEX_DISCONNECTED` is not proof of a permission failure. Keep the verified data directory on every isolated command when shell environments do not persist.
 
-Call `api --json` once. Use its runtime version and method list for later requests. Read `api --method METHOD --json` only for a needed input Schema. Request `--output-schema` only for unfamiliar response fields.
+For a familiar read, use the documented CLI command directly. Reuse the known executable, supported request and adequate view. Do not run version, setup, service-status or API probes before every question.
 
-Prefer `call` with one stdin JSON object `{method,params}`. Send JSON through a file or a literal quoted here-document. Avoid shell interpolation and extra escaping. Examples in references also show human CLI syntax.
+Read `api --method METHOD --json` only for an unfamiliar method or field, or to correct INVALID_ARGUMENT. Request `--output-schema` only for unfamiliar response fields. Use `api --json` when the available method itself is unknown. Reuse returned discovery within this conversation; correct a failed request once. A missing command or unsupported method is a capability gap, not permission to upgrade.
 
-Use the generated method Schema for Agent calls rather than combining CLI flags with params. Set `compact:true` and a small limit where supported. Keep IDs, scope and versions. On INVALID_ARGUMENT, read the needed Schema.
-
-Correct the request once. If the runtime has no `api`, read `--version --json` once. Read the relevant command's help once. Version alone does not establish support.
+Use `call` with one stdin JSON object `{method,params}` for batching or structured selections. Follow the method's generated Schema; CLI flags do not belong in params. Send JSON through a file or a literal quoted here-document. For a simple fact, the documented human CLI syntax is enough. Keep IDs, scope and versions, and use compact output with a small page where supported.
 
 A recovery hint never authorizes a write retry.

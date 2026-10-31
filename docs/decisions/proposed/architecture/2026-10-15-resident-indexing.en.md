@@ -4,6 +4,8 @@
 
 Status: proposed
 
+The startup-preparation, notification-driven and idle-discovery portions are superseded by [demand-driven indexing](../../implemented/architecture/2026-10-31-demand-indexing.en.md). Durable recovery and resource-reclamation rationale, together with unresolved native-platform and scale qualification, remain applicable.
+
 ## Problem
 
 The first real query waits for initial preparation. Idle service exits repeat startup and parser recovery. Keeping the existing process alive would also retain source-wide parser state and detail caches. Moving work into the background alone does not reduce its computation or memory.

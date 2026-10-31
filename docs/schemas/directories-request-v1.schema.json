@@ -27,12 +27,6 @@
         "null"
       ]
     },
-    "choiceToken": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
     "grantId": {
       "type": [
         "string",
@@ -46,8 +40,6 @@
       "type": "string",
       "enum": [
         "list",
-        "choose",
-        "confirm",
         "authorize",
         "revoke"
       ]

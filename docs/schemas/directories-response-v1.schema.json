@@ -16,18 +16,6 @@
       "items": {
         "$ref": "#/definitions/Grant"
       }
-    },
-    "chosenPath": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "choiceToken": {
-      "type": [
-        "string",
-        "null"
-      ]
     }
   },
   "required": [
@@ -40,8 +28,6 @@
       "type": "string",
       "enum": [
         "list",
-        "choose",
-        "confirm",
         "authorize",
         "revoke"
       ]

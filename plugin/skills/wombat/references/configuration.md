@@ -1,6 +1,6 @@
 # Current configuration
 
-Default to this Codex workspace only when the request means “this project”. Otherwise keep the selected project's exact cwd. Use the discovered Agent API. Read each needed method Schema once.
+Default to this Codex workspace only when the request means “this project”. Otherwise keep the selected project's exact cwd. Reuse known requests. Read a method Schema only for an unfamiliar field or a failed request.
 
 `optimize` lists suggestions with a scalar `project`. `config` reads inventory with `scope.project`. Request at most three initial items. For several configuration kinds, use one `config` request with `kinds`.
 

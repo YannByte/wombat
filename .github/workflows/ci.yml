@@ -127,25 +127,6 @@ jobs:
         run: corepack pnpm licenses:generate
       - name: Release gate
         run: corepack pnpm release:check
-      - name: Install pinned browser acceptance tools
-        if: matrix.target == 'linux-x64'
-        run: |
-          npm install --prefix "$RUNNER_TEMP/wombat-browser-tools" --no-save --package-lock=false playwright@1.62.1
-          node "$RUNNER_TEMP/wombat-browser-tools/node_modules/playwright/cli.js" install --with-deps chromium
-      - name: Browser acceptance with synthetic data
-        if: matrix.target == 'linux-x64'
-        run: >-
-          corepack pnpm verify:e2e -- --scope browser
-          --output-dir "$RUNNER_TEMP/wombat-browser-acceptance"
-          --playwright-module "$RUNNER_TEMP/wombat-browser-tools/node_modules/playwright/index.mjs"
-      - name: Retain synthetic browser acceptance report
-        if: always() && matrix.target == 'linux-x64'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: browser-acceptance-linux-x64
-          path: ${{ runner.temp }}/wombat-browser-acceptance/
-          if-no-files-found: ignore
-          retention-days: 1
       - name: Export core, bundled runtime and notices
         run: corepack pnpm native:export
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

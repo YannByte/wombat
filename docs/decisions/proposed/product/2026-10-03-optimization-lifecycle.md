@@ -10,7 +10,7 @@ Status: proposed
 
 ## 方案
 
-沿用共享 Rust 事实与生成契约，在 Web 和无交互接口共同补齐以下能力。当前界面、字段和操作分别由 [UI README](../../../development/frontend.md)、[契约](../../../development/contracts.md)和 [CLI 指南](../../../guides/cli.md)维护；发送与执行的职责由[原生交接决定](../../implemented/architecture/2026-10-03-native-codex-handoff.md)维护，不在此复制已交付机制。
+沿用共享 Rust 事实与生成契约，在 Web 和无交互接口共同补齐以下能力。当前界面、字段和操作分别由 [UI README](../../../development/architecture.md)、[契约](../../../development/contracts.md)和 [CLI 指南](../../../guides/cli.md)维护；发送与执行的职责由[原生交接决定](../../implemented/architecture/2026-10-03-native-codex-handoff.md)维护，不在此复制已交付机制。
 
 ### 运行观察与内容依据
 
@@ -36,7 +36,7 @@ G08：可靠历史版本下区分未观察到、版本未知、确认采用和�
 
 ### 完整产品旅程
 
-G09：补齐 Windows Hook、跨平台安装和完整故障旅程；发行操作由[发行 Skill](../../../../.agents/skills/wombat-release/SKILL.md)维护，目标平台的长期取舍由 [GitHub 分发决策](../../implemented/architecture/2026-10-04-github-release-distribution.md)维护；桌面范围及取舍由[本机 Web 决定](../../implemented/architecture/2026-10-01-local-web.md)维护，不将 Tauri 并入本轮 Web/CLI 修复。首次读取和项目级进度归[初始化提案](2026-10-02-progressive-initialization.md)，规模目标归[实时提案](../architecture/2026-09-30-live-usage.md)。
+G09：补齐 Windows Hook、跨平台安装和完整故障旅程；发行操作由[发行 Skill](../../../../.agents/skills/wombat-release/SKILL.md)维护，目标平台的长期取舍由 [GitHub 分发决策](../../implemented/architecture/2026-10-04-github-release-distribution.md)维护；桌面范围及取舍由[本机 Web 决定](../../implemented/architecture/2026-10-01-local-web.md)维护，不将 Tauri 并入本轮 Web/CLI 修复。首次读取和项目级进度归[初始化提案](../../rejected/product/2026-10-02-progressive-initialization.md)，规模目标归[实时提案](../architecture/2026-09-30-live-usage.md)。
 
 五页连续跨项目操作须保留范围、筛选、准确轮次、列表、焦点与查看位置；迟到响应、刷新和语言切换不能覆盖新选择。中文/英文、320/390/1280/1440px、原生下拉键盘、取消/关闭、未知送达、并发和版本变化均需实际浏览器旅程。补齐账户摘要、真实耗尽、过期限制和各分区独立降级验证，不从本机用量推导额度。
 

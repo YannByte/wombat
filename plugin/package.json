@@ -1,6 +1,6 @@
 {
   "name": "wombat",
-  "description": "Analyze Codex token usage and review configuration with local evidence",
+  "description": "Diagnose coding-agent project obstacles with local work evidence and exact usage",
   "license": "MIT",
   "homepage": "https://github.com/YannByte/wombat",
   "requiredCapabilities": [
@@ -11,7 +11,6 @@
     "config-json-v1",
     "account-json-v1",
     "handoff-json-v1",
-    "web-context-v1",
     "collection-json-v1",
     "setup-json-v1",
     "agent-api-v1",
@@ -20,9 +19,6 @@
     "config-content-hashes-v1"
   ],
   "skills": [
-    "wombat",
-    "wombat-daily-review",
-    "wombat-task-retro",
-    "wombat-config-review"
+    "wombat"
   ]
 }

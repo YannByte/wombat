@@ -9,8 +9,6 @@ use std::{fs, path::PathBuf};
 pub enum Action {
     #[default]
     List,
-    Choose,
-    Confirm,
     Authorize,
     Revoke,
 }
@@ -27,7 +25,6 @@ pub struct Request {
     pub action: Action,
     pub purpose: Option<Purpose>,
     pub path: Option<String>,
-    pub choice_token: Option<String>,
     pub grant_id: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
@@ -46,8 +43,6 @@ pub struct Response {
     pub output_version: u32,
     pub action: Action,
     pub grants: Vec<Grant>,
-    pub chosen_path: Option<String>,
-    pub choice_token: Option<String>,
 }
 fn db_path() -> Result<PathBuf> {
     Ok(crate::storage::data_home()?.join("user-v1/directories.sqlite3"))
@@ -191,25 +186,17 @@ pub fn dispatch(r: Request) -> Result<Response> {
             connection()?.execute("DELETE FROM grants WHERE id=?1", [id])?;
         }
         Action::List => {
-            if r.path.is_some() || r.choice_token.is_some() {
+            if r.path.is_some() {
                 return Err(crate::dto::operation_error(
                     "INVALID_ARGUMENT",
                     "读取不能授权目录",
                 ));
             }
         }
-        _ => {
-            return Err(crate::dto::operation_error(
-                "HOST_SELECTION_REQUIRED",
-                "需要宿主目录选择器",
-            ));
-        }
     }
     Ok(Response {
         output_version: 1,
         action: r.action,
         grants: grants()?,
-        chosen_path: None,
-        choice_token: None,
     })
 }

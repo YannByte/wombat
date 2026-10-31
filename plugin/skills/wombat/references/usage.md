@@ -2,7 +2,7 @@
 
 Start with the original scope and a small compact query. In the Agent API, live `usage` wraps `query`, `mode` and `verify`. Pin a returned `live:` ID in `usage.params.query.snapshotId` with `mode:"cached"`. The `snapshot` method takes a query directly and addresses saved disk snapshots. For human CLI calls, use `usage --compact --limit 3 --json`.
 
-If unsupported, omit `--compact`. A live query prepares data as needed. Do not refresh or scan separately before each task.
+A live query prepares data as needed. Do not refresh or scan separately before each task. An unsupported option or format needs the current runtime or explicit recovery; do not silently downgrade the request.
 
 Resolve “today/yesterday” and relative periods using the user's local date and timezone, not display language. Pass the timezone explicitly. The CLI default is UTC. `--since` includes its date and `--until` excludes it.
 

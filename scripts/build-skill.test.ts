@@ -10,7 +10,7 @@ test('plugin and standalone resources derive from declared Skill sources with ma
     assert.deepEqual(metadata.files,inventory(path.join(output,'wombat')));
     assert.deepEqual(inventory(path.join(output,'wombat')),inventory(path.join(output,'plugin/skills/wombat')));
     const names=skillNames(root);
-    assert.equal(names.length,4);
+    assert.equal(names.length,1);
     for(const name of names){
       const source=inventory(path.join(root,'plugin/skills',name));
       assert.deepEqual(inventory(path.join(output,'plugin/skills',name)),source);
@@ -58,7 +58,8 @@ test('shipped Skill catalog rejects missing, duplicate and unsafe names',()=>{
   try {
     mkdirSync(path.join(root,'plugin'));
     const check=(skills:unknown)=>{writeFileSync(path.join(root,'plugin/package.json'),JSON.stringify({skills}));return skillNames(root);};
-    assert.deepEqual(check(['wombat','wombat-task-retro']),['wombat','wombat-task-retro']);
+    assert.deepEqual(check(['wombat']),['wombat']);
+    assert.throws(()=>check(['wombat','wombat-task-retro']));
     for(const invalid of [undefined,{},[],['wombat','wombat'],['other','wombat'],['wombat','../other'],['wombat','UPPER'],['wombat',42],['wombat','x'.repeat(65)],Array.from({length:33},(_,i)=>i?'skill-'+i:'wombat')])assert.throws(()=>check(invalid));
   }finally{rmSync(root,{recursive:true,force:true});}
 });
@@ -76,7 +77,7 @@ test('Skill presentation follows source changes and rejects unusable invocation 
     writeFileSync(file,JSON.stringify({interface:null}));assert.throws(()=>skillPresentation(file,'$wombat:wombat'));
     writeFileSync(file,'{broken');assert.throws(()=>skillPresentation(file,'$wombat:wombat'));
     writeFileSync(file,JSON.stringify({interface:{...view,default_prompt:'Use $wombat-task-retro to inspect the selected task.'}}));
-    assert.equal(skillPresentation(file,'$wombat:wombat-task-retro').defaultPrompt[0],'Use $wombat:wombat-task-retro to inspect the selected task.');
+    assert.throws(()=>skillPresentation(file,'$wombat:wombat-task-retro'));
     assert.throws(()=>skillPresentation(file,'$wombat:wombat-daily-review'));
     assert.throws(()=>skillPresentation(file,'$wombat:../../other'));
   }finally{rmSync(dir,{recursive:true,force:true});}

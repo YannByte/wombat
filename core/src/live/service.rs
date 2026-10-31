@@ -1,4 +1,4 @@
-//! Resident indexing shares the existing writer and committed read views.
+//! Optional resident lifetime; source work is authorized only by queries.
 use super::*;
 use crate::service_dto::{Action, Request, Response};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -117,7 +117,6 @@ pub(super) struct Control {
     pub resident: AtomicBool,
     pub paused: AtomicBool,
     pub stopping: AtomicBool,
-    pub changed: AtomicBool,
     pub watcher_ok: AtomicBool,
     pub cache_bytes: AtomicU64,
     pub instance: String,
@@ -199,7 +198,6 @@ impl Control {
             resident: AtomicBool::new(resident),
             paused: AtomicBool::new(paused),
             stopping: AtomicBool::new(false),
-            changed: AtomicBool::new(false),
             watcher_ok: AtomicBool::new(false),
             cache_bytes: AtomicU64::new(0),
             instance: uuid::Uuid::new_v4().to_string(),
@@ -207,39 +205,7 @@ impl Control {
         })
     }
 }
-pub(super) fn prepare(shared: &Shared, jobs: &mpsc::SyncSender<Job>) -> Result<()> {
-    let roots = Vec::new();
-    let key = source_key(&roots);
-    let mut entries = shared.0.lock().unwrap();
-    let entry = entries
-        .entry(key.clone())
-        .or_insert_with(|| Entry::new(roots));
-    if entry.paused {
-        entry.restoring = true;
-        if jobs
-            .try_send(Job {
-                key,
-                restore_only: true,
-            })
-            .is_err()
-        {
-            entry.restoring = false;
-            return Err(operation_error(
-                "UPDATE_BUSY",
-                "Unable to queue committed data restoration",
-            ));
-        }
-        return Ok(());
-    }
-    scheduling::request_work(entry, &key, false, false, jobs)?;
-    Ok(())
-}
-pub(super) fn handle(
-    request: Request,
-    control: &Control,
-    shared: &Shared,
-    jobs: &mpsc::SyncSender<Job>,
-) -> Result<Response> {
+pub(super) fn handle(request: Request, control: &Control, shared: &Shared) -> Result<Response> {
     let _settings = control
         .settings
         .lock()
@@ -265,7 +231,6 @@ pub(super) fn handle(
             for entry in shared.0.lock().unwrap().values_mut() {
                 entry.paused = false;
             }
-            prepare(shared, jobs)?;
         }
         Action::Pause => {
             paused()?;
@@ -329,17 +294,14 @@ pub(super) fn handle(
     })
 }
 
+/// Notifications invalidate retained views; they never enqueue source work.
 pub(super) struct Watch {
     watcher: Option<notify::RecommendedWatcher>,
     roots: std::collections::BTreeSet<PathBuf>,
-    keys: std::collections::BTreeSet<String>,
-    updated: Instant,
 }
 impl Watch {
-    pub fn new(control: Arc<Control>, jobs: mpsc::SyncSender<Job>) -> Self {
-        let callback_control = Arc::clone(&control);
+    pub fn new(control: Arc<Control>, shared: Shared) -> Self {
         let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            // Access events caused by our own reads must not trigger another scan.
             if event
                 .as_ref()
                 .is_ok_and(|e| matches!(e.kind, notify::EventKind::Access(_)))
@@ -347,35 +309,21 @@ impl Watch {
                 return;
             }
             if event.is_err() {
-                callback_control.watcher_ok.store(false, Ordering::Relaxed);
+                control.watcher_ok.store(false, Ordering::Relaxed);
             }
-            if callback_control.changed.swap(true, Ordering::Relaxed) {
-                return;
+            for entry in shared.0.lock().unwrap().values_mut() {
+                entry.changed = true;
             }
-            let _ = jobs.try_send(Job {
-                key: String::new(),
-                restore_only: false,
-            });
         })
         .ok();
         Self {
             watcher,
             roots: Default::default(),
-            keys: Default::default(),
-            updated: Instant::now()
-                .checked_sub(Duration::from_secs(300))
-                .unwrap_or_else(Instant::now),
         }
     }
-    pub fn update(&mut self, shared: &Shared, control: &Control, force: bool) {
+    /// Called before requested work, never by an idle timer or notification.
+    pub fn update(&mut self, shared: &Shared, control: &Control) {
         use notify::Watcher;
-        let keys: std::collections::BTreeSet<_> =
-            shared.0.lock().unwrap().keys().cloned().collect();
-        if !force && keys == self.keys && self.updated.elapsed() < Duration::from_secs(300) {
-            return;
-        }
-        self.keys = keys;
-        self.updated = Instant::now();
         let roots: std::collections::BTreeSet<_> = shared
             .0
             .lock()
@@ -401,7 +349,6 @@ impl Watch {
             if self.roots.contains(&root) && root.exists() {
                 continue;
             }
-            // A missing root remains retryable through the periodic discovery pass.
             if watcher
                 .watch(
                     &root,

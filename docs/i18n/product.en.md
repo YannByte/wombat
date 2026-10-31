@@ -2,7 +2,7 @@
 
 [中文](product.md) | English
 
-This page defines the CLI/Web presentation language and the rules for user-facing pages and copy. The [bilingual documentation workflow](workflow.en.md) owns document pairing.
+This page defines the CLI presentation language and the rules for user-facing pages and copy. The [bilingual documentation workflow](workflow.en.md) owns document pairing.
 
 ## Usage
 
@@ -15,7 +15,6 @@ WOMBAT_LANG=en wombat --help
 
 Language precedence is `--lang`, `WOMBAT_LANG`, system language, then the Chinese compatibility default. Supported languages are `zh` / `en` and their regional tags. The system language is the first nonempty value of `LC_ALL`, `LC_MESSAGES`, and `LANG`, or the runtime language when none is set; `C` / `POSIX` selects English. An unsupported explicit selection is an argument error; an unmatched system language falls back to Chinese.
 
-Web switches through the header or detail language button while retaining page, filters, dialogs, focus and original content. Explicit link language (from --lang or WOMBAT_LANG) takes precedence, followed by local `user-v1/language.json`, tab-session choice and browser language. Changes persist through the narrow preference API across ports/restarts; save failures offer retry. CLI continues using arguments and environment without reading the Web preference.
 
 ## User-facing pages and copy
 
@@ -32,14 +31,14 @@ Use these rules to write and review pages, dialogs, forms, notices, CLI help, an
 
 ## Module boundaries
 
-- `@wombat/client/locale` is a separate public entry written in portable TypeScript, with no Node, React, or Rust dependency. It provides `LocaleRuntime`, `resolveLocale`, typed `t`, immutable state, and subscriptions; each CLI process or browser page uses its own presentation instance.
+- `@wombat/client/locale` is a separate public entry written in portable TypeScript, with no Node, React, or Rust dependency. It provides `LocaleRuntime`, `resolveLocale`, typed `t`, immutable state, and subscriptions; each CLI process uses its own presentation instance.
 - `client/src/locale/zh.ts` and `en.ts` contain complete messages with feature-prefixed keys; the Chinese key set constrains the English keys. Parameter names are derived from Chinese templates, and a separate check verifies bilingual parameter parity. Values are inserted verbatim without recursive parsing or translation.
-- The CLI interprets language arguments and environment variables; Web reads language state. Module-level labels resolve lazily to avoid capturing an old language at startup. UI operations use stable identifiers and must not infer business actions from translated text.
+- The CLI interprets language arguments and environment variables. Module-level labels resolve lazily to avoid capturing an old language at startup. UI operations use stable identifiers and must not infer business actions from translated text.
 - Language affects help, notices, labels, dates, and compact number display. JSON fields, error codes, model identifiers, source titles, user content, usage, and amounts are not translated. Known core and host progress signals are mapped at the presentation layer; unknown core diagnostics and source issues remain verbatim.
 - Count messages use complete templates and native `Intl.PluralRules` for singular/plural selection; zero, unknown values and two independent counts are handled separately. Month buckets show localized calendar months without converting calendar dates to the host timezone. Configuration instruction tokens are marked as estimates. Lists use KiB (1,024 B), retain exact byte evidence and sort by raw values.
 
 ## Verification and limits
 
-`corepack pnpm i18n:check` checks static Chinese and English dictionaries for missing, duplicate, and empty entries, interpolation-parameter parity, and mixed-language values. It also checks hard-coded copy in selected CLI/Web presentation sinks. Source checks validate finite translation keys and `@wombat/client/locale` bindings. They follow same-file constants, no-argument helper returns, and limited conditional composition, and detect translated results passed directly into React state. The check uses the TypeScript syntax tree and ignores comments; it is not general cross-file data-flow analysis. Dynamic cross-file composition may be missed. Passing checks do not establish translation quality or complete runtime coverage; review the actual interface and language switching under the rules above.
+`corepack pnpm i18n:check` checks static Chinese and English dictionaries for missing, duplicate, and empty entries, interpolation-parameter parity, and mixed-language values. It also checks hard-coded copy in selected CLI presentation sinks. Source checks validate finite translation keys and `@wombat/client/locale` bindings. They follow same-file constants, no-argument helper returns, and limited conditional composition. The check uses the TypeScript syntax tree and ignores comments; it is not general cross-file data-flow analysis. Dynamic cross-file composition may be missed. Passing checks do not establish translation quality or complete runtime coverage; review the actual interface and language switching under the rules above.
 
-`corepack pnpm test:repo` exercises checker failure cases; module tests cover language precedence, runtime switching, presentation formatting; end-to-end tests after a build confirm that language does not alter shared core data. This delivery covers Chinese and English CLI/Web presentation. It does not add arbitrary language plugins, a general grammar expression language, right-to-left layout, a documentation website, or full translation of core diagnostics.
+`corepack pnpm test:repo` exercises checker failure cases; module tests cover language precedence, runtime switching, presentation formatting; end-to-end tests after a build confirm that language does not alter shared core data. This delivery covers Chinese and English CLI presentation. It does not add arbitrary language plugins, a general grammar expression language, right-to-left layout, a documentation website, or full translation of core diagnostics.

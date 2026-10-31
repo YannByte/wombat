@@ -23,8 +23,7 @@
   },
   "dependencies": {
     "@wombat/client": "workspace:*",
-    "string-width": "7.2.0",
-    "@wombat/web": "workspace:*"
+    "string-width": "7.2.0"
   },
   "devDependencies": {
     "@types/node": "22.20.4",

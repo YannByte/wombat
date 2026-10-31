@@ -2,13 +2,12 @@
 
 English | [中文](README.zh-CN.md)
 
-`@wombat/cli` reads arguments and writes text or JSON results. It connects typed queries to the local core and starts Web on request.
+`@wombat/cli` reads arguments and writes text or JSON results. It connects typed queries to the local core.
 
 ## Public entries
 
 - The package exports argument parsing and `runUsageCli`. `./format` exports text formatting.
 - `api` lists local methods and schemas. `call` reads one bounded JSON request from stdin.
-- `web` starts the local Web host. With no subcommand, the CLI prints usage text.
 
 ## Limits
 

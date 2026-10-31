@@ -5,6 +5,7 @@ import {
   appendFile,
   mkdir,
   readFile,
+  access,
   rename,
   writeFile,
 } from "node:fs/promises";
@@ -17,7 +18,7 @@ import {
 } from "../helpers/local-product.js";
 
 test(
-  "resident indexing updates without readers, pauses, resumes, restores and preserves fixed reads",
+  "resident lifetime performs no indexing without queries and preserves pause, restart and fixed reads",
   { timeout: 180_000 },
   async (t) => {
     await withLocalProduct(async (f) => {
@@ -29,6 +30,12 @@ test(
       ]);
       const started = await f.client.service!({ action: "start" });
       assert(started.running && started.resident);
+      assert.equal(started.revision, null);
+      await f.client.service!({ action: "resume" });
+      await assert.rejects(access(path.join(f.data, "live-v2/index.sqlite")), {code: "ENOENT"});
+      const fresh = () => f.client.live!({
+        query: { action: "usage", scope: { allTime: true } }, mode: "fresh", waitMs: 15000,
+      });
       const cached = () =>
         f.client.live!({
           query: { action: "usage", scope: { allTime: true } },
@@ -47,11 +54,7 @@ test(
           "Resident service did not publish the expected committed state",
         );
       };
-      await until(async () => {
-        const s = await f.client.service!({ action: "status" });
-        return s.ready === true && !s.preparing;
-      });
-      const first = await cached();
+      const first = await fresh();
       assert.equal(first.result.summary.tokens.total, 100);
       // Cross the old idle-exit boundary with no clients connected.
       await delay(16_000);
@@ -61,14 +64,20 @@ test(
       );
       const file = path.join(f.root, "sessions/task.jsonl");
       await f.append("task", [measurement("task", "second", 200, at)]);
-      // Waiting here is intentional: no live read is allowed to trigger synchronization.
+      // Observe an intentional quiet window through read-only status/cached reads.
+      // A source notification must not authorize indexing in the absence of a live query.
+      const quietUntil = Date.now() + 2000;
+      while (Date.now() < quietUntil) {
+        const status = await f.client.service!({action: "status"});
+        assert.equal(status.revision, first.result.snapshotRef.snapshotId);
+        assert.equal(status.preparing, false);
+        assert.equal((await cached()).result.summary.tokens.total, 100);
+        await delay(100);
+      }
+      // Auto reads must consume invalidation even within the five-minute cache lifetime.
       await until(async () => {
-        const s = await f.client.service!({ action: "status" });
-        return (
-          !!s.revision &&
-          s.revision !== first.result.snapshotRef.snapshotId &&
-          !s.preparing
-        );
+        const value = await f.client.live!({query: {action: "usage", scope: {allTime:true}}});
+        return value.result.summary.tokens.total === 300 && value.freshness.status === "current";
       });
       const second = await cached();
       assert.equal(second.result.summary.tokens.total, 300);
@@ -100,13 +109,11 @@ test(
       }
       await f.client.service!({ action: "resume" });
       t.diagnostic(
-        "Background append and fixed reads passed; checking pause and incomplete tails",
+        "On-demand append and fixed reads passed; checking pause and incomplete tails",
       );
-      const browser = await f.browser();
-      assert((await browser.service!({ action: "status" })).running);
-      await assert.rejects(browser.service!({ action: "pause" }), {
-        code: "EACCES",
-      });
+      const nativeApi = await f.native();
+      assert((await nativeApi.service!({ action: "status" })).running);
+      assert((await nativeApi.service!({action:"pause"})).paused);
       const paused = await f.client.service!({ action: "pause" });
       assert(paused.paused);
       await f.append("task", [measurement("task", "third", 300, at)]);
@@ -120,13 +127,8 @@ test(
         },
       );
       await f.client.service!({ action: "resume" });
-      await until(async () => {
-        const s = await f.client.service!({ action: "status" });
-        return (
-          s.revision !== second.result.snapshotRef.snapshotId && !s.preparing
-        );
-      });
-      assert.equal((await cached()).result.summary.tokens.total, 600);
+      assert.equal((await cached()).result.summary.tokens.total, 300);
+      assert.equal((await fresh()).result.summary.tokens.total, 600);
       // A split line cannot publish a half observation.
       const tail = JSON.stringify(measurement("task", "fourth", 400, at));
       await appendFile(file, tail.slice(0, tail.length / 2));
@@ -138,7 +140,7 @@ test(
       assert.equal((await cached()).result.summary.tokens.total, 600);
       await appendFile(file, tail.slice(tail.length / 2) + "\n");
       await until(async () => {
-        const result = await cached();
+        const result = await fresh();
         return result.result.summary.tokens.total === 1000;
       });
       await f.client.service!({ action: "pause" });
@@ -147,10 +149,9 @@ test(
       );
       await f.stop();
       await f.start(true);
-      await until(async () => {
-        const s = await f.client.service!({ action: "status" });
-        return s.paused && s.ready === true && !s.preparing;
-      });
+      const beforeRestore = await f.client.service!({action: "status"});
+      assert(beforeRestore.paused);
+      assert.equal(beforeRestore.revision, null);
       const restored = await cached();
       assert.equal(restored.result.summary.tokens.total, 1000);
       assert.equal(restored.freshness.status, "paused");

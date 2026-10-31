@@ -60,9 +60,7 @@ export const focusedQuestions={
   ],
 } as const;
 export type FocusedScenario=keyof typeof focusedQuestions;
-export const taskSkillNames={ 'daily-review':'wombat-daily-review','task-retro':'wombat-task-retro','config-review':'wombat-config-review' } as const;
-export function taskSkill(scenario:string):string{return Object.hasOwn(taskSkillNames,scenario)?taskSkillNames[scenario as keyof typeof taskSkillNames]:'wombat';}
-export const conversationScenarios=['workflow',...Object.keys(focusedQuestions)] as const;
+export const conversationScenarios=[...Object.keys(focusedQuestions)] as const;
 export function isFocusedScenario(value:string):value is FocusedScenario{return Object.hasOwn(focusedQuestions,value);}
 export function focusedQuestion(scenario:FocusedScenario,language:ConversationLanguage,variant:number):string {
   assert.ok(Number.isInteger(variant)&&variant>=0&&variant<4,'Expected variant 0..3');

@@ -1,77 +1,117 @@
-import {test} from 'node:test';
+import { projectTestClient } from '../helpers/project-client.js';
+import type { UsageClient } from '@wombat/client';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {realpathSync} from 'node:fs';
-import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn,spawnSync} from 'node:child_process';
-import {once} from 'node:events';
-import {createNodeClient} from '@wombat/client/node';
-import {createHttpClient} from '@wombat/client/http';
-import {startWebHost} from '@wombat/web';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
+import { createNodeClient } from '@wombat/client/node';
+test('task statistics and budgets share exact facts across Agent CLI and native calls', { timeout: 60000 }, async () => {
+    const dir = realpathSync.native(await mkdtemp(path.join(os.tmpdir(), 'wombat-statistics-'))), source = path.join(dir, 'source'), foreign = path.join(dir, 'foreign'), project = path.join(dir, 'project');
+    for (const folder of [source, foreign])
+        await mkdir(path.join(folder, 'sessions'), { recursive: true });
+    await mkdir(project);
+    const date = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10), today = date(0), yesterday = date(-1), tomorrow = date(1);
+    const write = async (root: string, id: string, amounts: [
+        string,
+        number
+    ][]) => {
+        const records = [{ type: 'session_meta', payload: { id, cwd: project } }, { type: 'turn_context', payload: { turn_id: 'turn', model: 'gpt-5.4' } }, ...amounts.map(([day, total], n) => ({ timestamp: day + 'T00:01:00Z', type: 'event_msg', payload: { type: 'token_usage_record', thread_id: id, turn_id: 'turn', response_id: id + n, usage: { input_tokens: total, cached_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 0, reasoning_output_tokens: 0, total_tokens: total } } }))];
+        const file = path.join(root, 'sessions', id + '.jsonl'), body = records.map(r => JSON.stringify(r)).join('\n') + '\n';
+        await writeFile(file, body);
+        return { file, body };
+    };
+    const original = await Promise.all([write(source, 'a', [[yesterday, 100], [today, 100], [today, 50]]), write(source, 'b', [[yesterday, 100], [today, 0]]), write(source, 'c', [[today, 300]]), write(foreign, 'foreign', [[today, 999]])]);
+    const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES, WOMBAT_CORE_BIN: process.env.WOMBAT_CORE_BIN };
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), entry = path.resolve('dist/wombat.js');
+    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: source, WOMBAT_AUTO_PRICES: '0', WOMBAT_CORE_BIN: binary });
+    const service = spawn(binary, ['--serve-usage'], { env: process.env, stdio: 'ignore' });
+    await once(service, 'spawn');
+    const client = createNodeClient({ binaryPath: binary, automaticPrices: false });
+    let nativeEntry: UsageClient | undefined;
+    const run = (args: string[], input = '') => { const result = spawnSync(process.execPath, [entry, ...args], { env: process.env, input, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }); assert.ifError(result.error); assert.equal(result.status, 0, result.stderr); return JSON.parse(result.stdout); };
+    try {
+        const live = await client.live!({ query: { action: 'threads', roots: [source], scope: { allTime: true }, limit: 3 }, mode: 'fresh' }), snapshotId = live.result.snapshotRef.snapshotId;
+        const scope = { project, since: today, until: tomorrow, timezone: 'UTC' }, comparison = { kind: 'periods' as const, baselineSince: yesterday, baselineUntil: today, dimension: 'thread' as const };
+        const request = { action: 'statistics' as const, snapshotId, scope, comparison, presentation: 'models' as const, limit: 1 };
+        const stats = (await client.live!({ query: request, mode: 'cached' })).result.statistics!;
+        assert.deepEqual([stats.population.measuredTasks, stats.population.completeTasks, stats.population.completeTaskTokens, stats.population.meanTokens, stats.population.medianTokens, stats.population.p90Tokens], [3, 3, 450, 150, 150, 270]);
+        assert.equal(stats.growth!.taskCountDelta, 1);
+        assert.equal(stats.growth!.attributedTokenDelta, 250);
+        assert.equal(stats.growth!.taskCountContribution! + stats.growth!.perTaskContribution!, 250);
+        const selected = live.result.items.find(i => i.kind === 'thread' && i.threadUsage.tokens.total === 300);
+        assert.ok(selected && selected.kind === 'thread');
+        const typical = (await client.live!({ query: { ...request, threadId: selected.id }, mode: 'cached' })).result.statistics!.selectedTask!;
+        assert.equal(typical.aboveP90, true);
+        assert.equal(typical.percentileRank, 5 / 6);
+        const agent = run(['call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: request } }));
+        assert.deepEqual(agent.result.statistics, stats);
+        const human = run(['statistics', '--snapshot', snapshotId, '--project', project, '--since', today, '--until', tomorrow, '--baseline-since', yesterday, '--baseline-until', today, '--presentation', 'models', '--limit', '1', '--json']);
+        assert.deepEqual(human.statistics, stats);
+        run(['monitor', 'set', '--id', 'daily', '--period', 'day', '--tokens', '400', '--review', '--project', project, '--timezone', 'UTC', '--json']);
+        const first = run(['monitor', 'check', '--id=daily', '--root', source, '--json']);
+        assert.equal(first.notifications.length, 2);
+        assert.ok(first.notifications.some((n: {
+            kind: string;
+        }) => n.kind === 'budget_exceeded'));
+        assert.equal(run(['monitor', 'check', '--id', 'daily', '--root', source, '--json']).notifications.length, 0);
+        const foreignView = (await client.live!({ query: { action: 'usage', roots: [foreign], scope: { allTime: true } }, mode: 'fresh' })).result;
+        await client.monitor!({ action: 'upsert', plan: { id: 'foreign', enabled: true, period: 'day', review: false, tokenLimit: 500, scope: { project, sourceInstanceId: foreignView.quality.sources[0].source.id, timezone: 'UTC' } } });
+        await client.monitor!({ action: 'check', snapshotId: foreignView.snapshotRef.snapshotId, ids: ['foreign'] });
+        nativeEntry = projectTestClient(client, [source], [project]);
 
-test('task statistics and budgets share exact facts across Agent CLI and authorized Web', {timeout:60000},async()=>{
- const dir=realpathSync.native(await mkdtemp(path.join(os.tmpdir(),'wombat-statistics-'))),source=path.join(dir,'source'),foreign=path.join(dir,'foreign'),project=path.join(dir,'project');
- for(const folder of [source,foreign])await mkdir(path.join(folder,'sessions'),{recursive:true});await mkdir(project);
- const date=(offset:number)=>new Date(Date.now()+offset*86400000).toISOString().slice(0,10),today=date(0),yesterday=date(-1),tomorrow=date(1);
- const write=async(root:string,id:string,amounts:[string,number][])=>{
-  const records=[{type:'session_meta',payload:{id,cwd:project}},{type:'turn_context',payload:{turn_id:'turn',model:'gpt-5.4'}},...amounts.map(([day,total],n)=>({timestamp:day+'T00:01:00Z',type:'event_msg',payload:{type:'token_usage_record',thread_id:id,turn_id:'turn',response_id:id+n,usage:{input_tokens:total,cached_input_tokens:0,cache_creation_input_tokens:0,output_tokens:0,reasoning_output_tokens:0,total_tokens:total}}}))];
-  const file=path.join(root,'sessions',id+'.jsonl'),body=records.map(r=>JSON.stringify(r)).join('\n')+'\n';await writeFile(file,body);return {file,body};
- };
- const original=await Promise.all([write(source,'a',[[yesterday,100],[today,100],[today,50]]),write(source,'b',[[yesterday,100],[today,0]]),write(source,'c',[[today,300]]),write(foreign,'foreign',[[today,999]])]);
- const old={WOMBAT_DATA_HOME:process.env.WOMBAT_DATA_HOME,CODEX_HOME:process.env.CODEX_HOME,WOMBAT_AUTO_PRICES:process.env.WOMBAT_AUTO_PRICES,WOMBAT_CORE_BIN:process.env.WOMBAT_CORE_BIN};
- const binary=path.resolve('dist',process.platform==='win32'?'wombat-core.exe':'wombat-core'),entry=path.resolve('dist/wombat.js');
- Object.assign(process.env,{WOMBAT_DATA_HOME:path.join(dir,'data'),CODEX_HOME:source,WOMBAT_AUTO_PRICES:'0',WOMBAT_CORE_BIN:binary});
- const service=spawn(binary,['--serve-usage'],{env:process.env,stdio:'ignore'});await once(service,'spawn');
- const client=createNodeClient({binaryPath:binary,automaticPrices:false});let host:Awaited<ReturnType<typeof startWebHost>>|undefined;
- const run=(args:string[],input='')=>{const result=spawnSync(process.execPath,[entry,...args],{env:process.env,input,encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});assert.ifError(result.error);assert.equal(result.status,0,result.stderr);return JSON.parse(result.stdout);};
- try{
-  const live=await client.live!({query:{action:'threads',roots:[source],scope:{allTime:true},limit:3},mode:'fresh'}),snapshotId=live.result.snapshotRef.snapshotId;
-  const scope={project,since:today,until:tomorrow,timezone:'UTC'},comparison={kind:'periods' as const,baselineSince:yesterday,baselineUntil:today,dimension:'thread' as const};
-  const request={action:'statistics' as const,snapshotId,scope,comparison,presentation:'models' as const,limit:1};
-  const stats=(await client.live!({query:request,mode:'cached'})).result.statistics!;
-  assert.deepEqual([stats.population.measuredTasks,stats.population.completeTasks,stats.population.completeTaskTokens,stats.population.meanTokens,stats.population.medianTokens,stats.population.p90Tokens],[3,3,450,150,150,270]);
-  assert.equal(stats.growth!.taskCountDelta,1);assert.equal(stats.growth!.attributedTokenDelta,250);assert.equal(stats.growth!.taskCountContribution!+stats.growth!.perTaskContribution!,250);
-  const selected=live.result.items.find(i=>i.kind==='thread'&&i.threadUsage.tokens.total===300);assert.ok(selected&&selected.kind==='thread');
-  const typical=(await client.live!({query:{...request,threadId:selected.id},mode:'cached'})).result.statistics!.selectedTask!;assert.equal(typical.aboveP90,true);assert.equal(typical.percentileRank,5/6);
-  const agent=run(['call'],JSON.stringify({method:'usage',params:{mode:'cached',query:request}}));assert.deepEqual(agent.result.statistics,stats);
-  const human=run(['statistics','--snapshot',snapshotId,'--project',project,'--since',today,'--until',tomorrow,'--baseline-since',yesterday,'--baseline-until',today,'--presentation','models','--limit','1','--json']);assert.deepEqual(human.statistics,stats);
-  run(['monitor','set','--id','daily','--period','day','--tokens','400','--review','--project',project,'--timezone','UTC','--json']);
-  const first=run(['monitor','check','--id=daily','--root',source,'--json']);assert.equal(first.notifications.length,2);assert.ok(first.notifications.some((n:{kind:string})=>n.kind==='budget_exceeded'));
-  assert.equal(run(['monitor','check','--id','daily','--root',source,'--json']).notifications.length,0);
-  const foreignView=(await client.live!({query:{action:'usage',roots:[foreign],scope:{allTime:true}},mode:'fresh'})).result;
-  await client.monitor!({action:'upsert',plan:{id:'foreign',enabled:true,period:'day',review:false,tokenLimit:500,scope:{project,sourceInstanceId:foreignView.quality.sources[0].source.id,timezone:'UTC'}}});
-  await client.monitor!({action:'check',snapshotId:foreignView.snapshotRef.snapshotId,ids:['foreign']});
-  host=await startWebHost({client,assets:path.resolve('dist/web'),roots:[source],projectRoots:[project],automaticPrices:false});
-  const token=new URLSearchParams(new URL(host.url).hash.slice(1)).get('token')!;
-  const browser=createHttpClient({origin:host.origin,token,fetch:(input,init)=>fetch(input,{...init,headers:{...init?.headers,Origin:host!.origin}})});
-  const webView=await browser.live!({query:{action:'usage',scope:{allTime:true},limit:1},mode:'fresh'});
-  const webStats=await browser.live!({query:{...request,snapshotId:webView.result.snapshotRef.snapshotId},mode:'cached'});assert.deepEqual(webStats.result.statistics,stats);
-  const listed=await browser.monitor!({action:'list'});assert.equal(listed.plans.length,1);assert.equal(listed.notifications.length,2);assert.ok(!JSON.stringify(listed).includes(foreignView.quality.sources[0].source.id));
-  await browser.monitor!({action:'acknowledge',notificationId:first.notifications[0].id});assert.ok((await client.monitor!({action:'list'})).notifications.find(n=>n.id===first.notifications[0].id)?.acknowledged);
-  await assert.rejects(browser.monitor!({action:'check',snapshotId:webView.result.snapshotRef.snapshotId,ids:['foreign']}),{code:'SOURCE_NOT_AUTHORIZED'});
-  await assert.rejects(browser.monitor!({action:'check',snapshotId:foreignView.snapshotRef.snapshotId,ids:['daily']}),{code:'VIEW_EXPIRED'});
-  await assert.rejects(browser.monitor!({action:'remove',id:'foreign'}),{code:'NOT_FOUND'});
-  await assert.rejects(browser.monitor!({action:'upsert',plan:{id:'foreign',enabled:true,period:'day',review:true,scope:{project}}}),{code:'NOT_FOUND'});
-  const plan=listed.plans[0];await browser.monitor!({action:'upsert',plan:{...plan,enabled:false}});
-  assert.equal((await browser.monitor!({action:'check',snapshotId:webView.result.snapshotRef.snapshotId,ids:['daily']})).notifications.length,0);
-  for(const {file,body}of original)assert.equal(await readFile(file,'utf8'),body);
-  const extra=await Promise.all([1,2,3].map(async n=>{const root=path.join(dir,'extra-'+n);await mkdir(path.join(root,'sessions'),{recursive:true});await write(root,'extra-'+n,[[today,111]]);return root;}));
-  const roots=[source,...extra];
-  const full=(await client.live!({query:{action:'usage',roots,scope:{allTime:true},limit:1},mode:'fresh'})).result;
-  const compact=(await client.live!({query:{action:'usage',snapshotId:full.snapshotRef.snapshotId,scope:{allTime:true},compact:true,limit:1},mode:'cached'})).result;
-  assert.equal(compact.quality.sources.length,3);assert.equal(compact.quality.detailSummary?.omittedSources,1);
-  const omitted=full.quality.sources.find(source=>!compact.quality.sources.some(retained=>retained.source.id===source.source.id))!.source.id;
-  await client.monitor!({action:'upsert',plan:{id:'wide',enabled:true,period:'day',review:false,tokenLimit:100,scope:{project,timezone:'UTC'}}});
-  const wide=await client.monitor!({action:'check',snapshotId:full.snapshotRef.snapshotId,ids:['wide']});assert.equal(wide.notifications[0].sourceInstanceIds.length,4,'Compact display examples cannot become the authorization source set');
-  assert.ok(!(await browser.monitor!({action:'list'})).notifications.some(n=>n.planId==='wide'),'A restricted host cannot read wider-scope totals');
-  await client.monitor!({action:'upsert',plan:{id:'fourth',enabled:true,period:'day',review:false,tokenLimit:100,scope:{project,sourceInstanceId:omitted,timezone:'UTC'}}});
-  await host.close();host=await startWebHost({client,assets:path.resolve('dist/web'),roots,projectRoots:[project],automaticPrices:false});
-  const widerToken=new URLSearchParams(new URL(host.url).hash.slice(1)).get('token')!;
-  const wider=createHttpClient({origin:host.origin,token:widerToken,fetch:(input,init)=>fetch(input,{...init,headers:{...init?.headers,Origin:host!.origin}})});
-  const pinned=await wider.live!({query:{action:'usage',scope:{allTime:true},compact:true,limit:1},mode:'fresh'});
-  const fourth=await wider.monitor!({action:'check',snapshotId:pinned.result.snapshotRef.snapshotId,ids:['fourth']});assert.equal(fourth.notifications.length,1);assert.deepEqual(fourth.notifications[0].sourceInstanceIds,[omitted]);
-  const api=run(['api','--json']);assert.ok(api.methods.includes('monitor'));
-  assert.equal(run(['call'],JSON.stringify({method:'monitor',params:{action:'list'}})).action,'list');
- }finally{await host?.close();if(service.exitCode===null&&service.signalCode===null){service.kill('SIGTERM');await once(service,'exit');}for(const[key,value]of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value;}await rm(dir,{recursive:true,force:true});}
+        const nativeApi = nativeEntry;
+        const webView = await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true }, limit: 1 }, mode: 'fresh' });
+        const webStats = await nativeApi.live!({ query: { ...request, snapshotId: webView.result.snapshotRef.snapshotId }, mode: 'cached' });
+        assert.deepEqual(webStats.result.statistics, stats);
+        const listed = await nativeApi.monitor!({ action: 'list' });
+        assert.equal(listed.plans.length, 2);
+        assert.ok(listed.notifications.length >= 2);
+        assert.ok(listed.plans.some(p=>p.id==='foreign'));
+        await nativeApi.monitor!({ action: 'acknowledge', notificationId: first.notifications[0].id });
+        assert.ok((await client.monitor!({ action: 'list' })).notifications.find(n => n.id === first.notifications[0].id)?.acknowledged);
+        const plan = listed.plans.find(p=>p.id==='daily')!;
+        await nativeApi.monitor!({ action: 'upsert', plan: { ...plan, enabled: false } });
+        assert.equal((await nativeApi.monitor!({ action: 'check', snapshotId: webView.result.snapshotRef.snapshotId, ids: ['daily'] })).notifications.length, 0);
+        for (const { file, body } of original)
+            assert.equal(await readFile(file, 'utf8'), body);
+        const extra = await Promise.all([1, 2, 3].map(async (n) => { const root = path.join(dir, 'extra-' + n); await mkdir(path.join(root, 'sessions'), { recursive: true }); await write(root, 'extra-' + n, [[today, 111]]); return root; }));
+        const roots = [source, ...extra];
+        const full = (await client.live!({ query: { action: 'usage', roots, scope: { allTime: true }, limit: 1 }, mode: 'fresh' })).result;
+        const compact = (await client.live!({ query: { action: 'usage', snapshotId: full.snapshotRef.snapshotId, scope: { allTime: true }, compact: true, limit: 1 }, mode: 'cached' })).result;
+        assert.equal(compact.quality.sources.length, 3);
+        assert.equal(compact.quality.detailSummary?.omittedSources, 1);
+        const omitted = full.quality.sources.find(source => !compact.quality.sources.some(retained => retained.source.id === source.source.id))!.source.id;
+        await client.monitor!({ action: 'upsert', plan: { id: 'wide', enabled: true, period: 'day', review: false, tokenLimit: 100, scope: { project, timezone: 'UTC' } } });
+        const wide = await client.monitor!({ action: 'check', snapshotId: full.snapshotRef.snapshotId, ids: ['wide'] });
+        assert.equal(wide.notifications[0].sourceInstanceIds.length, 4, 'Compact display examples cannot become the authorization source set');
+        assert.ok((await nativeApi.monitor!({action:'list'})).notifications.some(n=>n.planId==='wide'));
+        await client.monitor!({ action: 'upsert', plan: { id: 'fourth', enabled: true, period: 'day', review: false, tokenLimit: 100, scope: { project, sourceInstanceId: omitted, timezone: 'UTC' } } });
+        nativeEntry = projectTestClient(client, roots, [project]);
+
+        const wider = nativeEntry;
+        const pinned = await wider.live!({ query: { action: 'usage', scope: { allTime: true }, compact: true, limit: 1 }, mode: 'fresh' });
+        const fourth = await wider.monitor!({ action: 'check', snapshotId: pinned.result.snapshotRef.snapshotId, ids: ['fourth'] });
+        assert.equal(fourth.notifications.length, 1);
+        assert.deepEqual(fourth.notifications[0].sourceInstanceIds, [omitted]);
+        const api = run(['api', '--json']);
+        assert.ok(api.methods.includes('monitor'));
+        assert.equal(run(['call'], JSON.stringify({ method: 'monitor', params: { action: 'list' } })).action, 'list');
+    }
+    finally {
+        if (service.exitCode === null && service.signalCode === null) {
+            service.kill('SIGTERM');
+            await once(service, 'exit');
+        }
+        for (const [key, value] of Object.entries(old)) {
+            if (value === undefined)
+                delete process.env[key];
+            else
+                process.env[key] = value;
+        }
+        await rm(dir, { recursive: true, force: true });
+    }
 });

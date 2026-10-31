@@ -13,13 +13,11 @@ export function stdoutFromLog(log: string): string {
   const pattern = /\n\[(stdout|stderr)\] /g, parts = [...log.matchAll(pattern)];
   return parts.map((part, index) => part[1] === 'stdout' ? log.slice(part.index! + part[0].length, parts[index + 1]?.index ?? log.length) : '').join('');
 }
-export type Scope = 'api' | 'browser' | 'all';
+export type Scope = 'integration' | 'e2e' | 'all';
 export interface VerifyOptions {
   scope: Scope;
   outputDir: string;
   resume: boolean;
-  playwrightModule?: string;
-  browserExecutable?: string;
 }
 export interface ResumeRecord {
   runKey?: unknown;
@@ -35,31 +33,22 @@ export interface BoundedCommandResult {
   spawnError?: Error;
 }
 
-export function parseVerifyArgs(args: string[], env: NodeJS.ProcessEnv = process.env): VerifyOptions {
+export function parseVerifyArgs(args: string[]): VerifyOptions {
   if (args[0] === '--') args = args.slice(1);
   const values = new Map<string, string>();
   let resume = false;
-  for (let index = 0; index < args.length; index++) {
-    const key = args[index];
-    if (key === '--resume') {
-      if (resume) throw new Error('Usage: verify:e2e --output-dir ABSOLUTE_PATH [--scope api|browser|all] [--resume]');
-      resume = true;
-      continue;
-    }
-    if (!['--scope', '--output-dir', '--playwright-module', '--browser-executable'].includes(key)
-      || values.has(key) || !args[index + 1] || args[index + 1].startsWith('--')) {
-      throw new Error('Usage: verify:e2e --output-dir ABSOLUTE_PATH [--scope api|browser|all] [--resume] [--playwright-module PATH] [--browser-executable PATH]');
-    }
-    values.set(key, args[++index]);
+  const usage = 'Usage: verify:e2e --output-dir ABSOLUTE_PATH [--scope integration|e2e|all] [--resume]';
+  for (let i = 0; i < args.length; i++) {
+    const key = args[i];
+    if (key === '--resume' && !resume) { resume = true; continue; }
+    if (!['--scope', '--output-dir'].includes(key) || values.has(key) || !args[i + 1] || args[i + 1].startsWith('--')) throw new Error(usage);
+    values.set(key, args[++i]);
   }
   const scope = values.get('--scope') ?? 'all';
-  if (scope !== 'api' && scope !== 'browser' && scope !== 'all') throw new Error('--scope must be api, browser, or all');
+  if (scope !== 'integration' && scope !== 'e2e' && scope !== 'all') throw new Error('--scope must be integration, e2e, or all');
   const outputDir = values.get('--output-dir');
   if (!outputDir || !path.isAbsolute(outputDir)) throw new Error('--output-dir must be an explicit absolute path outside the repository');
-  const playwrightModule = values.get('--playwright-module') ?? env.WOMBAT_PLAYWRIGHT_MODULE;
-  const browserExecutable = values.get('--browser-executable');
-  if (scope !== 'api' && !playwrightModule) throw new Error('Browser scope requires --playwright-module PATH or WOMBAT_PLAYWRIGHT_MODULE');
-  return { scope, outputDir: path.resolve(outputDir), resume, ...(playwrightModule ? { playwrightModule } : {}), ...(browserExecutable ? { browserExecutable } : {}) };
+  return { scope, outputDir: path.resolve(outputDir), resume };
 }
 
 export function isWithin(parent: string, candidate: string): boolean {
@@ -85,9 +74,7 @@ export function assertExternalOutputDir(root: string, outputDir: string): string
 }
 
 export function plannedStages(scope: Scope): string[] {
-  if (scope === 'api') return ['integration', 'e2e'];
-  if (scope === 'browser') return ['browser'];
-  return ['integration', 'e2e', 'browser'];
+  return scope === 'all' ? ['integration', 'e2e'] : [scope];
 }
 
 export function artifactIdentity(files: PayloadFile[]): string {
@@ -95,22 +82,9 @@ export function artifactIdentity(files: PayloadFile[]): string {
 }
 
 export function acceptanceInputIdentity(root: string): string {
-  const files = (['tests/integration', 'tests/e2e', 'plugin'] as const).flatMap(directory =>
+  const files = (['tests/integration', 'tests/e2e', 'tests/helpers', 'plugin'] as const).flatMap(directory =>
     inventory(path.join(root, directory)).map(file => ({ ...file, path: `${directory}/${file.path}` })));
   return hash(JSON.stringify(files));
-}
-
-export function externalFileIdentity(file: string): { path: string; sha256: string } {
-  const real = realpathSync(file);
-  if (!statSync(real).isFile()) throw new Error(`Expected an external file: ${file}`);
-  return { path: real, sha256: hashFile(real) };
-}
-
-export function externalPackageIdentity(directory: string): { path: string; name: string; version: string; sha256: string } {
-  const real = realpathSync(directory);
-  const manifest = JSON.parse(readFileSync(path.join(real, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
-  if (typeof manifest.name !== 'string' || typeof manifest.version !== 'string') throw new Error(`External package has no identity: ${real}`);
-  return { path: real, name: manifest.name, version: manifest.version, sha256: hash(JSON.stringify(inventory(real))) };
 }
 
 export function runFingerprint(input: {
@@ -118,8 +92,6 @@ export function runFingerprint(input: {
   artifactSha256: string;
   acceptanceInputsSha256: string;
   scope: Scope;
-  playwright?: { path: string; sha256: string };
-  browserExecutable?: { path: string; sha256: string } | { unresolved: true };
 }): string {
   return hash(JSON.stringify({ version: VERIFY_E2E_VERSION, ...input }));
 }
@@ -207,7 +179,7 @@ export async function runBoundedCommand(options: {
 
 export function workspaceArtifactFiles(root: string): PayloadFile[] {
   const rootFiles = builtFiles(root).map(file => ({ ...file, path: `dist/${file.path}` }));
-  const packageFiles = (['client', 'cli', 'ui', 'web'] as const).flatMap(directory =>
+  const packageFiles = (['client', 'cli'] as const).flatMap(directory =>
     inventory(path.join(root, directory, 'dist')).map(file => ({ ...file, path: `${directory}/dist/${file.path}` })));
   return [...rootFiles, ...packageFiles];
 }

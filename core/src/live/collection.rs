@@ -367,7 +367,6 @@ pub(super) fn sync_with_policy(
     changed |= prior.get("failures").unwrap_or(&json!({})) != &serde_json::to_value(&failures)?;
     changed |= prior.get("epochs") != Some(&serde_json::to_value(&epochs)?);
     changed |= prior.get("prices").and_then(Value::as_str) != Some(&prices.catalog_hash);
-    changed |= !prior.contains_key("readHeader");
     if !changed {
         tx.commit()?;
         return Ok(None);
@@ -481,16 +480,10 @@ pub(super) fn sync_with_policy(
     Ok(Some(Arc::new(snapshot)))
 }
 #[cfg(test)]
-pub(super) fn restore(
-    db: &rusqlite::Connection,
-    key: &str,
-    roots: &[String],
-) -> Result<Option<Arc<Snapshot>>> {
-    restore_projects::restore_projects(db, key, roots, || None, |_| {})
-}
-mod restore_projects;
-pub(super) use restore_projects::incomplete as restoring_projects;
-pub(super) use restore_projects::restore_projects;
+pub(super) use restore::restore_view as restore;
+mod restore;
+pub(super) use restore::incomplete as restoring_projects;
+pub(super) use restore::restore_view;
 
 #[cfg(test)]
 mod observation_tests;

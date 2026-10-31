@@ -6,7 +6,7 @@
   },
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
-    "pnpm-lock.yaml": "7128a48df418f8e0b6ae85dace5a53b14dad5ee20e5a6e699ceda4f9351fda8d",
+    "pnpm-lock.yaml": "4549471f09bc4dfa647e4abca69fb5a315b7be8a90c7b9e0fd744905cffc30d7",
     "core/Cargo.lock": "f479d44a3be37dd66354e23b04c804910d25d73ae7c5558924aad1d04180dfd7"
   },
   "node": [
@@ -59,45 +59,6 @@
         {
           "name": "LICENSE",
           "sha256": "8f7fe359ab18923b48a4f0d50745f34d24e77a4973510b86bb8d35daf2a15c48"
-        }
-      ]
-    },
-    {
-      "name": "@oxc-project/types",
-      "version": "0.152.0",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "95ced5ecf1133fbf41d409b5555c86c344f83f3b019926057ddbc07cfdcc27b3"
-        }
-      ]
-    },
-    {
-      "name": "@rolldown/binding-darwin-arm64",
-      "version": "1.2.12",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "same-version rolldown package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734"
-        }
-      ]
-    },
-    {
-      "name": "@rolldown/pluginutils",
-      "version": "1.0.1",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "e1919b3b98b8bf6c1b99fcc60a0ed46027c97ac947432e1278446c9606f50161"
         }
       ]
     },
@@ -195,32 +156,6 @@
     {
       "name": "@types/node",
       "version": "26.0.0",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
-        }
-      ]
-    },
-    {
-      "name": "@types/react-dom",
-      "version": "19.3.0",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
-        }
-      ]
-    },
-    {
-      "name": "@types/react",
-      "version": "19.3.0",
       "license": "MIT",
       "role": "development",
       "licenseSource": "installed package",
@@ -336,19 +271,6 @@
       ]
     },
     {
-      "name": "csstype",
-      "version": "3.2.3",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "11d55bd4541c75ee7879547ac49089c489163dae49551389713c3d026cab383e"
-        }
-      ]
-    },
-    {
       "name": "debug",
       "version": "4.4.3",
       "license": "MIT",
@@ -384,19 +306,6 @@
         {
           "name": "license",
           "sha256": "306fa513e39b23a6e8747520de761809d206b99800ef41907b530226574c59ae"
-        }
-      ]
-    },
-    {
-      "name": "detect-libc",
-      "version": "2.1.2",
-      "license": "Apache-2.0",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
         }
       ]
     },
@@ -605,32 +514,6 @@
         {
           "name": "LICENSE",
           "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a"
-        }
-      ]
-    },
-    {
-      "name": "lightningcss-darwin-arm64",
-      "version": "1.33.0",
-      "license": "MPL-2.0",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
-        }
-      ]
-    },
-    {
-      "name": "lightningcss",
-      "version": "1.33.0",
-      "license": "MPL-2.0",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
         }
       ]
     },
@@ -1220,19 +1103,6 @@
       ]
     },
     {
-      "name": "nanoid",
-      "version": "3.3.19",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "da4db1480d9beea3483a2eda5c53b22238d0827d57da162b48f122e04d2d9987"
-        }
-      ]
-    },
-    {
       "name": "path-key",
       "version": "3.1.1",
       "license": "MIT",
@@ -1242,19 +1112,6 @@
         {
           "name": "license",
           "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
-        }
-      ]
-    },
-    {
-      "name": "picocolors",
-      "version": "1.1.1",
-      "license": "ISC",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "6582629e2979466878f6014313dcc2f3756c9616148682227ce3063dde310750"
         }
       ]
     },
@@ -1272,19 +1129,6 @@
       ]
     },
     {
-      "name": "postcss",
-      "version": "8.5.28",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8"
-        }
-      ]
-    },
-    {
       "name": "prettier",
       "version": "3.9.9",
       "license": "MIT",
@@ -1298,32 +1142,6 @@
       ]
     },
     {
-      "name": "react-dom",
-      "version": "19.3.0",
-      "license": "MIT",
-      "role": "runtime",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
-        }
-      ]
-    },
-    {
-      "name": "react",
-      "version": "19.3.0",
-      "license": "MIT",
-      "role": "runtime",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
-        }
-      ]
-    },
-    {
       "name": "require-from-string",
       "version": "2.0.2",
       "license": "MIT",
@@ -1333,32 +1151,6 @@
         {
           "name": "license",
           "sha256": "6ee0feb1f6ef996ff5a68600f8cf98909cf412d39ef3cdceaefd87d636fa1b7f"
-        }
-      ]
-    },
-    {
-      "name": "rolldown",
-      "version": "1.2.12",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734"
-        }
-      ]
-    },
-    {
-      "name": "scheduler",
-      "version": "0.28.0",
-      "license": "MIT",
-      "role": "runtime",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
         }
       ]
     },
@@ -1385,19 +1177,6 @@
         {
           "name": "license",
           "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
-        }
-      ]
-    },
-    {
-      "name": "source-map-js",
-      "version": "1.2.2",
-      "license": "BSD-3-Clause",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE",
-          "sha256": "6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd"
         }
       ]
     },
@@ -1541,19 +1320,6 @@
         {
           "name": "license",
           "sha256": "63cb98b3f6abfb3c3592c16f88253c1bdc834087bf52671e8ce5609e4eb693cf"
-        }
-      ]
-    },
-    {
-      "name": "vite",
-      "version": "8.3.1",
-      "license": "MIT",
-      "role": "development",
-      "licenseSource": "installed package",
-      "files": [
-        {
-          "name": "LICENSE.md",
-          "sha256": "387dd7baa307083401a27c58c362c30832f5ba1dba84f10cc22c33401523f45c"
         }
       ]
     },
@@ -4831,102 +4597,6 @@
     {
       "name": "@esbuild/win32-x64",
       "version": "0.28.2"
-    },
-    {
-      "name": "@rolldown/binding-android-arm-eabi",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-android-arm64",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-darwin-x64",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-freebsd-x64",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-arm-gnueabihf",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-arm64-gnu",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-arm64-musl",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-ppc64-gnu",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-s390x-gnu",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-x64-gnu",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-linux-x64-musl",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-openharmony-arm64",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-win32-arm64-msvc",
-      "version": "1.2.12"
-    },
-    {
-      "name": "@rolldown/binding-win32-x64-msvc",
-      "version": "1.2.12"
-    },
-    {
-      "name": "lightningcss-android-arm64",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-darwin-x64",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-freebsd-x64",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-linux-arm-gnueabihf",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-linux-arm64-gnu",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-linux-arm64-musl",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-linux-x64-gnu",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-linux-x64-musl",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-win32-arm64-msvc",
-      "version": "1.33.0"
-    },
-    {
-      "name": "lightningcss-win32-x64-msvc",
-      "version": "1.33.0"
     }
   ]
 }

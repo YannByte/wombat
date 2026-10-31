@@ -41,4 +41,4 @@ On RESOURCE_LIMIT, distinguish output size from computation. `--compact` bounds 
 
 At the same snapshot, use `turns --thread THREAD_ID --matched-only --sort tokens --limit 3 --compact --json` with original filters. Then use `investigate --thread THREAD_ID --turn TURN_ID --snapshot ID --compact --json` with those filters. In Agent `investigate` requests, put this selection in `scope.threadId` and `scope.turnId`; top-level `turnId` is for `steps`. This reads one turn and relevant control evidence. Show selected-turn findings as examples, not whole-task rankings.
 
-If one turn exceeds budget, use its public timing summary or `optimize activity` where supported and show the gap. Stop repeated failing analyses. Do not dump raw logs or reconstruct accounting in the conversation.
+If one turn exceeds budget, use its public timing summary or `optimize activity` and show the gap. Stop repeated failing analyses. Do not dump raw logs or reconstruct accounting in the conversation.

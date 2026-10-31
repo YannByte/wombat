@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-demand-driven-indexing": {
+      "zh": "eedc9b296686f418f730b6cbab66ab45cba6244eb584871be04bbe0503be0a89",
+      "en": "7fbbee7f3561038e1206d6ea9f617c4e438d2168cc6531e4c694315c92e5fede"
+    },
+    "/decision-demand-driven-indexing/problem": {
+      "zh": "c03d69ca1f99677f89717aa5c07a765ee3d33f12ac19aed0c7c3b21a0ae1c85c",
+      "en": "cea4ab65c56ca8880ba5f5bf251b6fad447d4d86fae27f5e6e5586af0813de32"
+    },
+    "/decision-demand-driven-indexing/decision": {
+      "zh": "f8a1d35c4f8d879403541583093a66184b16499658a8f570f1c1a92e5774ce97",
+      "en": "c8031f7698c571959344333f97be6274580b4f8f7f20b26f524b525cb4832a39"
+    },
+    "/decision-demand-driven-indexing/alternatives-considered": {
+      "zh": "bad1c1241c9147e4a1f4ec61a953e2c5223ea9f5dd5b7193a3fdba53493e6675",
+      "en": "cc4187194a0e98efd031ec1299a7f323d802b8013e32bccf307bce109653dd2b"
+    },
+    "/decision-demand-driven-indexing/consequences-and-verification": {
+      "zh": "36a0dba090d96fedd99d7479768908b50c94d3e60fb2aedd0eb407951783cde4",
+      "en": "dc3bc78bcfe306d30de7a31a03ccd07453dd8e25f31715dcb48094c291fb40ad"
+    }
+  }
+}

@@ -8,7 +8,7 @@ export function commandMentionsExecutable(command: string, executable: string): 
 
 export function onboardingOptions(args: string[]) {
   const values = new Map<string, string>();
-  const allowed = ['output-dir', 'release-dir', 'codex-bin', 'playwright-module', 'browser-executable', 'agent-bin', 'agent-skill'];
+  const allowed = ['output-dir', 'release-dir', 'codex-bin', 'agent-bin', 'agent-skill'];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--' && i === 0) continue;
     const key = args[i].slice(2), value = args[++i];
@@ -26,5 +26,5 @@ export function onboardingOptions(args: string[]) {
   if (Boolean(agentBin) !== Boolean(agentSkill) || agentSkill && !/^wombat(?:-collection)?:wombat$/.test(agentSkill))
     throw new Error('Supply both --agent-bin and --agent-skill with an installed Wombat invocation');
   return {output: required('output-dir'), release: required('release-dir'), codex: required('codex-bin'),
-    playwright: required('playwright-module'), browser: optional('browser-executable'), agentBin, agentSkill};
+    agentBin, agentSkill};
 }

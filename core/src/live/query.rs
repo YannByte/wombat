@@ -92,8 +92,7 @@ pub(super) fn query_with_probe(
         },
         request.verify,
         refresh,
-    )?
-    .project(request.query.scope.project.clone());
+    )?;
     selector.wait_ms = request.wait_ms;
     selector.peer_closed = peer_closed;
     selector.rebuild = request.rebuild;

@@ -2,20 +2,20 @@
   "version": 2,
   "sections": {
     "/wombat-architecture": {
-      "zh": "7d52da36834c03a656a3954bfe0bf20b1b0888221f1107aebfdf9ba6dfb5998e",
-      "en": "b9b156107ed4d1b39d2c332c9d27c9ddcfb7b102d1451b63b4bf01d7dd72844a"
+      "zh": "029fb68841d083d0879efca6252d6170a5ba0dce208b2fd6ba0f1215afe2def8",
+      "en": "eff59dddd125896aa6c63bec02ab925da3116a8cc33a3a31746ceb983a31466c"
     },
     "/wombat-architecture/data-flow": {
       "zh": "f3d50ef603c7d029feccd2525ac4d8d4adc4d5dbb77d2da5afef5fec06405d8b",
       "en": "28a598b035fcef6728d9b87dab8fe37d1d5bb1264f7b5ece72420c53628ed6fa"
     },
     "/wombat-architecture/modules": {
-      "zh": "d251a77743c84558ea3f5390c811a933a3d6465d7e822f6a321d6a0e7b01c279",
-      "en": "f5497264e856fef781df866ecaf1a27f2129b34085bd135354c2025d93a2c7eb"
+      "zh": "9c23506f33f07e37c07d2726142da3e5620bc4b74794aae0234ad54044f0b0f8",
+      "en": "8d8b3029fd697c5a7285564e5d4b89e9f1c987d4916eeca00dab7189e6699808"
     },
     "/wombat-architecture/host-and-service-responsibilities": {
-      "zh": "168ed8584910d1be043198c92dbd2dc681a0496a5181719497c931bac0a15b18",
-      "en": "9207e90f963625b4c12cc8db018e37cdc1f1e69f00eddcda21d4615e95edb65f"
+      "zh": "e4174ee8369cbbab5999b77b352c51ebdc1e8d0d32fee79a71110cfad605a5b9",
+      "en": "ec56ab6ce300d6cc44153dc016b880554157a59a4c1943663302b8fd3dee4a40"
     },
     "/wombat-architecture/domain-and-persistence": {
       "zh": "239ef154c5b483c2b69f8848c880e10aaf2a7add23507822000f14f6b2a901da",
@@ -38,8 +38,8 @@
       "en": "d21c55ef8979542b50bb350f29ab9d75b2bf2ccd8caad5addd38bd92f8e4d634"
     },
     "/wombat-architecture/development-entry-points": {
-      "zh": "fb51011cdd7281ec7ba51281d8a4c39cf9b570926ba547029de6b9083274dae9",
-      "en": "742644487b831d429617470403e9656e5d792e00c5566698e55b3f54f7567619"
+      "zh": "923855c7d4d891f8ad80020b684bdd598e62c0bde25df0179bd3e0d3b1b36df8",
+      "en": "f3b0dced75faf214335953384f5fca02525a9cca14886d0de15e163b7031b6df"
     }
   }
 }

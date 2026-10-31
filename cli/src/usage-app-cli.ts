@@ -234,7 +234,6 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
     if (argv[0] === 'prices') return await (await import('./prices-cli.js')).runPricingCli(argv.slice(1));
     if (argv[0] === 'optimize') return await (await import('./config-cli.js')).runConfigCli(argv.slice(1));
     if (argv[0] === 'skill') return (await import('./skill-cli.js')).runSkillCli(argv.slice(1));
-    if (argv[0] === 'web') return await (await import('./web-cli.js')).runWebCli(argv.slice(1));
     if (argv[0] === 'update') return await (await import('./update-cli.js')).runUpdateCli(argv.slice(1));
     if (argv[0] === 'doctor') return (await import('./doctor-cli.js')).runDoctorCli(argv.slice(1));
     const invocation = parseUsageArgs(argv);
@@ -243,7 +242,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
       return 0;
     }
     if (invocation.help) {
-      process.stdout.write(invocation.json ? JSON.stringify({ outputVersion: 5, name: 'Wombat', commands: ['service', 'refresh', 'usage', 'threads', 'turns', 'steps', 'prices', 'web', 'optimize', 'directories', 'account', 'update', 'doctor', 'timing', 'compare', 'investigate', 'trajectory', 'resources', 'review', 'context', 'skill', 'collection', 'hook', 'setup', 'api', 'call', 'statistics', 'monitor'], help: usageHelp() }) + '\n' : usageHelp());
+      process.stdout.write(invocation.json ? JSON.stringify({ outputVersion: 5, name: 'Wombat', commands: ['service', 'refresh', 'usage', 'threads', 'turns', 'steps', 'prices', 'optimize', 'directories', 'account', 'update', 'doctor', 'timing', 'compare', 'investigate', 'trajectory', 'resources', 'review', 'context', 'skill', 'collection', 'hook', 'setup', 'api', 'call', 'statistics', 'monitor'], help: usageHelp() }) + '\n' : usageHelp());
       return 0;
     }
     const client = createNodeClient();

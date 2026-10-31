@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,13 +8,13 @@ import { runBoundedCommand, type BoundedCommandResult } from './verify-e2e-helpe
 import { toolCommand } from './run-tool.ts';
 import {prepareFirstInstall} from './first-install-state.ts';
 import {
-  acceptanceInputIdentity, assertExternalOutputDir, currentArtifactIdentity, currentSourceIdentity, externalFileIdentity, externalPackageIdentity,
+  acceptanceInputIdentity, assertExternalOutputDir, currentArtifactIdentity, currentSourceIdentity,
   isWithin, parseVerifyArgs, plannedStages, reusableStage, runFingerprint, type Scope,
 } from './verify-e2e-helpers.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD_TIMEOUT = 30 * 60_000;
-const STAGE_TIMEOUT: Record<string, number> = { integration: 20 * 60_000, e2e: 30 * 60_000, browser: 12 * 60_000 };
+const STAGE_TIMEOUT: Record<string, number> = { integration: 20 * 60_000, e2e: 30 * 60_000 };
 const BUILD_LOG_BUDGET = 32 * 1024 * 1024;
 const STAGE_LOG_BUDGET = 16 * 1024 * 1024;
 const reportName = 'e2e-report.json';
@@ -50,9 +49,7 @@ interface Report {
   startedAt: string;
   completedAt?: string;
   outputDir: string;
-  parameters: { playwrightModule?: string; browserExecutable?: string };
   effectiveArtifacts: { cliEntry: string; coreBinary: string };
-  browserInputs?: Awaited<ReturnType<typeof browserArtifact>>;
   preparation?: ReturnType<typeof prepareFirstInstall>;
   stages: StageResult[];
   failure?: { stage: string; message: string };
@@ -100,63 +97,7 @@ function commandFor(name: string, options: ReturnType<typeof parseVerifyArgs>, r
   if (name === 'build') { const [program, args] = toolCommand('corepack', ['pnpm', 'run', 'build']); return [program, ...args]; }
   if (name === 'integration') { const [program, args] = toolCommand('corepack', ['pnpm', 'run', 'test:integration']); return [program, ...args]; }
   if (name === 'e2e') { const [program, args] = toolCommand('corepack', ['pnpm', 'run', 'test:e2e']); return [program, ...args]; }
-  if (name === 'browser') {
-    const args = ['pnpm', 'run', 'verify:event-upgrade:browser', '--', '--playwright-module', path.resolve(root, options.playwrightModule!)];
-    if (options.browserExecutable) args.push('--browser-executable', path.resolve(root, options.browserExecutable));
-    const [program, childArgs] = toolCommand('corepack', args); return [program, ...childArgs];
-  }
   throw new Error(`Unknown acceptance stage: ${name}`);
-}
-
-async function browserArtifact(options: ReturnType<typeof parseVerifyArgs>, root: string): Promise<{
-  playwright?: { path: string; sha256: string };
-  playwrightPackage?: { path: string; name: string; version: string; sha256: string };
-  playwrightCore?: { path: string; name: string; version: string; sha256: string };
-  browserExecutable?: { path: string; sha256: string } | { unresolved: true };
-  runtimeIdentityUnresolved?: true;
-}> {
-  if (options.scope === 'api') return {};
-  const module = externalFileIdentity(path.resolve(root, options.playwrightModule!));
-  let playwrightPackage: Awaited<ReturnType<typeof externalPackageIdentity>> | undefined;
-  let playwrightCore: Awaited<ReturnType<typeof externalPackageIdentity>> | undefined;
-  let runtimeIdentityUnresolved: true | undefined;
-  const findPackage = (entry: string, names: string[]) => {
-    let directory = path.dirname(realpathSync(entry));
-    for (;;) {
-      const manifestPath = path.join(directory, 'package.json');
-      if (existsSync(manifestPath)) {
-        try {
-          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { name?: unknown };
-          if (typeof manifest.name === 'string' && names.includes(manifest.name)) return directory;
-        } catch { /* Continue to the parent; package identity remains unresolved. */ }
-      }
-      const parent = path.dirname(directory);
-      if (parent === directory) return undefined;
-      directory = parent;
-    }
-  };
-  try {
-    const modulePackageRoot = findPackage(module.path, ['playwright', 'playwright-core', '@playwright/test']);
-    if (modulePackageRoot) playwrightPackage = externalPackageIdentity(modulePackageRoot);
-    else runtimeIdentityUnresolved = true;
-    const require = createRequire(module.path);
-    const coreRoot = findPackage(require.resolve('playwright-core'), ['playwright-core']);
-    if (coreRoot) playwrightCore = externalPackageIdentity(coreRoot);
-    else runtimeIdentityUnresolved = true;
-  } catch { runtimeIdentityUnresolved = true; }
-  if (options.browserExecutable) return { playwright: module, ...(playwrightPackage ? { playwrightPackage } : {}), ...(playwrightCore ? { playwrightCore } : {}),
-    browserExecutable: externalFileIdentity(path.resolve(root, options.browserExecutable)), ...(runtimeIdentityUnresolved ? { runtimeIdentityUnresolved } : {}) };
-  try {
-    const imported: unknown = await import(pathToFileURL(module.path).href);
-    if (imported && typeof imported === 'object' && 'chromium' in imported && imported.chromium && typeof imported.chromium === 'object'
-      && 'executablePath' in imported.chromium && typeof imported.chromium.executablePath === 'function') {
-      const executable = (imported.chromium.executablePath as () => string)();
-      if (executable && existsSync(executable)) return { playwright: module, ...(playwrightPackage ? { playwrightPackage } : {}), ...(playwrightCore ? { playwrightCore } : {}),
-        browserExecutable: externalFileIdentity(executable), ...(runtimeIdentityUnresolved ? { runtimeIdentityUnresolved } : {}) };
-    }
-  } catch { /* The existing browser verifier reports module API/load errors at its stage. */ }
-  return { playwright: module, ...(playwrightPackage ? { playwrightPackage } : {}), ...(playwrightCore ? { playwrightCore } : {}),
-    browserExecutable: { unresolved: true }, runtimeIdentityUnresolved: true };
 }
 
 function loadPrevious(file: string): Report | undefined {
@@ -177,9 +118,8 @@ async function main(): Promise<number> {
   const previous = options.resume ? loadPrevious(path.join(realOutput, reportName)) : undefined;
   const runId = `${new Date().toISOString().replaceAll(':', '-')}-${process.pid}`;
   const report: Report = { format: 1, runnerVersion: 1, runId, status: 'running', scope: options.scope, platform: `${process.platform}-${process.arch}`,
-    startedAt: timestamp(), outputDir: realOutput, parameters: { ...(options.playwrightModule ? { playwrightModule: path.resolve(root, options.playwrightModule) } : {}), ...(options.browserExecutable ? { browserExecutable: path.resolve(root, options.browserExecutable) } : {}) },
-    effectiveArtifacts: { cliEntry: path.join(root, 'dist/wombat.js'), coreBinary: path.join(root, 'dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core') },
-    stages: [], boundaries: ['Integration and E2E suites use isolated source and data homes plus synthetic fixtures; this runner does not inspect real Agent logs.', 'Browser acceptance uses the existing synthetic event-upgrade verifier; no screenshots are produced.', 'A passing run covers only the selected scope and current platform; it does not replace human review of claims, privacy, or untested platforms.'] };
+    startedAt: timestamp(), outputDir: realOutput,     effectiveArtifacts: { cliEntry: path.join(root, 'dist/wombat.js'), coreBinary: path.join(root, 'dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core') },
+    stages: [], boundaries: ['Integration and E2E suites use isolated source and data homes plus synthetic fixtures; this runner does not inspect real Agent logs.', 'A passing run covers only the selected scope and current platform; it does not replace human review of claims, privacy, or untested platforms.'] };
   const sandbox = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'wombat-verify-e2e-')));
   cleanupSandbox = () => rmSync(sandbox, { recursive: true, force: true });
   const preparation = prepareFirstInstall(sandbox, [path.join(sandbox, 'data')]);
@@ -212,10 +152,7 @@ async function main(): Promise<number> {
     artifactSha256 ??= currentArtifactIdentity(root);
     if (currentSourceIdentity(root) !== sourceBefore) throw new Error('Source identity changed after build validation');
     report.sourceSha256 = sourceBefore; report.artifactSha256 = artifactSha256;
-    activeStage = 'external-browser-inputs';
-    const browser = await browserArtifact(options, root);
-    report.browserInputs = browser;
-    const runKey = runFingerprint({ sourceSha256: sourceBefore, artifactSha256, acceptanceInputsSha256, scope: options.scope, ...browser });
+    const runKey = runFingerprint({ sourceSha256: sourceBefore, artifactSha256, acceptanceInputsSha256, scope: options.scope });
     report.runKey = runKey;
     const old = previous?.runKey === runKey ? previous : undefined;
     if (buildValid) report.stages.unshift({ name: 'build', status: 'passed', command: ['checkBuild'], startedAt: report.startedAt, completedAt: timestamp(), elapsedMs: 0, timeoutMs: BUILD_TIMEOUT, exitCode: 0, reused: true, reusedFrom: 'existing verified artifact' });
@@ -229,43 +166,27 @@ async function main(): Promise<number> {
       writeInitial();
       throw new Error(report.failure.message);
     };
-    const verifyBrowserInputs = async (where: string) => {
-      if (JSON.stringify(await browserArtifact(options, root)) === JSON.stringify(browser)) return;
-      report.runKey = undefined;
-      report.status = 'failed';
-      report.failure = { stage: `browser-identity-${where}`, message: 'Playwright or browser executable identity changed during acceptance' };
-      writeInitial();
-      throw new Error(report.failure.message);
-    };
     for (const name of plannedStages(options.scope)) {
       activeStage = name;
       verifyCoreInputs(`before-${name}`);
-      if (name === 'browser') await verifyBrowserInputs('before');
-      const canReuse = options.resume && old && !(name === 'browser' && (browser.runtimeIdentityUnresolved || (browser.browserExecutable && 'unresolved' in browser.browserExecutable)))
+      const canReuse = options.resume && old
         && reusableStage(old, name, runKey);
       if (canReuse) {
         const prior = old!.stages.find(item => item.name === name && item.status === 'passed')!;
         report.stages.push({ ...prior, reused: true, reusedFrom: old!.runId }); writeInitial();
         progress({ event: 'stage-reused', stage: name, sourceSha256: sourceBefore, artifactSha256 });
         verifyCoreInputs(`after-${name}`);
-        if (name === 'browser') await verifyBrowserInputs('after');
-        continue;
+          continue;
       }
       const command = commandFor(name, options, root);
       if (!await stage(report, realOutput, name, command, STAGE_TIMEOUT[name], STAGE_LOG_BUDGET, env)) return finish(report, realOutput);
       verifyCoreInputs(`after-${name}`);
-      if (name === 'browser') await verifyBrowserInputs('after');
     }
     activeStage = 'final-identity-validation';
     const finalSource = currentSourceIdentity(root), finalArtifact = currentArtifactIdentity(root);
     if (finalSource !== sourceBefore || finalArtifact !== artifactSha256 || acceptanceInputIdentity(root) !== acceptanceInputsSha256) {
       report.runKey = undefined;
       throw new Error('Source, acceptance tests, or build artifact changed during acceptance; results are not reusable');
-    }
-    const finalBrowser = await browserArtifact(options, root);
-    if (JSON.stringify(finalBrowser) !== JSON.stringify(browser)) {
-      report.runKey = undefined;
-      throw new Error('Playwright or browser executable identity changed during acceptance');
     }
     checkBuild(root);
     report.status = 'passed';

@@ -4,7 +4,7 @@
 
 Status: implemented
 
-The [CLI guide](../../../guides/cli.en.md) owns current query ranges and the [frontend guide](../../../development/frontend.en.md) owns Web navigation. This note retains the rationale for shared date defaults without maintaining retired terminal behavior.
+The [CLI guide](../../../guides/cli.en.md) owns current query ranges and the [frontend guide](../../../development/architecture.en.md) owns Web navigation. This note retains the rationale for shared date defaults without maintaining retired terminal behavior.
 
 ## Problem
 

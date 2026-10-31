@@ -53,19 +53,14 @@ pub(super) fn request(
     verify: bool,
     jobs: &mpsc::SyncSender<Job>,
 ) -> Result<u64> {
-    if entry.paused {
-        return Err(operation_error(
-            "INDEX_PAUSED",
-            "Background indexing is paused; resume it or query committed data",
-        ));
-    }
-    request_work(entry, key, verify, false, jobs)
+    request_work(entry, key, verify, false, false, jobs)
 }
 pub(super) fn request_work(
     entry: &mut Entry,
     key: &str,
     verify: bool,
     rebuild: bool,
+    include_history: bool,
     jobs: &mpsc::SyncSender<Job>,
 ) -> Result<u64> {
     if entry.paused {
@@ -77,13 +72,13 @@ pub(super) fn request_work(
     if let Some(work) = &mut entry.pending {
         work.verify |= verify;
         work.rebuild |= rebuild;
-        work.include_history |= entry.include_history;
+        work.include_history |= include_history;
         return Ok(work.ticket);
     }
     if let Some(work) = entry.running
         && (!verify || work.verify)
         && (!rebuild || work.rebuild)
-        && (!entry.include_history || work.include_history)
+        && (!include_history || work.include_history)
     {
         return Ok(work.ticket);
     }
@@ -105,36 +100,21 @@ pub(super) fn request_work(
         ticket,
         verify,
         rebuild,
-        include_history: entry.include_history,
+        include_history,
     });
     entry.syncing = true;
-    entry.following = true;
     Ok(ticket)
 }
 
-pub(super) fn begin(entry: &mut Entry, queued: bool) -> Option<SyncWork> {
-    let work = if queued {
-        entry.pending.take()?
-    } else {
-        if entry.pending.is_some() {
-            return None;
-        }
-        // Background work participates in the same completion/waiter protocol.
-        entry.requested += 1;
-        SyncWork {
-            ticket: entry.requested,
-            verify: false,
-            rebuild: false,
-            include_history: false,
-        }
-    };
+/// Only a caller-enqueued ticket can authorize source work. Idle maintenance cannot.
+pub(super) fn begin(entry: &mut Entry) -> Option<SyncWork> {
+    let work = entry.pending.take()?;
     entry.running = Some(work);
     entry.syncing = true;
     Some(work)
 }
 
 pub(super) fn finish(entry: &mut Entry, work: SyncWork) {
-    entry.include_history = false;
     entry.completed = work.ticket;
     entry.running = None;
     entry.syncing = entry.pending.is_some();
@@ -161,7 +141,7 @@ mod tests {
         let (tx, rx) = mpsc::sync_channel(1);
         request(&mut entry, "a", false, &tx).unwrap();
         rx.try_recv().unwrap();
-        begin(&mut entry, true).unwrap();
+        begin(&mut entry).unwrap();
         request(&mut entry, "a", true, &tx).unwrap();
         let shared: Shared = Arc::new((
             Mutex::new(BTreeMap::from([("a".into(), entry)])),
@@ -208,7 +188,7 @@ mod tests {
             assert_eq!(request(&mut entry, "a", false, &tx).unwrap(), first);
         }
         assert_eq!(rx.try_recv().unwrap().key, "a");
-        let running = begin(&mut entry, true).unwrap();
+        let running = begin(&mut entry).unwrap();
         for _ in 0..100 {
             assert_eq!(request(&mut entry, "a", false, &tx).unwrap(), first);
         }
@@ -222,7 +202,7 @@ mod tests {
         assert!(entry.syncing);
         assert!(entry.completed < verified);
         rx.try_recv().unwrap();
-        let running = begin(&mut entry, true).unwrap();
+        let running = begin(&mut entry).unwrap();
         assert!(running.verify);
         assert_eq!(request(&mut entry, "a", true, &tx).unwrap(), verified);
         finish(&mut entry, running);
@@ -233,25 +213,51 @@ mod tests {
     }
 
     #[test]
-    fn queued_work_upgrades_and_background_work_accepts_waiters() {
+    fn queued_work_upgrades_but_idle_workers_cannot_create_work() {
         let (tx, rx) = mpsc::sync_channel(1);
         let mut entry = Entry::new(vec![]);
+        assert!(begin(&mut entry).is_none());
         let ticket = request(&mut entry, "a", false, &tx).unwrap();
         assert_eq!(request(&mut entry, "a", true, &tx).unwrap(), ticket);
-        // A request can arrive after the worker selected a background source.
-        assert!(begin(&mut entry, false).is_none());
         rx.try_recv().unwrap();
-        let work = begin(&mut entry, true).unwrap();
+        let work = begin(&mut entry).unwrap();
         assert!(work.verify);
+        assert_eq!(request(&mut entry, "a", false, &tx).unwrap(), ticket);
+        assert!(rx.try_recv().is_err());
         finish(&mut entry, work);
-        let background = begin(&mut entry, false).unwrap();
+        assert!(begin(&mut entry).is_none());
+        assert_eq!(entry.completed, ticket);
+    }
+
+    #[test]
+    fn history_strength_belongs_to_queued_work_and_survives_prior_completion() {
+        let (tx, rx) = mpsc::sync_channel(2);
+        let mut entry = Entry::new(vec![]);
+        let first = request_work(&mut entry, "a", false, false, false, &tx).unwrap();
+        rx.try_recv().unwrap();
+        let running = begin(&mut entry).unwrap();
+        assert!(!running.include_history);
+        let history = request_work(&mut entry, "a", false, false, true, &tx).unwrap();
+        assert!(history > first);
         assert_eq!(
-            request(&mut entry, "a", false, &tx).unwrap(),
-            background.ticket
+            request_work(&mut entry, "a", false, false, false, &tx).unwrap(),
+            history
+        );
+        finish(&mut entry, running);
+        rx.try_recv().unwrap();
+        let running = begin(&mut entry).unwrap();
+        assert!(running.include_history);
+        assert_eq!(
+            request_work(&mut entry, "a", false, false, true, &tx).unwrap(),
+            history
         );
         assert!(rx.try_recv().is_err());
-        finish(&mut entry, background);
-        assert_eq!(entry.completed, background.ticket);
+        finish(&mut entry, running);
+        assert!(begin(&mut entry).is_none());
+        // A later recent-only request must not inherit history from the finished ticket.
+        request_work(&mut entry, "a", false, false, false, &tx).unwrap();
+        rx.try_recv().unwrap();
+        assert!(!begin(&mut entry).unwrap().include_history);
     }
 
     #[test]
@@ -314,7 +320,7 @@ mod tests {
         });
         assert_eq!(rx.try_recv().unwrap().key, key);
         assert!(rx.try_recv().is_err());
-        let work = begin(shared.0.lock().unwrap().get_mut(&key).unwrap(), true).unwrap();
+        let work = begin(shared.0.lock().unwrap().get_mut(&key).unwrap()).unwrap();
         let previous_touch = shared.0.lock().unwrap()[&key].touched;
         std::thread::scope(|scope| {
             let fresh = scope.spawn(|| {

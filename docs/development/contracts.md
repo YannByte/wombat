@@ -17,13 +17,13 @@ Rust 的 `core/src/usage_app_dto.rs` 定义请求与响应，`adapters/contract.
 
 `outputVersion=5` 是公共结果版本，`schemaVersion=4` 是内部快照版本；来源适配器和价格各有独立版本。内核通信封装为 `{op:"usage_app",args:Request}` → `{ok:true,value:Response}` 或 `{ok:false,error,code,details}`。用量操作为刷新、用量、对话、轮次、步骤；独立价表接口为 `prices`，提供 status/update，响应 `outputVersion=1`。
 
-公开操作、枚举、分页和错误详见[CLI](../guides/cli.md)。计量整数不能超过 JavaScript 安全整数；金额始终为十进制字符串。新字段及规则必须同时检查生成类型、Web、JSON 和当前快照。
+公开操作、枚举、分页和错误详见[CLI](../guides/cli.md)。计量整数不能超过 JavaScript 安全整数；金额始终为十进制字符串。新字段及规则必须同时检查生成类型、CLI JSON 和当前快照。
 
 用量汇总同时保留完整值与逐字段已记录小计，并给出筛选后规范计量记录的覆盖数和缺口原因；分页不改变范围。字段没有可用记录时小计为空，有效零值仍为零。完整用量份额不使用部分小计补分母。独立总量分析优先采用原生总量，仅对请求范围明确的响应，在原生总量不可用且原始输入与输出可靠时相加计算。原始输入已含缓存，输出已含推理；计算记录数和覆盖明确标注，原字段缺口保留，不还原累计区间。图表、排序和峰值使用该分析小计，份额要求同范围分析覆盖完整。计价仍采用原始测量。独立版本的可选分析保留不可变的原生观察审阅记录。公共类型、字段与枚举以 Rust 生成契约为准。
 
 用量请求增加可选 `presentation`，默认明细，分布只保留时段小计；显式指定任一种 presentation 时 offset/limit/page.total 按时段计数，明细一页包含所选时段的全部模型行，不拆日期组；省略 presentation 维持原有逐行分页。`sort: cost` 与按分析小计的 Token 排序均由内核完成。响应 `distribution` 给出筛选范围内按分析小计计算的 Token 最大值、并列峰值日期及准确筛选 Scope、金额最大值和未计价 Token 数；用量、轮次和计量的 `costShare` 以完整范围已计价金额为分母，未知或零分母返回缺失。对话按 matchedUsage 或最近匹配计量排序，threadUsage 保留全量。轮次默认完整；仅 turns 接受 matchedOnly 与 locateTurnId，先筛选排序再定位分页。匹配轮次只改变 items/page，不改变全对话汇总和份额分母；步骤仍完整。
 
-实时新鲜度initialScan表示仅包含首次扫描的临时任务元数据，来源partial且用量未知。预览不落盘，不属于无指定版本的cached结果；fresh/refresh仍等待完整同步。Web解除临时版本固定后保留任务和筛选，普通固定版本不变；边界见[首次任务视图决策](../decisions/implemented/architecture/2026-10-04-initial-task-preview.md)。
+实时新鲜度initialScan表示仅包含首次扫描的临时任务元数据，来源partial且用量未知。预览不落盘，不属于无指定版本的cached结果；fresh/refresh仍等待完整同步。普通固定版本不变；边界见[首次任务视图决策](../decisions/implemented/architecture/2026-10-04-initial-task-preview.md)。
 
 
 - [采集请求](../schemas/collection-request-v1.schema.json)与[响应](../schemas/collection-response-v1.schema.json)来自 `core/src/collection.rs`；偏好、安全接收与当前日志关联独立于 Token 账本。
@@ -45,9 +45,9 @@ Node价表传输只下载固定官方HTTPS文档；内核`prices`操作的宿主
 
 ## 只读配置契约 v1
 
-`core/src/config_dto.rs` 生成[请求](../schemas/config-request-v1.schema.json)与[响应](../schemas/config-response-v1.schema.json)，Node/HTTP 提供 `UsageClient.config`。list/detail/evidence/related_scopes/capabilities 不写来源；capabilities 不扫描。无 readView 时重采集。默认 UTC 近30天、截止日排他；`scope.allTime` 包含未知日期，不能同时给日期。配置范围不接受模型或强度；当前内容测量与日期无关。
+`core/src/config_dto.rs` 生成[请求](../schemas/config-request-v1.schema.json)与[响应](../schemas/config-response-v1.schema.json)，Node 提供 `UsageClient.config`。list/detail/evidence/related_scopes/capabilities 不写来源；capabilities 不扫描。无 readView 时重采集。默认 UTC 近30天、截止日排他；`scope.allTime` 包含未知日期，不能同时给日期。配置范围不接受模型或强度；当前内容测量与日期无关。
 
-readView 固定配置元数据和用量引用，全局最多8版、10分钟；淘汰、过期和重启返回 VIEW_EXPIRED。有效配置版本延长内核寿命并保留原用量，供返回任务轮次。续查 roots/projectRoots 必须与创建时一致；Web 仅接受本宿主发布的身份，启动根由宿主注入。
+readView 固定配置元数据和用量引用，全局最多8版、10分钟；淘汰、过期和重启返回 VIEW_EXPIRED。有效配置版本延长内核寿命并保留原用量，供返回任务轮次。续查 roots/projectRoots 必须与创建时一致。
 
 来源根盘点准确文件名 AGENTS.md、config.toml 顶层 MCP、skills 和 .agents/skills；默认 ~/.codex 还读 ~/.agents/skills。授权项目中有界递归发现 AGENTS.md，读取 .agents/skills 与 .codex/config.toml；不进入 .git、node_modules、target、dist、.codex、.agents 或符号链接目录。大小写不敏感的文件系统仍核验准确目录项名。只提供发现事实，不推断加载优先级或历史采用。扫描单文件10 MiB、总读64 MiB、检查条目和新配置各10,000、深度8、问题256，超限公开 resourceLimited。
 
@@ -55,9 +55,9 @@ readView 固定配置元数据和用量引用，全局最多8版、10分钟；�
 
 Hook单独测量当前声明原文：JSON对象、TOML平铺表头至末尾值或内联对象，保留原始转义和空白；不含其他配置、组级匹配器及引用脚本。bytesSource为hookDeclarationUtf8，estimate.payload为hookDeclaration，估算指纹绑定声明文本，item.contentHash仍绑定完整配置文件。无法可靠取得范围的嵌套TOML声明保持declarationUnavailable，不报配置无效；启用/信任/触发仍需要独立宿主证据。hooks.state是状态表，不作为事件。文件版本哈希每次读取仅计算一次，JSON借用声明原文，不复制脚本或命令正文进清单/缓存。
 
-配置响应hookRegistry独立提供授权项目的原生注册观察：启用、信任、处理类型、声明文件版本及注册哈希，不表示运行或注入。按校验后的结构、来源身份和文件哈希绑定普通文件键、插件独立JSON及内联声明键。原生版本仅用于诊断，不用版本白名单决定是否接入；当前CODEX_HOME必须属于所选来源，项目必须显式授权，不用来源目录冒充工作目录。Node先有界预检本地Hook声明及显式启用的插件；两者均无时不启动原生宿主。预检另有每文件10MiB/总32MiB预算。Node在两次一致的hooks/list之间对授权范围内普通文件流式计算哈希，Rust再次匹配当前清单版本；进入视图时超过60秒、原生失败、必需字段无效、重复身份、未知键形状或路径越界保持未知/partial。最多64个项目、512条注册、每文件10MiB/总32MiB哈希读取、64KiB缓冲和5秒查询取消期限；文件系统阻塞不承诺硬实时。完整注册观察不持久缓存，不导出命令/任意报错文本；发现与用户决定保留复查所需的项目、注册哈希及文件版本。固定readView保持原观察，新读取和发送复核重新获取，时间戳不改变相同证据的配置版本。CLI文本/JSON和Web详情共享结果。Unix已开放下述静态命令子集的hookTarget检查；Windows命令及运行证据仍待补。
+配置响应hookRegistry独立提供授权项目的原生注册观察：启用、信任、处理类型、声明文件版本及注册哈希，不表示运行或注入。按校验后的结构、来源身份和文件哈希绑定普通文件键、插件独立JSON及内联声明键。原生版本仅用于诊断，不用版本白名单决定是否接入；当前CODEX_HOME必须属于所选来源，项目必须显式授权，不用来源目录冒充工作目录。Node先有界预检本地Hook声明及显式启用的插件；两者均无时不启动原生宿主。预检另有每文件10MiB/总32MiB预算。Node在两次一致的hooks/list之间对授权范围内普通文件流式计算哈希，Rust再次匹配当前清单版本；进入视图时超过60秒、原生失败、必需字段无效、重复身份、未知键形状或路径越界保持未知/partial。最多64个项目、512条注册、每文件10MiB/总32MiB哈希读取、64KiB缓冲和5秒查询取消期限；文件系统阻塞不承诺硬实时。完整注册观察不持久缓存，不导出命令/任意报错文本；发现与用户决定保留复查所需的项目、注册哈希及文件版本。固定readView保持原观察，新读取和发送复核重新获取，时间戳不改变相同证据的配置版本。CLI 文本与 JSON 共享结果。Unix已开放下述静态命令子集的hookTarget检查；Windows命令及运行证据仍待补。
 
-插件注册包含明确pluginId，键中的身份、包内相对路径、事件及位置必须一致；相对路径不得含空分量、点分量或反斜线，并须与授权普通文件的路径后缀精确匹配。只读取原生列出的独立JSON或plugin.json内联声明；内联单对象及对象数组按原生hooks[n]位置绑定，测量真实JSON指针处的处理声明。清单阶段每个物理文件只读一次，不猜测缓存布局或遍历插件目录。清单只纳入注册涉及的声明与授权项目，不把插件配置视为全局生效；安全文件元数据及最近项目范围可保留，注册身份/状态仍只在视图中。注册缺失但来源文件未成功读取时，保留最近声明为stale；明确文件不存在或成功读取后声明消失才转历史。文件版本变化须重新绑定；未知形状保持未知。Web详情及CLI文本显示插件身份，JSON使用生成契约。
+插件注册包含明确pluginId，键中的身份、包内相对路径、事件及位置必须一致；相对路径不得含空分量、点分量或反斜线，并须与授权普通文件的路径后缀精确匹配。只读取原生列出的独立JSON或plugin.json内联声明；内联单对象及对象数组按原生hooks[n]位置绑定，测量真实JSON指针处的处理声明。清单阶段每个物理文件只读一次，不猜测缓存布局或遍历插件目录。清单只纳入注册涉及的声明与授权项目，不把插件配置视为全局生效；安全文件元数据及最近项目范围可保留，注册身份/状态仍只在视图中。注册缺失但来源文件未成功读取时，保留最近声明为stale；明确文件不存在或成功读取后声明消失才转历史。文件版本变化须重新绑定；未知形状保持未知。CLI 文本显示插件身份，JSON使用生成契约。
 
 hookTarget仅在当前文件版本匹配、原生明确启用且trusted/managed时检查；显式禁用可复查通过，缺注册/未信任/已变更保持未知。Unix使用锁定shlex2.0.1解析，不执行命令。插件命令采用Codex返回的已展开结果，包括原生插件目录/数据目录；正文仅经私有内核消息临时传入，单条上限16KiB、完整捕获上限768KiB，不进入公开DTO或缓存。结果须匹配项目、插件身份、注册哈希及当前文件的有效command声明；缺结果、版本变化或残留动态表达式保持未知，Wombat不自行展开变量。子集为python/python2/python3/python3.N（独立-B/-E/-I/-s/-S/-u/-q或--）、sh/bash/dash/zsh（独立-e/-u/-x/-v/-n或--，脚本名须含/）、无选项node/nodejs或--，以及带./、../或/的.sh/.py/.js/.mjs/.cjs直接路径。内联执行、模块执行、未知选项、环境赋值、管道/替换/通配/控制字符均未知。相对基址来自原生注册工作目录；按文件系统顺序检查授权边界及软链，不以权限错误或目录类型当缺失。Node缺入口时还排除.js/.json/.node扩展候选；目录或候选存在时保持解析未知。这里只断言静态引用，不证明解释器身份、脚本有效或运行失败。
 
@@ -75,7 +75,7 @@ currentItems 不计明确缺失的路径，清单仍公开缺失行；显式读�
 
 ## 优化与偏好契约 v1
 
-`core/src/optimize_dto.rs`生成[请求](../schemas/optimize-request-v1.schema.json)与[响应](../schemas/optimize-response-v4.schema.json)。Node/HTTP的UsageClient.optimize支持list/detail/history（group）、keep/not_applicable/redisplay/recheck/checks/capabilities/activity；CLI操作见[指南](../guides/cli.md)。对象级规则以本页阈值修订为准。日期及模型不影响检查，检查时刻独立返回。支持项目/来源/类别、pending/history、最多200项分页，默认50。
+`core/src/optimize_dto.rs`生成[请求](../schemas/optimize-request-v1.schema.json)与[响应](../schemas/optimize-response-v4.schema.json)。Node的UsageClient.optimize支持list/detail/history（group）、keep/not_applicable/redisplay/recheck/checks/capabilities/activity；CLI操作见[指南](../guides/cli.md)。对象级规则以本页阈值修订为准。日期及模型不影响检查，检查时刻独立返回。支持项目/来源/类别、pending/history、最多200项分页，默认50。
 
 建议身份绑定来源、对象、内容指纹、问题与项目范围。readView固定事实，decisionRevision固定记录，冲突返回VIEW_EXPIRED。keep需原因necessary；not_applicable需object_changed或incorrect_evidence。用户决定保存真实时间，与规则结果独立；已确认重试不重复追加。redisplay只清除最新展示决定。recheck重采集当前范围，不撤销决定，返回stillNeedsReview、verified或recheckUnavailable及独立检查事实。verified只证明原问题对应规则的可观察检查通过，不证明采用或节省；历史事件保留不可变recordId与recordedAt。
 
@@ -85,13 +85,13 @@ currentItems 不计明确缺失的路径，清单仍公开缺失行；显式读�
 
 用户记录在 `user-v1/reviews.sqlite3`，独立事务、最多20,000事件，达到上限报错而不删除历史。索引重建保留用户决定。闲置、MCP故障及空间清理尚未支持。Wombat方案生成、批准应用、执行进度和恢复接口已移除，本机Codex交接已接入，未完成验收，见[未完成提案](../decisions/proposed/product/2026-10-03-optimization-lifecycle.md)。不暴露任意文件写入、shell或dispatch。
 
-`core/src/preferences.rs` 生成[偏好请求](../schemas/preferences-request-v1.schema.json)与[响应](../schemas/preferences-response-v1.schema.json)，`UsageClient.preferences` 仅 get/set zh/en；私有原子文件为 `user-v1/language.json`，不接受任意路径或内容。Web 的语言优先级见[语言契约](../i18n/product.md)。
+`core/src/preferences.rs` 生成[偏好请求](../schemas/preferences-request-v1.schema.json)与[响应](../schemas/preferences-response-v1.schema.json)，`UsageClient.preferences` 仅 get/set zh/en；私有原子文件为 `user-v1/language.json`，不接受任意路径或内容。展示行为见[语言契约](../i18n/product.md)。
 
 `optimize` 响应版本 2 增加固定轮次的活动检查；请求版本 1 和持久复查格式保持原版本。`action: activity` 必须选择一个快照、任务和轮次，不接受配置视图或处理记录参数。它消费共用轮次分析，不采集配置、宿主钩子或价格，也不写复查历史。行为见[内核说明](../reference/core.md)，操作见[CLI 指南](../guides/cli.md)。无法识别的响应版本或字段会被拒绝。
 
 当前规则使用static-config-v7。bodyTokenEstimate独立分词精确正文，payload=skillBody，含tokenizerVersion、method/contentHash及referenceEncodingOnly，所在configRevision/readView固定快照。bodyEstimateStatus公开未知/解析/资源缺口，旧缓存默认unknown；解析失败不写零。全文/正文各≤1MiB，两者输入都计入单轮8MiB预算。AGENTS.md>16,384B为产品提醒，Skill正文≥5,000为参考提醒，description501—1,024为产品提醒，>1,024为规范问题且不重复500提醒。ruleOverrides只允许agentsBytes正安全整数及descriptionCharacters 0..1024，ruleParameters返回默认/覆盖/固定线及授权当前配置适用边界；记录保留原规则，recheckRuleParameters保存复查规则。规范约束不可覆盖，正文未知不能复查通过。加载预算诊断/闲置/空间能力仍关闭，边界见[优化闭环提案](../decisions/proposed/product/2026-10-03-optimization-lifecycle.md)。
 
-首次观察保存reviewBaseline：原始安全测量元数据，不含正文；后续复查保留基线并更新item。recheckRuleParameters记录实际复查参数。字节/码点需两端完整且当前；正文Token比较另须两端估算可用、方法/编码/载荷/分词器版本一致。仅展示文本变化，不将阈值差额或关联用量解释为节省。Web关联用量复用config evidence及usageRevision，日期不改变规则身份；CLI/Agent通过inventory evidence和turns读取同口径。
+首次观察保存reviewBaseline：原始安全测量元数据，不含正文；后续复查保留基线并更新item。recheckRuleParameters记录实际复查参数。字节/码点需两端完整且当前；正文Token比较另须两端估算可用、方法/编码/载荷/分词器版本一致。仅展示文本变化，不将阈值差额或关联用量解释为节省。关联用量复用config evidence及usageRevision，日期不改变规则身份；CLI/Agent通过inventory evidence和turns读取同口径。
 
 完整块与显式副本证据，公开文件版本、原文字节/行位置、声明哈希、方向和变换，不返回正文。config capabilities可返回启动授权根与宿主复制用重启命令；不是扫描成功事实，也不提供执行接口。live freshness.errorCode公开存储错误；facets.discoveredThreadCount只表示快照内已发现任务元数据，不是日期筛选后的计量数。
 
@@ -106,7 +106,7 @@ reviews.sqlite3仅使用user_version=4：review_events保存独立决定与检�
 
 ## 账户契约 v1
 
-`core/src/account_dto.rs`生成[请求](../schemas/account-request-v1.schema.json)与[响应](../schemas/account-response-v1.schema.json)，CLI/Web共用read/refresh。账户身份、额度、活动各有状态和读取时间；无凭据字段。Node读取前后身份，Rust检查账户归属并归一化；失败保留旧时间且标stale，换账户清除先前事实。
+`core/src/account_dto.rs`生成[请求](../schemas/account-request-v1.schema.json)与[响应](../schemas/account-response-v1.schema.json)，CLI共用read/refresh。账户身份、额度、活动各有状态和读取时间；无凭据字段。Node读取前后身份，Rust检查账户归属并归一化；失败保留旧时间且标stale，换账户清除先前事实。
 
 windows保留真实百分比、周期和重置；buckets分别返回原生credits、individualLimit和明确限制状态，不从百分比推定普通使用权限。余额及消费限额为校验后的原始小数字符串，来源未提供单位时不补货币或Token单位。异常字段标partial并保留合法同级字段，不使其他窗口变零。每次最多128桶；超限明确partial，不回退旧单桶。
 
@@ -119,12 +119,11 @@ handoff响应的allowanceChecks逐项目返回状态、实际/预览模型、来
 
 仅ChatGPT账户、openai提供方及60秒内的原生明确模型限制可返回blocked：支持selected_model_limit和luna_reserve通知中的blocked_model_slug精确匹配，限制截止不晚于原生reset_at。过期转unknown，不推定恢复；无模型绑定的百分比、消费限制或展示名称不能拦截。普通codex桶剩余不超过10%只提醒；available仅表示原生报告普通账户额度可用，不保证当前任务能执行。UI按期限刷新状态，无自动发送；CLI文本与JSON使用相同结果。最终受阻可能留下已创建但未入队的空Codex任务，不另建回执或自动删除。
 
-进入逐项目发送后，取消在入队前返回该项目 failed/CANCELLED，入队尝试后未确认接受则为 unknown/HANDOFF_UNKNOWN；尚未开始的项目为 failed/CANCELLED，不继续发送。更早取消可能直接返回 CANCELLED 错误。Node 可返回部分发送事实，HTTP 连接关闭后无法再交付该响应；页面关闭只停止自身等待和后续发送，不撤回 Codex 已接受请求。连接和本次发送保护会清理，重新打开只预览，重发仍需用户确认；不保存执行回执。
+进入逐项目发送后，取消在入队前返回该项目 failed/CANCELLED，入队尝试后未确认接受则为 unknown/HANDOFF_UNKNOWN；尚未开始的项目为 failed/CANCELLED，不继续发送。更早取消可能直接返回 CANCELLED 错误。Node 可返回部分发送事实。取消不会撤回 Codex 已接受的请求。连接和本次发送保护会清理，重发仍需用户明确授权；不保存执行回执。
 
-## Skill 与 Web 上下文契约 v1
+## Skill 契约 v1
 
 core/src/skill_dto.rs 生成[安装响应](../schemas/skill-installation-v1.schema.json)和[原生发现](../schemas/skill-discovery-v1.schema.json)，Node 入口提供 manageSkill 和 discoverWombatSkill。文件状态 absent/unmanaged/modified/installed 与 available/ambiguous/disabled/missing/unavailable/selection_changed 的发现状态独立。dataStatus 为 not_requested，安装不查询用量或账户。
 
-core/src/web_view_dto.rs 生成[受限 Web 上下文请求](../schemas/web-view-request-v1.schema.json)。通用客户端校验结构与生成浏览器参数，WebHost.openView 校验授权、读取真实结果并固定版本；只有只读查询，无任意根、文件应用或操作分派。实时版本不得跨明确来源根查询；未指定根的 CLI 固定版本行为保留。
 
 handoff v1 的 skillSelections 按 projectId/path 绑定，withoutSkill 仅由用户明确选择；响应 skillChecks 保留原生实例及选择，delivery.skillPath 记录实际绑定。原生名称可能含插件命名空间，队列接受确认同时核验消息身份和 Skill 名称/路径，未知不自动重试。

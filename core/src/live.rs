@@ -91,20 +91,15 @@ pub struct Response {
 struct Entry {
     paused: bool,
     changed: bool,
-    last_cost: Duration,
-    include_history: bool,
     restoring: bool,
-    preferred_project: Option<String>,
     roots: Vec<String>,
     views: VecDeque<(Instant, Arc<Snapshot>)>,
-    attempt: u64,
     checked: Option<String>,
     error: Option<String>,
     error_code: Option<&'static str>,
     touched: Instant,
     syncing: bool,
     last_sync: Instant,
-    following: bool,
     requested: u64,
     completed: u64,
     pending: Option<SyncWork>,
@@ -115,20 +110,15 @@ impl Entry {
         Self {
             paused: service::paused().unwrap_or(true),
             changed: false,
-            last_cost: Duration::ZERO,
-            include_history: false,
             restoring: false,
-            preferred_project: None,
             roots,
             views: VecDeque::new(),
-            attempt: 0,
             checked: None,
             error: None,
             error_code: None,
             touched: Instant::now(),
             syncing: false,
             last_sync: Instant::now(),
-            following: false,
             requested: 0,
             completed: 0,
             pending: None,
@@ -225,7 +215,7 @@ mod service;
 pub(crate) use service::offline as service_offline;
 mod transport;
 pub(crate) use collection::load_collected_except;
-use collection::{restore_projects, source_key, sources, sync};
+use collection::{restore_view, source_key, sources, sync};
 #[cfg(test)]
 use query::query;
 use query::{config_query, timing_query};

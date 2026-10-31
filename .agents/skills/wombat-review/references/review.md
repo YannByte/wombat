@@ -8,15 +8,15 @@ A review request authorizes inspection and relevant checks, not automatic source
 
 ## Review implementation and evidence
 
-Trace affected behavior from the real CLI/Web entry through generated contracts to the Rust owner and back. Inspect alternate callers, not only the happy path. Use the code conventions as the checklist; prioritize observable consequences over formatting preferences.
+Trace affected behavior from the real CLI entry through generated contracts to the Rust owner and back. Inspect alternate callers, not only the happy path. Use the code conventions as the checklist; prioritize observable consequences over formatting preferences.
 
 | Changed area | Review focus |
 |---|---|
-| Module or API boundaries | Correct business owner, public imports, current consumer, generated DTO changes and all consumers, Web/non-TTY parity |
+| Module or API boundaries | Correct business owner, public imports, current consumer, generated DTO changes and all consumers, CLI/non-TTY delivery |
 | Accounting or source evidence | Independent truth, hierarchical conservation, identity/replay handling, missing versus zero, pricing precision, partial failures, current versus historical evidence |
 | State, storage, or async work | Atomic publication, failure recovery, user-record preservation, cancellation ownership, late responses, version isolation, bounded cleanup |
 | Host or untrusted input | Authorization and version enforcement at execution, path scope, explicit process arguments, complete output/resource limits, sensitive-data handling |
-| UI or user operations | Shared business semantics, locale ownership, scope/navigation retention, visible unknown/failure states, real interaction evidence |
+| Skill or user operations | Shared business semantics, locale ownership, scope/selection retention, visible unknown/failure states, real interaction evidence |
 | Developer or release tools | Actual aggregate/CI invocation, source-versus-build prerequisites, valid and invalid fixtures, nonzero failures, platform and artifact evidence |
 
 For each candidate finding, identify a reachable trigger, the failing behavior, and its impact. Check callers and counterexamples that might invalidate it. Prefer a focused reproduction or existing test evidence where practical; label unverified hypotheses as questions rather than confirmed defects. Missing tests are actionable when a specific changed behavior or failure path lacks evidence, not simply because no new test file exists.

@@ -57,7 +57,7 @@ Read versions must fix measurements, timing facts, and method together, without 
 
 Add diagnostic business logic within the existing modular monolith, without a new permanent process, database service, Node log parser, or online analysis service. Initial delivery provides identical selected-turn evidence in CLI and Web. A later desktop host can reuse it through a restricted transport.
 
-The [live service](../../../../core/src/live.rs), [Node transport](../../../../client/src/node/live.ts), [Web host](../../../../web/src/index.ts), and [generator](../../../../scripts/generate-usage-contracts.mjs) assemble the shared core queries. Module references own the delivered mechanisms.
+The [live service](../../../../core/src/live.rs), [Node transport](../../../../client/src/node/live.ts), [Web host](../../../../client/src/node/index.ts), and [generator](../../../../scripts/generate-usage-contracts.mjs) assemble the shared core queries. Module references own the delivered mechanisms.
 
 ```mermaid
 flowchart LR

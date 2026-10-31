@@ -51,7 +51,7 @@ test('shipped Skill checks reject undeclared directories, missing entries and in
   for(const files of cases) {
     const result=check('check-skills.mjs',files);
     assert.equal(result.status,1);
-    assert.match(result.output,/declared Skills must match|Skill interface requires/);
+    assert.match(result.output,/declared Skills must match|Skill interface requires|exactly one main/);
   }
 });
 
@@ -72,12 +72,13 @@ test('document budgets count Unicode characters and reject excess or missing fil
 
 for (const owner of ['.agents/skills', 'plugin/skills']) {
   test(`Skill metadata validates both acceptance and rejection in ${owner}`, () => {
-    const file = `${owner}/sample/SKILL.md`;
-    const valid = '---\nname: sample\ndescription: Synthetic workflow\n---\nRun a check.\n';
+    const name = owner === 'plugin/skills' ? 'wombat' : 'sample';
+    const file = `${owner}/${name}/SKILL.md`;
+    const valid = `---\nname: ${name}\ndescription: Synthetic workflow\n---\nRun a check.\n`;
     assert.equal(check('check-skills.mjs', { [file]: valid }).status, 0);
     for (const [content, diagnostic] of [
-      [valid.replace('name: sample', 'name: other'), /name must be kebab-case and match/],
-      [valid.replace('description:', 'name: sample\ndescription:'), /duplicate name field/],
+      [valid.replace('name: '+name, 'name: other'), /name must be kebab-case and match/],
+      [valid.replace('description:', 'name: '+name+'\ndescription:'), /duplicate name field/],
       [valid.replace('description: Synthetic workflow\n', ''), /description is required/],
       [valid.replace('Run a check.', ''), /instruction body is empty/],
       [valid.replace('\n---\nRun', '\nRun'), /expected closed YAML frontmatter/],
@@ -110,9 +111,10 @@ test('decision records reject lifecycle drift, invalid dates and proposal sectio
 
 for (const skillRoot of ['.agents/skills', 'plugin/skills']) {
   test(`Skill resource checks use portable paths and follow nested references in ${skillRoot}`, () => {
-    const owner = `${skillRoot}/sample`;
+    const name = skillRoot === 'plugin/skills' ? 'wombat' : 'sample';
+    const owner = `${skillRoot}/${name}`;
     const resource = path.posix.relative(`${owner}/references`, 'owner.md');
-    const skill = '---\nname: sample\ndescription: Synthetic workflow\n---\nRead [procedure](references/procedure.md).\n';
+    const skill = `---\nname: ${name}\ndescription: Synthetic workflow\n---\nRead [procedure](references/procedure.md).\n`;
     const files: Record<string, string> = {
       [owner + '/SKILL.md']: skill,
       [owner + '/references/procedure.md']: `# Procedure\n\nRead [owner][facts].\n\n[facts]: ${resource}\n\n\`\`\`md\n[example](missing-example.md)\n\`\`\`\n`,

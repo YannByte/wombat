@@ -89,12 +89,11 @@ test('parses one explicit release identity and rejects ambiguous input', () => {
 
 test('isolated published installation preserves public version routes without registering native services', () => {
   for (const windows of [false, true]) {
-    const isolated = windows ? ['-NoService'] : ['--no-service'];
-    assert.deepEqual(installSourceArgs('1.0.0', 'file:///cache', true, windows), isolated);
-    assert.deepEqual(installSourceArgs('1.0.0-beta.1', 'file:///cache', true, windows), windows ? ['-Version', '1.0.0-beta.1', ...isolated] : ['--version', '1.0.0-beta.1', ...isolated]);
-    assert.deepEqual(installSourceArgs('1.0.0', 'file:///cache', false, windows), windows ? ['-Version', '1.0.0', '-BaseUrl', 'file:///cache', ...isolated] : ['--version', '1.0.0', '--base-url', 'file:///cache', ...isolated]);
+    assert.deepEqual(installSourceArgs('1.0.0', 'file:///cache', true, windows), []);
+    assert.deepEqual(installSourceArgs('1.0.0-beta.1', 'file:///cache', true, windows), windows ? ['-Version', '1.0.0-beta.1'] : ['--version', '1.0.0-beta.1']);
+    assert.deepEqual(installSourceArgs('1.0.0', 'file:///cache', false, windows), windows ? ['-Version', '1.0.0', '-BaseUrl', 'file:///cache'] : ['--version', '1.0.0', '--base-url', 'file:///cache']);
     // Archive upgrade qualification passes the preceding public tag unchanged.
-    assert.deepEqual(installSourceArgs('v0.3.6', 'file:///previous', false, windows), windows ? ['-Version', 'v0.3.6', '-BaseUrl', 'file:///previous', ...isolated] : ['--version', 'v0.3.6', '--base-url', 'file:///previous', ...isolated]);
+    assert.deepEqual(installSourceArgs('v0.3.6', 'file:///previous', false, windows), windows ? ['-Version', 'v0.3.6', '-BaseUrl', 'file:///previous'] : ['--version', 'v0.3.6', '--base-url', 'file:///previous']);
   }
 });
 

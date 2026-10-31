@@ -8,15 +8,15 @@ import {once} from 'node:events';
 import {setTimeout as delay} from 'node:timers/promises';
 const jsonl=(rows:unknown[])=>rows.map(r=>JSON.stringify(r)+'\n').join('');
 const usage=(thread:string,id:string,n:number,day:string)=>({type:'event_msg',timestamp:`${day}T00:00:00Z`,payload:{type:'token_usage_record',thread_id:thread,turn_id:'u',response_id:id,usage:{input_tokens:n,cached_input_tokens:0,cache_write_input_tokens:0,output_tokens:0,reasoning_output_tokens:0,total_tokens:n}}});
-test('built CLI and Web share period drivers, family totals and durable refresh changes',{timeout:60_000},async()=>{
+test('built CLI and native share period drivers, family totals and durable refresh changes',{timeout:60_000},async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'wombat-comparison-')),root=path.join(dir,'source'),data=path.join(dir,'data');
  await mkdir(path.join(root,'sessions'),{recursive:true});
  for(const [id,parent,n] of [['parent',null,100],['child','parent',30],['other',null,70]] as const)await writeFile(path.join(root,'sessions',`${id}.jsonl`),jsonl([{type:'session_meta',payload:{id,cwd:`/synthetic/${id}`,forked_from_id:parent}},{type:'turn_context',payload:{turn_id:'u',model:'gpt-5.4',effort:'high'}},{type:'response_item',timestamp:'2026-09-09T00:00:00Z',payload:{type:'message',role:'developer',content:[{type:'input_text',text:'Synthetic injected instruction'}]}},usage(id,`before-${id}`,n,'2026-09-02'),...(id==='parent'?[{type:'event_msg',timestamp:'2026-09-09T00:00:00Z',payload:{type:'compacted'}}]:[]),usage(id,`after-${id}`,id==='parent'?140:n,'2026-09-09')]));
  const env:NodeJS.ProcessEnv={...process.env,CODEX_HOME:root,WOMBAT_DATA_HOME:data,WOMBAT_AUTO_PRICES:'0',WOMBAT_CODEX_BIN:path.join(dir,'absent-codex')};delete env.WOMBAT_CORE_BIN;
  const binary=path.resolve('dist',process.platform==='win32'?'wombat-core.exe':'wombat-core'),cli=path.resolve('dist/wombat.js');
- let service:ReturnType<typeof spawn>|undefined,web:ReturnType<typeof spawn>|undefined;
+ let service:ReturnType<typeof spawn>|undefined;
  const stop=async(child:ReturnType<typeof spawn>|undefined)=>{if(!child||child.exitCode!==null||child.signalCode!==null)return;const exit=once(child,'close');child.kill('SIGTERM');const timer=setTimeout(()=>child.kill('SIGKILL'),2000);try{await exit;}finally{clearTimeout(timer);}};
- const run=(args:string[])=>{const p=spawnSync(process.execPath,[cli,...args,'--json'],{env,encoding:'utf8',timeout:15_000,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
+ const run=(args:string[],input?:string)=>{const p=spawnSync(process.execPath,[cli,...args,'--json'],{env,input,encoding:'utf8',timeout:15_000,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
  try{
   service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
   const first=run(['usage','--fresh','--all-time']);
@@ -37,14 +37,7 @@ test('built CLI and Web share period drivers, family totals and durable refresh 
   let restored=run(['usage','--cached','--all-time']);const restoredBy=Date.now()+5000;
   while(restored.snapshotRef.snapshotId!==refreshed.snapshotRef.snapshotId&&Date.now()<restoredBy){await delay(30);restored=run(['usage','--cached','--all-time']);}
   assert.equal(restored.snapshotRef.snapshotId,refreshed.snapshotRef.snapshotId);assert.deepEqual(restored.freshness.publicationChange,refreshed.freshness.publicationChange);
-  web=spawn(process.execPath,[cli,'web','--port','0'],{env,stdio:['ignore','pipe','pipe']});let output='',errors='';web.stderr!.on('data',b=>{errors+=b;if(errors.length>65536)web?.kill('SIGTERM');});web.stdout!.on('data',b=>{output+=b;if(output.length>65536)web?.kill('SIGTERM');});
-  const deadline=Date.now()+10_000;let url:string|undefined;
-  while(!url&&Date.now()<deadline){url=output.match(/http:\/\/127\.0\.0\.1:\d+\/[^\s]*/)?.[0];if(!url)await delay(30);}assert.ok(url,output+errors);
-  const parsed=new URL(url),token=new URLSearchParams(parsed.hash.slice(1)).get('token');assert.ok(token);
-  const call=async(query:unknown)=>{
-    const response=await fetch(`${parsed.origin}/api/live`,{method:'POST',headers:{Origin:parsed.origin,'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({query,mode:'cached'}),signal:AbortSignal.timeout(10_000)});
-    assert.equal(response.status,200);const frames=(await response.text()).trim().split('\n').map(line=>JSON.parse(line));const final=frames.at(-1);assert.equal(final.type,'result',JSON.stringify(final));return final.value;
-  };
+  const call=(query:import('@wombat/client').UsageRequest)=>run(['call'],JSON.stringify({method:'usage',params:{query:{roots:[root],...query},mode:'cached'}}));
   await call({action:'usage',scope:{allTime:true}});
   const value=(await call({action:'compare',snapshotId:restored.snapshotRef.snapshotId,scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'},comparison:{kind:'periods',baselineSince:'2026-09-01',baselineUntil:'2026-09-08',dimension:'project'},limit:1})).result;
   assert.equal(value.comparison.delta.tokens,50);assert.deepEqual(value.freshness.publicationChange,restored.freshness.publicationChange);
@@ -53,14 +46,14 @@ test('built CLI and Web share period drivers, family totals and durable refresh 
   const parentTurns=run(['turns','--thread',id('parent'),'--all-time','--snapshot',restored.snapshotRef.snapshotId]);
   const turn=parentTurns.items[0].id;
   const exactCli=run(['investigate','--thread',id('parent'),'--turn',turn,'--all-time','--snapshot',restored.snapshotRef.snapshotId,'--compact']);
-  const exactWeb=(await call({action:'investigate',snapshotId:restored.snapshotRef.snapshotId,scope:{threadId:id('parent'),turnId:turn,allTime:true},compact:true})).result;
-  assert.deepEqual(exactWeb,exactCli);assert.equal(exactWeb.summary.tokens.total,250);
-  assert.equal(exactWeb.scope.turnId,turn);assert.ok(exactWeb.inspection.limitations.includes('selected_turn_only'));
+  const exactNative=(await call({action:'investigate',snapshotId:restored.snapshotRef.snapshotId,scope:{threadId:id('parent'),turnId:turn,allTime:true},compact:true})).result;
+  assert.deepEqual(exactNative,exactCli);assert.equal(exactNative.summary.tokens.total,250);
+  assert.equal(exactNative.scope.turnId,turn);assert.ok(exactNative.inspection.limitations.includes('selected_turn_only'));
   const fullUsage=(await call({action:'usage',snapshotId:restored.snapshotRef.snapshotId,scope:{allTime:true},limit:1})).result;
   const compactUsage=(await call({action:'usage',snapshotId:restored.snapshotRef.snapshotId,scope:{allTime:true},limit:1,compact:true})).result;
   assert.deepEqual(compactUsage.summary,fullUsage.summary);assert.deepEqual(compactUsage.items,fullUsage.items);assert.deepEqual(compactUsage.page,fullUsage.page);
   assert.equal(compactUsage.facets,undefined);assert.ok(compactUsage.quality.detailSummary);
 
   const bad=spawnSync(process.execPath,[cli,'compare','--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-04','--baseline-until','2026-09-11','--json'],{env,encoding:'utf8',timeout:10_000});assert.equal(bad.status,1);assert.equal(JSON.parse(bad.stdout).error.code,'INVALID_ARGUMENT');
- }finally{await stop(web);await stop(service);await rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+ }finally{await stop(service);await rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });

@@ -1,4 +1,4 @@
-/** Real installed runtime, native plugin manager, browser and optional native model journey. */
+/** Real installed runtime, native plugin manager and optional native model journey. */
 import assert from 'node:assert/strict';
 import {spawn, type ChildProcess} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, realpathSync, rmSync, readdirSync} from 'node:fs';
@@ -8,7 +8,6 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {onboardingOptions, commandMentionsExecutable} from './verify-onboarding-options.ts';
 import {assertExternalOutputDir, runBoundedCommand, stdoutFromLog, terminateTree} from './verify-e2e-helpers.ts';
 import {checkBuild, sourceIdentity} from './build-identity.ts';
-import {playwright, type Browser, type BrowserServer} from './event-upgrade-browser/playwright.ts';
 import {agentMetrics} from './verify-agent-query.ts';
 import {nativeSessionId} from './verify-skill-conversation-helpers.ts';
 import {cleanupOnboardingCores} from './onboarding-cleanup.ts';
@@ -30,13 +29,13 @@ const report: {status: string; sourceSha256: string; platform: string; checks: u
   status: 'running', sourceSha256: sourceIdentity(repo), platform: process.platform+'-'+process.arch, checks: [],
   boundaries: ['Real local candidate archive and native plugin installation; only independent synthetic usage is queried.',
     'Optional model sessions retain the current authentication profile; runtime queries are restricted to synthetic source and data. No credentials are read or copied.',
-    'Browser acceptance uses installed production assets, two languages and desktop/narrow layouts. No Hook trust changes or publication. Other platforms and large-history performance remain separate.']};
+    'CLI acceptance uses installed production assets and two languages. No Hook trust changes or publication. Other platforms and large-history performance remain separate.']};
 const save = () => writeFileSync(path.join(output, 'onboarding-report.json'), JSON.stringify(report, null, 2)+'\n', {mode: 0o600});
 const pass = (name: string, evidence: unknown = {}) => {report.checks.push({name, status: 'passed', evidence}); save(); console.log(JSON.stringify({stage: name, status: 'passed'}));};
 const cancel = new AbortController(), onCancel = () => cancel.abort();
 process.once('SIGINT', onCancel); process.once('SIGTERM', onCancel);
 const deadline = setTimeout(onCancel, 12*60_000);
-let web: ChildProcess | undefined, browser: Browser | undefined, server: BrowserServer | undefined;
+
 save();
 const run = async (name: string, command: string[], commandEnv: NodeJS.ProcessEnv = env, timeoutMs = 120_000) => {
   const log = path.join(output, name+'.log');
@@ -45,26 +44,6 @@ const run = async (name: string, command: string[], commandEnv: NodeJS.ProcessEn
   assert.ok(!result.timedOut && !result.outputLimit && !result.interrupted && !result.closeTimedOut && !result.spawnError && !result.logError, name);
   return stdoutFromLog(readFileSync(log, 'utf8')).trim();
 };
-const start = async (command: string[]) => {
-  const started = performance.now(); let text = '';
-  web = spawn(command[0], command.slice(1), {cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe']});
-  const child = web, log = path.join(output, 'web-start-'+report.checks.length+'.log');
-  const capture = (chunk: Buffer) => {
-    if (Buffer.byteLength(text)+chunk.length > 2*1024*1024) {child.kill('SIGTERM'); return;}
-    text += chunk.toString(); writeFileSync(log, text, {mode: 0o600});
-  };
-  child.stdout!.on('data', capture); child.stderr!.on('data', capture);
-  let spawnError: Error | undefined; child.once('error', error => {spawnError = error;});
-  const until = Date.now()+60_000;
-  for (;;) {
-    cancel.signal.throwIfAborted();
-    const url = text.match(/https?:\/\/127\.0\.0\.1:\d+\/[^\s"<>]*/)?.[0];
-    if (url) return {url, startupMs: Math.round(performance.now()-started)};
-    if (spawnError || child.exitCode !== null || child.signalCode !== null || Date.now()>until) throw new Error('Installed Web failed to start; inspect '+log);
-    await delay(50, undefined, {signal: cancel.signal});
-  }
-};
-const closeWeb = async () => {if (web) assert.ok(await terminateTree(web), 'Web process tree did not stop'); web = undefined;};
 const fixtureFile = path.join(source, 'sessions/synthetic.jsonl');
 const timestamp = new Date().toISOString();
 const record = (response: string, tokens: number) => JSON.stringify({timestamp, type: 'event_msg', payload: {
@@ -72,16 +51,8 @@ const record = (response: string, tokens: number) => JSON.stringify({timestamp, 
   usage: {input_tokens: tokens-10, cached_input_tokens: 0, output_tokens: 10, total_tokens: tokens}}})+'\n';
 const sourceBody = [JSON.stringify({timestamp, type: 'session_meta', payload: {id: 'onboarding', cwd}}),
   JSON.stringify({timestamp, type: 'turn_context', payload: {turn_id: 'turn', model: 'gpt-5.4'}})].join('\n')+'\n'+record('one', 110);
-const api = async (url: string, method: string, body: unknown) => {
-  const parsed = new URL(url), token = new URLSearchParams(parsed.hash.slice(1)).get('token'); assert.ok(token);
-  const response = await fetch(parsed.origin+'/api/'+method, {method: 'POST', signal: AbortSignal.any([cancel.signal, AbortSignal.timeout(15_000)]),
-    headers: {Origin: parsed.origin, Authorization: 'Bearer '+token, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-  assert.equal(response.status, 200);
-  const frame = (await response.text()).trim().split('\n').map(row => JSON.parse(row)).at(-1);
-  assert.equal(frame.type, 'result', JSON.stringify(frame)); return frame.value;
-};
 try {
-  const installed = await start(['/bin/sh', installer, '--prefix', prefix, '--base-url', pathToFileURL(options.release).href, '--no-modify-path', '--plugin', '--open']);
+  await run('install', ['/bin/sh', installer, '--prefix', prefix, '--base-url', pathToFileURL(options.release).href, '--no-modify-path', '--plugin']);
   const id = readFileSync(path.join(prefix, 'lib/wombat/current.txt'), 'utf8').trim(), destination = path.join(prefix, 'lib/wombat/versions', id);
   const release = JSON.parse(readFileSync(path.join(destination, 'release.json'), 'utf8'));
   assert.equal(release.sourceSha256, report.sourceSha256);
@@ -90,59 +61,27 @@ try {
   const setup = JSON.parse(await run('native-discovery', [launcher, 'setup', '--project', cwd, '--json']));
   assert.equal(setup.discovery.status, 'available'); assert.equal(setup.discovery.instances[0].name, 'wombat:wombat');
   assert.equal(setup.runtimeChecks[0].status, 'compatible');
-  pass('fresh-install-plugin-and-open', {release, startupMs: installed.startupMs, invocation: 'wombat:wombat', noSystemNodeOrRust: true});
-  const pw = await playwright(options.playwright);
-  server = await pw.chromium.launchServer({headless: true, executablePath: options.browser, timeout: 20_000});
-  browser = await pw.chromium.connect(server.wsEndpoint(), {timeout: 15_000});
-  const empty = await api(installed.url, 'live', {query: {action: 'usage', scope: {allTime: true}}, mode: 'fresh'});
-  assert.equal(empty.result.summary.measurementCount, 0);
-  for (const language of ['zh', 'en']) for (const width of [390, 1440]) {
-    const context = await browser.newContext({viewport: {width, height: 900}}), page = await context.newPage();
-    const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
-    page.setDefaultTimeout(15_000); page.setDefaultNavigationTimeout(15_000);
-    try {
-      const url = new URL(installed.url), fragment = new URLSearchParams(url.hash.slice(1)); fragment.set('lang', language); url.hash = fragment.toString(); url.search = '?allTime=1&timezone=UTC';
-      await page.goto(url.href); await page.locator('.empty h2').waitFor();
-      assert.equal(await page.evaluate('document.documentElement.lang'), language);
-      assert.equal(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), true);
-      assert.deepEqual(errors, []); pass(`empty-${language}-${width}`);
-    } finally {await context.close();}
+  pass('fresh-install-plugin', {release, invocation:'wombat:wombat', noSystemNodeOrRust:true});
+  const query = async (name: string, args: string[]) => JSON.parse(await run(name, [launcher,...args,'--json']));
+  const empty = await query('empty', ['usage','--all-time','--fresh','--wait-ms','60000']);
+  assert.equal(empty.summary.measurementCount,0);
+  writeFileSync(fixtureFile,sourceBody);
+  const first = await query('first',['usage','--all-time','--fresh','--wait-ms','60000']);
+  assert.equal(first.summary.tokens.total,110);
+  for (const language of ['zh','en']) {
+    const tasks = await query('tasks-'+language, ['--lang',language,'threads','--all-time']);
+    assert.equal(tasks.summary.tokens.total,110);
+    assert.ok(tasks.items.some((v: {kind:string})=>v.kind==='thread'));
   }
-  writeFileSync(fixtureFile, sourceBody);
-  const first = await api(installed.url, 'live', {query: {action: 'usage', scope: {allTime: true}}, mode: 'fresh'});
-  assert.equal(first.result.summary.tokens.total, 110);
-  for (const language of ['zh', 'en']) for (const width of [390, 1440]) {
-    const context = await browser.newContext({viewport: {width, height: 900}}), page = await context.newPage();
-    const errors: string[] = []; page.on('pageerror', e => errors.push(e.message)); page.setDefaultTimeout(15_000);
-    try {
-      const url = new URL(installed.url), fragment = new URLSearchParams(url.hash.slice(1)); fragment.set('lang', language); url.hash = fragment.toString(); url.search = '?page=threads&allTime=1&timezone=UTC';
-      await page.goto(url.href); await page.locator('.thread-row').first().waitFor(); await page.locator('.thread-row').first().click();
-      await page.waitForFunction(() => document.querySelector('.turn[open] > summary .token-number')?.getAttribute('title') === '110 Token');
-      if (width <= 760) await page.locator('.task-return').click(); else await page.goBack();
-      await page.reload(); await page.locator('.thread-row').first().waitFor();
-      assert.equal(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), true);
-      assert.deepEqual(errors, []); pass(`task-drilldown-return-reload-${language}-${width}`);
-    } finally {await context.close();}
-  }
-  const updateContext = await browser.newContext({viewport: {width: 390, height: 900}}), updatePage = await updateContext.newPage();
-  updatePage.setDefaultTimeout(15_000);
-  const updateUrl = new URL(installed.url); updateUrl.search = '?page=threads&allTime=1&timezone=UTC';
-  await updatePage.goto(updateUrl.href); await updatePage.locator('.thread-row').first().waitFor(); await updatePage.locator('.thread-row').first().click();
-  await updatePage.waitForFunction(() => document.querySelector('.task-detail > p.subtle .token-value')?.getAttribute('title') === '110 Token');
-  appendFileSync(fixtureFile, record('two', 220));
-  const updated = await api(installed.url, 'live', {query: {action: 'usage', scope: {allTime: true}}, mode: 'fresh'});
-  assert.equal(updated.result.summary.tokens.total, 330); assert.notEqual(updated.result.snapshotRef.snapshotId, first.result.snapshotRef.snapshotId);
-  const fixed = await api(installed.url, 'live', {query: {action: 'usage', snapshotId: first.result.snapshotRef.snapshotId, scope: {allTime: true}}, mode: 'cached'});
-  assert.equal(fixed.result.summary.tokens.total, 110);
-  await updatePage.locator('.query-scope .scope-actions button').click();
-  await updatePage.waitForFunction(() => document.querySelector('.task-detail > p.subtle .token-value')?.getAttribute('title') === '330 Token');
-  await updateContext.close();
-  pass('append-and-fixed-view', {previous: 110, current: 330});
-  await closeWeb(); await assert.rejects(fetch(new URL(installed.url).origin, {signal: AbortSignal.timeout(1000)}));
-  const resumed = await start(['/bin/sh', installer, '--prefix', prefix, '--plugin-only', '--open']);
-  assert.equal(readFileSync(path.join(prefix, 'lib/wombat/current.txt'), 'utf8').trim(), id);
-  assert.equal((await api(resumed.url, 'live', {query: {action: 'usage', scope: {allTime: true}}, mode: 'fresh'})).result.summary.tokens.total, 330);
-  pass('plugin-only-open-and-retained-data', {startupMs: resumed.startupMs, sameRuntime: true}); await closeWeb();
+  appendFileSync(fixtureFile,record('two',220));
+  const updated = await query('updated',['usage','--all-time','--fresh','--wait-ms','60000']);
+  assert.equal(updated.summary.tokens.total,330);
+  const fixed = await query('fixed',['usage','--snapshot',first.snapshotRef.snapshotId,'--all-time']);
+  assert.equal(fixed.summary.tokens.total,110);
+  pass('append-and-fixed-view',{previous:110,current:330});
+  await run('plugin-only',['/bin/sh',installer,'--prefix',prefix,'--plugin-only']);
+  assert.equal(readFileSync(path.join(prefix,'lib/wombat/current.txt'),'utf8').trim(),id);
+  pass('plugin-only-retains-runtime');
   if (options.agentBin) {
     const modelData = path.join(work, 'cold-model-data'), answer = path.join(work, 'answer.json'), schema = path.join(work, 'answer-schema.json');
     writeFileSync(schema, JSON.stringify({type: 'object', additionalProperties: false, required: ['tokens', 'taskId', 'explanation'], properties: {tokens: {type: 'integer'}, taskId: {type: 'string'}, explanation: {type: 'string'}}}));
@@ -165,9 +104,7 @@ try {
 } catch (error) {report.status = 'failed'; report.failure = error instanceof Error ? error.stack : String(error); process.exitCode = 1;}
 finally {
   try {
-    const closes = await Promise.allSettled([browser?.close(), server?.close(), closeWeb()]);
     await cleanupOnboardingCores(prefix,[data,path.join(work,'cold-model-data')]);
-    for (const closed of closes) if (closed.status === 'rejected') throw closed.reason;
     pass('owned-process-cleanup');
     rmSync(work, {recursive: true, force: true, maxRetries: 5, retryDelay: 100});
   } catch (error) {report.status = 'failed'; report.failure = (report.failure ?? '')+'\nCleanup: '+String(error); process.exitCode = 1;}

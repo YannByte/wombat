@@ -15,7 +15,7 @@ import {
 } from "../helpers/local-product.js";
 
 test(
-  "Skill batch template and consecutive evidence reads use real CLI and Web contracts",
+  "Skill batch template and consecutive evidence reads use real CLI and native contracts",
   { timeout: 60000 },
   async () => {
     await withLocalProduct(async (f) => {
@@ -130,10 +130,10 @@ test(
       assert.equal(text.fragments[0].text, "verified evi");
       assert(text.fragments[0].nextCursor);
       assert(text.sourceBytesRead <= 64);
-      const browser = await f.browser();
-      await browser.live!({ query: template.params.query, mode: "cached" });
+      const nativeApi = await f.native();
+      await nativeApi.live!({ query: template.params.query, mode: "cached" });
       const [, webText] = await readLocated(
-        (r) => browser.conversation!(r.params),
+        (r) => nativeApi.conversation!(r.params),
         request,
         12,
         1,

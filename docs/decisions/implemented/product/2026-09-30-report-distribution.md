@@ -4,7 +4,7 @@
 
 Status: implemented
 
-字段语义由[契约](../../../development/contracts.md)维护，当前 Web 导航见[前端说明](../../../development/frontend.md)。
+字段语义由[契约](../../../development/contracts.md)维护，当前 Web 导航见[前端说明](../../../development/architecture.md)。
 
 ## 问题
 

@@ -165,7 +165,7 @@
       "additionalProperties": false
     },
     {
-      "description": "List directory grants or explicitly choose, authorize or revoke a grant.",
+      "description": "List directory grants or explicitly authorize or revoke a selected path.",
       "type": "object",
       "properties": {
         "method": {
@@ -1746,12 +1746,6 @@
             "null"
           ]
         },
-        "choiceToken": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "grantId": {
           "type": [
             "string",
@@ -1765,8 +1759,6 @@
       "type": "string",
       "enum": [
         "list",
-        "choose",
-        "confirm",
         "authorize",
         "revoke"
       ]

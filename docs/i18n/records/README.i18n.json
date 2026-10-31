@@ -5,39 +5,35 @@
       "zh": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562",
       "en": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562"
     },
-    "/wombat-review-your-codex-work-and-usage": {
-      "zh": "5e4a1d12b494838b58c99f9282b8803ba798e28686feeb9edf11527bb1edaad6",
-      "en": "ba0d2ab75553d89a1a105839ac3de5e28b5232f5ba61afb9b6057bdd2b641739"
+    "/wombat-diagnose-and-improve-coding-agent-work": {
+      "zh": "01264cb0ccda5deb540787d35adf706aec89419d353c8541ac98d0bf27ae9c53",
+      "en": "f3a662a9879929ce1377252c6b9d680803bc4ef72530522e7421cc64384fe68b"
     },
-    "/wombat-review-your-codex-work-and-usage/get-started": {
-      "zh": "7f0ed13ffa221a0437582fe3d711e1926d178259cac33b980f52fd832197115a",
-      "en": "035844aa066dcade6dfc68545d5ad05ff05c7c9b6f29435442533c9c9ab1d033"
+    "/wombat-diagnose-and-improve-coding-agent-work/get-started": {
+      "zh": "4232027eafe81f17a2565cd8d00ae8002ff18b3ad5d28c084ef94e366333db91",
+      "en": "9224f682d1043293757b040c2527ff5eb91726a54438a8f05d0603b3afbdd678"
     },
-    "/wombat-review-your-codex-work-and-usage/choose-a-task": {
-      "zh": "13a4bc63bd4b18fa842c630710ef539bf13f320509118d94be0715b5f2f4a972",
-      "en": "7b7fd6e00e6e3d408d9b53684636fe7c731c213adb30c32083dd08eaefaadc53"
+    "/wombat-diagnose-and-improve-coding-agent-work/choose-a-task": {
+      "zh": "4ccc3ab2c3faaf5f75039af1048188026660b0b036b0174994cf736e6e76f1b3",
+      "en": "5b0a69e1bf0d3c4a8994395c5aac48388cd0a5ef0138f090c95e932d644153b8"
     },
-    "/wombat-review-your-codex-work-and-usage/first-preparation-and-results": {
-      "zh": "1472a40dce507d2ef164cccdda2b17b2cf1d9a01d9d785ade72a0f1c3699ac05",
-      "en": "76602f1c9fd4d78ddbc863e421177c32e781761d655289e82e76f176fdb1cc45"
+    "/wombat-diagnose-and-improve-coding-agent-work/first-preparation-and-results": {
+      "zh": "d12dc55a682a895edc373da20a25cc7d2af2b0522f38d982af127333cab2a280",
+      "en": "6ce59e9c3fb0a969da4851d08dd1bae7728fac4edc8df9885798086ad78dd2b2"
     },
-    "/wombat-review-your-codex-work-and-usage/open-web": {
-      "zh": "046ad45ddf6583d42d3ca4707bc2882c38a12cb736c63b607abd7eb29b49cd80",
-      "en": "4ea47ad62686c18eabcdf9d6abaed8f93fe5d9ee4c2ac4c9fdc3949ef0ff25c2"
-    },
-    "/wombat-review-your-codex-work-and-usage/update": {
+    "/wombat-diagnose-and-improve-coding-agent-work/update": {
       "zh": "db3b0b730796d179dcc315189c7ca7adc35ca0a444681ccdcaac010fdc87412e",
       "en": "8582e594d80456980adaae6d7565bfac7064a71a5c65f51fd8bda67a1b889ca7"
     },
-    "/wombat-review-your-codex-work-and-usage/scope-and-limits": {
+    "/wombat-diagnose-and-improve-coding-agent-work/scope-and-limits": {
       "zh": "0f39ad9f7caf2db20dd18d4442af05a6a9bc8e8a9cf6c7e0f89ff256ed7c298a",
       "en": "fc45c7b635632ff792e764805b73942446c9f3617dece5a5198e0328c004993b"
     },
-    "/wombat-review-your-codex-work-and-usage/help-and-contribution": {
+    "/wombat-diagnose-and-improve-coding-agent-work/help-and-contribution": {
       "zh": "dd2b2faa1a163b3d827f6e9c38e973303b2b9c6d2034740ebdc7008269f016be",
       "en": "05d93b4f94763b0499d6d4b4914c58c73cd23f1891bb45d2b9f7149b839342f9"
     },
-    "/wombat-review-your-codex-work-and-usage/license": {
+    "/wombat-diagnose-and-improve-coding-agent-work/license": {
       "zh": "3ae9b43b0b2ab0253c26742d9a180634319a002755081eaed0bdb18ba4a3c29d",
       "en": "1a044ed47f1540e7d83b3f35501b9a3475aa043c07bf24dbfd4d6cd9fabba51d"
     }

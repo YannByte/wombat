@@ -1,10 +1,10 @@
 # Process and recheck
 
-For a Web handoff, keep supplied cwd, target IDs/paths, hashes/existence, selectionVersion, readView and decisionRevision. Before an edit, make sure that the scope and current file state match the reviewed targets. Changed targets require renewed review. Do not substitute a reordered “first” item or expand to the whole machine.
+Before editing, retain the selected project and work item, original issue, evidence references, target content version, success criterion and baseline measures when relevant. Check that current target content still matches the reviewed version. A changed target requires renewed review within the authorized scope.
 
-Process within the user's authorization in the receiving conversation. Keep purpose, triggers, necessary constraints, tests, references and shared projects. For a narrowly authorized edit, keep other source files and existing navigation artifacts. Do not rewrite them just to restate the result.
+Process within the user's authorization in the receiving conversation. Keep purpose, triggers, necessary constraints, tests, references and shared projects. For a narrowly authorized edit, keep other source files. Do not rewrite them just to restate the result.
 
-Codex owns file edits, review and recovery. Wombat has no apply/recover job API. Do not send another handoff to yourself.
+Codex owns file edits, review and recovery. Wombat has no apply/recover job API.
 
 After editing an existing configuration suggestion, call `optimize recheck --suggestion ID --project-root PATH --project PATH --json` with current evidence. Examine per-rule outcomes. For a direct file review without a Wombat suggestion ID, check the original target and issue with an appropriate parser, reference check or behavior test. Do not create a suggestion merely to report a fix. A passing static recheck is not proof of actual adoption, better task quality or financial savings. Show remaining findings and unavailable checks. Keep user decisions separate from checks.
 

@@ -15,8 +15,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const packageFiles = [
   'package.json',
   'client/package.json',
-  'ui/package.json',
-  'web/package.json',
   'cli/package.json',
 ] as const;
 

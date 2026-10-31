@@ -22,9 +22,8 @@ curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/instal
 
 插件阶段失败时，已安装的 Wombat 和数据会保留。错误提示会给出失败阶段、错误码、恢复操作和私有诊断摘要的路径。发现检查遇到权限不足、连接断开或超时时，先处理提示中的问题，再只运行 `wombat setup --project PATH --json`，无需重装。Skill 被禁用或存在冲突时，先检查 Codex 中该项目的插件设置，再执行同一只读检查。只有插件安装失败或已确认版本、内容不匹配时，才使用安装器的 `--plugin-only`（macOS/Linux）或 `-PluginOnly`（PowerShell）；保留自定义安装目录选项。此模式复用当前运行时，不重复下载，也不修改 PATH；不要附加版本或下载源选项。向 [Issues](https://github.com/YannByte/wombat/issues) 附加诊断摘要前，请先检查其内容：摘要包含本机项目和 Skill 路径，但不包含原始命令输出或 Hook 配置。
 
-需要打开 Web 时，执行 `wombat web --open`，或给安装器附加 `--open` / `-Open`。仅安装运行时与 Web，可省略 `--plugin` 或 `-Plugin`。浏览器未自动打开时，使用终端输出的完整地址。
 
-提供服务控制能力的运行时会在安装后注册当前用户的自动启动，并在后台准备近期数据，不打开 Web、不信任 Hooks，也不调用模型。若不需要自动启动，macOS/Linux 加 `--no-service`，Windows 加 `-NoService`。`--plugin-only` 或 `-PluginOnly` 不改变服务。尚未提供服务控制的公开运行时保留原有行为。可用 `wombat service status --json` 检查进度；安装成功不代表数据已经就绪。暂停、恢复和移除方式见[后台索引](cli.md)。
+默认安装不启动索引，也不注册自动启动。查询才触发准备，并复用已提交结果。如需保留可选常驻查询服务，macOS/Linux 加 `--service`，Windows 加 `-Service`；没有查询时仍不索引。`--plugin-only` / `-PluginOnly` 不改变服务。已有自动启动注册保留，直到执行 `wombat service disable --json` 移除；更新后的服务同样只在查询时索引。安装成功不代表数据已经就绪。查看进度、暂停、恢复和移除方式见[查询服务控制](cli.md)。
 
 ## 更新
 

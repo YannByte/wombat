@@ -26,7 +26,7 @@ const managedReleaseFiles = new Set([
   'cli/package.json', 'client/package.json', 'core/Cargo.lock', 'core/Cargo.toml',
   'docs/dependency-licenses.json', 'docs/guides/installation.en.md',
   'docs/guides/installation.i18n.json', 'docs/guides/installation.md',
-  'scripts/install/install.sh', 'scripts/install/install.ps1', 'package.json', 'ui/package.json', 'web/package.json',
+  'scripts/install/install.sh', 'scripts/install/install.ps1', 'package.json',
   'scripts/release-notes/current.json',
 ]);
 

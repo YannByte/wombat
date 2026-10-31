@@ -23,7 +23,7 @@ test('failed onboarding cleans a real detached core before any Web URL was recei
     const until=Date.now()+10_000;
     for(;;) {
       assert.equal(service.exitCode,null,'Owned core exited before readiness');
-      try{await stat(path.join(data,'live-v2/index.sqlite'));break;}catch(error){if(!error||typeof error!=='object'||!('code' in error)||error.code!=='ENOENT')throw error;}
+      try{await stat(path.join(data,'live-v2/service-v2.lock'));break;}catch(error){if(!error||typeof error!=='object'||!('code' in error)||error.code!=='ENOENT')throw error;}
       assert.ok(Date.now()<until,'Owned core readiness timed out');await delay(25);
     }
     const closed=once(service,'close');

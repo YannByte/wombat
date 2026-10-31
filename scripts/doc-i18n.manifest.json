@@ -126,16 +126,6 @@
       "record": "docs/i18n/records/SECURITY.i18n.json"
     },
     {
-      "zh": "ui/README.zh-CN.md",
-      "en": "ui/README.md",
-      "record": "ui/README.i18n.json"
-    },
-    {
-      "zh": "web/README.zh-CN.md",
-      "en": "web/README.md",
-      "record": "web/README.i18n.json"
-    },
-    {
       "zh": "docs/decisions/implemented/architecture/2026-10-01-local-web.md",
       "en": "docs/decisions/implemented/architecture/2026-10-01-local-web.en.md",
       "record": "docs/decisions/implemented/architecture/2026-10-01-local-web.i18n.json"
@@ -226,9 +216,9 @@
       "record": "docs/decisions/proposed/product/2026-10-03-optimization-lifecycle.i18n.json"
     },
     {
-      "zh": "docs/decisions/proposed/product/2026-10-02-progressive-initialization.md",
-      "en": "docs/decisions/proposed/product/2026-10-02-progressive-initialization.en.md",
-      "record": "docs/decisions/proposed/product/2026-10-02-progressive-initialization.i18n.json"
+      "zh": "docs/decisions/rejected/product/2026-10-02-progressive-initialization.md",
+      "en": "docs/decisions/rejected/product/2026-10-02-progressive-initialization.en.md",
+      "record": "docs/decisions/rejected/product/2026-10-02-progressive-initialization.i18n.json"
     },
     {
       "zh": "docs/decisions/implemented/architecture/2026-10-04-codex-task-timing.md",
@@ -296,16 +286,6 @@
       "record": "docs/reference/cli.i18n.json"
     },
     {
-      "zh": "docs/reference/web-host.md",
-      "en": "docs/reference/web-host.en.md",
-      "record": "docs/reference/web-host.i18n.json"
-    },
-    {
-      "zh": "docs/development/frontend.md",
-      "en": "docs/development/frontend.en.md",
-      "record": "docs/development/frontend.i18n.json"
-    },
-    {
       "zh": "docs/development/plugin.md",
       "en": "docs/development/plugin.en.md",
       "record": "docs/development/plugin.i18n.json"
@@ -321,11 +301,6 @@
       "record": "docs/development/decision-maintenance.i18n.json"
     },
     {
-      "zh": "docs/guides/web.md",
-      "en": "docs/guides/web.en.md",
-      "record": "docs/guides/web.i18n.json"
-    },
-    {
       "zh": "docs/guides/plugin.md",
       "en": "docs/guides/plugin.en.md",
       "record": "docs/guides/plugin.i18n.json"
@@ -339,6 +314,16 @@
       "zh": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.md",
       "en": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.en.md",
       "record": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/implemented/architecture/2026-10-31-demand-indexing.md",
+      "en": "docs/decisions/implemented/architecture/2026-10-31-demand-indexing.en.md",
+      "record": "docs/decisions/implemented/architecture/2026-10-31-demand-indexing.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/implemented/architecture/2026-10-31-cli-task-skill.md",
+      "en": "docs/decisions/implemented/architecture/2026-10-31-cli-task-skill.en.md",
+      "record": "docs/decisions/implemented/architecture/2026-10-31-cli-task-skill.i18n.json"
     }
   ],
   "legacyUnpaired": [],
@@ -354,26 +339,5 @@
     "docs/i18n/terminology.md",
     ".github/pull_request_template.md"
   ],
-  "assetPairs": [
-    {
-      "zh": "assets/prototype-usage-overview-zh.png",
-      "en": "assets/prototype-usage-overview-en.png"
-    },
-    {
-      "zh": "assets/prototype-high-usage-turn-zh.png",
-      "en": "assets/prototype-high-usage-turn-en.png"
-    },
-    {
-      "zh": "assets/prototype-conversations-zh.png",
-      "en": "assets/prototype-conversations-en.png"
-    },
-    {
-      "zh": "assets/prototype-overview-zh.jpg",
-      "en": "assets/prototype-overview-en.jpg"
-    },
-    {
-      "zh": "assets/prototype-review-zh.jpg",
-      "en": "assets/prototype-review-en.jpg"
-    }
-  ]
+  "assetPairs": []
 }

@@ -4,6 +4,8 @@
 
 Status: proposed
 
+The [CLI and task Skill decision](../../implemented/architecture/2026-10-31-cli-task-skill.en.md) supersedes this proposal’s Web, multiple-entry and mandatory setup flows. Retain the collection and evidence requirements below only where they have a current CLI consumer.
+
 ## Problem
 
 The old technical draft placed removed Wombat generation, application, and recovery flows in a user Skill and copied runtime assets separately. It did not distinguish Web browsing from processing in a Codex conversation or cover current account and native handoff capabilities. The user requested deletion and redesign based on main.
@@ -108,7 +110,7 @@ When starting from Skill, Codex first answers the question and opens a matching 
 
 When starting from Web, users can view data directly or open “Use with Skill” for invocation guidance. Offer generic questions for the page topic, such as explaining today's main usage contributors or checking the current project's configuration suggestions and their evidence. Show the exact invocation name only after confirming an available instance. Examples may be copied; they do not bind selected page objects into processing tasks, send to Codex, or create conversations.
 
-The [UI README](../../../development/frontend.en.md) owns current recommendation actions and presentation. Processing continues in the current conversation; Web retains viewing and rechecks. Preserve legacy dispatch interfaces and records while evaluating removal separately. Details still show issues, locations, evidence, methods, user decisions, and recheck results without assuming successful changes. Instructions and Extensions retain filters/details; Tasks retains turns, events, and same-version drill-down.
+The [UI README](../../../development/architecture.en.md) owns current recommendation actions and presentation. Processing continues in the current conversation; Web retains viewing and rechecks. Preserve legacy dispatch interfaces and records while evaluating removal separately. Details still show issues, locations, evidence, methods, user decisions, and recheck results without assuming successful changes. Instructions and Extensions retain filters/details; Tasks retains turns, events, and same-version drill-down.
 
 #### Languages, failure, and design acceptance
 
@@ -128,7 +130,7 @@ New pages, preparation notices, recovery messages, and handoff copy provide both
 
 ### Skill entry and data initialization
 
-Initialization prepares the requested task. The Skill invokes the current CLI and reuses Rust source discovery, index restoration, and incremental synchronization, without another database, first-run flag, or log parser. See [initialization and continuous discovery](2026-10-02-progressive-initialization.en.md) for the product flow.
+Initialization prepares the requested task. The Skill invokes the current CLI and reuses Rust source discovery, index restoration, and incremental synchronization, without another database, first-run flag, or log parser. See [initialization and continuous discovery](../../rejected/product/2026-10-02-progressive-initialization.en.md) for the product flow.
 
 Determine intent and required data before checking the executable and relevant capabilities. With only a Skill name and no task, explain executable availability and offer one natural-language example without scanning complete history. Reuse a successful executable check within the conversation and recheck when its path or capabilities change.
 

@@ -2,12 +2,12 @@
   "version": 2,
   "sections": {
     "/cli-entry": {
-      "zh": "d5f1247c6d11c4c44ed58a6e43e3d55458fce664ebe60e1345350f6737f1ded0",
-      "en": "e848b047d24f2d6be5486b5fa3ebe151e34eb420ac08575bd2942c7c4406cac4"
+      "zh": "1ec06cd50aa42aecc818b3e3ef274a25b6dbefd0d03b1bfb650e7863134ede02",
+      "en": "55d84cdd2eaf7df3b2fd70ab10899113e2a5231eaa7b58a9892a27404c415c22"
     },
     "/cli-entry/public-entries": {
-      "zh": "2e3b0e243cf7d8ea655df32f8547998baa87bf2c84df12651c9110d5c2103f97",
-      "en": "2573a7328ae3bf526616e3678e21141f2c6a1d40ce39799527ee3eb45c3f42cd"
+      "zh": "9c159ab005b3a78f7161b1e767624f00c8eb570d8dd29204a0afa410e203cd11",
+      "en": "d83e8f5b885cc60445e965ef9b569683010cd44c1a753d342a37aed39eed4afc"
     },
     "/cli-entry/limits": {
       "zh": "b01626eb4792a95ea776ce7b0548e691269c939a8a2a97df8140de202ec5e419",

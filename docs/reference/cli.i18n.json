@@ -2,16 +2,16 @@
   "version": 2,
   "sections": {
     "/cli-command-entry": {
-      "zh": "c9848a8daec8b5402ec21435fb3fd470f3afc5e9f8fc2e920c1d81924e5fe846",
-      "en": "50e4df819d5942fe8faddbe49e4fa78a4ec0c9d79d080fc8bf648c8c3e876892"
+      "zh": "f6c542568607f20c9be18a1f58b215f9b2f1da6f1bcb385db62630d5b8fc8a39",
+      "en": "a38e9572b9df88f9925316d6e1c80c4a9b3763e8beb0b53cde1f4c64e617a6c7"
     },
     "/cli-command-entry/public-entries": {
-      "zh": "155c0ca2bfc2381c7496291d24af46d1226ea46c037e2fc7c691e337cf001be2",
-      "en": "c933849d8e2913064b9fdc80b78ea84cfed1fc22424ec3e2ced9fcbf4ab11dd4"
+      "zh": "8377f27709fdc7552d3e777c622df55157425595337b3393e4b7e10888213963",
+      "en": "d0c628c8ec6d0113696121261506408362a7763ef1d745ccccd902146b939049"
     },
     "/cli-command-entry/agent-interface-principles": {
-      "zh": "dff05c9fcd973aa87bbc4c85da84b3a24385a662b7a3c8a30ec44722faeb481e",
-      "en": "02ef784b530ab6419839db232cf4778a468307139e3aae7b54f1871442ce34d6"
+      "zh": "040c2b07cf9af5012254452d9ce7634eb26dd06781a80423c87778a9be236ce7",
+      "en": "9b6510d8f82bcbef0d655babcf3b7417b1a74175aee6b94ae524a11bfec8f0d2"
     },
     "/cli-command-entry/limits-and-verification": {
       "zh": "40db23bc2767f02673b2cc7615b48b5b9e358ffab56a28a2898a48fc9635ae17",
@@ -19,15 +19,11 @@
     },
     "/cli-command-entry/whole-turn-timing": {
       "zh": "97e13fc56f4038e0835bd772cfc371aee79713840cfcf01a4d99bfd7b9105592",
-      "en": "fe65230efece54b07a5933159ed184fb5c2c7cc1805cef4976211f8541b78c49"
+      "en": "9902dcb8e46b0f7c3e96824cf366bef7f77b90b3bbedf6db79e9d1a5987c69eb"
     },
     "/cli-command-entry/unsupported-formats-and-recovery": {
-      "zh": "88f2fa1cd2e231ca4a820b6e4758ee373db722d616edd19e7150c54792355b5a",
-      "en": "c7cb332f3b2dbddda1a149001aa72f3021590aef5cab42ba7891e46f22db6b1c"
-    },
-    "/cli-command-entry/web-assembly": {
-      "zh": "982a18185bf293d5c407088d8378ba416e9efe3cd04305c82eb3a6089f6dfc40",
-      "en": "9e404168bf8eccd76c74a410b328be6bef98f1b7ed17fb3c58f769d2aa7f3ffd"
+      "zh": "c1c2f6f2a91c1122a66f86c276b177af742b706fb843cef2f0310e07a052f518",
+      "en": "03bc7df345be3c78db9dde1b5d5a9122f3eb8179b7390280a3fdc18548d0eacf"
     },
     "/cli-command-entry/collection-entries": {
       "zh": "2acc64b6b4cc4a32a2ff3bc7d2639479bfb7ba6d7f4e48f3f32bf4c65c322e0b",

@@ -28,10 +28,7 @@ fn cached_history_interest_does_not_suppress_a_later_auto_backfill() {
     let cached = ReadViewSelector::new(roots.clone(), None, Mode::Cached, false, false).unwrap();
     select_view(&cached, &state, &jobs, &AtomicBool::new(false)).unwrap();
     assert!(receiver.try_recv().is_err());
-    assert!(
-        !state.0.lock().unwrap()[&key].include_history,
-        "A cached read must not expand subsequent background scans"
-    );
+    assert!(state.0.lock().unwrap()[&key].pending.is_none());
     let automatic = ReadViewSelector::new(roots, None, Mode::Auto, false, false).unwrap();
     let (_, freshness) = select_view(&automatic, &state, &jobs, &AtomicBool::new(false)).unwrap();
     assert_eq!(freshness.status, "syncing");
@@ -168,7 +165,7 @@ fn auto_reads_reuse_committed_views_until_five_minutes_and_manual_refresh_bypass
             assert_eq!(job.key, key);
             let mut entries = state.0.lock().unwrap();
             let entry = entries.get_mut(&key).unwrap();
-            let work = scheduling::begin(entry, true).unwrap();
+            let work = scheduling::begin(entry).unwrap();
             scheduling::finish(entry, work);
             entry.last_sync = Instant::now();
             drop(entries);
@@ -324,7 +321,7 @@ fn cancelling_reader_preserves_shared_pending_work_and_other_readers() {
     let mut entries = state.0.lock().unwrap();
     assert!(entries[&key].pending.is_some());
     assert!(entries[&key].syncing);
-    let work = scheduling::begin(entries.get_mut(&key).unwrap(), true).unwrap();
+    let work = scheduling::begin(entries.get_mut(&key).unwrap()).unwrap();
     scheduling::finish(entries.get_mut(&key).unwrap(), work);
     drop(entries);
     cancelled.store(false, Ordering::Relaxed);
@@ -382,5 +379,54 @@ fn unknown_fixed_read_cannot_seed_default_roots_for_later_live_sync() {
         cancelled.store(true, Ordering::Relaxed);
         state.1.notify_all();
         assert_eq!(code(reader.join().unwrap().err().unwrap()), "CANCELLED");
+    });
+}
+
+#[test]
+fn dirty_cached_reads_preserve_invalidation_for_the_next_auto_query() {
+    let root = tempfile::tempdir().unwrap();
+    let roots = vec![root.path().to_string_lossy().into_owned()];
+    let key = source_key(&roots);
+    let state = shared(&key, roots.clone(), fixture(&key, "ready"));
+    {
+        let mut entries = state.0.lock().unwrap();
+        let entry = entries.get_mut(&key).unwrap();
+        entry.requested = 1;
+        entry.completed = 1;
+        entry.changed = true;
+    }
+    let (jobs, receiver) = mpsc::sync_channel(1);
+    let cached = ReadViewSelector::new(roots.clone(), None, Mode::Cached, false, false).unwrap();
+    let (_, freshness) = select_view(&cached, &state, &jobs, &AtomicBool::new(false)).unwrap();
+    assert_eq!(freshness.status, "stale");
+    assert!(receiver.try_recv().is_err());
+    assert!(state.0.lock().unwrap()[&key].changed);
+    let automatic = ReadViewSelector::new(roots, None, Mode::Auto, false, false).unwrap();
+    let (_, freshness) = select_view(&automatic, &state, &jobs, &AtomicBool::new(false)).unwrap();
+    assert_eq!(freshness.status, "syncing");
+    assert_eq!(receiver.try_recv().unwrap().key, key);
+}
+
+#[test]
+fn late_notification_does_not_turn_a_completed_fresh_ticket_into_a_timeout() {
+    let root = tempfile::tempdir().unwrap();
+    let roots = vec![root.path().to_string_lossy().into_owned()];
+    let key = source_key(&roots);
+    let state = shared(&key, roots.clone(), fixture(&key, "ready"));
+    let (jobs, receiver) = mpsc::sync_channel(1);
+    let request = ReadViewSelector::new(roots, None, Mode::Fresh, false, false).unwrap();
+    std::thread::scope(|scope| {
+        let reader = scope.spawn(|| select_view(&request, &state, &jobs, &AtomicBool::new(false)));
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+        let mut entries = state.0.lock().unwrap();
+        let entry = entries.get_mut(&key).unwrap();
+        let work = scheduling::begin(entry).unwrap();
+        scheduling::finish(entry, work);
+        entry.changed = true;
+        drop(entries);
+        state.1.notify_all();
+        assert_eq!(reader.join().unwrap().unwrap().1.status, "stale");
+        assert!(state.0.lock().unwrap()[&key].changed);
+        assert!(receiver.try_recv().is_err());
     });
 }

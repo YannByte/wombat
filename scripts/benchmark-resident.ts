@@ -1,4 +1,4 @@
-/** Long-running synthetic truth and resource qualification; never reads user logs. */
+/** On-demand queries with optional resident lifetime; synthetic truth only. */
 import assert from "node:assert/strict";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
@@ -161,12 +161,19 @@ function unchangedBuild() {
   );
 }
 async function waitReady(prior?: string | null) {
+  let requested = false;
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     if (child && (child.exitCode !== null || child.signalCode !== null))
       throw new Error("Resident process exited before readiness: " + stderr);
     const s = await status();
     if (s.errorCode) throw new Error("Indexing failed: " + s.errorCode);
+    if (s.running && !requested) {
+      // Startup and notifications never prepare data; this workload requests it.
+      await client.live!({ query: {action:"usage",scope:{allTime:true},compact:true}, mode:"fresh",waitMs:120000 }, {signal:controller.signal});
+      requested = true;
+      continue;
+    }
     if (
       s.running &&
       s.ready &&

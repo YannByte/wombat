@@ -2,27 +2,18 @@
 
 [中文](architecture.md) | English
 
-Wombat shares a Rust core and generated contracts across GUI, CLI and Web hosts. The Tauri 2 desktop host remains planned; Web is implemented and TUI is removed. See module READMEs for interfaces and [unfinished proposal](../decisions/proposed/product/2026-10-03-optimization-lifecycle.en.md) for outstanding acceptance.
+Wombat is a local CLI and one main Skill for project engineering diagnosis and work analysis. The Skill selects evidence by user task. Rust owns source facts, accounting, storage and queries. Codex owns interpretation, project edits and validation. There is no project initialization phase or Web host.
 
 ## Data Flow
 
 ```mermaid
 flowchart LR
-  L[Agent logs] --> A[Rust adapters / measurements / pricing]
-  A --> D[SQLite index / views]
-  A --> S[Immutable snapshots]
-  D --> Q[Rust shared queries]
-  S --> Q
-  HK[Hooks] --> B[CLI Hook input]
-  B --> RC[Rust collection]
-  RC --> O[Observations]
-  O --> Q
-  SK[Skill] --> C
-  Q --> N[client/node]
+  L[Agent logs] --> R[Rust facts / accounting / queries]
+  R --> D[SQLite index / fixed views]
+  D --> N[Typed Node client]
   N --> C[CLI JSON / text]
-  N --> W[web loopback host]
-  W --> H[client/http]
-  H --> U[ui React]
+  S[One main Skill] --> C
+  S --> A[Codex project reads / edits / checks]
 ```
 
 ## Modules
@@ -32,22 +23,18 @@ flowchart LR
 | `core/` | Adapters, accounting, pricing, storage, live service, and queries; an independent Rust library and executable, without UI framework dependencies |
 | `client/` | Rust-generated DTOs, schema validation, `UsageClient`, stable errors, cancellation, and progress; the generic entry imports neither Node nor terminal libraries |
 | `client/src/node/` | Restricted core communication, subprocesses, live connections, official price downloads, timeouts, and output limits; exported as `@wombat/client/node` |
-| `client/src/http/` | Browser HTTP transport and streamed progress; exported as `@wombat/client/http`, with business fields still validated by generated contracts |
 | `client/src/locale/` | Shared typed Chinese/English dictionaries, language subscriptions, and presentation formatting; source content and protocol values stay untranslated |
-| `web/` | `startWebHost` receives a client, built assets, startup scope, and port; owns local HTTP, authentication, static files, and connection cleanup, without business algorithms |
-| `ui/` | React / TypeScript / Vite frontend; `App` receives `UsageClient`, implements five surfaces and details, and wires HTTP; no Node/Tauri dependency |
-| `cli/` | Arguments, JSON/text, exit codes, and explicit Web startup/shutdown; the default command prints usage text |
+| `cli/` | Arguments, JSON/text, exit codes and local query lifecycle; the default command prints usage text |
 | `plugin/` | User plugins |
 
-Dependencies point from `cli → web + client/node`, `web → client`, `ui → client + client/http + client/locale`. The core has no presentation dependencies. Modules communicate through public entries or versioned protocols, retaining a modular monolith.
+Dependencies point from `cli → client/node → core`. The main Skill reuses public CLI queries and Codex native project tools. No browser transport or UI package is shipped.
 
 Business rules stay in Rust: adapters own source semantics and identity; `pricing.rs` / `pricing_sync.rs` own amounts and catalog eligibility; `live.rs` / `live_index.rs` own incremental indexes and versions; `usage_store.rs` owns immutable snapshots; `usage_app.rs` / `usage_app_dto.rs` own operations, filters, sorting, full-scope totals, and pagination. Lists never recompute totals, shares, or pricing from the current page.
 
-The frontend query coordinator owns version observation, a consistent main view and a bounded query cache. Turns, events and period details load independently on demand, with filters included in query identity. Business sorting and full-scope totals remain in the core; see the [frontend guide](frontend.en.md) for pagination and cancellation.
 
 ## Host and service responsibilities
 
-The Web host adapts authenticated loopback requests to UsageClient. The core owns directory grants, version-bound selections, user decisions, and check facts; Node sends native Codex tasks and reads account facts. Codex acceptance does not establish resolution, and rechecks do not revoke user decisions. HTTP limits and connection ownership belong in the [Web reference](../reference/web-host.en.md); transport contracts belong in the [client reference](../reference/client.en.md).
+The CLI supplies explicit source and project scope. The core owns version-bound evidence, user decisions and check facts. Codex acceptance does not establish resolution. Rechecks never revoke user decisions.
 
 ## Domain and persistence
 
@@ -106,4 +93,4 @@ Parent relationships use events and a shared relationship index. Lifecycle uses 
 
 ## Development entry points
 
-Use the [delivery workflow](workflow.en.md) for code conventions and verification, the [GitHub distribution decision](../decisions/implemented/architecture/2026-10-04-github-release-distribution.en.md) for release/runtime rationale, and [unfinished proposal](../decisions/proposed/product/2026-10-03-optimization-lifecycle.en.md) for outstanding acceptance. Host selection rationale belongs in the [local Web decision](../decisions/implemented/architecture/2026-10-01-local-web.en.md); native execution ownership belongs in the [Codex decision](../decisions/implemented/architecture/2026-10-03-native-codex-handoff.en.md).
+Use the [delivery workflow](workflow.en.md) for code conventions and verification, the [GitHub distribution decision](../decisions/implemented/architecture/2026-10-04-github-release-distribution.en.md) for release/runtime rationale, and [unfinished proposal](../decisions/proposed/product/2026-10-03-optimization-lifecycle.en.md) for outstanding acceptance. Host selection rationale belongs in the [earlier host decision](../decisions/implemented/architecture/2026-10-01-local-web.en.md); native execution ownership belongs in the [Codex decision](../decisions/implemented/architecture/2026-10-03-native-codex-handoff.en.md).

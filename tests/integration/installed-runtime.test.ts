@@ -37,7 +37,7 @@ test('installed runtime queries synthetic usage, fixed drill-down and configurat
     for (const name of readdirSync(dist).filter(name => /^wombat(?:-.*)?\.js$/.test(name))) cpSync(path.join(dist, name), path.join(installed, name));
     const coreName = process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core';
     cpSync(path.join(dist, coreName), path.join(installed, coreName));
-    for (const name of ['web', 'skill']) cpSync(path.join(dist, name), path.join(installed, name), {recursive:true});
+    cpSync(path.join(dist, 'skill'), path.join(installed, 'skill'), {recursive:true});
     accessSync(path.join(installed, coreName), constants.X_OK);
     const source = path.join(temp, 'source'), project = path.join(temp, 'project');
     mkdirSync(path.join(source, 'sessions'), { recursive: true }); mkdirSync(project);

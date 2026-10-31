@@ -2,7 +2,7 @@
 
 Use this flow for usage improvement questions or a work review that needs original evidence. Keep a simple totals question to one query.
 
-1. Resolve the requested dates, timezone and filters. Start with a compact usage query. Batch only needed rankings through `also`; totals come from `summary`, never the returned page. With a ready background index, use `mode:"cached"` when its recorded cutoff is adequate. Otherwise use the normal readiness flow.
+1. Resolve the requested dates, timezone and filters. Start with a compact usage query. Batch only needed rankings through `also`; totals come from `summary`, never the returned page. Reuse an adequate returned view with `mode:"cached"`; otherwise start with `mode:"auto"`. Do not probe service readiness or try an empty cache before the task query.
 2. Select a task from the returned ranking. Query its matching turns with `matchedOnly:true` and the original filters. Use `method:"usage"`, `mode:"cached"` and `query.snapshotId` for a returned `live:` ID. `method:"snapshot"` addresses saved disk snapshots; omit `roots` because that snapshot already binds its sources.
 3. For a specific candidate, inspect its exact task and turn. Do not start with a whole-day deep analysis when bounded evidence can answer the question. On `RESOURCE_LIMIT`, narrow once to that selection. Smaller pages cannot reduce whole-task computation.
 4. Execute dependent `conversation` location and bounded reads consecutively in one host invocation. Use [read-located.ts](../scripts/read-located.ts) when the host can import TypeScript. It needs a caller that uses the selected CLI, sends one generated request, accepts exits 0/2 and parses the validated JSON. Do not install a runtime for this helper; the same two public calls work in other hosts.
@@ -16,7 +16,7 @@ Keep the CLI caller's timeout, cancellation and output bounds. The helper makes 
 This is a synthetic batch example. Replace its date bounds and timezone with the user's scope. Copy supported request fields from the discovered Schema.
 
 ```json
-{"method":"usage","params":{"query":{"action":"usage","scope":{"since":"2026-01-02","until":"2026-01-03","timezone":"Asia/Shanghai"},"compact":true,"limit":1},"also":[{"action":"usage","presentation":"models","scope":{"since":"2026-01-02","until":"2026-01-03","timezone":"Asia/Shanghai"},"compact":true,"limit":3},{"action":"threads","sort":"tokens","scope":{"since":"2026-01-02","until":"2026-01-03","timezone":"Asia/Shanghai"},"compact":true,"limit":3}],"mode":"cached"}}
+{"method":"usage","params":{"query":{"action":"usage","scope":{"since":"2026-01-02","until":"2026-01-03","timezone":"Asia/Shanghai"},"compact":true,"limit":1},"also":[{"action":"usage","presentation":"models","scope":{"since":"2026-01-02","until":"2026-01-03","timezone":"Asia/Shanghai"},"compact":true,"limit":3},{"action":"threads","sort":"tokens","scope":{"since":"2026-01-02","until":"2026-01-03","timezone":"Asia/Shanghai"},"compact":true,"limit":3}],"mode":"auto"}}
 ```
 
 Give recommendations as: observed step, proposed change, and a check for correctness or effectiveness. Read selected evidence before naming a step to remove. Separate expected negative tests from accidental failures. High usage, cached reads and a costly model alone do not prove waste. Do not calculate operation costs or promise savings without a comparison.

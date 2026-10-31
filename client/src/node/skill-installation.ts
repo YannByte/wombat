@@ -13,7 +13,7 @@ import {discoverWombatSkill} from './codex/skills.js';
 import type {CodexOptions} from './codex/process.js';
 
 const MARKER='.wombat-install.json';
-export const skillCapabilities=['usage-json-v3','usage-json-v5','usage-compact-v1','inspection-json-v5','config-json-v1','account-json-v1','handoff-json-v1','web-context-v1','collection-json-v1','setup-json-v1','agent-api-v1','usage-statistics-v1','monitor-v1','config-content-hashes-v1'];
+export const skillCapabilities=['usage-json-v3','usage-json-v5','usage-compact-v1','inspection-json-v5','config-json-v1','account-json-v1','handoff-json-v1','collection-json-v1','setup-json-v1','agent-api-v1','usage-statistics-v1','monitor-v1','config-content-hashes-v1'];
 interface File {path:string;size:number;sha256:string;executable:boolean}
 interface Manifest {format:number;name:string;version:string;source:string;requiredCapabilities:string[];files:File[];contentHash:string}
 export interface SkillInstallationOptions extends CodexOptions {resourcesPath?:string}
@@ -100,11 +100,11 @@ export async function skillRuntimeChecks(discovery:Discovery,query:QueryOptions=
       result.requiredCapabilities=value.requiredCapabilities;
       result.missingCapabilities=result.requiredCapabilities.filter(c=>!skillCapabilities.includes(c));
       let actual:string;
-      if(!standalone&&value.skills!==undefined){
-        if(!Array.isArray(value.skills)||!value.skills.length||value.skills.length>32)throw new CoreError('SKILL_MANIFEST_INVALID','Invalid plugin Skill inventory');
+      if(!standalone){
+        if(!Array.isArray(value.skills)||value.skills.length!==1)throw new CoreError('SKILL_MANIFEST_INVALID','Invalid plugin Skill inventory');
         const skills:{name:string;contentHash:string}[]=[];
         for(const skill of value.skills){
-          if(!object(skill)||typeof skill.name!=='string'||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill.name)||skill.name.length>64||typeof skill.contentHash!=='string'||!/^[0-9a-f]{64}$/.test(skill.contentHash)||skills.some(s=>s.name===skill.name))throw new CoreError('SKILL_MANIFEST_INVALID','Invalid plugin Skill identity');
+          if(!object(skill)||skill.name!=='wombat'||typeof skill.contentHash!=='string'||!/^[0-9a-f]{64}$/.test(skill.contentHash)||skills.some(s=>s.name===skill.name))throw new CoreError('SKILL_MANIFEST_INVALID','Invalid plugin Skill identity');
           if(hash(JSON.stringify(await inventory(path.join(path.dirname(directory),skill.name),query)))!==skill.contentHash)return {...result,status:'modified',errorCode:'SKILL_RESOURCE_CHANGED'};
           skills.push({name:skill.name,contentHash:skill.contentHash});
         }

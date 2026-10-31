@@ -6,4 +6,3 @@ Follow [root instructions](../AGENTS.md) and the [delivery workflow](../docs/dev
 - Keep src/index.ts injectable and free of Node/terminal dependencies. src/node/ owns core paths, subprocess cancellation, timeouts, output bounds, and cleanup.
 - Validate requests/responses at trust boundaries. Match Rust protocol versions, operations, and error codes; never disguise unknown fields or failures as success.
 - For generated-contract changes, rebuild core/client before client tests, typechecks, and real-core integration tests. Do not test stale dist.
-- src/http/ owns browser transport only, using generated contracts and shared cancellation/progress. No Node imports or separate business DTOs.

@@ -278,15 +278,7 @@ fn future_publication_change_rejects_before_project_publication_without_writes()
         json!({"methodVersion":2,"futureShape":true}),
     );
     crate::live_index::save_map(&db, &scope, &view).unwrap();
-    let error = restore_projects::restore_projects(
-        &db,
-        &key,
-        &roots,
-        || None,
-        |_| panic!("unsupported publication must never expose partial facts"),
-    )
-    .err()
-    .unwrap();
+    let error = restore::restore_view(&db, &key, &roots).err().unwrap();
     assert_eq!(
         crate::live_index::failure_code(&error),
         "UNSUPPORTED_VERSION"

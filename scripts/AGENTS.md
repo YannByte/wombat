@@ -10,4 +10,4 @@ Follow [root instructions](../AGENTS.md). This directory owns checks, generators
 - Bound subprocess time/output and clean temporary directories. Do not turn failures into success or disable rules globally; justify object-specific exceptions.
 - Automate computable steps/checks behind one package entry. Reuse evidence and report stages. Git/external mutations resume by revalidating identities; never replace published identities.
 - Use native absolute paths in filesystem fixtures; declare foreign path grammar in recorded-path tests. Test tooling on every target.
-- test:repo runs *.test.ts and *.test.mjs for tools; product, browser, and install checks are separate.
+- test:repo runs *.test.ts and *.test.mjs for tools; product and install checks are separate.

@@ -57,9 +57,12 @@ pub(crate) fn load(
     prior: &serde_json::Map<String, serde_json::Value>,
     prices: crate::pricing_sync::Response,
 ) -> Result<Option<Snapshot>> {
-    let Some(raw) = prior.get("readHeader") else {
-        return Ok(None);
-    };
+    let raw = prior.get("readHeader").ok_or_else(|| {
+        operation_error(
+            "INDEX_UNAVAILABLE",
+            "Committed query header is missing; explicitly rebuild the index",
+        )
+    })?;
     if raw.get("version").and_then(serde_json::Value::as_u64) != Some(u64::from(VERSION)) {
         return Err(operation_error(
             "UNSUPPORTED_VERSION",
@@ -79,11 +82,17 @@ pub(crate) fn load(
     let header: Header = serde_json::from_value(raw.clone())?;
     anyhow::ensure!(
         header.manifest.snapshot_ref.snapshot_id == prior["id"].as_str().unwrap_or_default()
-            && header.manifest.price_catalog_hash == prices.catalog_hash
+            && prior.get("prices").and_then(serde_json::Value::as_str)
+                == Some(header.manifest.price_catalog_hash.as_str())
             && header.manifest.events.partitions.is_empty()
             && header.manifest.threads.iter().all(|t| t.turns.is_empty()),
         "query header identity mismatch"
     );
+    // A valid current header can need repricing. Invalid or missing headers
+    // have already failed; a price change never authorizes format recovery.
+    if header.manifest.price_catalog_hash != prices.catalog_hash {
+        return Ok(None);
+    }
     let mut snapshot = memory::memory(
         Collected::default(),
         header.manifest.snapshot_ref.snapshot_id.clone(),

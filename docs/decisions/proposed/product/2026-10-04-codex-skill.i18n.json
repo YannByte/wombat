@@ -2,8 +2,8 @@
   "version": 2,
   "sections": {
     "/decision-codex-skill-entry-and-distribution": {
-      "zh": "c9f55cfbd261ae3b3728026fdf0bbb3305db3f292276adb57b45e4a42715eadd",
-      "en": "600416fb50b6a537ce3c2b22a4bf5656ab47e51e20174947ea4b03ddd513511b"
+      "zh": "e1e36de30f3c0398a9a0d76104b0479be13b8d5e18d3bf0ab965cf9d3bfb5b53",
+      "en": "1d8b3bebe539f7eda152a70789a2d9afc2d86deb0a8ab976d9ba69b94875eddd"
     },
     "/decision-codex-skill-entry-and-distribution/problem": {
       "zh": "1f182e7b37fc1dda2a285af9af372ed782f3fe61c071e73b10169110658bc04e",
@@ -54,8 +54,8 @@
       "en": "a9f150d3b1ca16fcc019d5d73a904133d08ff8109f232e1a93936c78617094d9"
     },
     "/decision-codex-skill-entry-and-distribution/proposal/web-setup-and-skill-collaboration-design/skill-and-web-round-trips": {
-      "zh": "eece81c3c05724197addec3a2b2ced2ec6c46bed8da3172bdd6e304ff37be7fc",
-      "en": "11fd39985959f7723d597428646d359762a273d6d7405f7179a270bea330829a"
+      "zh": "2c09ecdf85886d801b12e96f02d5b155561b9556bc2c47396eb11940cf1111b5",
+      "en": "542d78be3e789b515ec171b38aecf92c75bd4a50aefa05654c55ea0b64f4f4d1"
     },
     "/decision-codex-skill-entry-and-distribution/proposal/web-setup-and-skill-collaboration-design/languages-failure-and-design-acceptance": {
       "zh": "cd6d060ee930f6ac7b7030c06ab27fbee38b867c72ca86aef5778ca5299ff064",
@@ -66,8 +66,8 @@
       "en": "a74043085f352daf9b2cb7e97ba7ca655b5f4ba76b69220cc2f70612048da21e"
     },
     "/decision-codex-skill-entry-and-distribution/proposal/skill-entry-and-data-initialization": {
-      "zh": "81ff3f970caa78f1687c0ecd3576d76c360626d79efc4ec269f7c5466a111db6",
-      "en": "0b34f53c389d0b551898f44eabd7256ccd8be71e31f0a8fbf97503a2b3a786a0"
+      "zh": "d12fdff0b7945ee9be1227c195dc4fade64a031807c65798134addc42f92f7ed",
+      "en": "b0277c74bdf34760e68d341025c98dc97e5f08f7397bb791fdeb95d4beeff87b"
     },
     "/decision-codex-skill-entry-and-distribution/proposal/user-tasks-and-answers": {
       "zh": "b1b2abec7a2650e9b8d68c7594882398e19f79bfc885928aee939800fb9a7e79",

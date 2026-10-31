@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "node --import tsx cli/src/index.ts",
-    "build": "node scripts/build-core.mjs && pnpm --filter @wombat/client build && pnpm --filter @wombat/ui build && pnpm --filter @wombat/web build && pnpm --filter @wombat/cli build && node scripts/build-cli.mjs && node scripts/build-web.ts && node scripts/build-skill.ts && node scripts/record-build.ts",
+    "build": "node scripts/build-core.mjs && pnpm --filter @wombat/client build && pnpm --filter @wombat/cli build && node scripts/build-cli.mjs && node scripts/build-skill.ts && node scripts/record-build.ts",
     "build:core": "node scripts/build-core.mjs",
     "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.json && node scripts/check-module-boundaries.mjs",
     "test": "pnpm run test:prebuild && pnpm run test:core && pnpm run test:unit && pnpm run test:integration && pnpm run test:e2e",
@@ -19,7 +19,6 @@
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
     "test:e2e": "node --import tsx --test tests/e2e/*.test.ts",
     "verify:e2e": "node --import tsx scripts/verify-e2e.ts",
-    "verify:event-upgrade:browser": "node --import tsx scripts/verify-event-upgrade-browser.ts",
     "contracts:generate": "node scripts/build-core.mjs --check && node scripts/generate-usage-contracts.mjs",
     "contracts:check": "node scripts/build-core.mjs --check && node scripts/generate-usage-contracts.mjs --check",
     "skills:check": "node scripts/check-skills.mjs",
@@ -28,7 +27,7 @@
     "docs:i18n:check": "node scripts/check-doc-i18n.mjs",
     "docs:i18n:record": "node scripts/check-doc-i18n.mjs --write",
     "docs:check": "pnpm run skills:check && pnpm run notes:check && pnpm run docs:budget && pnpm run docs:structure && pnpm run docs:i18n:check && pnpm run public:check",
-    "repo:check": "pnpm run format:check && pnpm run installers:check && pnpm run release:source-check && pnpm run docs:check && node scripts/check-module-boundaries.mjs && pnpm run i18n:check && pnpm run test:repo",
+    "repo:check": "node scripts/check-delivery.ts && pnpm run installers:check && pnpm run release:source-check && pnpm run docs:check && node scripts/check-module-boundaries.mjs && pnpm run i18n:check && pnpm run test:repo",
     "licenses:generate": "node scripts/dependency-licenses.mjs",
     "licenses:check": "node scripts/dependency-licenses.mjs --check",
     "public:check": "node scripts/check-public-release.mjs",
@@ -42,7 +41,7 @@
     "github:pack": "node scripts/prepare-github-release.ts",
     "github:verify": "node scripts/verify-github-release.ts",
     "native:export": "node scripts/export-native.ts",
-    "i18n:check": "node scripts/check-ui-i18n.ts",
+    "i18n:check": "node scripts/check-copy.ts",
     "test:repo": "node --import tsx --test scripts/*.test.mjs scripts/*.test.ts",
     "benchmark:usage": "node --import tsx scripts/benchmark-usage-v1.ts",
     "benchmark:live": "node --import tsx scripts/benchmark-live.ts",
@@ -55,7 +54,6 @@
     "skills:scope": "node .agents/skills/wombat-review/scripts/scope.ts",
     "skills:verify": "node .agents/skills/wombat-verify/scripts/verify.ts",
     "release:source-check": "node scripts/check-release-source.ts",
-    "preview:retire": "node --import tsx scripts/retire-prototype.ts",
     "verify:skill-native": "node --import tsx scripts/verify-skill-native.ts",
     "verify:onboarding": "node --import tsx scripts/verify-onboarding.ts",
     "verify:agent-query": "node --import tsx scripts/verify-agent-query.ts",
@@ -65,16 +63,13 @@
     "verify:skill-native-events": "node --import tsx scripts/verify-skill-native-events.ts",
     "installers:generate": "node scripts/generate-installers.ts",
     "installers:check": "node scripts/generate-installers.ts --check",
-    "plugin:install": "node scripts/install-plugin-bootstrap.ts",
-    "format:check": "node scripts/format-source.ts",
-    "format:write": "node scripts/format-source.ts --write"
+    "plugin:install": "node scripts/install-plugin-bootstrap.ts"
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6",
     "@types/node": "26.0.0",
     "@wombat/cli": "workspace:*",
     "@wombat/client": "workspace:*",
-    "@wombat/web": "workspace:*",
     "ajv": "8.18.0",
     "cross-spawn": "7.0.6",
     "esbuild": "^0.25.0",
@@ -82,12 +77,11 @@
     "mdast-util-from-markdown": "2.0.2",
     "mdast-util-gfm": "3.1.0",
     "micromark-extension-gfm": "3.0.0",
-    "prettier": "3.9.9",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
   "license": "MIT",
-  "description": "Local Codex token usage analyzer and configuration review tool. Inspect tasks, AGENTS.md, Skills, MCP and Hooks through a Codex plugin, with a Web dashboard for details.",
+  "description": "Evidence-backed project diagnosis for coding agents, with local work history and exact usage through one Skill and CLI.",
   "keywords": [
     "codex",
     "codex-skill",
@@ -100,8 +94,8 @@
     "mcp",
     "hooks",
     "configuration-review",
-    "web-dashboard",
-    "cli"
+    "cli",
+    "engineering-diagnosis"
   ],
   "repository": {
     "type": "git",

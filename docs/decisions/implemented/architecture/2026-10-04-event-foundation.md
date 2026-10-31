@@ -57,7 +57,7 @@ Status: implemented
 
 决定在现有模块化单体内新增耗时分析业务，不新增常驻进程、数据库服务、Node 日志解析器或在线分析服务。首次交付包括 CLI 和 Web 的同一轮次数据依据；桌面以后实现受限传输即可复用。
 
-[实时服务](../../../../core/src/live.rs)、[Node 传输](../../../../client/src/node/live.ts)、[Web 宿主](../../../../web/src/index.ts)及[生成器](../../../../scripts/generate-usage-contracts.mjs)装配共用内核查询；具体已交付机制由模块说明维护。
+[实时服务](../../../../core/src/live.rs)、[Node 传输](../../../../client/src/node/live.ts)、[Web 宿主](../../../../client/src/node/index.ts)及[生成器](../../../../scripts/generate-usage-contracts.mjs)装配共用内核查询；具体已交付机制由模块说明维护。
 
 ```mermaid
 flowchart LR

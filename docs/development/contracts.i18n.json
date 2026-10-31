@@ -2,8 +2,8 @@
   "version": 2,
   "sections": {
     "/public-contracts": {
-      "zh": "2b3daed370f732e30ca71af31d008411c11d8f20ada7fbf88abaa622c7d35f8f",
-      "en": "b2de622fc845df2551ba5b519452e0aab4d4f20a38e635b1a48d8e542f08d4d2"
+      "zh": "2673e1fcd5f7cb694467776942ce538fc9f34560315264a36fb8d32c150e23ec",
+      "en": "f5a2fcc7432b207614e1f30ea60f9884b7b990fa7b3b690482eccd0181928d7c"
     },
     "/public-contracts/client-entries": {
       "zh": "43df27589e6cac42deff22d885581433bb66077922612dcb496abf56f4557b4f",
@@ -14,24 +14,24 @@
       "en": "915bf5b2f18acd8eac9354ef9e35c5e64ff6b0a2d2d7cf402875f2feaf42a971"
     },
     "/public-contracts/read-only-configuration-contract-v1": {
-      "zh": "000fdfb0cd3a65c1cfb92601923eab9e15db58b04c38b3711bf6eef4b114a4b9",
-      "en": "0f2421dece4ba5974ad8e4ee733eee7bb4137fa5234e0987f2382d0f7be4f8d1"
+      "zh": "26618e997d66cc09cdde152fc04eca7b3a9cdc07c280a1b0f964c2f1556631c5",
+      "en": "983c3583f0c0e684ef8bae00d64733d19f17273783c4da5fbb64af817e7dc6da"
     },
     "/public-contracts/optimize-and-preference-contracts-v1": {
-      "zh": "a9252e82c6bb9fa2067adc2935b0710cb30f9b0e77b133ad265f1e29eb1c98c2",
-      "en": "0ce9c9444928bb6b91d82dce15eddcec294dcd1e08e39e03647d116fdb312f9b"
+      "zh": "836f8255b28fbd40dd5e06fe4f806bfb00b3940476d85ffd5b2747694879a3bc",
+      "en": "590df9aefe7d015a73d7c04307d1fb65a00817de58bb1e72db5cf1c6e3d04e24"
     },
     "/public-contracts/account-contract-v1": {
-      "zh": "390c4e1b573c6d836b89d887b8d1a9ad3fec8073bb3d93b858e38f5c9fd4a746",
-      "en": "fbe1c2c11a0a7c71d399d5ccfe31a72f69c21cb0a9786fb36bc0f1eb972b8d64"
+      "zh": "68849c40edb27eb0c45924a5674068ca3b51ada6faefed605f6c0f047431df9c",
+      "en": "78913de5992e72aa16ab7c897d9be63095fd6b4d82622a3058eff1bb3db98960"
     },
     "/public-contracts/handoff-allowance-assessment": {
-      "zh": "1c14fad80d3d9e6eda3e7c93daa8b152689b813f4d277491442e9bca76489314",
-      "en": "e12bdcb2d68d73a32d9f2aacd406df6199484b3bcf32aa00a39479e80ed5fff1"
+      "zh": "4e56797b55c6068ad099263cb4a8b1ef26510ab2408a9aa07bb4f9cb6568efdf",
+      "en": "049a651653bb1abf9a253150919bc8ee92acbb6fea7f7076a1b7fa84d7e85ed9"
     },
-    "/public-contracts/skill-and-web-context-contracts-v1": {
-      "zh": "a07e4a40ac7e7818300c1356be742616ac714c8225ec7b9d7e938ea0358cf651",
-      "en": "acd299327258fe1bc87078ddfeb557b2056ff0a4ce5e872fb5f2d838c6a7db3c"
+    "/public-contracts/skill-contracts-v1": {
+      "zh": "48363c2ca750888a39973e124beacca3ad1a3d68db7cced7aea330045ab46910",
+      "en": "955decf358326467910ac976ef1ca36b5fb50c3051d31ded6bb865b6eb00e9a8"
     }
   }
 }

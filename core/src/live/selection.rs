@@ -17,7 +17,6 @@ pub(super) struct ReadViewSelector<'a> {
     capture_now: bool,
     wait: WaitPolicy,
     key: String,
-    project: Option<String>,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WaitPolicy {
@@ -35,10 +34,6 @@ impl WaitPolicy {
     }
 }
 impl ReadViewSelector<'_> {
-    pub(super) fn project(mut self, project: Option<String>) -> Self {
-        self.project = project;
-        self
-    }
     pub(super) fn capture_now(mut self) -> Self {
         self.capture_now = true;
         self
@@ -106,7 +101,6 @@ impl ReadViewSelector<'_> {
             capture_now: false,
             wait,
             key,
-            project: None,
         })
     }
 }
@@ -149,7 +143,6 @@ pub(super) fn select_view(
         .entry(key.clone())
         .or_insert_with(|| Entry::new(roots));
     entry.touched = Instant::now();
-    entry.preferred_project = request.project.clone();
     let history_requested = selector.is_none()
         && request.include_history
         && entry.views.back().is_some_and(|(_, v)| {
@@ -170,6 +163,7 @@ pub(super) fn select_view(
         && (request.mode == Mode::Fresh
             || request.refresh
             || request.capture_now
+            || entry.changed
             || entry.requested == 0
             || history_requested
             || entry
@@ -179,8 +173,14 @@ pub(super) fn select_view(
             || entry.syncing
             || scheduling::auto_due(entry))
     {
-        entry.include_history |= request.include_history;
-        ticket = scheduling::request_work(entry, key, request.verify, request.rebuild, jobs)?;
+        ticket = scheduling::request_work(
+            entry,
+            key,
+            request.verify,
+            request.rebuild,
+            request.include_history,
+            jobs,
+        )?;
         let preview_at = Instant::now() + Duration::from_millis(250);
         let deadline = Instant::now()
             + request
@@ -246,16 +246,19 @@ pub(super) fn select_view(
             "Background indexing is paused",
         ));
     }
-    let current = entry.completed >= ticket
+    let completed = entry.completed >= ticket
         && entry.error.is_none()
         && !entry.syncing
         && !entry.restoring
-        && !entry.changed
         && entry
             .views
             .back()
             .is_some_and(|(_, v)| !v.expired_detail_lease());
-    if (request.mode == Mode::Fresh || request.refresh) && !current && selector.is_none() {
+    // A notification can describe bytes beyond this scan's captured boundary or
+    // arrive late. Keep it for the next query without turning a completed ticket
+    // into a timeout. Freshness still reports that later invalidation as stale.
+    let current = completed && !entry.changed;
+    if (request.mode == Mode::Fresh || request.refresh) && !completed && selector.is_none() {
         return Err(operation_error(
             if entry.error.is_some() {
                 entry.error_code.unwrap_or("SOURCE_UNREADABLE")

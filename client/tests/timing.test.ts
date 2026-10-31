@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CoreError, createUsageClient, type TimingRequest, type TimingLocalResult, type TimingShareResult } from '@wombat/client';
-import { createHttpClient } from '@wombat/client/http';
 import { withAutomaticPrices } from '../src/node/auto-prices.js';
 import { validate as validateLocal } from '../src/generated/validate-timing-local-response.js';
 import { validate as validateShare } from '../src/generated/validate-timing-share-response.js';
@@ -170,17 +169,6 @@ test('timing cancellation discards late results and never invokes prices or othe
   assert.equal(calls, 1);
 });
 
-test('HTTP timing uses its dedicated route and preserves cancellation and core failures', async () => {
-  const reader = createHttpClient({ origin: 'http://127.0.0.1:1', token: 'synthetic', fetch: async (url, options) => {
-    assert.equal(String(url), 'http://127.0.0.1:1/api/timing');
-    assert.equal(new Headers(options?.headers).get('authorization'), 'Bearer synthetic');
-    assert.deepEqual(JSON.parse(String(options?.body)), { action: 'capabilities' });
-    return new Response(JSON.stringify({ type: 'result', value: capabilityResult }) + '\n', { headers: { 'content-type': 'application/x-ndjson' } });
-  } });
-  assert.deepEqual(await reader.timing!({ action: 'capabilities' }), capabilityResult);
-  const failed = createHttpClient({ origin: 'http://127.0.0.1:1', token: 'synthetic', fetch: async () => new Response('{"type":"error","code":"VIEW_EXPIRED","message":"expired"}\n', { headers: { 'content-type': 'application/x-ndjson' } }) });
-  await assert.rejects(failed.timing!(summary), { code: 'VIEW_EXPIRED' });
-});
 
 test('nonempty local fragment navigation enforces bounds and stays outside sharing contracts', async () => {
   const refs = ['event:synthetic-endpoint'];

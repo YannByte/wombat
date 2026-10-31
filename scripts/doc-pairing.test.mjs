@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectPair, recordDifferences } from './doc-pairing.mjs';
-import { findCopy, dictionaryErrors } from './check-ui-i18n.ts';
+import { findCopy, dictionaryErrors } from './check-copy.ts';
 const pair = { zh: 'docs/a.md', en: 'docs/a.en.md', record: 'docs/a.i18n.json' };
 const pairs = new Map([[pair.zh, pair], [pair.en, pair]]);
 const zh = '# 标题\n\n中文 | [English](a.en.md)\n\n## 一\n\n说明。\n\n## 二\n\n另一个段落。\n';
@@ -34,7 +34,7 @@ test('reference links preserve locale and exact query/fragment suffixes', () => 
 });
 test('copy check excludes comments and detects literals/templates plus English label prose', () => {
   assert.deepEqual(findCopy('view.ts', '// 中文注释\nfunction title() { return t("common.title"); }'), []);
-  assert.equal(findCopy('view.tsx', 'const a = "用量"; const b = `第 ${n} 页`; const c = {label: "Show usage"}; function View(){return <p>{a}{b}</p>}').length, 3);
+  assert.equal(findCopy('cli.ts', 'const a = "用量"; const b = `第 ${n} 页`; const c = {label: a, title:b, message:"Show usage"};').length, 3);
   assert.deepEqual(dictionaryErrors({ greeting: '你好 {name}' }, { greeting: 'Hi {user}' }), ['greeting: interpolation parameters differ']);
   assert.ok(dictionaryErrors({ key: '文本' }, {}).length);
 });

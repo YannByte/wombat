@@ -2,24 +2,24 @@
   "version": 2,
   "sections": {
     "/product-language-and-copy": {
-      "zh": "7e9cae11f806242ecf32b7e482348e21de59fce17d84a9408315d318fb983ae1",
-      "en": "0c7f7527a79de456afe4034ff01370bc2d632be7da8e9f7c802ef331fb873419"
+      "zh": "0c030efe203eca61e989caef3c520b36690f70f71e6d14f4013d354336552120",
+      "en": "7045d5284d8b1f10f702e9c31a12d883cd4b6052fc6038167de0ffec6c225e4d"
     },
     "/product-language-and-copy/usage": {
-      "zh": "053e0aa49a61fbd2381bc430a65ed44667b43c58d3914f8c35cc4ad9df1ce9e7",
-      "en": "238dd9c5af62ebbc89a6cc61a77f86d3be3786e5903f17368a168c0f057cd011"
+      "zh": "623954b30a6b25ad5e7d04a45fd962f91f6afe0b9565ee914a7e79bda9212046",
+      "en": "232af266b4e996bc05279bc46134d27e0d0beb060b618ce41eb10a20ccbfac55"
     },
     "/product-language-and-copy/user-facing-pages-and-copy": {
       "zh": "75f82d3dc534ccd39615f8131e85bfd074da1c2ff8c2f0e246640f2a2588d9fb",
       "en": "ce6d63a1089d4e207cfc438df890dea2ccbcdcc8ffd4f40bce64e9f1cb389aec"
     },
     "/product-language-and-copy/module-boundaries": {
-      "zh": "54dadc5a01f03e2ae9781d1a4a924160403230d278333fe04d66efdfa63952dd",
-      "en": "b2b610b66b71de5d60530b41be3b2647bae48757ce5e4dbbb311d096a6f2e5af"
+      "zh": "53e7102c0175256fc116c8062907ea10d8837270e2bf861456edec085f3eab43",
+      "en": "f9d9ed81b820e73a50669669c85270e0f4f0cd4bd682d53193cbcc79d59dd9ea"
     },
     "/product-language-and-copy/verification-and-limits": {
-      "zh": "5fbf289f2d1f089fa03e08935648ff32fecfc66a57a211bc4cb8fb40edb08223",
-      "en": "7da47cd1033c4a8c9962f114d3f147fb5fef5c2c851bfa674beb24143fe309cf"
+      "zh": "a1cab5b1ce6f800f9d20ee61b281dee3116d6a8d5e0ae94877b71a2dbf95ae73",
+      "en": "520872fea7fe23dc79abfb0ca813df7a90b3ca84c98f1a58b02e7f5a3fc25495"
     }
   }
 }

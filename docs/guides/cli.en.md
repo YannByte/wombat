@@ -2,7 +2,7 @@
 
 [中文](cli.md) | English
 
-Wombat synchronizes local Codex logs incrementally by default and updates queries incrementally. An explicit refresh also saves a fixed snapshot. Current functionality includes usage, tasks, whole-turn timing, configuration measurements and manual review queries. Every subcommand works without a TTY; JSON and Web use the same Rust queries.
+Wombat synchronizes local Codex logs incrementally by default and updates queries incrementally. An explicit refresh also saves a fixed snapshot. Current functionality includes usage, tasks, whole-turn timing, configuration measurements and manual review queries. Every subcommand works without a TTY; JSON uses the shared Rust queries.
 
 ```sh
 wombat prices --json
@@ -17,9 +17,8 @@ wombat steps --thread THREAD_ID --turn TURN_ID --sort time --json
 Repeat `--root` to include multiple roots. Without it, use CODEX_HOME or `~/.codex`. Both sessions and archived_sessions are read; the display range does not limit historical collection. Refresh rejects query filters.
 
 
-`wombat web --open` asks the OS to open a browser after startup. If opening fails, the server stays available with the printed URL.
 
-Hook inventory JSON exposes the same per-project native registration and plugin identity as Web detail; text output also names the plugin. Registration does not establish execution. See the [configuration contract](../development/contracts.en.md) for supported declaration forms and unknown states.
+Hook inventory JSON exposes per-project native registration and plugin identity; text output also names the plugin. Registration does not establish execution. See the [configuration contract](../development/contracts.en.md) for supported declaration forms and unknown states.
 
 
 ## Agent interface
@@ -68,7 +67,7 @@ Statistics defaults to the last thirty calendar days; `--all-time` selects all a
 
 A monitor plan saves its identity filters, timezone, calendar period and optional Token threshold. `--review` also requests the most recently closed period's statistics. Add `--disabled` to save a paused plan; reuse its ID to change settings. Default warning is 80% of the threshold, configurable with `--warning 0.9`. These are user budgets, separate from account allowances. `check` checks all enabled plans unless `--id` selects one; repeated `--root` selects sources. A recent pinned check uses `--snapshot ID --id PLAN_ID` without source roots. An expired view requires a fresh check of the original scope.
 
-`watch` checks while this command runs and emits only new notifications. It does not install a background service or send messages; Ctrl+C stops it with exit130. `--interval` accepts 5–3600 seconds. Web has the same plans, manual checks and an optional sixty-second loop while its budget panel stays open. Monitoring needs an active host, and source logs must record usage before thresholds can be detected. Partial facts can prove a threshold crossing but cannot prove remaining budget. Acknowledgement is stored separately from the original facts. Period reviews cover the latest closed period, without catching up every missed period.
+`watch` checks while this command runs and emits only new notifications. It does not install a background service or send messages; Ctrl+C stops it with exit130. `--interval` accepts 5–3600 seconds. Monitoring needs an active host, and source logs must record usage before thresholds can be detected. Partial facts can prove a threshold crossing but cannot prove remaining budget. Acknowledgement is stored separately from the original facts. Period reviews cover the latest closed period, without catching up every missed period.
 
 ## Usage inspection and review
 
@@ -89,7 +88,7 @@ Review does not accept pagination. Without dates, it selects the fixed view cuto
 
 ## Codex Skill
 
-The redesigned [user Skill](plugin.en.md) starts from conversational tasks and can use Web to inspect evidence. Processing continues in the current Codex conversation; Web retains viewing and rechecks. The Skill consumes existing CLI JSON and bounded index restoration/synchronization; account reads do not wait for logs.
+The [main Skill](plugin.en.md) starts with the requested task. It reuses CLI JSON only when evidence requires it. Static project checks have no initialization step. Account reads do not wait for logs.
 
 Codex manages the formal plugin, whose invocation name on verified Codex 0.160.0 is $wombat:wombat. Standalone local trials use $wombat:
 
@@ -102,9 +101,8 @@ wombat skill uninstall --json
 
 Standalone installation copies only reviewed local product assets, defaulting to ~/.agents/skills/wombat. --directory selects a directory ending in wombat; --cwd selects the native discovery project. Only unchanged managed copies can be explicitly replaced or removed; custom directories, links, and user changes are protected. Independent v1 JSON separates file state, discovery/enablement, runtime capabilities, and data not requested. Installation does not scan logs. Unconfirmed native discovery exits2 without rolling back completed file installation. These commands do not manage plugins.
 
-web --context FILE --json accepts a restricted generated contract: page is usage/threads/instructions/extensions/optimize, with the corresponding read-only usage/configuration/optimization request. --root/--project-root still authorize startup roots. The host reads and validates versions before returning effective context and a connection URL. Project, source, full object IDs, timezone, dates, and versions are retained; the product converts exclusive CLI until into display dates. Supply paired dates or allTime; unsupported browser filters are rejected. The browser uses its own pagination size. Restart requires a new URL, and connection tokens must stay local.
 
-For a separate Codex task, CLI handoff checks actually enabled Skills per project, rechecks names/paths, and sends text plus a skill item to the persistent queue. Use --skill PROJECT_ID=PATH. Missing, disabled, or conflicting instances require selection or explicit --without-skill to use existing handoff behavior. Unknown delivery is never retried automatically; acceptance does not establish completed changes or rechecks. The primary Web interface no longer provides dispatch buttons; existing handoff interfaces and records remain. See the [product plan](../decisions/proposed/product/2026-10-04-codex-skill.en.md).
+For a separate Codex task, CLI handoff checks actually enabled Skills per project, rechecks names/paths, and sends text plus a skill item to the persistent queue. Use --skill PROJECT_ID=PATH. Missing, disabled, or conflicting instances require selection or explicit --without-skill to use existing handoff behavior. Unknown delivery is never retried automatically; acceptance does not establish completed changes or rechecks.  See the [product plan](../decisions/proposed/product/2026-10-04-codex-skill.en.md).
 
 ## Language
 
@@ -119,9 +117,9 @@ Choose presentation language with `--lang zh` or `--lang en`, or set `WOMBAT_LAN
 - `--snapshot ID` pins a current snapshot. Continue pagination with the same snapshotId instead of resolving latest again. Unknown formats are explicitly rejected.
 - Live queries accept `--root`. Omitting it always selects the default Codex source; another window's roots do not change this. Fixed usage snapshots cannot also specify source roots; timing roots bind the requested source scope to the fixed version.
 
-One data directory shares a Rust service. The installed background service keeps indexing without a CLI or browser; `usage --watch` only observes results. Accounting uses complete log records and cannot show tokens the model has not yet logged. Service lifecycle and resource limits belong in the [core reference](../reference/core.en.md).
+One data directory shares a Rust service. Queries trigger indexing; service startup, file notifications and idle time do not. `usage --watch` explicitly requests repeated reads. Accounting uses complete log records and cannot show tokens the model has not yet logged. Service lifecycle and resource limits belong in the [core reference](../reference/core.en.md).
 
-## Background indexing
+## Query service controls
 
 ```sh
 wombat service status --json
@@ -133,7 +131,7 @@ wombat service disable --json
 wombat service enable --json
 ```
 
-`status` reports the running instance, preparation, committed-data readiness and configured automatic startup separately. `pause` takes effect at the current transaction boundary and preserves queries; `resume` continues indexing. `stop` waits boundedly for this instance to exit; later queries or login can start it again. `disable` removes current-user automatic startup and stops the service. `enable` registers and starts it. Automatic startup needs a managed installation and an available native user-session manager. An explicit-root Web host cannot change global service settings. Web setup exposes status and permitted pause/resume controls.
+`status` reports the running instance, preparation, committed-data readiness and configured automatic startup separately. `pause` takes effect at the current transaction boundary and preserves queries; `resume` allows later queries to update the index; it does not prepare data itself. `stop` waits boundedly for this instance to exit; later queries or login can start it again. `disable` removes current-user automatic startup and stops the service. `enable` registers and starts it. Automatic startup needs a managed installation and an available native user-session manager.
 
 ## Whole-turn timing
 
@@ -152,7 +150,7 @@ Summary supports repeated `--root`, `--source`, and one of `--fresh` or `--cache
 
 `--share` asks Rust for a separate safe summary projection; CLI does not remove fields from local JSON. Timing bypasses automatic prices, configuration scans, Hook capture, and account observation. Date, Token, cost, offset, compare, and watch options are rejected. A resource-limited result can retain verified native scalars while affected derived values are omitted with calculation limits.
 
-Summary exits0 when the core marks the inspected scope complete, even if optional fields are not recorded; partial or provisional results exit2. Successful evidence navigation and capabilities exit0 without establishing whole-turn completeness. Errors exit1 and cancellation exits130. JSON errors use `{outputVersion:1,error:{code,message}}` with localized safe templates, including NOT_FOUND and VIEW_EXPIRED, without source paths or underlying error details. Status stays on stderr. Ctrl+C cancels this call and does not stop shared synchronization. Use `corepack pnpm verify:e2e` for real-core and browser acceptance; results cover only the selected platform and scope.
+Summary exits0 when the core marks the inspected scope complete, even if optional fields are not recorded; partial or provisional results exit2. Successful evidence navigation and capabilities exit0 without establishing whole-turn completeness. Errors exit1 and cancellation exits130. JSON errors use `{outputVersion:1,error:{code,message}}` with localized safe templates, including NOT_FOUND and VIEW_EXPIRED, without source paths or underlying error details. Status stays on stderr. Ctrl+C cancels this call and does not stop shared synchronization. Use `corepack pnpm verify:e2e` for real-core and CLI acceptance; results cover only the selected platform and scope.
 
 ## Official price catalog
 
@@ -165,7 +163,7 @@ After a successful update, the next live synchronization creates a complete read
 ## Filtering and pagination
 
 - `usage --group day|week|month`: without dates, day selects the last 30 calendar days, week selects this month and the previous 5 months, and month selects this month and the previous 11. All end today; response until is tomorrow, exclusively. Explicit since/until takes precedence, and changing grouping preserves a manual range. A task filter without dates selects its full range. Weeks start on Monday; events are assigned by timestamp and selected timezone.
-- `--since` is inclusive and `--until` exclusive. `--all-time` includes unknown dates and cannot accompany date bounds or --undated. CLI timezone defaults to UTC; Web uses the system timezone.
+- `--since` is inclusive and `--until` exclusive. `--all-time` includes unknown dates and cannot accompany date bounds or --undated. CLI timezone defaults to UTC.
 - `--model`, `--effort`, and `--project` match exactly. A project is observed directory evidence, not a path substring. `--model-unknown`, `--effort-unknown`, and `--undated` select missing model, effort, and date respectively, and cannot accompany corresponding explicit values or date ranges.
 - `threads --search TEXT` searches titles or projects; its sorts are `tokens|cost|recent`, using matching usage or latest matching measurement. Turns and steps use `tokens|cost|time`.
 - `--snapshot ID` pins a current snapshot. Continue pagination with the same snapshotId instead of resolving latest again. Unknown formats are explicitly rejected.
@@ -189,17 +187,10 @@ Exit codes: 0 for success or an empty range; 2 for usable but incomplete reads o
 
 Only current usage-v4 snapshots (schema4) are readable. Usage JSON v5 and timing JSON v6 are independent output formats. Unknown versions are rejected while existing files and user records remain intact. No migration or old-command/output compatibility is provided. Retired scan/report/checkup/quota/codex/observe/compare commands have no placeholder entries.
 
-## Local Web
-
-Run `wombat web` and open the printed link. `--port 0` selects a port automatically by default; repeat `--root <directory>` to restrict sources, use `--lang zh/en` for the initial language, and `--json` for one startup JSON record. Ctrl+C stops this Web host; closing a tab does not exit the CLI.
-
-Access is local only; restart requires a new link. Pages provide usage, tasks, turns, sources, and prices; date, model, effort, and directory filters are retained in the URL. Reloading reads a local version again; use Refresh data to recover an expired version. Existing business interfaces are connected over HTTP and source logs remain read-only; remote deployment is unsupported. See [architecture](../development/architecture.en.md).
-
-New queries: `usage --presentation projects|models` groups by historical directory or model; `--project-unknown` selects missing directory evidence, `--agent` / `--source` limits sources, and `threads --locate-thread ID` returns the page containing a full ID. Task sorting uses matching usage/latest matching measurement; full-task usage remains separate.
 
 ## Read-only configuration
 
-`wombat web --project-root /path/to/project` adds a configuration folder absent from history and is repeatable; omission retains the launch directory. Local Web automatically adds reliable historical cwd values from current sources to its project catalog; direct CLI configuration queries still use `--project-root` for explicit scope. `--root` continues to select Codex sources separately from project configuration roots.
+`--project-root` explicitly selects project configuration roots; `--root` selects Codex source roots.
 
 `wombat optimize inventory --json` provides equivalent non-TTY queries. Filter and sort with `--kind rule|skill|mcp`, `--observation used|loaded_only|unknown`, `--search`, and `--sort tokens|activity|size|name|content_tokens|characters|recent`. `--limit` defaults to50, maximum200; `--offset` starts at0. `--since` / `--until` include the start and exclude the end; `--timezone` defaults to UTC.
 
@@ -226,13 +217,13 @@ wombat optimize capabilities --json
 
 Retain original roots and project/source scope, using the returned decisionRevision after each operation. Reload on conflicts. detail/keep/not-applicable/redisplay require suggestion identity; keep/not-applicable also require a reason. Lists support category, offset and limit 1..200 (default 50). Edit outside Wombat, then recheck directly; --suggestion optionally limits rechecks to one problem. Rechecks do not write sources or revoke decisions; redisplay does not restore files. Configuration/review results use v1, exit 2 for evidence gaps, 1 for errors and 130 for cancellation. Capabilities do not scan. Index rebuilds retain product-data records.
 
-Adjust product reminders with `--agents-bytes 16384 --description-characters 500`, retaining the same flags in subsequent operations. Values apply to authorized current configuration and stay in records. The body5,000 reference line and description1,024 specification maximum are immutable; the Web reminder panel shares this contract. Full/body estimates are separate; see [contracts](../development/contracts.en.md).
+Adjust product reminders with `--agents-bytes 16384 --description-characters 500`, retaining the same flags in subsequent operations. Values apply to authorized current configuration and stay in records. The body5,000 reference line and description1,024 specification maximum are immutable. Full/body estimates are separate; see [contracts](../development/contracts.en.md).
 
-The Web optimization list presents a suggestion, value and key metric. Details expand handling steps and basis, with record counts, turn tokens and estimated API cost visible together. Related record dates do not change current static checks; exact turns return to the original suggestion and filters. No association remains unknown; costs are not allocated by counts. CLI/Agent first obtain item.id/readView from optimize, then use inventory --action evidence --item ID --read-view VERSION with date/timezone flags; returned usageRevision/threadId/turnId locate turns. Keep authorized roots and avoid mixing read versions. Explicit rechecks expose before/after text measurements through reviewBaseline/item; unknown or mismatched methods are incomparable, and changes do not establish savings.
+CLI/Agent first obtain item.id/readView from optimize, then use inventory --action evidence --item ID --read-view VERSION with date/timezone flags; returned usageRevision/threadId/turnId locate turns. Keep authorized roots and avoid mixing read versions. Explicit rechecks expose before/after text measurements through reviewBaseline/item; unknown or mismatched methods are incomparable, and changes do not establish savings.
 
 ## Local Codex handoff and account
 
-Handoff requires a runnable local Codex; the native interface is verified on0.160.0. Codex owns sign-in, model review, execution and restoration. CLI and the retained HTTP handoff interface share the same selection; sign-in credentials are not copied.
+Handoff requires a runnable local Codex; the native interface is verified on0.160.0. Codex owns sign-in, model review, execution and restoration. The CLI binds the reviewed selection; sign-in credentials are not copied.
 
 ```sh
 wombat optimize handoff preview --project-root /path/to/project --json
@@ -245,7 +236,7 @@ Review project working directories, files and evidence in preview, then send usi
 
 Delivery returns accepted, failed or unknown and an available Codex task ID; accepted establishes request acceptance only. Inspect with `codex resume TASK_ID`. After disconnection inspect Codex before deciding to resend; resending is manual, without execution receipts or historical lookup. Repeated manual sends may create new tasks; closing Wombat does not cancel accepted tasks. Use `optimize recheck` after handling to determine whether a problem remains.
 
-Low allowance only warns; a reliable native restriction on the current task prevents sending. Expired, unknown or other-model restrictions do not establish exhaustion for this task or trigger automatic retries. Sending checks the actual task again; a final restriction may leave an empty Codex task with no queued request. The legacy confirmation component remains but is not a primary Web entry.
+Low allowance only warns; a reliable native restriction on the current task prevents sending. Expired, unknown or other-model restrictions do not establish exhaustion for this task or trigger automatic retries. Sending checks the actual task again; a final restriction may leave an empty Codex task with no queued request.
 
 The account v1 response has independent identity, allowance and activity status/read times, with masked email only. Actual window names, models, periods and resets come from Codex, without fixed five-hour/seven-day periods or legacy single-bucket fallback. Failures retain previous data/read times; account changes clear old facts. A past reset does not establish restored allowance. Balances and spending limits retain native decimal strings without guessing units. Reset credits are read-only; missing details and an empty list differ, and the 128-row detail limit never replaces the native count. Overview and account details share observations independently of project/date scope. Allowances are not added to or converted from project tokens/API estimates. Partial reads or unconfirmed delivery exit2, errors1 and cancellation130. `turns --sort recent` orders by reliable activity times, with unknown times last.
 

@@ -10,7 +10,7 @@ Static configuration facts and focused UI tests do not establish a complete opti
 
 ## Proposal
 
-Extend shared Rust facts and generated contracts through both Web and noninteractive entries. The [UI README](../../../development/frontend.en.md), [contract](../../../development/contracts.en.md), and [CLI guide](../../../guides/cli.en.md) own current interfaces, fields, and operations. The [native-handoff decision](../../implemented/architecture/2026-10-03-native-codex-handoff.en.md) owns sending/execution responsibilities without duplicating shipped mechanisms here.
+Extend shared Rust facts and generated contracts through both Web and noninteractive entries. The [UI README](../../../development/architecture.en.md), [contract](../../../development/contracts.en.md), and [CLI guide](../../../guides/cli.en.md) own current interfaces, fields, and operations. The [native-handoff decision](../../implemented/architecture/2026-10-03-native-codex-handoff.en.md) owns sending/execution responsibilities without duplicating shipped mechanisms here.
 
 ### Runtime observations and content evidence
 
@@ -36,7 +36,7 @@ G08: under reliable historical versions, distinguish no observation, unknown ver
 
 ### Complete product journeys
 
-G09: complete Windows Hooks, platform installations, and failure journeys. The [release Skill](../../../../.agents/skills/wombat-release/SKILL.md) owns release operations and the [GitHub distribution decision](../../implemented/architecture/2026-10-04-github-release-distribution.en.md) owns durable target rationale; the [local-Web decision](../../implemented/architecture/2026-10-01-local-web.en.md) owns desktop scope/tradeoffs without adding Tauri to this Web/CLI repair round. The [initialization proposal](2026-10-02-progressive-initialization.en.md) owns first reads and project progress; the [live-index proposal](../architecture/2026-09-30-live-usage.en.md) owns scale targets.
+G09: complete Windows Hooks, platform installations, and failure journeys. The [release Skill](../../../../.agents/skills/wombat-release/SKILL.md) owns release operations and the [GitHub distribution decision](../../implemented/architecture/2026-10-04-github-release-distribution.en.md) owns durable target rationale; the [local-Web decision](../../implemented/architecture/2026-10-01-local-web.en.md) owns desktop scope/tradeoffs without adding Tauri to this Web/CLI repair round. The [initialization proposal](../../rejected/product/2026-10-02-progressive-initialization.en.md) owns first reads and project progress; the [live-index proposal](../architecture/2026-09-30-live-usage.en.md) owns scale targets.
 
 Continuous cross-project journeys across five pages must retain scope, filters, exact turns, lists, focus, and reading position. Late responses, refreshes, and language changes cannot overwrite new selection. Verify Chinese/English at 320/390/1280/1440px, native-select keyboard use, cancellation/closing, unknown delivery, concurrency, and version changes in actual browsers. Complete account-summary, actual-exhaustion, expired-restriction, and independently degraded section checks without deriving allowance from local usage.
 

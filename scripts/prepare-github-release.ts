@@ -61,7 +61,6 @@ for (const target of targets) {
     mkdirSync(path.join(bundle, 'runtime'), {recursive: true});
     mkdirSync(licenses, {recursive: true});
     for (const file of cliFiles) copyFileSync(path.join(root, 'dist', file), path.join(runtime, file));
-    cpSync(path.join(root, 'dist', 'web'), path.join(runtime, 'web'), {recursive: true});
     cpSync(path.join(root, 'dist', 'skill'), path.join(runtime, 'skill'), {recursive: true});
     copyFileSync(path.join(root, 'LICENSE'), path.join(bundle, 'LICENSE'));
     const notices = readFileSync(path.join(root, 'licenses/THIRD_PARTY_NOTICES.md'), 'utf8');

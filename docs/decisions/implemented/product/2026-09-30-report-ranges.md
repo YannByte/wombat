@@ -4,7 +4,7 @@
 
 Status: implemented
 
-当前查询范围见[CLI 指南](../../../guides/cli.md)，Web 导航见[前端说明](../../../development/frontend.md)。本记录保留共享默认日期的理由，不维护退役终端行为。
+当前查询范围见[CLI 指南](../../../guides/cli.md)，Web 导航见[前端说明](../../../development/architecture.md)。本记录保留共享默认日期的理由，不维护退役终端行为。
 
 ## 问题
 
