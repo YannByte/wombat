@@ -5,35 +5,35 @@
       "zh": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562",
       "en": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work": {
-      "zh": "01264cb0ccda5deb540787d35adf706aec89419d353c8541ac98d0bf27ae9c53",
-      "en": "f3a662a9879929ce1377252c6b9d680803bc4ef72530522e7421cc64384fe68b"
+    "/wombat-diagnose-and-improve-agent-work": {
+      "zh": "3f8738acf5a8fc83621eb534d1596c5f156fb1be25131da5d6116ad0fdd01d80",
+      "en": "5c6888e30d17e70485d55cdc855a6e67e4daddea3422d77d2e00b31e5abe4009"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/get-started": {
+    "/wombat-diagnose-and-improve-agent-work/get-started": {
       "zh": "00b2421aa0022293eb34fb9d1e5b6ebd52907237bcfccaffaf011cfb0b7960e3",
       "en": "33ef19b08848f6c7a9b4f53365757080aad979869bcf27cd4c9217d4197573fd"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/choose-a-task": {
+    "/wombat-diagnose-and-improve-agent-work/choose-a-task": {
       "zh": "4ccc3ab2c3faaf5f75039af1048188026660b0b036b0174994cf736e6e76f1b3",
       "en": "5b0a69e1bf0d3c4a8994395c5aac48388cd0a5ef0138f090c95e932d644153b8"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/first-preparation-and-results": {
+    "/wombat-diagnose-and-improve-agent-work/first-preparation-and-results": {
       "zh": "d12dc55a682a895edc373da20a25cc7d2af2b0522f38d982af127333cab2a280",
       "en": "6ce59e9c3fb0a969da4851d08dd1bae7728fac4edc8df9885798086ad78dd2b2"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/update": {
+    "/wombat-diagnose-and-improve-agent-work/update": {
       "zh": "db3b0b730796d179dcc315189c7ca7adc35ca0a444681ccdcaac010fdc87412e",
       "en": "8582e594d80456980adaae6d7565bfac7064a71a5c65f51fd8bda67a1b889ca7"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/scope-and-limits": {
+    "/wombat-diagnose-and-improve-agent-work/scope-and-limits": {
       "zh": "0f39ad9f7caf2db20dd18d4442af05a6a9bc8e8a9cf6c7e0f89ff256ed7c298a",
       "en": "fc45c7b635632ff792e764805b73942446c9f3617dece5a5198e0328c004993b"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/help-and-contribution": {
+    "/wombat-diagnose-and-improve-agent-work/help-and-contribution": {
       "zh": "dd2b2faa1a163b3d827f6e9c38e973303b2b9c6d2034740ebdc7008269f016be",
       "en": "05d93b4f94763b0499d6d4b4914c58c73cd23f1891bb45d2b9f7149b839342f9"
     },
-    "/wombat-diagnose-and-improve-coding-agent-work/license": {
+    "/wombat-diagnose-and-improve-agent-work/license": {
       "zh": "3ae9b43b0b2ab0253c26742d9a180634319a002755081eaed0bdb18ba4a3c29d",
       "en": "1a044ed47f1540e7d83b3f35501b9a3475aa043c07bf24dbfd4d6cd9fabba51d"
     }

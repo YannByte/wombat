@@ -1,6 +1,6 @@
 ---
 name: wombat
-description: Diagnose coding-agent project obstacles with local task evidence, propose specific improvements and recheck changes. Also query Codex work history, usage, costs and timing.
+description: Diagnose project obstacles with local task evidence, propose specific improvements and recheck changes. Also query Codex work history, usage, costs and timing.
 ---
 
 # Wombat

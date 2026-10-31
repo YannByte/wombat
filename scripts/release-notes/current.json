@@ -5,7 +5,8 @@
     "Project reviews inspect actual execution and validation paths, examine counterevidence and identify a concrete owner, smallest change and original check to rerun. Reviews distinguish a verified fix from later adoption or improved outcomes.",
     "Installation and source notifications no longer trigger background indexing. Queries prepare the data they need and reuse persistent accounting facts and bounded history views. Explicit monitoring and optional resident process lifetime remain available.",
     "The shipped product is CLI and Skill only. The Web interface, browser transport and separate task Skills are removed. Refresh the Codex plugin with the documented installer --plugin option and use the main Skill for all task flows.",
-    "Resumed development acceptance now invalidates old results when shared test helpers change, while unchanged inputs remain reusable. Clean installed-runtime acceptance uses only the required CLI and Skill assets, without depending on removed Web files."
+    "Resumed development acceptance now invalidates old results when shared test helpers change, while unchanged inputs remain reusable. Clean installed-runtime acceptance uses only the required CLI and Skill assets, without depending on removed Web files.",
+    "CLI command dispatch and command discovery now share one lazy registry. Help opens with the main usage entry, and obsolete Web and interactive-prompt error branches are removed. The schema tooling's URI parser also includes upstream security fixes."
   ],
   "knownLimitations": [
     "Codex is the only production data source. Native plugin discovery requires a compatible local Codex. Windows Hook collection and native user-session manager behavior on Linux and Windows remain separately qualified capabilities.",

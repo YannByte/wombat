@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-# Wombat — Diagnose and Improve Coding-Agent Work
+# Wombat — Diagnose and Improve Agent Work
 
 English | [中文](README.zh-CN.md)
 
-Find what blocks a coding-agent task, make a concrete improvement, and check the original problem again.
+Find what blocks an Agent task, make a concrete improvement, and check the original problem again.
 
 Wombat combines efficient local work-history retrieval with exact usage calculations. One Skill selects the evidence needed for your task and helps Codex inspect, change and verify the project. Start with your question. No project initialization or full-history scan is required for a static engineering review.
 

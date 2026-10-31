@@ -86,7 +86,7 @@
     }
   },
   "license": "MIT",
-  "description": "Evidence-backed project diagnosis for coding agents, with local work history and exact usage through one Skill and CLI.",
+  "description": "Evidence-backed project diagnosis for agents, with local work history and exact usage through one Skill and CLI.",
   "keywords": [
     "codex",
     "codex-skill",

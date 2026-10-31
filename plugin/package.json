@@ -1,6 +1,6 @@
 {
   "name": "wombat",
-  "description": "Diagnose coding-agent project obstacles with local work evidence and exact usage",
+  "description": "Diagnose project obstacles with local work evidence and exact usage",
   "license": "MIT",
   "homepage": "https://github.com/YannByte/wombat",
   "requiredCapabilities": [
