@@ -4,6 +4,8 @@ Fix the user's question, project, work item and observed failure or delay. Read 
 
 Start with the smallest evidence set. With a known turn, query that turn instead of rediscovering a ranking. Batch related measures where supported. Do not collect trajectory, resources and whole-task analysis for completeness. Required negative tests, validation, recovery and accidental repetition have different purposes.
 
+For an open project review, use [project checks](project-checks.md) to choose a consequential path and inspect it proactively. A deterministic defect does not need a recorded incident, but its trigger and consequence must be established. For a reported failure, use the same checks around that failure's owner.
+
 Investigate these project mechanisms when evidence points to them:
 
 | Observed obstacle | Inspect | Concrete action and check |

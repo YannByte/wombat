@@ -1,6 +1,6 @@
 # Improve a project workflow
 
-Begin with an observed obstacle or the user's specific target. Use [diagnose](diagnose.md) for the three initial mechanism families: instruction and entry disagreement, checks bypassed by delivery, and failures without bounded handling or recovery.
+Begin with an observed obstacle or the user's specific target. Use [project checks](project-checks.md) to inspect the relevant execution, validation or recovery boundary even when no failure has been reported. Use [diagnose](diagnose.md) to investigate an established obstacle.
 
 Read the existing mechanism before proposing a new one. Prefer a correction to its owner, connecting an existing check or making a current failure path actionable. Do not add policy text, another Skill, a service or an overall scoring system by default.
 
