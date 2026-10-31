@@ -80,6 +80,11 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "ajv@8.18.0>fast-uri": "3.1.9"
+    }
+  },
   "license": "MIT",
   "description": "Evidence-backed project diagnosis for coding agents, with local work history and exact usage through one Skill and CLI.",
   "keywords": [

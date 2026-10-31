@@ -6,7 +6,7 @@
   },
   "scope": "All locked Rust packages with notices, annotated by the enabled normal/build/dev graph across target conditions; disabled optional packages are not compiled into this build. Locally installed Node dependency graphs cover the root and every workspace importer, including development dependencies; first-party private workspace packages are excluded from third-party notices. Optional Node binaries absent on this host are listed separately. This is not cross-platform installation verification.",
   "lockfiles": {
-    "pnpm-lock.yaml": "4549471f09bc4dfa647e4abca69fb5a315b7be8a90c7b9e0fd744905cffc30d7",
+    "pnpm-lock.yaml": "d4f9866a5a62a930879b7017a55e039317ceaa08359d10c9bda43ee027e644d2",
     "core/Cargo.lock": "04a24915ad84996352f3d6c854176f6ff1c28f3b51ff5e8ae57ccfab61bd98c1"
   },
   "node": [
@@ -389,7 +389,7 @@
     },
     {
       "name": "fast-uri",
-      "version": "3.1.8",
+      "version": "3.1.9",
       "license": "BSD-3-Clause",
       "role": "development",
       "licenseSource": "installed package",
