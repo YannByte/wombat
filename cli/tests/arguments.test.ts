@@ -6,6 +6,14 @@ import {dateWindow} from '../src/calendar.js';
 const now=new Date('2026-11-01T12:00:00Z');
 const parse=(args:string[])=>parseUsageArgs(args,now);
 
+test('recorded absolute project identities survive cross-host queries while relative folders resolve locally',()=>{
+  for(const project of ['/synthetic/项目甲','C:\\Recorded\\My Project','\\\\server\\share\\项目']){
+    assert.equal(parse(['usage','--project',project]).request.scope?.project,project);
+  }
+  assert.equal(parse(['usage','--project','.']).request.scope?.project,process.cwd());
+  assert.equal(parse(['usage','--project','relative/project']).request.scope?.project,path.resolve('relative/project'));
+});
+
 test('calendar presets use local calendar boundaries, including DST and month changes',()=>{
   const expected={today:['2026-11-01','2026-11-02'],yesterday:['2026-10-31','2026-11-01'],week:['2026-10-26','2026-11-02'],'last-week':['2026-10-19','2026-10-26'],month:['2026-11-01','2026-11-02']} as const;
   for(const [word,[since,until]]of Object.entries(expected))assert.deepEqual(parse(['usage',word,'--timezone','America/New_York']).request.scope,{since,until,timezone:'America/New_York'});

@@ -26,9 +26,13 @@ test('five task entries join project evidence, preserve totals, read bounded his
       await f.write('unmetered',[row('session_meta',{id:'unmetered',cwd:f.project},at),row('event_msg',{type:'agent_message',message:'Work without token observations'},at)]);
       await f.write('beta',[row('session_meta',{id:'beta',cwd:f.project},at),measurement('beta','b',200,at)]);
       await f.write('outside',[row('session_meta',{id:'outside',cwd:f.project+'-other'},at),measurement('outside','c',9000,at)]);
+      const foreignProject=process.platform==='win32'?'/recorded/项目':'Z:\\Recorded\\项目';
+      await f.write('foreign',[row('session_meta',{id:'foreign',cwd:foreignProject},at),row('event_msg',{type:'agent_message',message:'Foreign project evidence'},at)]);
       await f.client.live!({query:{action:'usage',roots:[f.root],scope:{allTime:true}},mode:'fresh'});
       const before:UsageResult=invoke(['usage','--project',f.project,...dates,'--json']);assert.equal(before.summary.tokens.total,1200);
       const history:ConversationResult=invoke(['history','--project',f.project,...dates,'--json']);assert.equal(history.items.length,3);assert.ok(history.items.some(i=>i.record?.upstreamId==='unmetered'));
+      const foreign:ConversationResult=invoke(['history','--project',foreignProject,...dates,'--json']);
+      assert.equal(foreign.items.length,1);assert.equal(foreign.items[0].project,foreignProject);
       const selected=history.items.find(i=>i.record?.upstreamId==='alpha');assert.ok(selected?.evidence.threadId);if(!selected?.evidence.threadId)assert.fail('Missing alpha');
       const found:ConversationResult=invoke(['history','search','Unique release evidence','--project',f.project,...dates,'--json']);assert.ok(found.items.length>0);assert.ok(found.items.every(i=>i.project===f.project));
       const read:HistoryRead=invoke(['history','read',selected.evidence.threadId,'--find','Unique release evidence','--project',f.project,...dates,'--json']);

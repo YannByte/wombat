@@ -8,6 +8,10 @@ import {t} from '@wombat/client/locale';
 export function invalidInput(value: string): never {
   throw new CoreError('INVALID_ARGUMENT', t('cli.config.invalid', {value}));
 }
+/** A recorded project can use another host's path grammar; only relative selections need a local base. */
+export function projectFilter(value:string):string {
+  return path.posix.isAbsolute(value)||path.win32.isAbsolute(value)?value:path.resolve(value);
+}
 export function commandLine(args:readonly string[]):string {
   const quote=(value:string)=>/^[\w./:-]+$/.test(value)?value:"'"+value.replaceAll("'",process.platform==='win32'?"''":"'\\''")+"'";
   return ['wombat',...args].map(quote).join(' ');

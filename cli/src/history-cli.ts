@@ -4,7 +4,7 @@ import {CoreError, type UsageClient, type UsageScope, type HistoryRead, type Con
 import {createNodeClient} from '@wombat/client/node';
 import {t,messageOriginText} from '@wombat/client/locale';
 import {dateWindow} from './calendar.js';
-import {ask, canPrompt, commandLine, invalidInput, pageNumber, parseOptions, withCancellation} from './human-input.js';
+import {ask, canPrompt, commandLine, invalidInput, pageNumber, parseOptions, projectFilter, withCancellation} from './human-input.js';
 import {terminalText,terminalBlock} from './display-text.js';
 import {resultExitCode} from './exit-codes.js';
 
@@ -53,7 +53,7 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
     if (action !== 'list' && p.values.has('--offset')) invalidInput('--offset');
     if (action === 'read' && p.values.has('--limit')) invalidInput('--limit');
     const explicitDates = p.values.has('--since') || p.values.has('--until') || p.flags.has('--all-time');
-    const scope: UsageScope = {...dateWindow({since:p.get('--since'),until:p.get('--until'),timezone:p.get('--timezone'),allTime:p.flags.has('--all-time') || undefined},'recent'),...(p.get('--project')?{project:path.resolve(p.get('--project')!)}:{}),...(p.get('--source')?{sourceInstanceId:p.get('--source')}: {})};
+    const scope: UsageScope = {...dateWindow({since:p.get('--since'),until:p.get('--until'),timezone:p.get('--timezone'),allTime:p.flags.has('--all-time') || undefined},'recent'),...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),...(p.get('--source')?{sourceInstanceId:p.get('--source')}: {})};
     const roots = p.all('--root').length?p.all('--root').map(r=>path.resolve(r)):undefined;
     const client = createNodeClient({automaticPrices:false}), options = {signal};
     const limit = pageNumber(p.get('--limit'),20,1,200);

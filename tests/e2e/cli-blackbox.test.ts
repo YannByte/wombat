@@ -20,6 +20,8 @@ const counts = (input: number, read: number, write: number, output: number) => (
 const jsonl = (rows: object[]) => rows.map(value => JSON.stringify(value)).join('\n') + '\n';
 
 async function fixture() {
+  // Recorded POSIX identities deliberately differ from the host filesystem grammar.
+  // Query filters must preserve them on Windows, where these folders need not exist.
   const root = await mkdtemp(path.join(tmpdir(), 'wombat-cli-blackbox-'));
   const source = path.join(root, 'source with spaces');
   const data = path.join(root, 'data');

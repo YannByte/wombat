@@ -4,7 +4,7 @@ import {CoreError,type ProjectResult, type ConfigRequest} from '@wombat/client';
 import {createNodeClient} from '@wombat/client/node';
 import {t} from '@wombat/client/locale';
 import {dateWindow} from './calendar.js';
-import {ask,canPrompt,invalidInput, pageNumber, parseOptions, projectDirectory, withCancellation} from './human-input.js';
+import {ask,canPrompt,invalidInput, pageNumber, parseOptions, projectDirectory, projectFilter, withCancellation} from './human-input.js';
 import {formatConfigText} from './config-cli.js';
 import {formatOptimizeText,runVerificationCli} from './optimize-cli.js';
 import {formatArtifactsText} from './artifacts-cli.js';
@@ -44,7 +44,7 @@ export async function runProjectCli(argv:readonly string[]):Promise<number>{
     const roots=p.all('--root').map(r=>path.resolve(r)),client=createNodeClient({automaticPrices:false});
     if(p.get('--task')) {
       if(target||['--agents-bytes','--description-characters','--sort','--offset','--limit','--since','--until','--timezone'].some(k=>p.values.has(k)))invalidInput('--task');
-      const scope={allTime:true,...(p.get('--project')?{project:path.resolve(p.get('--project')!)}:{}),sourceInstanceId:p.get('--source')};
+      const scope={allTime:true,...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),sourceInstanceId:p.get('--source')};
       const selected=await resolveRecord(client,p.get('--task')!,scope,roots,argv,signal);
       const turns=(await client.live!({query:{action:'turns',threadId:selected.thread.id,scope,snapshotId:selected.snapshotId,limit:20,compact:true},mode:'cached'},{signal})).result;
       const available=turns.items.filter(i=>i.kind==='turn');

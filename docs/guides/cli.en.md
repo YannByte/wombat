@@ -59,7 +59,7 @@ wombat check --project "/path/to/My Project"
 wombat clean --project "/path/to/My Project"
 ```
 
-A Windows path can be written as `"C:\Work\My Project"`. One `--project` selects both inspection scope and related records; you do not repeat the read directory and filter directory. Projects come from explicit records or selected directories, never guesses from keywords in folder names. History and usage filter recorded project identities even if the original directory no longer exists. Current inspection and cleanup require an existing readable directory.
+A Windows path can be written as `"C:\Work\My Project"`. One `--project` selects both inspection scope and related records; you do not repeat the read directory and filter directory. Projects come from explicit records or selected directories, never guesses from keywords in folder names. History and usage filter recorded project identities even if the original directory no longer exists. Usage, history and task queries preserve the original grammar of absolute recorded project paths, including paths from another operating system; only relative selections resolve against the current directory. Current inspection and cleanup require an existing readable directory.
 
 If the current project cannot be identified, inspection and cleanup explain the missing scope instead of scanning the entire home directory. An interactive terminal can ask for a folder; scripts should supply `--project` directly.
 

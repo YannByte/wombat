@@ -2,7 +2,7 @@ import {writeHelp} from './help.js';
 import path from 'node:path';
 import { commandRoutes } from './command-routing.js';
 import {dateWindow, isTimeWord, shiftDate} from './calendar.js';
-import {parseOptions,pageNumber,invalidInput} from './human-input.js';
+import {parseOptions,pageNumber,invalidInput,projectFilter} from './human-input.js';
 import { resultExitCode } from './exit-codes.js';
 import { configureLanguage } from './locale.js';
 import { t } from '@wombat/client/locale';
@@ -44,7 +44,7 @@ export function parseUsageArgs(input:string[],now=new Date()):Invocation {
   const explicitBaseline=p.values.has('--baseline-since')||p.values.has('--baseline-until');
   const scope:NonNullable<UsageRequest['scope']>={...dateWindow({since:value('--since'),until:value('--until'),timezone:value('--timezone'),allTime:flag('--all-time')||session&&!value('--since')&&!value('--until')||undefined,undated:flag('--undated')||undefined},action==='statistics'?'recent':action==='compare'?'compare':'today',word,now)};
   for(const [name,key]of [['--agent','agentKind'],['--source','sourceInstanceId'],['--model','model'],['--effort','reasoningEffort'],['--project','project']] as const)if(value(name))scope[key]=value(name);
-  if(scope.project)scope.project=path.resolve(scope.project);
+  if(scope.project)scope.project=projectFilter(scope.project);
   for(const [name,key,conflict]of [['--model-unknown','modelUnknown','--model'],['--effort-unknown','effortUnknown','--effort'],['--project-unknown','projectUnknown','--project']] as const)if(flag(name)){if(value(conflict))invalidInput(name);scope[key]=true;}
   if(value('--task')&&action!=='compare'){if(action==='statistics')request.threadId=value('--task');else scope.threadId=value('--task');}
   if(action==='compare') {
