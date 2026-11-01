@@ -15,8 +15,6 @@ Use Wombat in Codex. Wombat retrieves local work records and calculates usage; C
 
 ## See the result
 
-The tasks, numbers and findings below are synthetic, not real reports.
-
 ### Check usage
 
 > **You:** How much did I use today, and where did it go?
@@ -47,7 +45,7 @@ The tasks, numbers and findings below are synthetic, not real reports.
 
 **Stable: [`v0.5.0`](https://github.com/YannByte/wombat/releases/tag/v0.5.0).**
 
-Install Codex first. The plugin installer needs a local `codex` command that supports native plugins. Wombat's local analysis needs no separate API key or development tools.
+Install a version of Codex that supports native plugins, with the `codex` command available locally. Wombat's local analysis needs no separate API key or development tools.
 
 On macOS or Linux, install Wombat and its plugin:
 
@@ -67,17 +65,24 @@ On Windows PowerShell:
 
 > $wombat:wombat Show today's usage and the three tasks that used the most Tokens. Tell me whether the data is complete.
 
-The answer includes the time range, total usage, top tasks and any missing data, in your language. For installation trouble, follow the reported recovery step; see the [installation guide](docs/guides/installation.en.md). For CLI-only use, omit `--plugin` or `-Plugin`.
+The answer uses the language of your question and includes the time range, total usage, top tasks and any missing data. For installation trouble, follow the reported recovery step; see the [installation guide](docs/guides/installation.en.md). For CLI-only use, omit `--plugin` or `-Plugin`.
 
 ## More ways to use it
 
-Use the same `$wombat:wombat` entry:
+Ask with `$wombat:wombat`, for example:
 
 | Task | Example request |
 |---|---|
-| Resume work | Find our last decision about this project's installer. Show the conversation location and next step. |
+| Find a decision | Why did we choose this installation approach last time? Find the discussion and show its location in the original conversation. |
+| Resume work | Where did we leave this project yesterday? Find the last confirmed results, unfinished work and next step. |
 | Review the week | What did I work on in this project this week? Separate verified results from work that still needs checking. |
+| Compare usage | How did this project's usage change from last week to this week? Which tasks and models account for the main differences? |
+| Check estimated costs | What would this week's usage cost at API prices? Which models are still unpriced? |
+| Investigate a recurring problem | This installation problem keeps coming back. Use related records and current code to find what remains unresolved and suggest a change. |
 | Verify a change | Recheck the original installation failure after this fix. What passed, and what remains unverified? |
+| Free up space | How much space do old Codex versions and caches use, and which can be cleaned? Do not delete anything yet. |
+
+Use these examples as a starting point and explore questions from your own work. Add a project, time range or specific problem to narrow the scope. You can follow up with “Show the original conversation,” “Suggest the smallest change,” or “Recheck the original failure after the change.”
 
 See the [plugin guide](docs/guides/plugin.en.md) for more uses, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
 
