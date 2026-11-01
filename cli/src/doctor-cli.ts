@@ -117,6 +117,6 @@ export async function runDoctorCli(argv:string[]):Promise<number>{
       for(const check of result.runtimeChecks??[])process.stdout.write(t('setup.runtimeCheck',{version:check.pluginVersion??'—',status:t(`setup.runtime.${check.status}`)})+'\n');
       for(const code of result.errorCodes)process.stdout.write(t('setup.errorLine',{code})+'\n');
     }
-    return local.status==='pass'?setupExitCode(result):2;
+    return local.status==='fail'?1:local.status==='warning'?2:setupExitCode(result);
   });
 }

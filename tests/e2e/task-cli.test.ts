@@ -11,8 +11,8 @@ test('five task entries join project evidence, preserve totals, read bounded his
   await withLocalProduct(async f=>{
     const native=await nativeCodexFixture(f.dir),saved=process.env.WOMBAT_CODEX_BIN;
     process.env.WOMBAT_CODEX_BIN=native.binary;
-    const invoke=(args:string[],status?:number,input?:AgentRequest)=>{
-      const run=spawnSync(process.execPath,[f.entry,...args],{cwd:f.project,env:process.env,encoding:'utf8',input:input?JSON.stringify(input):'',timeout:20000,maxBuffer:2*1024*1024});
+    const invoke=(args:string[],status?:number,input?:AgentRequest,overrides:NodeJS.ProcessEnv={})=>{
+      const run=spawnSync(process.execPath,[f.entry,...args],{cwd:f.project,env:{...process.env,...overrides},encoding:'utf8',input:input?JSON.stringify(input):'',timeout:20000,maxBuffer:2*1024*1024});
       assert.ifError(run.error);assert.ok(status===undefined?[0,2].includes(run.status??-1):run.status===status,run.stderr+run.stdout);
       return JSON.parse(run.stdout);
     };
@@ -46,6 +46,8 @@ test('five task entries join project evidence, preserve totals, read bounded his
       for(const topic of ['history','usage','check','clean','system']){
         const help=invoke([topic,'--help','--json'],0);assert.ok(help.examples.length);assert.ok(help.next.length);assert.equal(help.command,'wombat '+topic);
       }
+      const brokenDoctor=invoke(['system','doctor','--json'],1,undefined,{WOMBAT_CORE_BIN:path.join(f.dir,'missing-core')});
+      assert.equal(brokenDoctor.installationChecks.find((c:{id:string})=>c.id==='core')?.status,'fail');
       const baseline=report.checks.result!.suggestions.find(s=>s.findings.some(f=>f.rule==='localReference'));assert.ok(baseline?.baselineId);
       await writeFile(path.join(f.project,'missing-validation.md'),'Run the project validation before delivery.\n');
       await writeFile(path.join(f.project,'AGENTS.md'),shortRules);
