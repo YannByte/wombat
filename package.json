@@ -87,7 +87,7 @@
     }
   },
   "license": "MIT",
-  "description": "Codex plugin and local CLI for conversation history search, Token usage and cost analysis, project diagnosis, and safe cleanup. Find past decisions and verify fixes.",
+  "description": "Codex plugin and local CLI for conversation history search, Token usage analysis, project diagnosis, and safe cleanup. Find past decisions and verify fixes.",
   "keywords": [
     "codex",
     "openai-codex",
@@ -97,7 +97,6 @@
     "session-search",
     "token-usage",
     "usage-analysis",
-    "cost-estimates",
     "task-history",
     "agent-skills",
     "cli",

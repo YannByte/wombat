@@ -6,32 +6,32 @@
       "en": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562"
     },
     "/wombat-codex-history-usage-and-project-diagnosis": {
-      "zh": "6307fc5587dd2833ab84511dcda6bf74340fd6e727b1420aedfc27be64121167",
-      "en": "03d9d465e6f96d7337bd626353f11e0f14faf602adb18cae34629a9b06a54db4"
+      "zh": "53ddb1f4c44d4fb4aa65c3195e0d28b933c58e36512f053881e25638caa4ce28",
+      "en": "91aa7d9f734efd321aa64a34f9f94fc2cd12a5cdf6b70e602d3e85e6ac44fa36"
     },
     "/wombat-codex-history-usage-and-project-diagnosis/see-the-result": {
       "zh": "35497fb0468470974d5916fe615bf8d132b30133f0bb48e2f183553b08f6aa97",
       "en": "7ed45431bf09970914b09efd485be60dd4e62f92884ac6be4afe935aaa53ad35"
     },
-    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/check-codex-token-usage-and-estimated-costs": {
-      "zh": "857db7a31991af4a171c40097dfe22cfe2ee99756ff70569a5dd92fac9ebb1e5",
-      "en": "1ac65b9aa63f41535ed6e29c7c73f0025f834ee4f7e7c21a5d881012baa7b146"
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/understand-project-progress-and-token-usage": {
+      "zh": "9d1a00a1ad16a2036a1f0a7f019c5783a21de87c8978176ea69d9dfdc4691798",
+      "en": "d4a70a90649ce8011209b0626c29fc89b4a97803da6bf7e95fb9023f4d244e3f"
     },
-    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/diagnose-project-problems-and-verify-improvements": {
-      "zh": "f324ddd91967635902f863b277f5db8427f02f77d96607caeeb282a1b67b3573",
-      "en": "ac32141b1a133ca2a75d94b79f04790103c14ebc39d9deb8a51f0f8a4a065d00"
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/fix-a-recurring-project-problem": {
+      "zh": "f2b77f9ea4b7ba6e2c61ba1cbfeb8befa85c561e5bb05602f3652d7b576f465f",
+      "en": "ef471e2b8a83501d185cfceb01328bf7c782ecd11ce45bdd39a6bb6d97cb2063"
     },
-    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/preview-and-clean-up-codex-files": {
-      "zh": "59e91cf1c8df548c168c0fec2043ed3166970b5fe54181650b186d09852bbcb7",
-      "en": "91501f16828a215b0a344ab4e866fb596abfe86f33f0f8fbebe728b67a78e6eb"
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/clean-up-temporary-files-and-build-outputs": {
+      "zh": "f06e6dd86280cb356fd338ff6ac1e45c52f1bcf38f62548345314de9934b1318",
+      "en": "8f3eb7155e42f1409176bb41652bfe9c8668316b2d0cc251154df0bdb3f299cd"
     },
     "/wombat-codex-history-usage-and-project-diagnosis/install-wombat-for-codex": {
       "zh": "57a5bfbba9e7cf1d8de7c1b2077d43029eed3af0c1e62d30c9d0ae403e2c2ea5",
       "en": "c8c3fb89fd4d9d9f12ead8a81b8e0cf27659deccb4c8b7ec00534f0179c60522"
     },
     "/wombat-codex-history-usage-and-project-diagnosis/more-ways-to-use-it": {
-      "zh": "34830d41dbfe61b061213509ea26e5db7b1999d57ff627bea9dc029134745b52",
-      "en": "b1105c415b715b1d74676c13a17f684b6d2fdffc0935175846cf4661bd487b6a"
+      "zh": "2e8c0b09ac9b9289fb2783ab7bdbc8105793d01e7d833bdff9b28337f1f100f0",
+      "en": "57caadf181ee3c91e70b2ff7abcdc3be300024c63a46778feb50d5b5962062f3"
     },
     "/wombat-codex-history-usage-and-project-diagnosis/common-questions": {
       "zh": "3b30b685be5af364d8dcb66b9fbc097db7f4cf15e31d3c5289c2690594213ffb",
@@ -41,17 +41,13 @@
       "zh": "cea68e1574440d6fc45166674ca6bf97996983938a5ff7194b44d5d47a4de93f",
       "en": "4154c6ebfb05e3fa43a1e7b620316e1b48f3802ecee834c5a8287c98e8b55241"
     },
-    "/wombat-codex-history-usage-and-project-diagnosis/common-questions/does-wombat-show-my-subscription-bill": {
-      "zh": "759df755f403971b897de92afcbd8aa61ecfa85a49d2853c1f04bf233c57d2ea",
-      "en": "966324ee1251feea2f6694cb436b7c5864dbd12d12febfc82f8d4ace5e5d028d"
-    },
     "/wombat-codex-history-usage-and-project-diagnosis/common-questions/can-i-use-wombat-without-the-plugin": {
       "zh": "0b80a4e4ca1343c876a2af423a65a72496e580032b2bcdc37e48794f6b09c7db",
       "en": "368e3879ca77c0b33692812038502a47b9096fd55bd453ac8a89b84148d905e5"
     },
     "/wombat-codex-history-usage-and-project-diagnosis/before-you-use-it": {
-      "zh": "8a7f4372d3c4964df0cd2e570e001adad906944d5d9665e4ca9b6650a1ee9d10",
-      "en": "d2ae70007abc7423a8fdcb0fb60633d9ae649d46cba5b5af708bab2bd97bdc88"
+      "zh": "f25ee763169e86809dded4ab3ea90bb826107d38a762d91824abad7c200693cd",
+      "en": "db3e662d70c7a14e04c77827ad25a9a78acaee371931d1bbef43dd4b56f1cc4d"
     },
     "/wombat-codex-history-usage-and-project-diagnosis/update": {
       "zh": "eb3aac893b74b463367812d1d741fd8003a9498496a5548a39563ad33642bf11",
