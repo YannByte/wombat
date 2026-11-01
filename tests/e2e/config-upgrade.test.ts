@@ -32,7 +32,9 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
     const client = createNodeClient({ binaryPath: binary }), nativeEntry = projectTestClient(client, [root], [project]);
     const nativeApi = nativeEntry;
     try {
-        const all = await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true, timezone: 'UTC' } }, mode: 'fresh' });
+        // Pin completed fixture facts before testing configuration and historical totals.
+        const all = await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true, timezone: 'UTC' } }, mode: 'fresh', waitMs: 20000 });
+        assert.notEqual(all.result.freshness?.initialScan,true);
         assert.equal(all.result.summary.tokens.total, 330);
         assert.ok(all.result.items.some(i => i.kind === 'usage' && i.date == null), 'all dates explicitly includes undated usage');
         const day = await nativeApi.live!({ query: { action: 'usage', scope: { since: '2026-09-29', until: '2026-09-30', timezone: 'UTC' }, snapshotId: all.result.snapshotRef.snapshotId }, mode: 'cached' });

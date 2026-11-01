@@ -17,7 +17,7 @@
     "test:core": "node scripts/build-core.mjs --test",
     "test:unit": "pnpm -r test",
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
-    "test:e2e": "node --import tsx --test tests/e2e/*.test.ts",
+    "test:e2e": "node --import tsx --test --test-concurrency=2 tests/e2e/*.test.ts",
     "verify:e2e": "node --import tsx scripts/verify-e2e.ts",
     "contracts:generate": "node scripts/contracts.ts",
     "contracts:check": "node scripts/contracts.ts --check",

@@ -17,10 +17,12 @@ test('built CLI and native share period drivers, family totals and durable refre
  const binary=path.resolve('dist',process.platform==='win32'?'wombat-core.exe':'wombat-core'),cli=path.resolve('dist/wombat.js');
  let service:ReturnType<typeof spawn>|undefined;
  const stop=async(child:ReturnType<typeof spawn>|undefined)=>{if(!child||child.exitCode!==null||child.signalCode!==null)return;const exit=once(child,'close');child.kill('SIGTERM');const timer=setTimeout(()=>child.kill('SIGKILL'),2000);try{await exit;}finally{clearTimeout(timer);}};
- const run=(args: CliInput,input?:string)=>{const p=spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, {env,input,encoding:'utf8',timeout:15_000,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
+ const run=(args: CliInput,input?:string,timeout=15_000)=>{const p=spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, {env,input,encoding:'utf8',timeout,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
  try{
   service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
-  const first=run(['usage','--fresh','--all-time']);
+  // Establish a completed fixture publication; these assertions are not latency checks.
+  const first=run(['usage','--wait-ms','20000','--all-time'],undefined,25_000);
+  assert.notEqual(first.freshness?.initialScan,true);
   const args=["usage", "compare",'--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--by','project','--limit','1'];
   const compared=run(args);assert.equal(compared.snapshotRef.snapshotId,first.snapshotRef.snapshotId);assert.equal(compared.comparison.delta.tokens,40);assert.equal(compared.page.total,3);assert.equal(compared.comparison.drivers[0].delta.tokens+compared.comparison.remaining.tokens,40);
   const threads=run({"method":"usage","params":{"query":{"action":"threads","scope":{"allTime":true}},"mode":"auto"}});const id=(name:string)=>threads.items.find((t:{upstreamId:string})=>t.upstreamId===name).id;
@@ -32,7 +34,7 @@ test('built CLI and native share period drivers, family totals and durable refre
   const emptyHistory=run({"method":"account","params":{"action":"history"}});assert.equal(emptyHistory.history.totalObservations,0,'history must work without a native Codex executable');
   await appendFile(path.join(root,'sessions','parent.jsonl'),jsonl([usage('parent','new',10,'2026-09-10')]));
   assert.equal(run(args).snapshotRef.snapshotId,first.snapshotRef.snapshotId,'compare must not refresh');
-  const refreshed=run(['usage','--fresh','--all-time']);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
+  const refreshed=run(['usage','--wait-ms','20000','--all-time'],undefined,25_000);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
   const fixed=run([...args,'--snapshot',first.snapshotRef.snapshotId]);assert.equal(fixed.comparison.delta.tokens,40);
   await stop(service);service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
   let restored=run(['usage','--cached','--all-time']);const restoredBy=Date.now()+5000;

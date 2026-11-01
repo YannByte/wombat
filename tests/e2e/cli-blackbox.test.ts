@@ -19,6 +19,14 @@ const counts = (input: number, read: number, write: number, output: number) => (
 });
 const jsonl = (rows: object[]) => rows.map(value => JSON.stringify(value)).join('\n') + '\n';
 
+async function stopFixture(env:NodeJS.ProcessEnv,cwd:string):Promise<void> {
+  // The private data home binds this control request to the fixture's own runtime.
+  // Release SQLite/file handles before removal instead of waiting for idle expiry.
+  const result=spawnProductCli(entry,{method:'service',params:{action:'stop'}},{cwd,env,encoding:'utf8',timeout:30000,maxBuffer:65536});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stderr+result.stdout);
+  assert.equal(JSON.parse(result.stdout).running,false,'Fixture service shutdown was not confirmed');
+}
+
 async function fixture() {
   // Recorded POSIX identities deliberately differ from the host filesystem grammar.
   // Query filters must preserve them on Windows, where these folders need not exist.
@@ -65,7 +73,10 @@ async function fixture() {
     if (json) assert.equal(result.stdout.trim().split('\n').length, 1, 'JSON stdout must contain one object');
     return { code: result.status, stdout: result.stdout, stderr: result.stderr, value: json ? JSON.parse(result.stdout) : undefined };
   };
-  return { root, source, data, active, run, cleanup: () => rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }) };
+  return { root, source, data, active, run, cleanup: async () => {
+    await stopFixture(env,root);
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 });
+  } };
 }
 
 test('real CLI starts its shared service through a capability probe without scanning sources', async () => {
@@ -90,6 +101,7 @@ test('real CLI starts its shared service through a capability probe without scan
     assert.equal(value.resultStatus, 'complete');
     assert.equal(value.readView, null);
   } finally {
+    await stopFixture(env,root);
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 });
   }
 });
