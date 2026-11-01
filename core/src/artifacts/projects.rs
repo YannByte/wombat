@@ -282,7 +282,7 @@ pub(super) fn discover(
     }
     if scope.product_temporary {
         let data = crate::storage::data_home()?;
-        let generations = data.join("usage-v4/generations");
+        let generations = data.join("usage-v4").join("generations");
         if linked(&generations) {
             b.mark_partial();
             return Ok(targets.into_values().take(MAX_ITEMS).collect());

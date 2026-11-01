@@ -413,7 +413,7 @@ pub(super) fn inspect(
     if target.kind == Kind::ProductTemporary {
         // A writer can temporarily close a stage file while still owning its generation.
         // Read the existing lock without creating product data or acquiring a write lock.
-        let lock = data.join("usage-v4/refresh.lock");
+        let lock = data.join("usage-v4").join("refresh.lock");
         let lock_state = if projects::linked(&lock) {
             UseState::Unknown
         } else {

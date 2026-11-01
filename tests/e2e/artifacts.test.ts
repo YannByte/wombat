@@ -40,7 +40,7 @@ test('assembled cleanup is read-only, retains original selection, protects asset
   assert.equal(after.items[0].recheck,'gone');assert.equal(after.items[0].assessment,'absent');assert.equal(after.partial,false);
   await assert.rejects(f.client.artifacts!({...q,selection:['foreign']}),{code:'INVALID_ARGUMENT'});
   const generation=path.join(f.data,'usage-v4/generations/00000000-0000-4000-8000-000000000001');const stage=path.join(generation,'.pending-synthetic');await mkdir(stage,{recursive:true});await writeFile(path.join(stage,'stage.bin'),'potential recovery data');await mkdir(path.join(generation,'committed'));await writeFile(path.join(f.data,'usage-v4/refresh.lock'),'');
-  const product=await f.client.artifacts!({action:'inspect',projectRoot:f.project,productTemporary:true});const pending=product.items.find(i=>i.path===stage)!;assert.ok(pending);assert.ok(['review','unknown'].includes(pending.assessment));assert.ok(!product.items.some(i=>i.path.endsWith('committed')));
+  const product=await f.client.artifacts!({action:'inspect',projectRoot:f.project,productTemporary:true});const pending=product.items.find(i=>i.path===stage)!;assert.ok(pending,JSON.stringify({expected:stage,items:product.items.map(i=>({path:i.path,kind:i.kind}))}));assert.equal(pending.kind,'product_temporary');assert.equal(pending.owner,f.data);assert.ok(['review','unknown'].includes(pending.assessment));assert.ok(!product.items.some(i=>i.path.endsWith('committed')));
   await mkdir(output);await writeFile(path.join(output,'replacement.o'),'replacement');
   const replaced=await f.client.artifacts!(q);assert.ok(['changed','unavailable'].includes(replaced.items[0].recheck!));
  });
