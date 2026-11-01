@@ -1,7 +1,7 @@
 //! Read-only, bounded inspection features over canonical facts in one snapshot.
 use super::*;
-use crate::session_events::{ItemKind, LifecycleKind, MessageOrigin, Payload};
-use crate::usage_store::EventReadBudget;
+use crate::session_events::{LifecycleKind, MessageOrigin, Payload};
+use crate::usage_store::inspection_index::{OrderKind, OrderPoint};
 use std::sync::{Arc, atomic::AtomicBool};
 
 const MAX_FACTS: usize = 250_000;
@@ -109,6 +109,8 @@ struct EventWork {
 fn thread_events(
     s: &Snapshot,
     thread: &crate::usage_store::ThreadEntry,
+    scope: &Scope,
+    tz: Tz,
     work: &mut EventWork,
 ) -> Result<Vec<Arc<crate::session_events::Event>>> {
     let mut events = Vec::new();
@@ -116,31 +118,72 @@ fn thread_events(
         p.target.thread_id.as_deref() == Some(thread.thread.id.as_str())
             || p.target.thread_id.is_none()
     }) {
-        let bytes = partition.chunks.iter().try_fold(0_u64, |sum, chunk| {
-            sum.checked_add(chunk.bytes).ok_or_else(limit)
-        })?;
-        let next_bytes = work.bytes.checked_add(bytes).ok_or_else(limit)?;
-        let next_facts = work.facts.checked_add(partition.count).ok_or_else(limit)?;
-        if next_bytes > MAX_EVENT_BYTES || next_facts > MAX_WORK {
-            return Err(limit());
+        for chunk in &partition.chunks {
+            // Gaps outside the calendar window still separate runtime evidence.
+            if !chunk.inspection.has_gaps
+                && (partition.target.thread_id.is_none()
+                    || !chunk.inspection.time.may_match(scope, tz))
+            {
+                continue;
+            }
+            let next_bytes = work.bytes.checked_add(chunk.bytes).ok_or_else(limit)?;
+            let next_facts = work.facts.checked_add(chunk.count).ok_or_else(limit)?;
+            if next_bytes > MAX_EVENT_BYTES || next_facts > MAX_WORK {
+                return Err(limit());
+            }
+            let batch = s.inspection_event_chunk(partition, chunk, &AtomicBool::new(false))?;
+            work.bytes = next_bytes;
+            work.facts = next_facts;
+            events.extend(batch.into_iter().filter(|e| {
+                e.position().source_instance_id.as_ref()
+                    == thread.thread.source_instance_id.as_str()
+                    && (e.thread_id().is_some() || !e.gaps().is_empty())
+            }));
         }
-        let batch = s.events_for_target(
-            &partition.target,
-            EventReadBudget {
-                max_facts: MAX_WORK - work.facts,
-                max_bytes: MAX_EVENT_BYTES - work.bytes,
-            },
-            &AtomicBool::new(false),
-        )?;
-        work.facts = next_facts;
-        work.bytes = next_bytes;
-        events.extend(batch.into_iter().filter(|e| {
-            e.position().source_instance_id.as_ref() == thread.thread.source_instance_id.as_str()
-                && (e.thread_id().is_some() || !e.gaps().is_empty())
-        }));
     }
     sort_events(&mut events);
     Ok(events)
+}
+fn thread_order(
+    s: &Snapshot,
+    thread: &crate::usage_store::ThreadEntry,
+) -> Result<BTreeMap<String, Option<Order>>> {
+    let mut points = Vec::new();
+    for partition in s.manifest.events.partitions.iter().filter(|p| {
+        p.target.thread_id.as_deref() == Some(thread.thread.id.as_str())
+            || p.target.thread_id.is_none()
+    }) {
+        for chunk in &partition.chunks {
+            for point in &chunk.inspection.order {
+                if point.position.source_instance_id.as_ref()
+                    == thread.thread.source_instance_id.as_str()
+                    && (partition.target.thread_id.is_some() || point.gap)
+                {
+                    if points.len() >= MAX_FACTS {
+                        return Err(limit());
+                    }
+                    points.push(point);
+                }
+            }
+        }
+    }
+    points.sort_by(|a, b| {
+        (
+            &a.position.source_instance_id,
+            &a.position.file_id,
+            &a.position.generation,
+            a.position.byte_offset,
+            a.position.ordinal,
+        )
+            .cmp(&(
+                &b.position.source_instance_id,
+                &b.position.file_id,
+                &b.position.generation,
+                b.position.byte_offset,
+                b.position.ordinal,
+            ))
+    });
+    reduce_order(points)
 }
 fn sort_events(events: &mut [Arc<crate::session_events::Event>]) {
     events.sort_by(|a, b| {
@@ -165,20 +208,26 @@ fn sort_events(events: &mut [Arc<crate::session_events::Event>]) {
 fn order_map(
     events: &[Arc<crate::session_events::Event>],
 ) -> Result<BTreeMap<String, Option<Order>>> {
+    let points: Vec<_> = events.iter().filter_map(|e| OrderPoint::of(e)).collect();
+    reduce_order(points.iter())
+}
+fn reduce_order<'a>(
+    points: impl IntoIterator<Item = &'a OrderPoint>,
+) -> Result<BTreeMap<String, Option<Order>>> {
     let mut epochs: BTreeMap<(String, String), u64> = BTreeMap::new();
     let mut out = BTreeMap::new();
     let mut context_epochs = BTreeMap::<(String, String), (u64, Option<String>)>::new();
     let mut gap_epochs = BTreeMap::<(String, String), u64>::new();
     let mut line_requests = BTreeMap::<(String, String, u64), BTreeSet<String>>::new();
-    for event in events {
-        let p = event.position();
+    for point in points {
+        let p = &point.position;
         let domain = (p.file_id.to_string(), p.generation.to_string());
         let context = context_epochs.entry(domain.clone()).or_default();
         let gap = gap_epochs.entry(domain.clone()).or_default();
-        if !event.gaps().is_empty() {
+        if point.gap {
             *gap += 1;
         }
-        if let Payload::ContextWindow { model, .. } = event.payload()
+        if let OrderKind::Context { model } = &point.value
             && (model.is_none() || model != &context.1)
         {
             context.0 += 1;
@@ -187,23 +236,16 @@ fn order_map(
         let epoch = epochs
             .entry((p.file_id.to_string(), p.generation.to_string()))
             .or_default();
-        if matches!(
-            event.payload(),
-            Payload::Lifecycle {
-                lifecycle: LifecycleKind::Compaction,
-                ..
-            } | Payload::Message {
-                origin: MessageOrigin::Compaction,
-                ..
-            } | Payload::Item {
-                item_kind: ItemKind::Compaction,
-                ..
-            }
-        ) {
+        if matches!(point.value, OrderKind::Compaction) {
             *epoch += 1;
         }
-        if let Payload::Measurement { value, .. } = event.payload() {
-            if value.request_scoped {
+        if let OrderKind::Measurement {
+            id,
+            request_scoped,
+            model,
+        } = &point.value
+        {
+            if *request_scoped {
                 line_requests
                     .entry((
                         p.file_id.to_string(),
@@ -211,11 +253,11 @@ fn order_map(
                         p.byte_offset,
                     ))
                     .or_default()
-                    .insert(value.id.clone());
+                    .insert(id.clone());
             }
-            if value.request_scoped && context.1 != value.model.raw.as_deref().map(str::to_owned) {
+            if *request_scoped && context.1 != model.clone() {
                 context.0 += 1;
-                context.1 = value.model.raw.as_deref().map(str::to_owned);
+                context.1 = model.clone();
             }
             let order = Order {
                 file: p.file_id.to_string(),
@@ -226,7 +268,7 @@ fn order_map(
                 context_epoch: context.0,
                 gap_epoch: *gap,
             };
-            match out.entry(value.id.clone()) {
+            match out.entry(id.clone()) {
                 std::collections::btree_map::Entry::Vacant(e) => {
                     e.insert(Some(order));
                 }
@@ -251,9 +293,8 @@ fn trajectory(
     thread: &crate::usage_store::ThreadEntry,
     rows: &[&PricedMeasurement],
     all: &[&PricedMeasurement],
-    events: &[Arc<crate::session_events::Event>],
+    order: &BTreeMap<String, Option<Order>>,
 ) -> Result<Vec<InputPoint>> {
-    let order = order_map(events)?;
     let selected: BTreeSet<_> = rows.iter().map(|r| r.fact.id.as_str()).collect();
     let mut rows: Vec<_> = all
         .iter()
@@ -766,7 +807,14 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
             if let Some(read) = &selected_turn {
                 ops.extend(read.operations.iter().map(|op| op.as_ref().clone()));
             } else {
-                for turn in thread.turns.keys() {
+                for (turn, entry) in &thread.turns {
+                    if !entry.operation_time.may_match(&request.scope, tz)
+                        && !baseline_scope
+                            .as_ref()
+                            .is_some_and(|scope| entry.operation_time.may_match(scope, tz))
+                    {
+                        continue;
+                    }
                     let operations = snapshot.operations_for_turn(&t.id, turn)?;
                     operation_work += operations.len();
                     if operation_work > MAX_WORK {
@@ -799,6 +847,7 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                 }
             }
         }
+        let turn_bound = selected_turn.is_some();
         let events = if request.action != Action::Resources
             && (opportunities.is_some()
                 || request.action == Action::Trajectory
@@ -809,7 +858,7 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                 sort_events(&mut events);
                 events
             } else {
-                thread_events(snapshot, thread, &mut event_work)?
+                thread_events(snapshot, thread, &request.scope, tz, &mut event_work)?
             }
         } else {
             vec![]
@@ -835,7 +884,11 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
                     .get(t.id.as_str())
                     .map(Vec::as_slice)
                     .unwrap_or_default(),
-                &events,
+                &if turn_bound {
+                    order_map(&events)?
+                } else {
+                    thread_order(snapshot, thread)?
+                },
             )?
         } else {
             vec![]

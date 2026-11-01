@@ -168,6 +168,9 @@ pub(super) fn save_with_prices(
             index.insert(
                 turn_id.clone(),
                 TurnEntry {
+                    operation_time: TimeRange::build(
+                        data.operations.iter().map(|op| op.timestamp.as_deref()),
+                    ),
                     turn: turns.get(&(thread.id.clone(), turn_id)).cloned(),
                     slice,
                 },
@@ -186,7 +189,7 @@ pub(super) fn save_with_prices(
     }
     let observation_versions = crate::observation_versions::SnapshotObservationVersions::current();
     let manifest = Manifest {
-        schema_version: 4,
+        schema_version: 5,
         observation_versions,
         title_observations: collected.title_observations,
         snapshot_ref: SnapshotRef {
@@ -292,7 +295,7 @@ pub(super) fn load_at(root: &Path, id: Option<&str>) -> Result<Snapshot> {
     let raw: serde_json::Value =
         serde_json::from_slice(&bounded_read(&directory.join("manifest.json"))?)
             .map_err(|_| corrupt("快照索引损坏"))?;
-    if raw["schemaVersion"] != 4 {
+    if raw["schemaVersion"] != 5 {
         return Err(operation_error("UNSUPPORTED_VERSION", "不支持此快照版本"));
     }
     crate::observation_versions::ObservationHeaderSet::Snapshot.validate_json(&raw, |kind| {
@@ -335,6 +338,13 @@ pub(super) fn load_at(root: &Path, id: Option<&str>) -> Result<Snapshot> {
     )
     .map_err(|e| corrupt(format!("标题观察无效：{e}")))?;
     super::events::validate_index(&manifest.events)?;
+    for thread in &manifest.threads {
+        for turn in thread.turns.values() {
+            turn.operation_time.validate(usize::from(
+                turn.operation_time.first.is_some() || turn.operation_time.undated,
+            ))?;
+        }
+    }
     if manifest.snapshot_ref.snapshot_id != id {
         return Err(corrupt("快照身份不匹配"));
     }

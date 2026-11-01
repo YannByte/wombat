@@ -11,7 +11,7 @@ import { createNodeClient } from "@wombat/client/node";
 import { t } from "@wombat/client/locale";
 import { configureLanguage } from "./locale.js";
 import { resultExitCode } from "./exit-codes.js";
-import { timingExitCode } from "./timing-format.js";
+import { timingExitCode } from "./exit-codes.js";
 import {
   configExitCode,
   optimizeExitCode,
@@ -133,6 +133,10 @@ async function call(
     throw new CoreError("CORE_UNAVAILABLE", "Method unavailable");
   };
   switch (request.method) {
+    case "artifacts": {
+      const r=await(client.artifacts?.(request.params,options)??unavailable());
+      return {result:r,exitCode:r.partial?2:0};
+    }
     case "service":
       return {
         result: await (client.service?.(request.params, options) ??

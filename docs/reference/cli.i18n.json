@@ -6,28 +6,28 @@
       "en": "a38e9572b9df88f9925316d6e1c80c4a9b3763e8beb0b53cde1f4c64e617a6c7"
     },
     "/cli-command-entry/public-entries": {
-      "zh": "a29989f4d5927b3f21313c8534f55191621bc2acb8e7cbf7c6feb33210011670",
-      "en": "5cbf17a08da7332c45f4374bc956fe58c9f009abe498fab92cee9eaec3221d5c"
+      "zh": "4029354921075089deef4a43a3a4ab7f3df98fcbf6472035b67364154e85017f",
+      "en": "3a39450cbc5e7a28bf22764b9c7956fa38dfcf635c35c8be0344f8858fb6bf71"
     },
     "/cli-command-entry/agent-interface-principles": {
       "zh": "040c2b07cf9af5012254452d9ce7634eb26dd06781a80423c87778a9be236ce7",
       "en": "9b6510d8f82bcbef0d655babcf3b7417b1a74175aee6b94ae524a11bfec8f0d2"
     },
     "/cli-command-entry/limits-and-verification": {
-      "zh": "40db23bc2767f02673b2cc7615b48b5b9e358ffab56a28a2898a48fc9635ae17",
-      "en": "c58699d4d12435fb95ec16bdefd3597b70c49062186a673a6c5ac3d2ecbe343a"
+      "zh": "034d075fbd63008bb597fc9c549a9f9f6a0ba81ce5a9257698551f783eca9d03",
+      "en": "9c37e143d06cedf0a6d658ce2a5e0f6548d634212e3e4fca1d7c1ccf19de0fdc"
     },
     "/cli-command-entry/whole-turn-timing": {
-      "zh": "97e13fc56f4038e0835bd772cfc371aee79713840cfcf01a4d99bfd7b9105592",
-      "en": "9902dcb8e46b0f7c3e96824cf366bef7f77b90b3bbedf6db79e9d1a5987c69eb"
+      "zh": "7055243ff08bb9473f157d85d4008deac2675991c63c7b36f4208827e3cb5f23",
+      "en": "02814e4c739c86e3d11d55e97c9455aa711af1a3b6a13871af478af22bbfc48f"
     },
     "/cli-command-entry/unsupported-formats-and-recovery": {
-      "zh": "c1c2f6f2a91c1122a66f86c276b177af742b706fb843cef2f0310e07a052f518",
-      "en": "03bc7df345be3c78db9dde1b5d5a9122f3eb8179b7390280a3fdc18548d0eacf"
+      "zh": "92ffdac1685e74934adc0078776031cae1af25271a6b7e492c74c23b48cd2a09",
+      "en": "15df29442a30c2ea3f5d512429f501d877a603041c8fd1894d9f5a4234c89b69"
     },
-    "/cli-command-entry/collection-entries": {
-      "zh": "2acc64b6b4cc4a32a2ff3bc7d2639479bfb7ba6d7f4e48f3f32bf4c65c322e0b",
-      "en": "c798cde2059bba9e5e28d43661ce08c7bea9ca0847506dfd2e58a0bd3ffdd6b1"
+    "/cli-command-entry/local-host-operations": {
+      "zh": "2e5102844c2ac7fccc76d2999cbf887416b6992ad0282e76ae6f46a1d8ef701a",
+      "en": "ab10cb373007a47e81e5a08d9b5f4b80b36b62af0199704e72b341705281f53f"
     },
     "/cli-command-entry/release-updates": {
       "zh": "c58a2d90bcf91a6db795aa2a76b17e5fa81b70169a1d0f601b6954c491186e4f",

@@ -124,10 +124,20 @@ fn memory_inner(
     if let Some(operations) = cold_operations {
         unassigned_uses = operations.unassigned;
         for (key, locations) in operations.turns {
-            memory_turns.entry(key).or_default().cold_operations = locations;
+            let data = memory_turns.entry(key.clone()).or_default();
+            data.operation_time = operations.times.get(&key).cloned().unwrap_or_default();
+            data.cold_operations = locations;
         }
     }
     for op in collected.operations {
+        memory_turns
+            .entry((
+                op.thread_id.to_string(),
+                op.turn_id.as_deref().unwrap_or("unassigned").to_owned(),
+            ))
+            .or_default()
+            .operation_time
+            .observe(op.timestamp.as_deref());
         if op.turn_id.as_deref().is_none_or(|id| id.is_empty()) {
             unassigned_uses
                 .entry(op.thread_id.to_string())
@@ -156,6 +166,11 @@ fn memory_inner(
         by_thread.entry(thread.to_string()).or_default().insert(
             turn.clone(),
             TurnEntry {
+                operation_time: memory_turns
+                    .get(&(thread.clone(), turn.clone()))
+                    .unwrap()
+                    .operation_time
+                    .clone(),
                 turn: turns.get(&(thread.to_string(), turn.clone())).cloned(),
                 slice: Slice {
                     offset: 0,
@@ -190,7 +205,7 @@ fn memory_inner(
     };
     let observation_versions = crate::observation_versions::SnapshotObservationVersions::current();
     let manifest = Manifest {
-        schema_version: 4,
+        schema_version: 5,
         observation_versions,
         title_observations: collected.title_observations,
         snapshot_ref: SnapshotRef {

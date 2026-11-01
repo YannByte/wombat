@@ -18,7 +18,7 @@ test('release notes accept package-script argument forwarding and reject missing
 test('renders complete English stable release notes from verified release facts', () => {
   const notes = renderReleaseNotes({summary: 'Stable summary.', highlights: ['One'], knownLimitations: ['Limit']}, set, 'owner/repo', 'v0.1.0-beta.1');
   assert.match(notes, /# Wombat v0\.1\.0/); assert.match(notes, /install\.sh \| sh\n/);
-  assert.match(notes, /wombat update --check\n+wombat update/); assert.match(notes, /compare\/v0\.1\.0-beta\.1\.\.\.v0\.1\.0/);
+  assert.match(notes, /wombat system update --check\n+wombat system update/); assert.match(notes, /compare\/v0\.1\.0-beta\.1\.\.\.v0\.1\.0/);
   assert.doesNotMatch(notes, /--version 0\.1\.0/);
 });
 test('rejects incomplete target sets, version copies and malformed editorial input', () => {

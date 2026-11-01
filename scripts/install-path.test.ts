@@ -55,13 +55,13 @@ test('optional resident registration precedes plugin checks and respects default
   const root=mkdtempSync(path.join(os.tmpdir(),'wombat-install-service-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
   const destination=path.join(root,'version'),launcher=path.join(root,'wombat'),marker=path.join(root,'calls'),script=path.join(root,'test.sh');
   mkdirSync(path.join(destination,'runtime'),{recursive:true});symlinkSync(process.execPath,path.join(destination,'runtime/node'));
-  writeFileSync(launcher,'#!/bin/sh\nprintf "%s\\n" "$*" >> "$MARKER"\nexit "${FAIL_SERVICE:-0}"\n');chmodSync(launcher,0o755);
+  writeFileSync(launcher,'#!/bin/sh\nprintf "%s\\n" "$*" >> "$MARKER"\ncat >> "$MARKER"\nexit "${FAIL_SERVICE:-0}"\n');chmodSync(launcher,0o755);
   writeFileSync(script,'set -eu\n'+serviceSource+'\nstart_service\n');
   assert.match(installer, /^start_service=0$/m);
   assert.match(installer, /--service\) start_service=1/);
   assert.match(windowsInstaller, /\[switch\]\$Service/);
   const env={...process.env,launcher,destination,MARKER:marker,start_service:'1'};
-  execFileSync('sh',[script],{env,stdio:'pipe'});assert.equal(readFileSync(marker,'utf8'),'service enable --json\n');
+  execFileSync('sh',[script],{env,stdio:'pipe'});assert.equal(readFileSync(marker,'utf8'),'call\n{"method":"service","params":{"action":"enable"}}\n');
   rmSync(marker);execFileSync('sh',[script],{env:{...env,start_service:'0'},stdio:'pipe'});assert(!existsSync(marker));
   assert.throws(()=>execFileSync('sh',[script],{env:{...env,FAIL_SERVICE:'17'},stdio:'pipe'}));
   assert(installer.indexOf('\nstart_service\n')<installer.indexOf('\ninstall_plugin\n'));

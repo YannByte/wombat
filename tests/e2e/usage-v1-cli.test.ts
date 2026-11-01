@@ -11,7 +11,7 @@ async function run(args: string[], env: NodeJS.ProcessEnv, tty = false): Promise
   stdout: string;
   stderr: string;
 }> {
-  return await new Promise((resolve, reject) => { const child = spawn(process.execPath, tty ? ['--input-type=module', '-e', "Object.defineProperty(process.stdin, 'isTTY', {value:true}); Object.defineProperty(process.stdout, 'isTTY', {value:true}); process.argv = [process.execPath, 'dist/wombat.js', ...process.argv.slice(1)]; await import('./dist/wombat.js');", '--', ...args] : ['dist/wombat.js', ...args], { cwd: process.cwd(), env: { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_LANG: 'zh', ...env }, stdio: ['ignore', 'pipe', 'pipe'] }); let stdout = '', stderr = ''; child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk); child.on('error', reject); child.on('close', code => resolve({ code, stdout, stderr })); });
+  return await new Promise((resolve, reject) => { const child = spawn(process.execPath, tty ? ['--input-type=module', '-e', "Object.defineProperty(process.stdin, 'isTTY', {value:true}); Object.defineProperty(process.stdout, 'isTTY', {value:true}); process.argv = [process.execPath, 'dist/wombat.js', ...process.argv.slice(1)]; await import('./dist/wombat.js');", '--', ...args] : ['dist/wombat.js', ...args], { cwd: process.cwd(), env: { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_LANG: 'zh', ...env }, stdio: ['pipe', 'pipe', 'pipe'] }); let stdout = '', stderr = ''; child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk); child.on('error', reject); child.on('close', code => resolve({ code, stdout, stderr })); });
 }
 async function mockCore(body: string): Promise<{
   dir: string;
@@ -90,11 +90,12 @@ test('v1 version works without a core or local package paths at runtime', async 
   assert.deepEqual(JSON.parse(result.stdout), { outputVersion: 5, name: 'Wombat', version: expectedVersion });
 });
 test('built CLI SIGINT returns CANCELLED and reaps an uncooperative core', { skip: process.platform === 'win32' }, async () => {
-  const core = await mockCore("process.on('SIGTERM',()=>{});process.stdin.resume();setInterval(()=>{},1000);console.error(JSON.stringify({stage:'ready-'+process.pid}));");
+  const core = await mockCore("require('node:fs').writeFileSync(process.env.TEST_PID_FILE,String(process.pid));process.on('SIGTERM',()=>{});process.stdin.resume();setInterval(()=>{},1000);");
   let corePid: number | undefined;
-  const child = spawn(process.execPath, ['dist/wombat.js', 'refresh', '--json'], {
-    env: { ...process.env, WOMBAT_CORE_BIN: core.binary }, stdio: ['ignore', 'pipe', 'pipe']
+  const child = spawn(process.execPath, ['dist/wombat.js', 'call'], {
+    env: { ...process.env, WOMBAT_CORE_BIN: core.binary,TEST_PID_FILE:path.join(core.dir,'pid') }, stdio: ['pipe', 'pipe', 'pipe']
   });
+  child.stdin.end(JSON.stringify({method:'snapshot',params:{action:'refresh'}}));
   try {
     const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
       let stdout = '', stderr = '';
@@ -102,14 +103,10 @@ test('built CLI SIGINT returns CANCELLED and reaps an uncooperative core', { ski
       child.stdout.on('data', chunk => stdout += chunk);
       child.stderr.on('data', chunk => {
         stderr += chunk;
-        const match = /ready-(\d+)/.exec(stderr);
-        if (match && corePid === undefined) {
-          corePid = Number(match[1]);
-          child.kill('SIGINT');
-        }
       });
       child.once('error', error => { clearTimeout(timer); reject(error); });
       child.once('close', code => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
+      void (async()=>{for(let i=0;i<200;i++){try{corePid=Number(await readFile(path.join(core.dir,'pid'),'utf8'));break;}catch{await new Promise(r=>setTimeout(r,20));}}if(corePid)child.kill('SIGINT');})();
     });
     assert.equal(result.code, 130, result.stderr);
     assert.equal(result.stdout.trim().split('\n').length, 1);

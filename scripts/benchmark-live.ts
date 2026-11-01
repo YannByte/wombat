@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from './cli-invocation.ts';
 /** Fixed synthetic live-index cold/append/rebuild benchmark. Run after build; POSIX only. */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -73,10 +74,10 @@ async function startService(dataHome: string): Promise<MeasuredService> {
   return service;
 }
 
-function invokeCli(environment: NodeJS.ProcessEnv, args: string[], timeout = 120_000, allowRestorePending = false): { elapsedMs: number; status: number | null; value: any; stderr: string } {
+function invokeCli(environment: NodeJS.ProcessEnv, args: CliInput, timeout = 120_000, allowRestorePending = false): { elapsedMs: number; status: number | null; value: any; stderr: string } {
   const start = performance.now();
-  const response = spawnSync(process.execPath, [cli, ...args], { env: environment, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
-  const value = parseBenchmarkCliResponse(args.join(' '), response, allowRestorePending);
+  const response = spawnProductCli(cli, args, { env: environment, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
+  const value = parseBenchmarkCliResponse(Array.isArray(args)?args.join(' '):JSON.stringify(args), response, allowRestorePending);
   return { elapsedMs: performance.now() - start, status: response.status, value, stderr: response.stderr };
 }
 
@@ -98,7 +99,7 @@ function usage(environment: NodeJS.ProcessEnv, snapshotId?: string): { elapsedMs
 }
 
 function taskStatistics(environment:NodeJS.ProcessEnv,snapshotId:string,extras:number) {
-  const response=invokeCli(environment,['statistics','--snapshot',snapshotId,'--all-time','--json','--compact']);
+  const response=invokeCli(environment,["usage", "stats",'--snapshot',snapshotId,'--all-time','--json','--compact']);
   assert.equal(response.status,0);const p=response.value.statistics.population;
   const totals=Array.from({length:threads},(_,i)=>{let n=0;for(let j=i;j<measurements;j+=threads)n+=110+2*(j%priceGroups);return n+(i===0?extras*110:0);}).sort((a,b)=>a-b);
   const total=totals.reduce((a,b)=>a+b,0),percentile=(q:number)=>{const h=(threads-1)*q,lo=Math.floor(h),hi=Math.ceil(h);return totals[lo]+(totals[hi]-totals[lo])*(h-lo);};
@@ -108,7 +109,7 @@ function taskStatistics(environment:NodeJS.ProcessEnv,snapshotId:string,extras:n
 }
 
 function threadsPage(environment: NodeJS.ProcessEnv, offset: number, snapshotId?: string): { elapsedMs: number; value: any } {
-  const args = ['threads', ...(snapshotId ? ['--snapshot', snapshotId] : ['--fresh']), '--sort', 'tokens', '--limit', '200', '--offset', String(offset), '--timezone', 'UTC', '--json'];
+  const args=queryInvocation({action:'threads',snapshotId,sort:'tokens',limit:200,offset,scope:{timezone:'UTC'}},{mode:snapshotId?'cached':'fresh'});
   const start = performance.now();
   while (true) {
     const response = invokeCli(environment, args, 15_000);
@@ -158,18 +159,18 @@ function assertThreadHierarchy(environment: NodeJS.ProcessEnv, expectedTokens: n
 }
 
 function readyQueries(environment: NodeJS.ProcessEnv, snapshotId: string, threadId: string, expectedTokens: number, expectedCost: bigint) {
-  const cases = [
+  const cases: {name:string;args:CliInput}[] = [
     {name:'daily-utc', args:['usage','--all-time','--timezone','UTC','--group','day']},
     {name:'monthly-shanghai', args:['usage','--all-time','--timezone','Asia/Shanghai','--group','month']},
     {name:'filtered-daily-shanghai', args:['usage','--since','2026-09-29','--until','2026-09-30','--timezone','Asia/Shanghai','--group','day']},
-    {name:'ranking', args:['threads','--all-time','--sort','tokens','--limit','200','--timezone','UTC']},
-    {name:'turns', args:['turns','--thread',threadId,'--timezone','UTC']},
+    {name:'ranking', args:{"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":200,"scope":{"allTime":true,"timezone":"UTC"}},"mode":"auto"}}},
+    {name:'turns', args:{"method":"usage","params":{"query":{"action":"turns","threadId":threadId,"scope":{"timezone":"UTC"}},"mode":"auto"}}},
   ];
   return cases.map(test => {
     const samples=Array.from({length:10},()=>{
-      const response=invokeCli(environment,[...test.args,'--snapshot',snapshotId,'--json']);
+      const response=invokeCli(environment,Array.isArray(test.args)?[...test.args,'--snapshot',snapshotId,'--json']:{...test.args,params:{...test.args.params,query:{...(test.args as Extract<CliInput,{method:'usage'}>).params.query,snapshotId}}} as CliInput);
       assert.equal(response.status,0);
-      if(test.args[0]==='usage')assertUsageHierarchy(response.value,expectedTokens,expectedCost);
+      if(Array.isArray(test.args)&&test.args[0]==='usage')assertUsageHierarchy(response.value,expectedTokens,expectedCost);
       return {elapsedMs:response.elapsedMs,responseBytes:Buffer.byteLength(JSON.stringify(response.value))};
     });
     const sorted=samples.map(sample=>sample.elapsedMs).sort((a,b)=>a-b);
@@ -278,7 +279,7 @@ try {
   };
 
   const fixedSnapshotStart = performance.now();
-  const fixedSnapshotResponse = invokeCli(firstService.environment, ['refresh', '--root', source, '--json']);
+  const fixedSnapshotResponse = invokeCli(firstService.environment, {"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});
   assert.equal(fixedSnapshotResponse.status, 0);
   const fixedSnapshotRefreshMs = performance.now() - fixedSnapshotStart;
   const snapshotId = fixedSnapshotResponse.value.snapshotRef.snapshotId as string;
@@ -298,7 +299,7 @@ try {
   const restoredService = await startService(initialDataHome);
   const restoreStart = performance.now();
   const preferredProject = projects > 1 ? '/synthetic/project-0' : undefined;
-  const restoredUsage = async (args: string[]) => {
+  const restoredUsage = async (args: CliInput) => {
     while (true) {
       const response = invokeCli(restoredService.environment, args, 15_000, true);
       if (response.value.error?.code !== 'SYNC_PENDING') return response;

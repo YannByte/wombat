@@ -14,7 +14,7 @@ pub(super) fn records(
         .iter()
         .filter_map(|r| r.fact.turn_id.as_deref())
         .collect();
-    for event in thread_events(s, thread, work)? {
+    for event in thread_events(s, thread, scope, tz, work)? {
         let at = event
             .time()
             .timestamp

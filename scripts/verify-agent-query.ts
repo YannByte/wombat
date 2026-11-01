@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from './cli-invocation.ts';
 /** Installed-runtime qualification over synthetic truth; optional real Codex execution. */
 import {spawn,spawnSync,type ChildProcess} from 'node:child_process';
 import {cpSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,realpathSync,rmSync,writeFileSync} from 'node:fs';
@@ -27,8 +28,8 @@ export function agentMetrics(stdout:string){
  return {commands,unsupportedToolCalls,toolCalls:commands.length,toolResultBytes:bytes.reduce((a,b)=>a+b,0),inputTokens:sum('input_tokens'),cachedInputTokens:sum('cached_input_tokens'),outputTokens:sum('output_tokens'),reasoningTokens:sum('reasoning_tokens')};
 }
 export {stdoutFromLog} from './verify-e2e-helpers.ts';
-function query(cli:string,env:NodeJS.ProcessEnv,args:string[]){
- const start=performance.now();const run=spawnSync(process.execPath,[cli,...args,'--json'],{cwd:path.dirname(cli),env,encoding:'utf8',timeout:15_000,maxBuffer:1024*1024});
+function query(cli:string,env:NodeJS.ProcessEnv,args: CliInput){
+ const start=performance.now();const run=spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, {cwd:path.dirname(cli),env,encoding:'utf8',timeout:15_000,maxBuffer:1024*1024});
  if(run.error||![0,2].includes(run.status??-1))throw new Error('Installed query failed: '+(run.error?.message??run.stderr.slice(0,1000)));
  const value:unknown=JSON.parse(run.stdout);if(!record(value)||record(value.error))throw new Error('Invalid installed query result');return {value,bytes:Buffer.byteLength(run.stdout),elapsedMs:Math.round(performance.now()-start)};
 }
@@ -47,37 +48,37 @@ async function qualify(outputDir:string,agentBin?:string,language:'zh'|'en'='en'
   mkdirSync(runtime);mkdirSync(path.dirname(installed),{recursive:true});
   const dist=path.join(root,'dist');
   for(const name of readdirSync(dist).filter(name=>/^wombat(?:-.*)?\.js$/.test(name)))cpSync(path.join(dist,name),path.join(runtime,name));
-  for(const name of [process.platform==='win32'?'wombat-core.exe':'wombat-core','web','skill'])cpSync(path.join(dist,name),path.join(runtime,name),{recursive:true});
+  for(const name of [process.platform==='win32'?'wombat-core.exe':'wombat-core','skill'])cpSync(path.join(dist,name),path.join(runtime,name),{recursive:true});
   cpSync(path.join(runtime,'skill/plugin/skills/wombat'),installed,{recursive:true});
   const cli=path.join(runtime,'wombat.js');
   const env={...process.env,WOMBAT_DATA_HOME:path.join(sandbox,'data'),WOMBAT_AUTO_PRICES:'0',WOMBAT_CORE_BIN:''};
   service=spawn(path.join(runtime,process.platform==='win32'?'wombat-core.exe':'wombat-core'),['--serve-usage'],{cwd:sandbox,env,detached:process.platform!=='win32',stdio:'ignore'});await once(service,'spawn');await delay(100);
-  const refreshed=query(cli,env,['refresh','--root',source]);const ref=refreshed.value.snapshotRef;if(!record(ref)||typeof ref.snapshotId!=='string')throw new Error('Missing fixed snapshot');
-  const listed=query(cli,env,['threads','--snapshot',ref.snapshotId,'--all-time']);if(!Array.isArray(listed.value.items))throw new Error('Missing installed task list');const task=listed.value.items.find(t=>record(t)&&t.upstreamId==='qualification');if(!record(task)||typeof task.id!=='string')throw new Error('Missing full task identity');
+  const refreshed=query(cli,env,{"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});const ref=refreshed.value.snapshotRef;if(!record(ref)||typeof ref.snapshotId!=='string')throw new Error('Missing fixed snapshot');
+  const listed=query(cli,env,queryInvocation({"action":"threads","snapshotId":ref.snapshotId as string,"scope":{"allTime":true}}, {mode:"auto"}));if(!Array.isArray(listed.value.items))throw new Error('Missing installed task list');const task=listed.value.items.find(t=>record(t)&&t.upstreamId==='qualification');if(!record(task)||typeof task.id!=='string')throw new Error('Missing full task identity');
   const common=['--snapshot',ref.snapshotId,'--all-time'];
-  const samples=[0,1,2].map(()=>query(cli,env,['investigate',...common,'--limit','5']));
+  const samples=[0,1,2].map(()=>query(cli,env,queryInvocation({"action":"investigate","limit":5,"snapshotId":ref.snapshotId as string,"scope":{"allTime":true}}, {mode:"cached"})));
   for(const sample of samples){const i=sample.value.inspection,summary=sample.value.summary;if(!record(i)||i.candidateCount!==1||!record(summary)||!record(summary.tokens)||summary.tokens.total!==1_100_000)throw new Error('Independent synthetic truth failed');}
-  const contexts=query(cli,env,['context',...common,'--thread',task.id]);const inventory=record(contexts.value.inspection)?contexts.value.inspection.context:null;if(!record(inventory)||inventory.injectedRecords!==1||inventory.modelWindowRecords!==1||!Array.isArray(inventory.records)||inventory.records.some(r=>!record(r)||r.bytes!==null||r.contentVersion!==null))throw new Error('Context physical-record truth failed');
-  const trajectory=query(cli,env,['trajectory',...common,'--thread',task.id]);const points=record(trajectory.value.inspection)?trajectory.value.inspection.trajectory:null;if(!Array.isArray(points)||points.length!==3||!record(points[2])||points[2].inputDelta!==null||!record(points[2].compactionComparison)||points[2].compactionComparison.inputDifference!==300000)throw new Error('Compaction boundary truth failed');
-  const review=query(cli,env,['review','--snapshot',ref.snapshotId,'--since','2026-09-02','--until','2026-09-03']);const concentration=record(review.value.inspection)&&record(review.value.inspection.review)?review.value.inspection.review.concentration:null;if(!record(concentration)||concentration.topTaskShare!==1||concentration.totalTokens!==1100000)throw new Error('Full-scope concentration truth failed');
+  const contexts=query(cli,env,queryInvocation({"action":"context","snapshotId":ref.snapshotId as string,"scope":{"allTime":true,"threadId":task.id}}, {mode:"cached"}));const inventory=record(contexts.value.inspection)?contexts.value.inspection.context:null;if(!record(inventory)||inventory.injectedRecords!==1||inventory.modelWindowRecords!==1||!Array.isArray(inventory.records)||inventory.records.some(r=>!record(r)||r.bytes!==null||r.contentVersion!==null))throw new Error('Context physical-record truth failed');
+  const trajectory=query(cli,env,queryInvocation({"action":"trajectory","snapshotId":ref.snapshotId as string,"scope":{"allTime":true,"threadId":task.id}}, {mode:"cached"}));const points=record(trajectory.value.inspection)?trajectory.value.inspection.trajectory:null;if(!Array.isArray(points)||points.length!==3||!record(points[2])||points[2].inputDelta!==null||!record(points[2].compactionComparison)||points[2].compactionComparison.inputDifference!==300000)throw new Error('Compaction boundary truth failed');
+  const review=query(cli,env,queryInvocation({"action":"review","snapshotId":ref.snapshotId as string,"scope":{"since":"2026-09-02","until":"2026-09-03"}}, {mode:"cached"}));const concentration=record(review.value.inspection)&&record(review.value.inspection.review)?review.value.inspection.review.concentration:null;if(!record(concentration)||concentration.topTaskShare!==1||concentration.totalTokens!==1100000)throw new Error('Full-scope concentration truth failed');
   const api=query(cli,env,['api']);
   if(!Array.isArray(api.value.methods)||!api.value.methods.includes('usage')||api.value.inputSchema!==null)throw new Error('Installed Agent method discovery failed');
   const method=query(cli,env,['api','--method','snapshot']);
   if(!record(method.value.inputSchema)||method.value.selectedMethod!=='snapshot')throw new Error('Installed per-method schema failed');
-  const structured=spawnSync(process.execPath,[cli,'call'],{cwd:sandbox,env,input:JSON.stringify({method:'snapshot',params:{action:'investigate',snapshotId:ref.snapshotId,scope:{allTime:true},limit:3,compact:true}}),encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});
+  const structured=spawnProductCli(cli, ['call'], {cwd:sandbox,env,input:JSON.stringify({method:'snapshot',params:{action:'investigate',snapshotId:ref.snapshotId,scope:{allTime:true},limit:3,compact:true}}),encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});
   if(structured.error||![0,2].includes(structured.status??-1))throw new Error('Installed structured call failed');
   const structuredResult:unknown=JSON.parse(structured.stdout);
   if(!record(structuredResult)||!record(structuredResult.summary)||!record(structuredResult.summary.tokens)||structuredResult.summary.tokens.total!==1100000||!record(structuredResult.quality)||!record(structuredResult.quality.detailSummary)||structuredResult.facets!==undefined)throw new Error('Compact structured total/quality failed');
   const compact=query(cli,env,['usage',...common,'--compact','--limit','1']);
   const full=query(cli,env,['usage',...common,'--limit','1']);
   if(JSON.stringify(compact.value.summary)!==JSON.stringify(full.value.summary)||JSON.stringify(compact.value.items)!==JSON.stringify(full.value.items))throw new Error('Installed compact conservation failed');
-  const turns=query(cli,env,['turns',...common,'--thread',task.id,'--matched-only']);
+  const turns=query(cli,env,queryInvocation({"action":"turns","matchedOnly":true,"threadId":task.id,"snapshotId":ref.snapshotId as string,"scope":{"allTime":true}}, {mode:"auto"}));
   const turn=Array.isArray(turns.value.items)?turns.value.items.find(t=>record(t)&&t.ordinal!==null):null;
   if(!record(turn)||typeof turn.id!=='string')throw new Error('Missing selected turn');
-  const selected=query(cli,env,['investigate',...common,'--thread',task.id,'--turn',turn.id,'--compact']);
+  const selected=query(cli,env,queryInvocation({action:'investigate',snapshotId:ref.snapshotId as string,scope:{allTime:true,threadId:task.id,turnId:turn.id},compact:true},{mode:'cached'}));
   const selectedInspection=selected.value.inspection;
   if(!record(selectedInspection)||!Array.isArray(selectedInspection.limitations)||!selectedInspection.limitations.includes('selected_turn_only')||!record(selected.value.scope)||selected.value.scope.turnId!==turn.id)throw new Error('Installed exact-turn inspection failed');
-  const invalid=spawnSync(process.execPath,[cli,'context','--snapshot','unsupported:synthetic','--all-time','--json'],{cwd:sandbox,env,encoding:'utf8',timeout:15000,maxBuffer:1024*1024});if(invalid.error||invalid.status!==1||!record(JSON.parse(invalid.stdout).error))throw new Error('Unknown snapshot failed closed incorrectly');
+  const invalid=spawnProductCli(cli, queryInvocation({"action":"context","snapshotId":"unsupported:synthetic","scope":{"allTime":true}}, {mode:"cached"}), {cwd:sandbox,env,encoding:'utf8',timeout:15000,maxBuffer:1024*1024});if(invalid.error||invalid.status!==1||!record(JSON.parse(invalid.stdout).error))throw new Error('Unknown snapshot failed closed incorrectly');
   report.agentInterface={methods:api.value.methods.length,structured:true,compactBytes:compact.bytes,fullBytes:full.bytes,selectedTurn:true};
   report.queryMatrix=[{case:'context-physical-records',records:2,bytes:contexts.bytes,elapsedMs:contexts.elapsedMs},{case:'compaction-observation',inputDifference:300000,continuousDelta:null,bytes:trajectory.bytes,elapsedMs:trajectory.elapsedMs},{case:'full-scope-concentration',topTaskShare:1,bytes:review.bytes,elapsedMs:review.elapsedMs},{case:'unknown-snapshot',status:'rejected'}];
   report.runtime={staged:true,fixtureRequests:3,refresh:{bytes:refreshed.bytes,elapsedMs:refreshed.elapsedMs},cachedQueries:samples.map(s=>({bytes:s.bytes,elapsedMs:s.elapsedMs})),completeTokens:1_100_000,candidateCount:1};

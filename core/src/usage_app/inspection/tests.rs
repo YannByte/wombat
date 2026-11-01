@@ -359,16 +359,20 @@ fn event_budget_is_shared_across_reads_and_rejects_before_decoding() {
         bytes: MAX_EVENT_BYTES - bytes,
     };
     assert_eq!(
-        order_map(&thread_events(&s, &thread, &mut work).unwrap())
-            .unwrap()
-            .len(),
+        order_map(
+            &thread_events(&s, &thread, &Scope::default(), chrono_tz::UTC, &mut work).unwrap()
+        )
+        .unwrap()
+        .len(),
         1
     );
     // A subsequent read exceeds the aggregate budget even if its payload cannot decode.
     Arc::make_mut(&mut s.manifest.events.partitions[0]).chunks[0]
         .file
         .sha256 = "invalid".into();
-    let error = thread_events(&s, &thread, &mut work).err().unwrap();
+    let error = thread_events(&s, &thread, &Scope::default(), chrono_tz::UTC, &mut work)
+        .err()
+        .unwrap();
     assert_eq!(
         error
             .downcast_ref::<crate::dto::OperationError>()
@@ -1023,4 +1027,147 @@ fn inspection_waits_only_for_selected_recorded_project_and_keeps_global_usage_pr
         )
         .is_ok()
     );
+}
+
+#[test]
+fn scoped_events_skip_old_blocks_but_preserve_full_trajectory_order() {
+    // An old turn fills two blocks. The first selected measurement shares a
+    // block with older facts; pruning must retain the complete touched encoding.
+    let source = snapshot(
+        &[
+            ("1", "a", "2026-09-01T00:00:00Z", 100),
+            ("2", "a", "2026-09-02T00:00:00Z", 200),
+            ("3", "a", "2026-09-03T00:00:00Z", 300),
+        ],
+        "scoped-order",
+    );
+    let source = positioned(source, true, false);
+    let mut collected = Collected {
+        sources: source.manifest.sources.clone(),
+        threads: source
+            .manifest
+            .threads
+            .iter()
+            .map(|t| t.thread.clone())
+            .collect(),
+        measurements: source
+            .ledger()
+            .unwrap()
+            .into_iter()
+            .map(|r| r.fact)
+            .collect(),
+        events: source.events().unwrap(),
+        ..Default::default()
+    };
+    for i in 0..600 {
+        collected.events.push(Arc::new(
+            Event::new(
+                Position {
+                    source_instance_id: "synthetic".into(),
+                    file_id: "fixture".into(),
+                    generation: "one".into(),
+                    byte_offset: 100 + i,
+                    ordinal: 0,
+                },
+                Some("a".into()),
+                None,
+                Time::from_source(Some("2026-09-01T00:00:00Z")).0,
+                vec![],
+                Payload::Activity {
+                    activity: crate::session_events::ActivityKind::Assistant,
+                },
+            )
+            .unwrap(),
+        ));
+    }
+    collected.events.push(Arc::new(
+        Event::new(
+            Position {
+                source_instance_id: "synthetic".into(),
+                file_id: "fixture".into(),
+                generation: "one".into(),
+                byte_offset: 400,
+                ordinal: 1,
+            },
+            Some("a".into()),
+            None,
+            Time::from_source(Some("2026-09-01T00:00:00Z")).0,
+            vec![crate::session_events::Gap::SourcePartial],
+            Payload::Activity {
+                activity: crate::session_events::ActivityKind::Assistant,
+            },
+        )
+        .unwrap(),
+    ));
+    collected.events.push(Arc::new(
+        Event::new(
+            Position {
+                source_instance_id: "synthetic".into(),
+                file_id: "fixture".into(),
+                generation: "one".into(),
+                byte_offset: 800,
+                ordinal: 0,
+            },
+            None,
+            None,
+            Time::from_source(Some("2026-09-03T00:00:00Z")).0,
+            vec![],
+            Payload::Activity {
+                activity: crate::session_events::ActivityKind::Assistant,
+            },
+        )
+        .unwrap(),
+    ));
+    let root = tempfile::tempdir().unwrap();
+    let s = crate::usage_store::memory(
+        collected,
+        "live:synthetic:scope".into(),
+        crate::pricing_sync::current_at(root.path()).unwrap(),
+        None,
+    )
+    .unwrap();
+    let thread = &s.manifest.threads[0];
+    let scope: Scope = serde_json::from_value(
+        serde_json::json!({"since":"2026-09-03","until":"2026-09-04","timezone":"UTC"}),
+    )
+    .unwrap();
+    let chunks = &s
+        .manifest
+        .events
+        .partitions
+        .iter()
+        .find(|p| p.target.thread_id.as_deref() == Some("a"))
+        .unwrap()
+        .chunks;
+    let selected_bytes = chunks
+        .iter()
+        .filter(|c| c.inspection.has_gaps || c.inspection.time.may_match(&scope, chrono_tz::UTC))
+        .map(|c| c.bytes)
+        .sum::<u64>();
+    assert!(selected_bytes < chunks.iter().map(|c| c.bytes).sum());
+    let mut work = EventWork {
+        bytes: MAX_EVENT_BYTES - selected_bytes,
+        facts: 0,
+    };
+    let events = thread_events(&s, thread, &scope, chrono_tz::UTC, &mut work).unwrap();
+    assert!(events.len() < 605);
+    assert!(
+        events
+            .iter()
+            .all(|e| e.thread_id().is_some() || !e.gaps().is_empty())
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| !e.gaps().is_empty() && e.position().byte_offset == 400)
+    );
+    assert_eq!(work.bytes, MAX_EVENT_BYTES);
+    let mut full = s.events().unwrap();
+    sort_events(&mut full);
+    assert!(thread_order(&s, thread).unwrap() == order_map(&full).unwrap());
+    let response = execute(request(serde_json::json!({"action":"trajectory","threadId":"a","scope":{"since":"2026-09-03","until":"2026-09-04","timezone":"UTC"}})), &s).unwrap();
+    let point = &response.inspection.unwrap().trajectory[0];
+    assert_eq!(point.epoch, 2);
+    assert_eq!(point.boundary, Some(InputBoundary::Compaction));
+    assert_eq!(point.input_delta, None);
 }

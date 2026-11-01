@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -53,8 +54,8 @@ async function fixture() {
   ]));
   const env: NodeJS.ProcessEnv = { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_LANG: 'zh', WOMBAT_DATA_HOME: data, CODEX_HOME: source, NO_COLOR: '1' };
   delete env.WOMBAT_CORE_BIN;
-  const run = (args: string[], json = true) => {
-    const result = spawnSync(process.execPath, [entry, ...args, ...(json ? ['--json'] : [])], {
+  const run = (args: CliInput, json = true) => {
+    const result = spawnProductCli(entry, Array.isArray(args) ? [...args, ...(json ? ['--json'] : [])] : args, {
       cwd: root, env, encoding: 'utf8', input: '', timeout: 15_000, maxBuffer: 8 * 1024 * 1024,
     });
     assert.ifError(result.error);
@@ -77,7 +78,7 @@ test('real CLI starts its shared service through a capability probe without scan
   };
   delete env.WOMBAT_CORE_BIN;
   try {
-    const result = spawnSync(process.execPath, [entry, 'optimize', 'capabilities', '--json'], {
+    const result = spawnProductCli(entry, ['check', 'capabilities', '--json'], {
       cwd: root, env, encoding: 'utf8', input: '', timeout: 15_000, maxBuffer: 8 * 1024 * 1024,
     });
     assert.ifError(result.error);
@@ -106,7 +107,7 @@ test('real CLI refresh, usage, threads, turns and steps conserve independent Tok
       assert.equal(initial.code, 1, initial.stdout);
       assert.equal(initial.value.error.code, 'SYNC_PENDING');
     }
-    const refresh = f.run(['refresh', '--root', f.source, '--root', f.source]);
+    const refresh = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source,f.source]},"mode":"auto"}});
     assert.equal(refresh.code, 0);
     assert.ok(['current','stale'].includes(refresh.value.freshness.status));
     assert.equal(refresh.value.summary.tokens.total, 491_210);
@@ -118,16 +119,16 @@ test('real CLI refresh, usage, threads, turns and steps conserve independent Tok
     assert.equal(report.code, 0);
     assert.equal(report.stderr, '');
     assert.deepEqual(report.value.summary, refresh.value.summary);
-    const threads = f.run(['threads', '--sort', 'tokens']);
+    const threads = f.run({"method":"usage","params":{"query":{"action":"threads","sort":"tokens"},"mode":"auto"}});
     const alpha = threads.value.items[0];
     assert.equal(alpha.title, 'Alpha 合成对话');
     assert.equal(alpha.threadUsage.tokens.total, 490_000);
     assert.equal(alpha.threadUsage.price.cost, '1.725');
-    const turns = f.run(['turns', '--thread', alpha.id, '--sort', 'tokens']);
+    const turns = f.run({"method":"usage","params":{"query":{"action":"turns","threadId":alpha.id,"sort":"tokens"},"mode":"auto"}});
     assert.equal(turns.code, 0);
     assert.equal(turns.value.summary.price.cost, '1.725');
     assert.deepEqual(turns.value.items.map((item: any) => item.usage.tokens.total), [310_000, 180_000]);
-    const steps = f.run(['steps', '--thread', alpha.id, '--turn', turns.value.items[1].id, '--sort', 'time']);
+    const steps = f.run({"method":"usage","params":{"query":{"action":"steps","threadId":alpha.id,"turnId":turns.value.items[1].id,"sort":"time"},"mode":"auto"}});
     assert.equal(steps.code, 0);
     assert.equal(steps.value.summary.price.cost, '0.435');
     assert.equal(steps.value.items.filter((item: any) => item.kind === 'operation').length, 1);
@@ -143,7 +144,7 @@ test('real CLI refresh, usage, threads, turns and steps conserve independent Tok
 test('real CLI filters, timezones, grouping and pagination retain the full matching totals', async () => {
   const f = await fixture();
   try {
-    f.run(['refresh', '--root', f.source]);
+    f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
     for (const filter of [['--model', 'gpt-6-sol'], ['--effort', 'high'], ['--project', '/synthetic/项目甲']]) {
       const result = f.run(['usage', ...dates, ...filter]);
       assert.equal(result.code, 0, result.stdout);
@@ -160,22 +161,22 @@ test('real CLI filters, timezones, grouping and pagination retain the full match
     for (const group of ['day', 'week', 'month']) {
       assert.equal(f.run(['usage', ...dates, '--group', group]).value.summary.price.knownCost, '1.7382');
     }
-    assert.equal(f.run(['threads', '--search', 'aLPHa']).value.summary.tokens.total, 490_000);
-    const first = f.run(['threads', '--sort', 'tokens', '--limit', '1']).value;
+    assert.equal(f.run({"method":"usage","params":{"query":{"action":"threads","search":"aLPHa"},"mode":"auto"}}).value.summary.tokens.total, 490_000);
+    const first = f.run({"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":1},"mode":"auto"}}).value;
     const ids = [first.items[0].id];
     for (const offset of [1, 2]) {
-      const page = f.run(['threads', '--sort', 'tokens', '--limit', '1', '--offset', String(offset), '--snapshot', first.snapshotRef.snapshotId]).value;
+      const page = f.run(queryInvocation({action:'threads',sort:'tokens',limit:1,offset,snapshotId:first.snapshotRef.snapshotId},{mode:'cached'})).value;
       assert.deepEqual(page.summary, first.summary);
       ids.push(page.items[0].id);
     }
     assert.equal(new Set(ids).size, 3);
-    const emptyPage = f.run(['threads', '--offset', '99']);
+    const emptyPage = f.run({"method":"usage","params":{"query":{"action":"threads","offset":99},"mode":"auto"}});
     assert.equal(emptyPage.code, 0);
     assert.equal(emptyPage.value.items.length, 0);
     assert.deepEqual(emptyPage.value.summary, first.summary);
-    const plain = f.run(['threads', '--offset', '99'], false);
+    const plain = f.run({"method":"usage","params":{"query":{"action":"threads","offset":99},"mode":"auto"}}, false);
     assert.doesNotMatch(plain.stdout, /100—99/);
-    assert.match(plain.stdout, /当前页无记录/);
+    assert.deepEqual(JSON.parse(plain.stdout).items,[]);
   } finally { await f.cleanup(); }
 });
 
@@ -199,8 +200,8 @@ test('real CLI rejects invalid requests and reports missing detail without scann
     }
     assert.equal(f.run(['--help']).code, 0);
     assert.equal(f.run(['--version']).code, 0);
-    f.run(['refresh', '--root', f.source]);
-    const missing = f.run(['turns', '--thread', 'missing']);
+    f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
+    const missing = f.run({"method":"usage","params":{"query":{"action":"turns","threadId":"missing"},"mode":"auto"}});
     assert.equal(missing.code, 1);
     assert.equal(missing.value.error.code, 'NOT_FOUND');
   } finally { await f.cleanup(); }
@@ -209,14 +210,14 @@ test('real CLI rejects invalid requests and reports missing detail without scann
 test('real CLI partial sources, failed refresh and corrupted snapshot have explicit outcomes', async () => {
   const f = await fixture();
   try {
-    const partial = f.run(['refresh', '--root', f.source, '--root', path.join(f.root, 'missing')]);
+    const partial = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source,path.join(f.root, 'missing')]},"mode":"auto"}});
     assert.equal(partial.code, 2);
     assert.equal(partial.value.quality.status, 'partial');
     assert.equal(partial.value.summary.tokens.total, 491_210);
-    const failed = f.run(['refresh', '--root', path.join(f.root, 'missing')]);
+    const failed = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[path.join(f.root, 'missing')]},"mode":"auto"}});
     assert.equal(failed.code, 1);
     assert.equal(failed.value.error.code, 'SOURCE_UNREADABLE');
-    const retained = f.run(['threads', '--snapshot', partial.value.snapshotRef.snapshotId]);
+    const retained = f.run(queryInvocation({"action":"threads","snapshotId":partial.value.snapshotRef.snapshotId}, {mode:"auto"}));
     assert.equal(retained.code, 2);
     assert.equal(retained.value.snapshotRef.snapshotId, partial.value.snapshotRef.snapshotId);
     const ledger = path.join(f.data, 'usage-v4', 'generations', retained.value.snapshotRef.snapshotId, 'committed', 'ledger.json');
@@ -231,23 +232,23 @@ test('language changes presentation while real core data and source titles stay 
   const f = await fixture();
   try {
     // The first live query may contain only preview metadata while scanning.
-    const refresh = f.run(['refresh', '--root', f.source]);
+    const refresh = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
     assert.equal(refresh.code, 0, refresh.stdout);
     assert.ok(['current','stale'].includes(refresh.value.freshness.status));
     const initial = f.run(['usage', ...dates]);
     assert.equal(initial.code, 0, initial.stdout);
     assert.equal(initial.value.summary.tokens.total, 491_210);
-    const args = ['threads', '--snapshot', initial.value.snapshotRef.snapshotId];
+    const args = ['usage','--snapshot',initial.value.snapshotRef.snapshotId];
     const zh = f.run([...args, '--lang=zh']);
     const en = f.run(['--lang', 'en', ...args]);
     assert.equal(zh.code, en.code);
     for (const field of ['summary', 'items', 'scope', 'page', 'snapshotRef', 'quality']) assert.deepEqual(en.value[field], zh.value[field]);
-    assert.equal(en.value.items[0].title, zh.value.items[0].title);
+    assert.equal(en.value.items[0], zh.value.items[0]);
     const plain = f.run(['usage', ...dates, '--lang=en'], false);
     assert.match(plain.stdout, /Wombat · Usage/);
     assert.match(plain.stdout, /Not priced/);
     const help = f.run(['--help', '--lang=en'], false);
-    assert.match(help.stdout, /Usage/); assert.match(help.stdout, /wombat threads/);
+    assert.match(help.stdout, /Usage/); assert.match(help.stdout, /wombat call/);
     const invalid = f.run(['usage', '--lang=en', '--unknown']);
     assert.equal(invalid.value.error.code, 'INVALID_ARGUMENT');
     assert.match(invalid.value.error.message, /Unknown option/);

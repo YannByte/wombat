@@ -38,7 +38,7 @@ test('Hook declaration measurements agree in CLI and HTTP without measuring or e
         assert.equal(item.usageCount, null);
         assert.ok(!JSON.stringify(result).includes('SYNTHETIC_NOT_EXPOSED'));
         assert.ok(!JSON.stringify(result).includes('writeFileSync'));
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'inventory', '--root', root, '--project-root', project, '--kind', 'hook', '--read-view', result.readView!, '--json'], { encoding: 'utf8', env: process.env, timeout: 15000 });
+        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'inventory', '--root', root, '--project-root', project, '--kind', 'hook', '--read-view', result.readView!, '--json'], { encoding: 'utf8', env: process.env, timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         const cliItem = JSON.parse(cli.stdout).items[0];
         assert.deepEqual([cliItem.bytes, cliItem.characters, cliItem.contentTokens, cliItem.estimate], [item.bytes, item.characters, item.contentTokens, item.estimate]);

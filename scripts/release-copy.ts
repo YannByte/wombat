@@ -39,10 +39,9 @@ function releaseReadme(content: string, version: string, chinese: boolean, file:
       (_match, indent: string) => `${indent}curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/install/install.sh | sh -s --${preview ? ` --version ${version}` : ''} --plugin`)
     .replace(/^([ \t]*)& \(\[scriptblock\]::Create\(\(irm https:\/\/raw\.githubusercontent\.com\/YannByte\/wombat\/main\/(?:scripts\/install\/)?install\.ps1\)\)\).*$/m,
       (_match, indent: string) => `${indent}& ([scriptblock]::Create((irm https://raw.githubusercontent.com/YannByte/wombat/main/scripts/install/install.ps1)))${preview ? ` -Version ${version}` : ''} -Plugin`);
-  const commands = preview ? `wombat update --check --version ${version}\nwombat update --version ${version}` : 'wombat update --check\nwombat update';
   const update = chinese
-    ? `## 更新\n\n重新执行上面的安装命令，可以更新 Wombat 与 Codex 插件。检查更新，或只更新 Wombat 运行时：\n\n\`\`\`sh\n${commands}\n\`\`\`\n\n指定版本和自定义安装目录见[安装指南](docs/guides/installation.md)。`
-    : `## Update\n\nRerun the installation command above to update Wombat and its Codex plugin. Check for updates, or update only the Wombat runtime:\n\n\`\`\`sh\n${commands}\n\`\`\`\n\nSee the [installation guide](docs/guides/installation.en.md) for specific versions and custom installation directories.`;
+    ? `## 更新\n\n重新执行上面的安装命令，可以更新 Wombat 与 Codex 插件。保留指定版本或自定义安装目录的选项。\n\n更新选项和仅更新运行时的方式见[安装指南](docs/guides/installation.md)。`
+    : `## Update\n\nRerun the installation command above to update Wombat and its Codex plugin. Keep any options for a specific version or custom installation directory.\n\nSee the [installation guide](docs/guides/installation.en.md) for update options and runtime-only updates.`;
   return replaceSection(next, chinese ? /^#{2,3} (?:更新|更新预发行版本|更新 Wombat)$/m : /^#{2,3} (?:Update|Update a pre-release|Update Wombat)$/m,
     /^## /m, update, file);
 }

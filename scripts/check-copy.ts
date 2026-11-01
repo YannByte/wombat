@@ -16,7 +16,6 @@ const unchanged = (value: string) => {
 // Exact dictionary-owned technical labels; neither whole namespaces nor arbitrary Latin text are exempt.
 const chineseTechnicalEntries: Readonly<Record<string, string>> = {
   'preview.skillRead': 'SKILL.md · {status}',
-  'directories.cliHelp': 'wombat directories list [--json]\nwombat directories authorize --purpose source|project --path <directory> [--json]\nwombat directories revoke --grant <id> [--json]\n',
   'config.hook': 'Hooks', 'config.rule': 'AGENTS.md', 'config.skill': 'Skill', 'config.mcp': 'MCP',
   'webui.agent': 'Agent', 'execution.useKind.skill': 'Skill', 'execution.useKind.mcp': 'MCP',
 };

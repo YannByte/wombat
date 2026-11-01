@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Request",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "projectRoot": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "keepPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "productTemporary": {
+          "type": "boolean",
+          "default": false
+        },
+        "codex": {
+          "type": "boolean",
+          "default": false
+        },
+        "action": {
+          "type": "string",
+          "const": "inspect"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "projectRoot"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "readView": {
+          "type": "string"
+        },
+        "baselineId": {
+          "type": "string"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100
+        },
+        "action": {
+          "type": "string",
+          "const": "apply"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "readView",
+        "baselineId",
+        "selection"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "readView": {
+          "type": "string"
+        },
+        "baselineId": {
+          "type": "string"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "action": {
+          "type": "string",
+          "const": "recheck"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "readView",
+        "baselineId"
+      ]
+    }
+  ]
+}

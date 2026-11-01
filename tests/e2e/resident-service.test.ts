@@ -170,7 +170,7 @@ test(
       );
       const schema = JSON.parse(f.cli(["api", "--method", "service"]));
       assert(schema.methods.includes("service"));
-      const cli = JSON.parse(f.cli(["service", "status", "--json"]));
+      const cli = JSON.parse(f.cli({"method":"service","params":{"action":"status"}}));
       assert(cli.running && cli.resident);
       // The same data store can be used from a caller with a different source home.
       // The service must honor that caller's Rust-discovered scope.

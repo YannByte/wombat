@@ -79,7 +79,8 @@ test('the root manifest repairs partially synchronized mirrors and preparation i
   assert.match(readme, /\*\*Beta:/);
   assert.match(readme, /--version 0\.2\.0-beta\.1 --plugin/);
   assert.match(readme, /-Version 0\.2\.0-beta\.1 -Plugin/);
-  assert.equal(readme.match(/wombat update --check/g)?.length, 1);
+  assert.doesNotMatch(readme, /wombat system update/);
+  assert.match(readme, /runtime-only updates/);
   assert.match(readFileSync(path.join(root, 'docs/guides/installation.en.md'), 'utf8'), /Node 26\.4\.0/);
 });
 
@@ -112,10 +113,10 @@ test('promotes beta user copy to stable installation and update instructions', t
   assert.match(english, /\*\*Stable:/); assert.match(chinese, /\*\*正式版：/);
   assert.match(english, /install\.sh \| sh -s -- --plugin\n/); assert.doesNotMatch(english, /--version 0\.1\.0/);
   assert.match(english, /install\.ps1\)\)\) -Plugin/); assert.match(chinese, /install\.ps1\)\)\) -Plugin/);
-  assert.match(english, /wombat update --check\n+wombat update/);
-  assert.match(chinese, /wombat update --check\n+wombat update/);
-  assert.equal(english.match(/wombat update --check/g)?.length, 1);
-  assert.equal(chinese.match(/wombat update --check/g)?.length, 1);
+  assert.doesNotMatch(english, /wombat system update/);
+  assert.doesNotMatch(chinese, /wombat system update/);
+  assert.match(english, /runtime-only updates/);
+  assert.match(chinese, /仅更新运行时/);
   assert.doesNotMatch(english, /Update a pre-release|\nold\n/);
   assert.doesNotMatch(chinese, /更新预发行版本|旧文案/);
   prepareVersionFiles(root, '0.1.0');
@@ -140,10 +141,11 @@ test('release copy preserves installer fences and plugin update guidance in the 
     const preview=applyReleaseCopy(file,original,'0.4.0-beta.1');
     assert.match(preview,/```sh\ncurl[^\n]+--version 0\.4\.0-beta\.1 --plugin\n```/);
     assert.match(preview,/```powershell\n& [^\n]+-Version 0\.4\.0-beta\.1 -Plugin\n```/);
-    assert.match(preview,/wombat update --check --version 0\.4\.0-beta\.1\nwombat update --version 0\.4\.0-beta\.1/);
+    assert.doesNotMatch(preview,/wombat system update/);
+    assert.match(preview,chinese?/更新选项和仅更新运行时/:/update options and runtime-only updates/);
     const stable=applyReleaseCopy(file,preview,'0.4.0');
     assert.doesNotMatch(stable,/--version|-Version|Old update copy/);
-    assert.match(stable,chinese?/只更新 Wombat 运行时/:/update only the Wombat runtime/);
+    assert.match(stable,chinese?/仅更新运行时/:/runtime-only updates/);
     assert.match(stable,chinese?/可以更新 Wombat 与 Codex 插件/:/update Wombat and its Codex plugin/);
     assert.ok(stable.endsWith('Retained scope.\n'));
     assert.equal(applyReleaseCopy(file,stable,'0.4.0'),stable);

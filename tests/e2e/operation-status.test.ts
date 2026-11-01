@@ -1,3 +1,4 @@
+import {queryInvocation,spawnProductCli, type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -46,7 +47,7 @@ test('unknown tool outcomes agree in CLI/API, retain fixed views and survive ser
         const before = await nativeTransport.query(query);
         assert.deepEqual(states(before), ['completed', 'failed', 'running', 'unknown']);
         assert.equal(before.summary.tokens.total, 110);
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'steps', '--snapshot', query.snapshotId, '--thread', thread.id, '--turn', turn.id, '--all-time', '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), queryInvocation({"action":"steps","threadId":thread.id,"turnId":turn.id,"snapshotId":query.snapshotId,"scope":{"allTime":true}}, {mode:"auto"}), { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.ifError(cli.error);
         assert.equal(cli.status, 0, cli.stderr + cli.stdout);
         assert.deepEqual(states(JSON.parse(cli.stdout)), states(before));

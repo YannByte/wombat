@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,appendFile,rm} from 'node:fs/promises';
@@ -16,19 +17,19 @@ test('built CLI and native share period drivers, family totals and durable refre
  const binary=path.resolve('dist',process.platform==='win32'?'wombat-core.exe':'wombat-core'),cli=path.resolve('dist/wombat.js');
  let service:ReturnType<typeof spawn>|undefined;
  const stop=async(child:ReturnType<typeof spawn>|undefined)=>{if(!child||child.exitCode!==null||child.signalCode!==null)return;const exit=once(child,'close');child.kill('SIGTERM');const timer=setTimeout(()=>child.kill('SIGKILL'),2000);try{await exit;}finally{clearTimeout(timer);}};
- const run=(args:string[],input?:string)=>{const p=spawnSync(process.execPath,[cli,...args,'--json'],{env,input,encoding:'utf8',timeout:15_000,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
+ const run=(args: CliInput,input?:string)=>{const p=spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, {env,input,encoding:'utf8',timeout:15_000,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
  try{
   service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
   const first=run(['usage','--fresh','--all-time']);
-  const args=['compare','--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--dimension','project','--limit','1'];
+  const args=["usage", "compare",'--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--dimension','project','--limit','1'];
   const compared=run(args);assert.equal(compared.snapshotRef.snapshotId,first.snapshotRef.snapshotId);assert.equal(compared.comparison.delta.tokens,40);assert.equal(compared.page.total,3);assert.equal(compared.comparison.drivers[0].delta.tokens+compared.comparison.remaining.tokens,40);
-  const threads=run(['threads','--all-time']);const id=(name:string)=>threads.items.find((t:{upstreamId:string})=>t.upstreamId===name).id;
-  const family=run(['compare','--thread',id('parent'),'--other-thread',id('other'),'--family','--all-time']);assert.equal(family.comparison.left.own.tokens.total,240);assert.equal(family.comparison.left.descendants.tokens.total,60);assert.equal(family.comparison.left.selected.tokens.total,300);assert.equal(family.comparison.left.memberCount,2);
-  const inspect=run(['investigate','--all-time']);assert.equal(inspect.inspection.candidateCount,0);assert.equal(inspect.snapshotRef.snapshotId,first.snapshotRef.snapshotId);
-  const trajectory=run(['trajectory','--thread',id('parent'),'--all-time']);assert.equal(trajectory.inspection.trajectory.length,2);assert.equal(trajectory.inspection.trajectory[1].uncachedDelta,null);assert.equal(trajectory.inspection.trajectory[1].compactionComparison.inputDifference,40);assert.ok(trajectory.inspection.limitations.includes('context_occupancy_unavailable'));
-  const contexts=run(['context','--thread',id('parent'),'--all-time']);assert.equal(contexts.inspection.context.injectedRecords,1);assert.equal(contexts.inspection.context.records[0].contentVersion,null);
-  const review=run(['review','--since','2026-09-08','--until','2026-09-15']);assert.equal(review.inspection.review.comparison.delta.tokens,40);assert.equal(review.inspection.review.models[0].usage.tokens.total,240);
-  const emptyHistory=run(['account','history']);assert.equal(emptyHistory.history.totalObservations,0,'history must work without a native Codex executable');
+  const threads=run({"method":"usage","params":{"query":{"action":"threads","scope":{"allTime":true}},"mode":"auto"}});const id=(name:string)=>threads.items.find((t:{upstreamId:string})=>t.upstreamId===name).id;
+  const family=run(["usage", "compare",'--thread',id('parent'),'--other-thread',id('other'),'--family','--all-time']);assert.equal(family.comparison.left.own.tokens.total,240);assert.equal(family.comparison.left.descendants.tokens.total,60);assert.equal(family.comparison.left.selected.tokens.total,300);assert.equal(family.comparison.left.memberCount,2);
+  const inspect=run({"method":"usage","params":{"query":{"action":"investigate","scope":{"allTime":true}},"mode":"cached"}});assert.equal(inspect.inspection.candidateCount,0);assert.equal(inspect.snapshotRef.snapshotId,first.snapshotRef.snapshotId);
+  const trajectory=run({"method":"usage","params":{"query":{"action":"trajectory","scope":{"allTime":true,"threadId":id('parent')}},"mode":"cached"}});assert.equal(trajectory.inspection.trajectory.length,2);assert.equal(trajectory.inspection.trajectory[1].uncachedDelta,null);assert.equal(trajectory.inspection.trajectory[1].compactionComparison.inputDifference,40);assert.ok(trajectory.inspection.limitations.includes('context_occupancy_unavailable'));
+  const contexts=run({"method":"usage","params":{"query":{"action":"context","scope":{"allTime":true,"threadId":id('parent')}},"mode":"cached"}});assert.equal(contexts.inspection.context.injectedRecords,1);assert.equal(contexts.inspection.context.records[0].contentVersion,null);
+  const review=run({"method":"usage","params":{"query":{"action":"review","scope":{"since":"2026-09-08","until":"2026-09-15"}},"mode":"cached"}});assert.equal(review.inspection.review.comparison.delta.tokens,40);assert.equal(review.inspection.review.models[0].usage.tokens.total,240);
+  const emptyHistory=run({"method":"account","params":{"action":"history"}});assert.equal(emptyHistory.history.totalObservations,0,'history must work without a native Codex executable');
   await appendFile(path.join(root,'sessions','parent.jsonl'),jsonl([usage('parent','new',10,'2026-09-10')]));
   assert.equal(run(args).snapshotRef.snapshotId,first.snapshotRef.snapshotId,'compare must not refresh');
   const refreshed=run(['usage','--fresh','--all-time']);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
@@ -43,9 +44,9 @@ test('built CLI and native share period drivers, family totals and durable refre
   assert.equal(value.comparison.delta.tokens,50);assert.deepEqual(value.freshness.publicationChange,restored.freshness.publicationChange);
   for(const action of ['investigate','resources','review','context'] as const){const q={action,snapshotId:restored.snapshotRef.snapshotId,scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'}};const response=(await call(q)).result;assert.equal(response.inspection.kind,action);assert.equal(response.summary.tokens.total,250);if(action==='review')assert.equal(response.inspection.review.comparison.delta.tokens,50);}
   const trajectoryValue=(await call({action:'trajectory',snapshotId:restored.snapshotRef.snapshotId,threadId:id('parent'),scope:{allTime:true}})).result;assert.deepEqual(trajectoryValue.inspection.trajectory.map((p:{input:number})=>p.input),[100,140,10]);assert.equal(trajectoryValue.inspection.trajectory[2].uncachedDelta,-130);
-  const parentTurns=run(['turns','--thread',id('parent'),'--all-time','--snapshot',restored.snapshotRef.snapshotId]);
+  const parentTurns=run(queryInvocation({"action":"turns","threadId":id('parent'),"snapshotId":restored.snapshotRef.snapshotId,"scope":{"allTime":true}}, {mode:"auto"}));
   const turn=parentTurns.items[0].id;
-  const exactCli=run(['investigate','--thread',id('parent'),'--turn',turn,'--all-time','--snapshot',restored.snapshotRef.snapshotId,'--compact']);
+  const exactCli=run(queryInvocation({action:'investigate',scope:{threadId:id('parent'),turnId:turn,allTime:true},snapshotId:restored.snapshotRef.snapshotId,compact:true},{mode:'cached'}));
   const exactNative=(await call({action:'investigate',snapshotId:restored.snapshotRef.snapshotId,scope:{threadId:id('parent'),turnId:turn,allTime:true},compact:true})).result;
   assert.deepEqual(exactNative,exactCli);assert.equal(exactNative.summary.tokens.total,250);
   assert.equal(exactNative.scope.turnId,turn);assert.ok(exactNative.inspection.limitations.includes('selected_turn_only'));
@@ -54,6 +55,6 @@ test('built CLI and native share period drivers, family totals and durable refre
   assert.deepEqual(compactUsage.summary,fullUsage.summary);assert.deepEqual(compactUsage.items,fullUsage.items);assert.deepEqual(compactUsage.page,fullUsage.page);
   assert.equal(compactUsage.facets,undefined);assert.ok(compactUsage.quality.detailSummary);
 
-  const bad=spawnSync(process.execPath,[cli,'compare','--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-04','--baseline-until','2026-09-11','--json'],{env,encoding:'utf8',timeout:10_000});assert.equal(bad.status,1);assert.equal(JSON.parse(bad.stdout).error.code,'INVALID_ARGUMENT');
+  const bad=spawnProductCli(cli, ['compare', '--since', '2026-09-08', '--until', '2026-09-15', '--baseline-since', '2026-09-04', '--baseline-until', '2026-09-11', '--json'], {env,encoding:'utf8',timeout:10_000});assert.equal(bad.status,1);assert.equal(JSON.parse(bad.stdout).error.code,'INVALID_ARGUMENT');
  }finally{await stop(service);await rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });

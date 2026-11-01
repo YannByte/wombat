@@ -38,7 +38,7 @@ impl FileMetadata {
     }
 
     #[cfg(not(windows))]
-    fn from_metadata(metadata: fs::Metadata) -> Self {
+    pub(crate) fn from_metadata(metadata: fs::Metadata) -> Self {
         #[cfg(unix)]
         let physical = {
             use std::os::unix::fs::MetadataExt;

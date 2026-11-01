@@ -32,7 +32,7 @@ Checked pages for GPT-5.3-Codex, GPT-5.4, GPT-5.4 Mini, and GPT-5.5 do not list 
 
 ## Updating prices online
 
-`wombat prices --json` returns the current catalog offline; `wombat prices update --json` explicitly updates online. Afterward, `wombat refresh` creates a snapshot with the new catalog; updating never changes old snapshots.
+`wombat call` with method `prices` and action `status` returns the current catalog offline; action `update` explicitly updates online. Afterward, method `snapshot` with action `refresh` creates a snapshot with the new catalog; updating never changes old snapshots.
 
 The fixed source is [OpenAI's official pricing Markdown](https://developers.openai.com/api/docs/pricing.md). This is a document endpoint, not a promised stable dedicated pricing API; `/v1/models` supplies no unit prices. Only standard text tables and Codex rows in dedicated tables are parsed. Batch, Flex, Fast, Ultrafast, multimodal, tool, and other dedicated models with future effective dates are excluded. The parser requires USD per million tokens, an explicit 272K long-context boundary, and complete supported-model coverage. Changes to format, units, thresholds, or required models return `PRICE_SOURCE_CHANGED` until adapted. Missing rates remain null; new models match exact names, while dated aliases retain only verified bundled mappings.
 

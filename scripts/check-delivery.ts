@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import ts from 'typescript';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -14,6 +15,23 @@ export function deliveryErrors(root: string): string[] {
   }
   const metadata = JSON.parse(readFileSync(path.join(root, 'plugin/package.json'), 'utf8'));
   if (JSON.stringify(metadata.skills) !== '["wombat"]') errors.push('plugin/package.json: ship exactly one main Skill');
+  const routing = path.join(root, 'cli/src/command-routing.ts');
+  const source = ts.createSourceFile(routing, existsSync(routing) ? readFileSync(routing, 'utf8') : '', ts.ScriptTarget.Latest, true);
+  let commands: string[] = [];
+  function visit(node: ts.Node): void {
+    if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'commandNames' && node.initializer && ts.isArrayLiteralExpression(node.initializer)) {
+      commands = node.initializer.elements.map(e => ts.isStringLiteral(e) ? e.text : '');
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  if (JSON.stringify(commands) !== '["usage","check","system","api","call"]') errors.push('cli/src/command-routing.ts: expose exactly usage, check, system, api and call');
+  const references = path.join(root, 'plugin/skills/wombat/references');
+  const files = existsSync(references) ? readdirSync(references).filter(f => f.endsWith('.md')).sort() : [];
+  if (JSON.stringify(files) !== '["diagnose.md","query.md","verify.md"]') errors.push('plugin/skills/wombat/references: retain exactly diagnose.md, query.md and verify.md');
+  const main = path.join(root, 'plugin/skills/wombat/SKILL.md');
+  const links = existsSync(main) ? [...readFileSync(main, 'utf8').matchAll(/\]\(references\/([^/)]+\.md)\)/g)].map(m => m[1]).sort() : [];
+  if (JSON.stringify(links) !== JSON.stringify(files) || links.length !== 3) errors.push('plugin/skills/wombat/SKILL.md: link directly to each of the three task references once');
   return errors;
 }
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

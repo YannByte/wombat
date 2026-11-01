@@ -15,7 +15,7 @@ Rust 的 `core/src/usage_app_dto.rs` 定义请求与响应，`adapters/contract.
 
 运行 `corepack pnpm contracts:generate` 重生，`contracts:check` 拒绝漂移。通用客户端校验请求与响应，不提供通用 shell、任意文件写入或任意操作分派。
 
-`outputVersion=5` 是公共结果版本，`schemaVersion=4` 是内部快照版本；来源适配器和价格各有独立版本。内核通信封装为 `{op:"usage_app",args:Request}` → `{ok:true,value:Response}` 或 `{ok:false,error,code,details}`。用量操作为刷新、用量、对话、轮次、步骤；独立价表接口为 `prices`，提供 status/update，响应 `outputVersion=1`。
+`outputVersion=5` 是公共结果版本，`schemaVersion=5` 是内部快照版本；来源适配器和价格各有独立版本。内核通信封装为 `{op:"usage_app",args:Request}` → `{ok:true,value:Response}` 或 `{ok:false,error,code,details}`。用量操作为刷新、用量、对话、轮次、步骤；独立价表接口为 `prices`，提供 status/update，响应 `outputVersion=1`。
 
 公开操作、枚举、分页和错误详见[CLI](../guides/cli.md)。计量整数不能超过 JavaScript 安全整数；金额始终为十进制字符串。新字段及规则必须同时检查生成类型、CLI JSON 和当前快照。
 

@@ -2,247 +2,117 @@
 
 中文 | [English](cli.en.md)
 
-Wombat 默认增量同步本机 Codex 日志，查询增量更新；显式 refresh 另外保存固定快照。当前提供用量、任务、整轮耗时、配置测量与人工处理查询；所有子命令无需 TTY，JSON 使用同一 Rust 查询。
+Wombat 提供五个命令入口。不指定命令时显示用量。查询按需准备本地数据；安装后无需初始化或扫描。明细操作使用生成的 JSON 接口。
+
+## 选择入口
+
+| 入口 | 用途 |
+|---|---|
+| `usage [stats\|compare]` | 用量总计、任务分布与对比 |
+| `check` | 项目检查、明确决策与原条件复查 |
+| `system` | 安装检查、升级、主动预算检查与建议性 Hook 输入 |
+| `api` | 查看本地方法与 Schema |
+| `call` | 执行单个生成的 JSON 请求 |
+
+## 用量与统计
 
 ```sh
-wombat prices --json
-wombat prices update --json
-wombat refresh --root /path/to/codex-home --json
-wombat usage --since 2026-09-23 --until 2026-09-30 --timezone Asia/Shanghai --json
-wombat threads --sort tokens --json
-wombat turns --thread THREAD_ID --sort tokens --json
-wombat steps --thread THREAD_ID --turn TURN_ID --sort time --json
+wombat usage --since 2026-10-01 --until 2026-10-08 --timezone Asia/Shanghai --json
+wombat usage stats --project /absolute/project --since 2026-10-01 --until 2026-10-08 --json
+wombat usage compare --since 2026-10-08 --until 2026-10-15 --baseline-since 2026-10-01 --baseline-until 2026-10-08 --dimension project --json
+wombat usage compare --thread THREAD_ID --other-thread OTHER_THREAD_ID --family --all-time --json
 ```
 
-`--root` 可重复；省略时使用 CODEX_HOME 或 `~/.codex`。同时读取 sessions 与 archived_sessions，显示范围不限制历史采集。刷新不接受查询筛选。
+起始日期包含当天，截止日期不包含当天。时区默认为 UTC。项目、模型、推理强度、Agent 和来源均按精确条件筛选。未知筛选项选择缺失值，不等于零。`--all-time` 包含日期未知记录，不能与日期边界或 `--undated` 同用。项目归属基于观测到的目录，不能按路径子串推断。
 
+`--group day|week|month` 选择日历周期。未指定日期时，day 覆盖最近 30 个日历日，week 覆盖本月及此前五个月，month 覆盖本月及此前十一个月。明确日期优先；未指定日期的任务使用其完整范围。周从星期一开始。事件按自身时间戳及所选时区归属。
 
+`--presentation distribution|details|projects|models` 选择返回分组。明确选择 distribution/details 时按周期分页，每个选中周期保留全部模型行；其他情况按行分页。`--sort time|tokens|cost` 排序用量；`--limit 1..500 --offset N` 默认返回 50 行。总量、占比、类别和分布尺度在分页前按完整匹配范围计算。未知费用排在已知费用之后。
 
-Hook 清单 JSON 提供项目注册观察及插件身份，文本输出也标明插件。注册不代表运行；支持的声明形式与未知状态见[配置契约](../development/contracts.md)。
+统计默认覆盖最近 30 个日历日。均值、中位数和 P90 基于完整任务总量；不完整任务和未归属测量分别保留。所选任务与该总体比较排名。模型总体可能重叠。对比周期必须等长且不重叠。除非明确使用 `--fresh`，对比读取已提交数据。完整任务 ID 通过结构化任务查询获取。
 
+## 检查清理候选
 
-## Agent 接口
+```sh
+wombat check cleanup --project-root /absolute/project --json
+wombat check cleanup --project-root /absolute/project --path target --keep dist --json
+wombat check cleanup recheck --read-view VIEW --baseline BASELINE --item ITEM_ID --json
+```
 
-用 `wombat api --json` 读取当前安装的方法、说明和预算，不扫描数据。用 `wombat api --method usage --json` 读取单个输入 Schema；需要响应字段时附加 `--output-schema`。两种 Schema 均从 Rust 生成，同一运行版本可以复用。
+此检查只读。默认在所选项目及其向下三层的项目目录中，根据支持的项目清单发现构建目录。重复使用 `--path` 可改为检查指定的当前任务临时路径；重复使用 `--keep` 可保留待使用的输出或其他选定材料。相对路径从 `--project-root` 解析，该选项默认为当前目录。添加 `--product-temporary` 可纳入 Wombat 待发布快照的临时目录，不包括已提交快照、索引和恢复代。
+
+结果区分候选、需要判断、保留、无法判断和已不存在的路径，并提供归属、重新生成依据、当前占用观察和逻辑字节数。候选不代表删除授权。缺少使用记录或时间较早不能证明闲置。Codex 检查依赖，并通过可信工具执行已授权的清理；Wombat 仅通过受控操作删除受支持的 Codex 候选。
+
+保留原视图、基线和条目标识，清理前后立即复查所选条目；复查不能扩大范围。条件变化或证据不可用时需重新判断，视图过期需重新检查。原位置不存在不能证明永久删除或释放空间，移入回收站也一样。参见[核心限制](../reference/core.md#artifact-observations)。
+
+```sh
+wombat check cleanup --codex --json
+wombat check cleanup --codex --path /absolute/codex/packages/app-server-daemon --json
+wombat check cleanup apply --read-view VIEW --baseline BASELINE --item ITEM_ID --json
+```
+
+Codex 模式发现受支持的 macOS 缓存、过期暂存内容和旧安装包。检查只读。查看具体候选并获得授权后，apply 仅永久删除明确选择的原 Codex 候选，执行最终检查并在需要时保持安装锁。保留返回的视图、基线和标识，供后续复查使用。不能换用其他删除工具绕过受阻或未知结果。apply 不清理任意项目路径。
+
+## 明细查询
+
+已知 Schema 可直接使用。字段不熟悉时只查看该方法。发现操作在本地执行，不扫描数据，也不调用模型。生成的方法保留历史、导航、消息、耗时、配置、账户、价格、采集、预算、偏好、目录授权和服务控制。已移除的顶层命令不提供别名。
 
 ```sh
 wombat api --method usage --json
 wombat call <<'JSON'
-{"method":"usage","params":{"mode":"auto","query":{"action":"threads","scope":{"project":"/absolute/project","since":"2026-10-01","until":"2026-10-08","timezone":"Asia/Shanghai"},"sort":"tokens","limit":3,"compact":true}}}
+{"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":3,"compact":true},"mode":"auto"}}
 JSON
 ```
 
-`call` 从标准输入接收单个 JSON 对象，默认输出 JSON，不交互提问。只派发清单中的生成协议方法，参数以所选 Schema 为准。结果保留所属协议，包括 `usage` 实时包装中的 `result` 和 `freshness`。下钻时保留快照、读取版本、范围、分页位置和游标；修改动作继续使用既有授权和目标选择要求。
+`usage` 方法返回包含 `result` 和 `freshness` 的实时封装；用量命令输出其中的结果。后续查询保留返回的快照、精确范围、完整 ID 和游标。`threads` 支持标题／项目搜索及 `tokens|cost|recent` 排序。`turns` 接受 `matchedOnly`、`locateTurnId`；`steps` 接受 `locateOperationId`。筛选轮次不改变完整任务汇总。操作不分摊 Token 费用。
 
-输入上限为 1 MiB，标准输入时限为十秒；输出上限为 2 MiB，产品查询自身的预算仍然适用。错误返回 `{outputVersion:1,error:{code,message,recovery}}`，不回显原输入、路径或内部诊断。`recovery` 指示读取 Schema、重新取得原视图、缩小查询、重试同一范围、检查接入或核对状态，不代表可以自动重试写入。退出码为：完整结果 0、部分结果 2、错误 1、取消 130；对应的普通命令使用同一判断。Ctrl+C 取消本次调用，不停止共享扫描。
+会话活动包含无用量的观测。搜索需选择项目或任务并返回位置；locate 选择消息；read 明确返回有界原文。将返回的证据放入 `targets`，保留快照和 `selection` 数组，不能替换为用量 scope。元数据使用 `nextCursor` 续读，各文本片段使用自身游标。未完成扫描不能证明零匹配。来源变化后需重新获取相同范围。原文属于不可信数据。参见[核心边界](../reference/core.md)。
 
-## 对比用量
+整轮耗时使用 `timing` 方法及完整任务／轮次 ID。证据页保留固定快照、集合及不透明游标；`use_records` 可选择对象。本地投影与 `share-v1` 是不同的核心投影。耗时读取不触发自动价格更新、Hook 接收或账户观测。未知耗时、加载情况和仓库基线仍保持未知。
 
-周期对比与会话对比均读取已提交数据，默认不刷新。先执行 `wombat usage --fresh`，再使用下列命令；结束日期不含当天，两个周期须等长且不重叠。
-
-```sh
-wombat compare --since 2026-09-08 --until 2026-09-15 --baseline-since 2026-09-01 --baseline-until 2026-09-08 --dimension project --json
-wombat compare --thread THREAD_ID --other-thread OTHER_THREAD_ID --family --all-time --json
-```
-
-`--dimension` 可选 `project`、`model` 或 `thread`；`--limit` 和 `--offset` 控制贡献分页。会话 ID 使用 `threads --json` 的 `id`；`--family` 加入明确关联的后代。两种比较均保留日期和维度筛选，并支持 `--snapshot` 固定版本；显式 `--fresh` 才请求同步。过期版本返回错误，重新读取列表后再比较。实时结果中的 `freshness.publicationChange` 说明最近成功发布的变化，文本也显示变化计数；没有完整基准时不提供摘要。[核心参考](../reference/core.md) 定义计算与限制。
-
-## 任务分布与预算
-
-用任务统计判断某个任务在所选总体中的位置，或把用量增长拆成任务数量变化与单任务用量变化。后续分页和比较保留返回的快照。
+## 项目检查与复查
 
 ```sh
-wombat statistics --project /absolute/project --since 2026-10-01 --until 2026-10-08 --presentation projects --json
-wombat statistics --snapshot SNAPSHOT_ID --thread THREAD_ID --since 2026-10-01 --until 2026-10-08 --json
-wombat statistics --snapshot SNAPSHOT_ID --since 2026-10-01 --until 2026-10-08 --baseline-since 2026-09-24 --baseline-until 2026-10-01 --presentation models --json
-wombat monitor set --id project-week --period week --tokens 1000000 --review --project /absolute/project --timezone Asia/Shanghai --json
-wombat monitor check --id project-week --json
-wombat monitor watch --id project-week --interval 60 --json
-wombat monitor list --json
-wombat monitor acknowledge --notification NOTIFICATION_ID --json
-wombat monitor remove --id project-week --json
+wombat check list --project-root /absolute/project --json
+wombat check inventory --project-root /absolute/project --json
+wombat check checks --item ITEM_ID --read-view READ_VIEW --json
+wombat check recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /absolute/project --json
 ```
 
-任务统计默认选择最近30个自然日；`--all-time` 选择全部可用日期。项目或模型分组接受 `--limit` 与 `--offset`，总体覆盖完整范围。`--thread` 选择的任务与该总体比较。完整任务总量用于均值、中位数和 P90；不完整任务及未归属计量单独保留。一个任务使用多个模型时，各模型总体可以重叠。等长且不重叠的比较周期保留其他筛选。[核心参考](../reference/core.md)拥有计算方法与限制。
+`--root` 选择来源日志；`--project-root` 选择配置。清单支持类型、观测、搜索、排序和分页；默认 50 条，最多 200 条。详情、证据和关联范围保留 `--item` 与 `--read-view`。复查保留原始来源／项目根目录、范围、规则、读取视图和基线 ID。只有 `miss` 且 `comparison.status=comparable` 才能证明原检查通过。缺失或过期证据不能证明修复。
 
-监控计划保存身份筛选、时区、自然周期及可选 Token 阈值。`--review` 同时请求最近一个已结束周期的统计。`--disabled` 保存暂停的计划；重复使用其 ID 可修改设置。预警默认在阈值的80%触发，可用 `--warning 0.9` 调整。这是用户预算，与账户额度独立。`check` 检查全部启用计划，`--id` 可选择一个；重复 `--root` 可选择来源。检查近期固定视图时使用 `--snapshot ID --id PLAN_ID`，不附加来源根目录。视图过期后，按原范围重新检查。
+检查和复查只读。Codex 负责已授权的项目修改和测试。只有明确的 `keep` 或 `not-applicable` 才写入用户决策，需提供建议、读取视图、理由和决策版本。决策在索引重建后保留。不创建自动采纳跟踪、审核历史或总体评分。文件读取不能证明 Skill 调用；关联轮次用量不属于配置独占费用。
 
-`watch` 在命令运行期间检查，只输出新提醒。它不安装后台服务或发送消息；Ctrl+C 以退出码130结束。`--interval` 接受5—3600秒。监控需要运行中的宿主，来源日志记录用量后才能检测阈值。不完整事实可以证明越过阈值，不能证明剩余预算。确认状态与原始事实分开保存。周期复盘覆盖最近一个已结束周期，不补齐所有错过的周期。
+## 同步与保存快照
 
-## 使用检查与复盘
+普通用量查询最多等待两秒；`--fresh` 最多等待十秒。`--wait-ms 1..600000` 隐含 fresh，并修改本调用的期限。`--cached` 读取已提交数据，不扫描来源。`--watch --json` 在结果变化时输出 NDJSON。Ctrl+C 取消本调用，不停止共享扫描。`--root` 可重复，默认使用 CODEX_HOME 或 `~/.codex`。根目录不继承其他窗口的选择。来源始终只读。
 
-先读取或更新用量，再用返回的 `snapshotRef.snapshotId` 固定以下查询；默认仅读取已提交数据，不主动同步。
+fresh 读取不保存快照。明确保存快照使用 `snapshot` 方法、`refresh` 动作；完整前缀校验使用 `usage` 方法，query 动作为 `refresh` 并设置 `verify:true`。后续读取可固定保存或实时视图。保存快照绑定原来源目录。未知版本直接拒绝，不迁移或删除。`usage --rebuild --wait-ms 600000 --json` 明确重建派生数据，保留用户记录，且仅在发布成功后切换原数据库。参见[格式恢复](../reference/cli.md#unsupported-formats-and-recovery)。
+
+## 本机宿主与可选接入
 
 ```sh
-wombat investigate --snapshot SNAPSHOT_ID --all-time --limit 3 --compact --json
-wombat investigate --snapshot SNAPSHOT_ID --thread THREAD_ID --turn TURN_ID --all-time --compact --json
-wombat context --snapshot SNAPSHOT_ID --all-time --json
-wombat trajectory --snapshot SNAPSHOT_ID --thread THREAD_ID --all-time --json
-wombat resources --snapshot SNAPSHOT_ID --project /absolute/project --all-time --json
-wombat review --snapshot SNAPSHOT_ID --since 2026-09-08 --until 2026-09-15 --json
-wombat steps --snapshot SNAPSHOT_ID --thread THREAD_ID --turn TURN_ID --locate-operation OPERATION_ID --json
-wombat account history --json
+wombat system doctor --json
+wombat system doctor --plugin --project /absolute/project --json
+wombat system update --check
+wombat system watch --once --id PLAN_ID --json
+wombat system watch --id PLAN_ID --interval 60 --json
 ```
 
-复盘不接受分页；省略日期时选择固定视图截止日期所在周，周一开始。其他检查可用 `--limit` 和 `--offset`，并保留同一范围。使用返回的完整证据身份下钻；操作不存在时返回 `NOT_FOUND`，视图过期时重新取得原范围并按身份定位。额度历史无需原生进程，只读取已保存的观测。阈值、统计口径及预算由[核心参考](../reference/core.md)维护；检查线索不能证明浪费，输入不是上下文占用，变更报告不是已验证的文件变化。
+普通 doctor 检查安装，不发现项目 Skill。添加 `--plugin` 检查所选 Skill；仅在需要原生注册证据时添加 `--hooks`。这些检查不安装内容，也不调用模型。查询不以这些检查为前提。update 只更新运行时；插件安装由[插件指南](plugin.md)说明。
 
-## Codex Skill
+使用 `call` 的 `service`、`monitor`、`account`、`prices`、`directories`、`collection`、`preferences` 方法执行其生成的动作。服务控制保留状态、暂停／恢复、停止及明确的自动启动启用／禁用。同一数据目录共享一个核心服务。启动和文件通知不在无请求时建立索引。预算计划使用身份筛选、时区及日历周期；部分用量可证明越限，不能证明剩余额度。账户额度、用户预算与 API 等价费用分别保留。目录授权需要明确选择路径和用途。
 
-通过[安装指南](installation.md)安装唯一的插件，在项目新对话中调用 `$wombat:wombat`。只检查发现与运行时：
+`system watch` 运行期间重新加载启用的计划，只输出新通知。`--once` 执行一次 fresh 检查；`--interval` 接受 5..3600 秒。它不安装服务，也不发送消息。Ctrl+C 返回 130。临时错误输出到 stderr 并在下一轮重试；无效输入直接失败。固定视图检查通过 `monitor` 方法传入快照和计划 ID。确认记录与事实分别保存；周期复盘只覆盖最近结束的周期。
 
-```sh
-wombat setup --project /path/to/project --json
-```
+采集偏好作用于整台机器；状态／事件可按授权来源和项目身份筛选。日志模式忽略新 Hook 输入并保留数据。Hook 模式不能证明注册、加载或信任；不随产品分发 Hook 插件或桥接程序。暂停最多保留 4,096 条缓冲观测，总计不超过 100,000 条。被拒收的输入不能证明完整覆盖。`system hook codex` 在四秒内接受最多 64 KiB，不输出 stdout，建议性接收失败也返回 0。它不能控制权限或提供模型上下文。
 
-默认不查询可选 Hooks；需要时加 `--hooks`。
+除非设置 WOMBAT_AUTO_PRICES=0，实时查询可自动补全缺失的官方价格。缓存或固定视图读取不触发更新。通过 `call` 明确执行 `prices` 更新可绕过重试间隔；失败保留原价格。新视图使用更新价格，旧快照金额不变。参见[价格说明](../reference/pricing.md)。
 
-## 语言
+## 输出与恢复
 
-使用 `--lang zh` 或 `--lang en` 选择展示语言；也可设置 `WOMBAT_LANG`。JSON 字段与原始内容保持不变，完整优先级见[产品语言](../i18n/product.md)。
+使用 `--lang en|zh` 或 WOMBAT_LANG 选择语言。来源内容和协议值保持原样。JSON 输出到 stdout，进度及监视错误输出到 stderr。`call` 在十秒内接受最多 1 MiB 的单个对象，最多输出 2 MiB。`api --output-schema` 提供生成的输出契约。错误恢复可能需要 Schema、原视图、更窄的查询或运行时检查；恢复提示不授权重复写入。
 
-## 自动同步
+`--compact --json` 将质量详情中每个保留列表的示例限制为三条并省略分面，同时保留完整汇总计数、总量及请求行。移除此项返回完整详情。资源受限时在相同视图与筛选条件下缩小到所选轮次。样本不能证明完整任务排名。金额为十进制字符串；Token 为安全整数或 null。未知或不完整金额单独保留 `knownCost`。上报费用不叠加到 API 等价费用。
 
-- 普通查询默认同步，最多等2秒；有旧结果时返回并公开 `freshness`，尚无数据时返回 `SYNC_PENDING`。首次大目录建库可能需要更久。
-- `--fresh` 等待本次同步，最长10秒；失败或超时明确报错。`--cached` 不触发来源扫描，返回已提交索引；没有索引时报错。
-- `usage --watch --json` 输出逐行 JSON，版本、日期范围或状态改变时发出结果；Ctrl+C 退出130。普通 `--json` 仍只输出一个对象。
-- `refresh --verify` 完整重读来源再保存快照，用于核验追加快速路径无法证明的历史前缀改写。正常 refresh 利用增量游标。
-- `--snapshot ID`固定当前快照，后续分页继续传同一snapshotId，不能重新解析latest。未知格式明确拒绝。
-- `--root` 可用于实时查询；每次省略时仍使用默认 Codex 来源，不会因为另一窗口指定根而改变。固定用量快照不能同时指定来源根；耗时查询的来源根用于将请求范围绑定到固定版本。
-
-同一数据目录共用 Rust 服务。查询才触发索引，服务启动、文件通知和空闲时间都不触发。`usage --watch` 是用户主动开启的重复查询。计量以完整日志记录为准，模型尚未写入的 Token 无法即时显示。服务生命周期及资源限制归[内核参考](../reference/core.md)所有。
-
-## 查询服务控制
-
-```sh
-wombat service status --json
-wombat service pause --json
-wombat service resume --json
-wombat service stop --json
-wombat service start --json
-wombat service disable --json
-wombat service enable --json
-```
-
-`status` 分别报告运行实例、准备进度、已提交数据是否就绪及自动启动配置。`pause` 在当前事务边界生效，仍可查询已有数据；`resume` 允许后续查询更新索引，本身不准备数据。`stop` 有界等待当前实例退出，后续查询或登录仍可能启动它。`disable` 移除当前用户的自动启动配置并停止服务，`enable` 注册并启动服务。自动启动需要受管安装及可用的原生用户会话管理器。
-
-## 整轮耗时
-
-```sh
-wombat timing --thread THREAD_ID --turn TURN_ID
-wombat timing summary --thread THREAD_ID --turn TURN_ID --text --lang en
-wombat timing --thread THREAD_ID --turn TURN_ID --snapshot SNAPSHOT_ID --share
-wombat timing evidence --thread THREAD_ID --turn TURN_ID --snapshot SNAPSHOT_ID --limit 50
-wombat timing evidence --thread THREAD_ID --turn TURN_ID --snapshot SNAPSHOT_ID --limit 50 --cursor OPAQUE_TOKEN
-wombat timing capabilities
-```
-
-`timing` 与 `timing summary` 等价，默认输出一个最终 v6 JSON 对象；`--text` 选择本地化文本，不能与 `--json` 同用。使用任务查询返回的完整 Wombat 任务和轮次身份。缺失值在 JSON 中保留 null，文本说明所需记录或可用范围；原生耗时、派生耗时、原生 TTFT 与首条内容记录延迟分别展示。区间并集与累加可能重叠，不能相加。
-
-摘要支持重复 `--root`、`--source`，以及 `--fresh` 或 `--cached` 之一。`--snapshot` 固定结果，不能与 `--fresh` 同用；固定版本同时指定来源根或来源时，必须匹配该版本的授权范围。后续证据页使用结果返回的快照身份；缺失或过期版本不会退回 latest。证据只支持本机投影，要求固定快照与相同目标和范围，接受 `--limit 1..200`（默认50）及原样传回的 `nextCursor.token`，不接受刷新模式。分页不改变整轮摘要。能力查询只接受输出、语言选项和可选 `--share`，不执行扫描；它报告解析器支持，不能证明某轮次实际存在这些字段。
-
-`--share` 请求 Rust 独立的安全摘要投影，CLI 不从本机 JSON 删除字段拼成分享结果。耗时查询绕过自动补价、配置扫描、Hook 采集和账户观察，拒绝日期、Token、金额、offset、compare、watch 参数。达到资源上限时，结果仍可保留已验证原生标量，受影响的派生值省略并说明计算限制。
-
-摘要在内核标明已检查范围完整时退出0，即使可选字段未记录；部分或暂定结果退出2。证据导航和能力查询成功时退出0，不据此证明整轮完整。错误退出1，取消退出130；JSON 错误使用 `{outputVersion:1,error:{code,message}}` 本地化安全模板，包括 NOT_FOUND 和 VIEW_EXPIRED，不输出来源路径或底层错误详情。状态写 stderr；Ctrl+C 取消本次调用，不终止共享同步。真实内核与 CLI 验收使用 `corepack pnpm verify:e2e`；结果只覆盖所选平台与范围。
-
-## 官方价表
-
-实时查询发现可补齐的缺价会自动检查官方价表；失败保留现有结果并返回 `priceUpdate`。失败15分钟、成功24小时内不重复下载；设置 `WOMBAT_AUTO_PRICES=0` 可关闭自动联网，`--cached` 和 `--snapshot` 始终不触发自动更新。手动 `prices update` 不受自动重试间隔限制。
-
-`prices`（或 `prices status`）离线查看当前完整价表；`prices update` 从固定官方地址联网下载并校验，默认输出简要结果，`--json` 返回 `outputVersion:1`、action、origin、updated、source、sourceHash、catalogHash和完整catalog。价格响应/错误版本独立于用量v5；错误仍为`{outputVersion:1,error:{code,message}}`，退出码1或取消130。常见失败包括PRICE_FETCH_FAILED、PRICE_SOURCE_CHANGED、PRICE_CACHE_INVALID、OUTPUT_LIMIT、TIMEOUT和UPDATE_BUSY。
-
-更新成功后，下一次实时同步按新价表生成完整读取版本；执行`refresh`可另存快照，旧快照金额保留。更新不支持自定义URL、导入路径或用量筛选。网络范围、代理、支持模型表与保存规则见[价格口径](../reference/pricing.md#联网更新价表)。
-
-## 筛选与分页
-
-- `usage --group day|week|month`：省略日期时，day 默认近30个自然日，week 默认本月及之前5个月，month 默认本月及之前11个月，均截止今天（响应 until 为明天，不包含）。显式 since/until 优先，切换分组不改变手动范围；限定任务且省略日期时展示该任务全部范围。周一起始；按事件时间及所选时区归日。
-- `--since` 包含起日，`--until` 不包含截止日；`--all-time` 包含日期未知，不能与日期或 --undated 同用。缺省时区 UTC。
-- `--model`、`--effort`、`--project` 精确匹配；项目是已观察到的目录证据，不是路径子串。`--model-unknown`、`--effort-unknown`、`--undated` 分别筛选缺失模型、强度和日期，不能与对应具体值或日期范围同时指定。
-- `threads --search TEXT` 搜索标题或项目，`--sort tokens|cost|recent`，按匹配用量或最近匹配计量排序；轮次与步骤使用 `tokens|cost|time`。
-- `--snapshot ID`固定当前快照，后续分页继续传同一snapshotId，不能重新解析latest。未知格式明确拒绝。
-- `usage --presentation distribution|details`：默认 details 保持分类明细；distribution 只返回时段小计。显式指定此参数时按日期组分页，limit 是时段数，明细保留该时段的全部模型行；省略时维持逐行分页。`--sort time|tokens|cost` 按日期倒序或消耗倒序；完整范围的 distribution 刻度、峰值筛选、未计价 Token 与金额占比在分页前计算，未知金额排在已知金额之后。
-- `--limit 1..500 --offset N`，默认50。完整范围排序、金额、分类、占比均在分页前计算。
-
-## JSON
-
-`--compact --json` 将质量详情中保留的各列表限制为三个例子，并省略 facets；`quality.detailSummary` 保存完整问题数、来源数、分类计数及省略详情数。总量、请求行、分页、范围和快照保持不变；去掉 `--compact` 可读取完整详情。`--limit` 只控制返回分页，不减少整任务计算。遇到 RESOURCE_LIMIT 时，用 `turns --matched-only` 选择轮次，再以同一快照与筛选检查该轮。单轮发现不代表整任务排行。
-
-
-用量使用 `outputVersion: 5`。成功对象包含 action、snapshotRef、scope、availableRange、summary、items、page、quality。运行时对生成 Schema 校验，未知参数拒绝。普通查询 stdout 只有一个最终 JSON 对象，watch为NDJSON；状态说明写stderr。实时结果另有freshness，status区分current、syncing、stale、failed和fixed，checkedAt为最后成功检查时间；current只表示已处理本次观察到的日志范围。
-
-金额为十进制字符串；Token 为安全整数或 null。`price.cost=null` 表示金额不完整，`knownCost` 为已知小计，status 区分 priced、partial、unknown。缺失不是零，reportedCost 不与标准折算相加。不能从已显示的两位金额重新求和。
-
-任务返回 matchedUsage 与 threadUsage。轮次默认覆盖完整任务，matchedUsage 保留来处条件；turns 可加 --matched-only 仅返回有匹配计量的轮次，--locate-turn ID 定位其所在页（定位成功优先于 offset，否则使用 offset）。筛选轮次不改变完整任务汇总。轮次份额分母为完整任务，步骤份额分母为完整轮次。操作没有独占计量，不显示费用。`unassigned` 承载任务内未归轮记录。
-
-退出码：0 成功或空范围；2 有结果但读取不完整或未确认同步完成；1 错误；130 取消。错误结构为 `{outputVersion:5,error:{code,message}}`，常见 code 包括 INVALID_ARGUMENT、NO_SNAPSHOT、SOURCE_UNREADABLE、SNAPSHOT_CORRUPT、UNSUPPORTED_VERSION、UPDATE_BUSY、CANCELLED、RESOURCE_LIMIT、DETAIL_UNAVAILABLE。部分结果仍可用返回的固定快照继续查询。
-
-## 旧版迁移
-
-仅读取当前 usage-v4 快照（schema4）；用量 JSON v5 与耗时 JSON v6 是独立输出格式。未知版本拒绝并保留已有文件和用户记录。不提供迁移或旧命令/输出兼容。已退出的scan/report/checkup/quota/codex/observe/compare命令不留占位入口。
-
-
-## 只读配置
-
-`--project-root` 明确选择项目配置根，`--root` 选择 Codex 来源根。
-
-`wombat optimize inventory --json` 提供同口径无TTY查询。使用 `--kind rule|skill|mcp`、`--observation used|loaded_only|unknown`、`--search`、`--sort tokens|activity|size|name|content_tokens|characters|recent` 筛选排序；`--limit` 默认50、最多200，`--offset` 从0开始。`--since` / `--until` 为包含起日、不含止日，`--timezone` 默认UTC。
-
-详情和证据使用 `--action detail|evidence|related_scopes --item ID --read-view VERSION`；创建版本时可传 `--snapshot live:…` 固定用量。继续查询须保留相同来源根和项目根参数；版本过期时重新查询清单。`--thread ID` 只列出该任务有证据关联的配置。`--action capabilities` 不扫描配置。完整参数见 `wombat optimize inventory --help`。
-
-返回配置v1 JSON；当前历史覆盖不完整时退出码2仍包含可用结果，参数/服务错误为1，取消为130。文件读取不算Skill调用，关联Token不是配置独占费用，全文内容Token使用固定基准，静态建议与人工复查已接入，来源修改仍关闭。范围和数据含义见[配置契约](../development/contracts.md)。
-
-## 静态建议与人工复查
-
-```sh
-wombat optimize list --project-root /path/to/project --json
-wombat optimize detail --suggestion SUGGESTION_ID --read-view READ_VIEW --json
-wombat optimize checks --item ITEM_ID --read-view READ_VIEW --json
-wombat optimize keep --suggestion SUGGESTION_ID --reason necessary --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /path/to/project --json
-```
-
-保留原授权根、项目/来源范围与规则参数，以及结果中的 `readView` 和建议的 `baselineId`。Codex 在获得授权后编辑文件；复查返回原问题的独立 `checks`。只有 `miss` 且 `comparison.status=comparable` 才能证明该检查通过；证据不足或不可比较不能当作修复成功。视图过期后重新检查，不能补造原基线。
-
-检查与复查不写处理历史。只有显式 `keep` 或 `not-applicable` 保存用户决定；后者原因使用 `object_changed` 或 `incorrect_evidence`。决定绑定原问题与证据版本，索引重建保留。列表支持 `repair`/`trim`、分页上限 200，默认 50。没有历史、重新显示、采用跟踪或交接发送接口。
-
-配置证据使用 `optimize inventory --action evidence --item ITEM_ID --read-view READ_VIEW`，返回的 `usageRevision`、任务与轮次位置可继续查询。关联轮次用量不代表配置独占费用。优化响应版本为 5；配置响应仍为 1。证据不足退出 2，错误退出 1，取消退出 130。能力目录只列出实际实现规则。
-
-## 本机账户观察
-
-```sh
-wombat account --json
-wombat account history --json
-```
-
-账户额度、API 等价金额和本地 Token 分别报告，不推断项目独占额度消耗。Wombat 不创建 Codex 任务；需要时由 Codex 使用原生任务工具传递选定证据。
-
-## 接入与采集
-
-`wombat setup --project /path/to/project --json` 检查原生发现与注册，分别保留各项状态。结果包含完整 Codex 版本、Wombat 运行版本，以及实际发现实例的能力声明和内容校验；文本输出也显示部分失败的错误码。查看日志无需信任 Hook；Skill 可用且兼容后，可在新的 Codex 对话中提问。此命令不安装、不信任、不读取账户凭据、不调用模型。`--root` 选择来源目录。缺少 Skill 不影响查看已有数据。
-
-```sh
-wombat collection status --json
-wombat collection mode hooks --json
-wombat collection events --project /path/to/project --limit 50 --json
-wombat collection pause --json
-wombat collection resume --json
-wombat collection mode logs --json
-wombat usage --watch --json
-```
-
-偏好作用于本机；`--project` 和可重复的 `--root` 只筛选状态与事件。logs 模式忽略新 Hook 输入并保留数据；hooks 模式允许安全接收，不证明注册或信任。安装[本地采集插件](plugin.md)，再在 Codex `/hooks` 中审查声明。POSIX 桥接使用受管启动器或 Codex PATH；Windows 仍未验收。移除插件不删除观察。
-
-暂停最多保留 4,096 条安全观察，恢复后可用；历史仍可查看。最多保留 100,000 条观察，已知溢出和身份冲突计入缺口。缺少原生身份时保持未知；输入拒绝和运行时失败不计入已存缺口，不声称无损投递或完整覆盖。来源事件时间可能缺失，与接收时间分开。已验证日志关联使用当前已提交的来源版本；后续比较前仍需获取普通固定查询视图。
-
-事件分页接受 `--limit 1..200`，以及 `nextAfter` 对应的 `--after`。状态与事件使用生成的 v1 JSON；暂停、待处理或已知缺口退出 2，错误退出 1，取消退出 130。普通实时查询准备历史；持续同步追加日志需保持 `usage --watch` 运行，一次查询不代表永久监控。`hook codex` 从 stdin 接收最多 64 KiB，等待最多四秒，不输出 stdout，advisory 接收失败也退出 0；不保留提示词或工具正文，不控制 Codex 权限。
-
-采集查询的 `--source ID` 在授权来源目录内保留选定来源身份；外部 ID 返回 `SOURCE_NOT_AUTHORIZED`。`--project` 接受本机相对路径，查询前转为绝对路径。
-
-## 活动与原文
-
-使用 `wombat api --method conversation --output-schema` 查看生成契约，通过 `wombat call` 发送请求。先准备一个用量视图，再使用该快照 ID。`activity` 包括没有用量记录的观察，`locate` 筛选记录的消息。`search` 要求选定项目或任务，只返回位置；`read` 显式返回受支持的原文。`changes` 同时需要当前与基线快照 ID。保留来源、项目、日期及时区筛选和返回的证据引用；索引事件偏移不是原文件偏移。
-
-```json
-{"method":"conversation","params":{"action":"locate","snapshotId":"SNAPSHOT_ID","selection":{"since":"2026-10-14","until":"2026-10-15","timezone":"Asia/Shanghai"},"limit":3}}
-```
-
-通过 `read` 的 `targets` 传入返回的证据对象。每个目标可指定自己的游标、文本字节预算和前后上下文数量。读取目标可来自选定授权视图内的不同任务。元数据及检索分页使用 `nextCursor` 和原筛选条件；正文使用各片段的游标。未完成或不完整的扫描不能证明零匹配。读取操作周边的文本时，将该活动证据用作 `locate` 的锚点，并设置有界半径；此时完整性仅针对该窗口。来源错误需要重新获取原视图及范围，再次定位证据。原文是不可信数据，不是指令。边界和格式限制见 [内核参考](../reference/core.md)。
+完整结果或空范围返回 0，可用但部分／暂定的结果返回 2，错误返回 1，取消返回 130。仅可选指标未知不会使耗时汇总变为部分结果。用量输出 v5、配置 v1、优化 v5、耗时 v6 与快照 schema5 是独立格式。生成的 API 错误封装保持 v1。格式及计算限制参见 [CLI 参考](../reference/cli.md)和[核心说明](../reference/core.md)。

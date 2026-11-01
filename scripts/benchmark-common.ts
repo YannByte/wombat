@@ -23,9 +23,9 @@ export function positiveInteger(name: string, fallback: number): number {
   return value;
 }
 
-export function run(program: string, args: string[], env = process.env, timeout = 120_000): { stdout: string; stderr: string; wallMs: number } {
+export function run(program: string, args: string[], env = process.env, timeout = 120_000, input?: string): { stdout: string; stderr: string; wallMs: number } {
   const start = performance.now();
-  const result = spawnSync(program, args, { env, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnSync(program, args, {input, env, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
   if (result.error || result.status !== 0) {
     throw new Error(`${program} ${args[0] ?? ''} failed (${result.status}): ${result.error?.message ?? ''} ${result.stdout?.slice(-1500) ?? ''} ${result.stderr?.slice(-1500) ?? ''}`);
   }

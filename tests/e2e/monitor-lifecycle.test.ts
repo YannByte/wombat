@@ -43,7 +43,7 @@ test('monitor thresholds, late reviews and acknowledgement survive restarts and 
     await f.stop();
     await rm(path.join(f.data, 'live-v2'), { recursive: true, force: true });
     await f.start(); await snapshot();
-    const restored = JSON.parse(f.cli(['monitor', 'list', '--json']));
+    const restored = JSON.parse(f.cli({method:'monitor',params:{action:'list'}}));
     assert.deepEqual(restored.plans, before.plans); assert.deepEqual(restored.notifications, before.notifications);
     assert.equal((await check()).notifications.length, 0); assert.equal((await check('review')).notifications.length, 0);
     await nativeApi.monitor!({ action: 'remove', id: 'budget' });
@@ -67,15 +67,15 @@ test('partial measured usage can prove a budget crossing without claiming a comp
   await withLocalProduct(async f => {
     const at = new Date().toISOString().slice(0, 10) + 'T00:01:00Z';
     await f.write('task', [row('session_meta', { id: 'task', cwd: f.project }, at), row('turn_context', { turn_id: 'turn', model: 'gpt-5.4' }, at), measurement('task', 'known', 100, at), measurement('task', 'missing', null, at)]);
-    f.cli(['monitor', 'set', '--id', 'partial', '--period', 'day', '--tokens', '100', '--project', f.project, '--timezone', 'UTC', '--json']);
-    const checked = JSON.parse(f.cli(['monitor', 'check', '--id', 'partial', '--root', f.root, '--json'], '', 2));
+    f.cli({method:'monitor',params:{action:'upsert',plan:{id:'partial',enabled:true,period:'day',tokenLimit:Number('100'),review:false,scope:{project:f.project,timezone:'UTC'}}}});
+    const checked = JSON.parse(f.cli(['system','watch','--once','--id','partial','--root',f.root,'--json'], '', 2));
     const notice = checked.notifications[0]; assert.equal(checked.notifications.length, 1);
     assert.equal(notice.kind, 'budget_exceeded'); assert.equal(notice.partial, true);
     assert.equal(notice.summary.tokens.total, null); assert.equal(notice.summary.tokenAnalysis.totalAnalysis.subtotal, 100);
     assert.equal(notice.statistics.population.incompleteTasks, 1); assert.equal(notice.statistics.population.completeTasks, 0); assert.equal(notice.statistics.population.meanTokens, null);
     const nativeApi = await f.native();
     const listed = await nativeApi.monitor!({ action: 'list' }); assert.deepEqual(listed.notifications[0], notice);
-    const repeated = JSON.parse(f.cli(['monitor', 'check', '--id', 'partial', '--root', f.root, '--json']));
+    const repeated = JSON.parse(f.cli(['system','watch','--once','--id','partial','--root',f.root,'--json']));
     assert.equal(repeated.notifications.length, 0);
   });
 });
@@ -84,8 +84,8 @@ test('Agent monitor watch detects newly appended usage, stays quiet on repeats a
   await withLocalProduct(async f => {
     const at = new Date().toISOString().slice(0, 10) + 'T00:01:00Z';
     await f.write('task', [row('session_meta', { id: 'task', cwd: f.project }, at), row('turn_context', { turn_id: 'turn', model: 'gpt-5.4' }, at), measurement('task', 'initial', 79, at)]);
-    f.cli(['monitor', 'set', '--id', 'watch', '--period', 'day', '--tokens', '100', '--project', f.project, '--timezone', 'UTC', '--json']);
-    const child = spawn(process.execPath, [f.entry, 'monitor', 'watch', '--id', 'watch', '--root', f.root, '--interval', '5', '--json'], { env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    f.cli({method:'monitor',params:{action:'upsert',plan:{id:'watch',enabled:true,period:'day',tokenLimit:Number('100'),review:false,scope:{project:f.project,timezone:'UTC'}}}});
+    const child = spawn(process.execPath, [f.entry, 'system', 'watch', '--id', 'watch', '--root', f.root, '--interval', '5', '--json'], { env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
     const exiting = once(child, 'exit');
     let stdout = '', stderr = '';
     child.stdout.on('data', chunk => { stdout += chunk; if (stdout.length > 262_144) child.kill('SIGKILL'); });
@@ -102,7 +102,7 @@ test('Agent monitor watch detects newly appended usage, stays quiet on repeats a
       await delay(6_000); assert.equal(stdout.trim().split('\n').length, 1, 'Unchanged checks must not repeat notifications');
       child.kill('SIGTERM'); const [code, signal] = await exiting;
       assert.equal(code, 130, stderr); assert.equal(signal, null);
-      const persisted = JSON.parse(f.cli(['monitor', 'list', '--json']));
+      const persisted = JSON.parse(f.cli({method:'monitor',params:{action:'list'}}));
       assert.equal(persisted.notifications.length, 1); assert.equal(persisted.notifications[0].id, notice.notifications[0].id);
     } finally {
       clearTimeout(timeout);

@@ -15,7 +15,7 @@ Generated files:
 
 Run `corepack pnpm contracts:generate` to regenerate; `contracts:check` rejects drift. The portable client validates requests and responses and exposes no general shell, arbitrary file writes, or arbitrary dispatch.
 
-`outputVersion=5` versions public results; `schemaVersion=4` versions internal snapshots. Source adapters and prices have separate versions. Core messages use `{op:"usage_app",args:Request}` → `{ok:true,value:Response}` or `{ok:false,error,code,details}`. Usage operations are refresh, usage, threads, turns, and steps. The separate `prices` interface provides status/update with `outputVersion=1`.
+`outputVersion=5` versions public results; `schemaVersion=5` versions internal snapshots. Source adapters and prices have separate versions. Core messages use `{op:"usage_app",args:Request}` → `{ok:true,value:Response}` or `{ok:false,error,code,details}`. Usage operations are refresh, usage, threads, turns, and steps. The separate `prices` interface provides status/update with `outputVersion=1`.
 
 See [CLI](../guides/cli.en.md) for operations, enums, pagination, and errors. Measurement integers cannot exceed JavaScript's safe integer range; amounts remain decimal strings. New fields and rules require checking generated types, CLI JSON and current snapshots together.
 

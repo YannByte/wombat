@@ -54,6 +54,7 @@ fn run(resident: bool) -> Result<()> {
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600))?;
     listener.set_nonblocking(true)?;
     let configs = Arc::new(Mutex::new(crate::config::Store::default()));
+    let artifacts = Arc::new(Mutex::new(crate::artifacts::Store::default()));
     let shared: Shared = Arc::new((Mutex::new(BTreeMap::new()), Condvar::new()));
     let (jobs, receiver) = mpsc::sync_channel::<Job>(32);
     let control = Arc::new(service::Control::new(resident)?);
@@ -371,6 +372,7 @@ fn run(resident: bool) -> Result<()> {
                 let active = Arc::clone(&active);
                 let state = Arc::clone(&shared);
                 let configs = Arc::clone(&configs);
+                let artifacts = Arc::clone(&artifacts);
                 let jobs = jobs.clone();
                 let control = Arc::clone(&control);
                 std::thread::spawn(move || {
@@ -430,6 +432,30 @@ fn run(resident: bool) -> Result<()> {
                                 "SERVICE_STOPPING",
                                 "Service is stopping at a transaction boundary",
                             ));
+                        }
+                        if value.get("artifacts").is_some() {
+                            #[derive(Deserialize)]
+                            #[serde(deny_unknown_fields)]
+                            struct ArtifactMessage {
+                                artifacts: crate::artifacts_dto::Request,
+                            }
+                            let request: ArtifactMessage =
+                                serde_json::from_value(value).map_err(|_| {
+                                    operation_error("INVALID_ARGUMENT", "Invalid artifact request")
+                                })?;
+                            let cancellation = PeerCancellation::new(buffered_cancel);
+                            #[cfg(unix)]
+                            let probe =
+                                || cancellation.observe(Instant::now(), || peer_closed(&stream));
+                            #[cfg(windows)]
+                            let peer_probe = stream.peer_probe();
+                            #[cfg(windows)]
+                            let probe = || cancellation.observe(Instant::now(), &peer_probe);
+                            return Ok(encode_success(&crate::artifacts::execute(
+                                request.artifacts,
+                                &artifacts,
+                                &probe,
+                            )?)?);
                         }
                         if value.get("monitor").is_some() {
                             #[derive(Deserialize)]
@@ -608,6 +634,7 @@ fn run(resident: bool) -> Result<()> {
                     && last_client.elapsed() > Duration::from_secs(15)
                     && active.load(std::sync::atomic::Ordering::Relaxed) == 0
                     && !configs.lock().unwrap().has_views()
+                    && !artifacts.lock().unwrap().has_views()
                     && !shared
                         .0
                         .lock()
@@ -628,6 +655,7 @@ fn run(resident: bool) -> Result<()> {
     // No active callers remain. Release read leases before the writer checkpoints
     // and closes, so an idle exit does not leave its own obsolete WAL pages pinned.
     *configs.lock().unwrap() = crate::config::Store::default();
+    *artifacts.lock().unwrap() = crate::artifacts::Store::default();
     shared.0.lock().unwrap().clear();
     control
         .stopping

@@ -1,13 +1,13 @@
-import { commandNames, commandRoutes, firstCommandIndex, usageActions } from './command-routing.js';
+import { commandNames, commandRoutes, firstCommandIndex } from './command-routing.js';
 import { resultExitCode } from './exit-codes.js';
 import { configureLanguage } from './locale.js';
-import { t, progressText } from '@wombat/client/locale';
+import { t } from '@wombat/client/locale';
 import { setTimeout as delay } from 'node:timers/promises';
 import packageMetadata from '../package.json' with { type: 'json' };
-import { CoreError, type UsageRequest, type UsageResult } from '@wombat/client';
+import { CoreError, type UsageRequest } from '@wombat/client';
 import { createNodeClient } from '@wombat/client/node';
 export function usageHelp(): string {
-  return [t('cli.usage-app-cli.help'), t('service.help'), t('statistics.help'), t('monitor.help'), t('comparison.help'), t('inspection.help'), ''].join('\n');
+  return t('cli.usage-app-cli.help');
 }
 export interface Invocation {
   request: UsageRequest;
@@ -16,17 +16,17 @@ export interface Invocation {
   version: boolean;
   mode: 'auto' | 'fresh' | 'cached';
   watch: boolean;
-  verify: boolean;
   waitMs?: number;
   rebuild?: boolean;
   includeHistory?: boolean;
 }
-const valued = new Set(['wait-ms', 'root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'turn', 'group', 'presentation', 'sort', 'search', 'limit', 'offset', 'locate-thread', 'locate-turn', 'locate-operation', 'baseline-since', 'baseline-until', 'dimension', 'other-thread']);
+const valued = new Set(['wait-ms', 'root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'group', 'presentation', 'sort', 'limit', 'offset', 'baseline-since', 'baseline-until', 'dimension', 'other-thread']);
 let knownTimezones: Set<string> | undefined;
 function invalid(message: string): never { throw new CoreError('INVALID_ARGUMENT', message); }
 export function parseUsageArgs(argv: string[]): Invocation {
-  let action: UsageRequest['action'] = 'usage';
-  let explicit = false;
+  let action: 'usage' | 'statistics' | 'compare' = 'usage';
+  argv=[...argv];
+  if(argv[0]==='usage') { argv.shift(); const nested: string | undefined = argv[0]; if(nested==='stats'||nested==='compare') { action=nested==='stats'?'statistics':'compare'; argv.shift(); } }
   let json = false;
   let help = false;
   let version = false;
@@ -36,7 +36,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
   const roots: string[] = [];
   for (let i = 0;i < argv.length;i++) {
     const arg = argv[i];
-    if (['--fresh', '--cached', '--watch', '--verify', '--rebuild', '--include-history'].includes(arg)) { if (liveFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", { p0: arg })); liveFlags.add(arg); continue; }
+    if (['--fresh', '--cached', '--watch', '--rebuild', '--include-history'].includes(arg)) { if (liveFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", { p0: arg })); liveFlags.add(arg); continue; }
     if (arg === '--version' || arg === '-v') {
       version = true;
       continue;
@@ -45,7 +45,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
       help = true;
       continue;
     }
-    if (['--all-time', '--model-unknown', '--effort-unknown', '--undated', '--project-unknown', '--matched-only', '--family'].includes(arg)) { if (unknownFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", { p0: arg })); unknownFlags.add(arg); continue; }
+    if (['--all-time', '--model-unknown', '--effort-unknown', '--undated', '--project-unknown', '--family'].includes(arg)) { if (unknownFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", { p0: arg })); unknownFlags.add(arg); continue; }
     if (arg === '--compact') {
       if (liveFlags.has(arg)) invalid(t("common.value_cannot_be_repeated", {p0: arg}));
       liveFlags.add(arg);
@@ -57,13 +57,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
       json = true;
       continue;
     }
-    if (!arg.startsWith('--')) {
-      if (explicit || !usageActions.has(arg))
-        invalid(t("cli.usage-app-cli.unknown_command_value", { p0: arg }));
-      action = arg as UsageRequest['action'];
-      explicit = true;
-      continue;
-    }
+    if (!arg.startsWith('--')) invalid(t('cli.usage-app-cli.unknown_command_value',{p0:arg}));
     const equal = arg.indexOf('=');
     const name = arg.slice(2, equal < 0 ? undefined : equal);
     if (!valued.has(name))
@@ -81,10 +75,9 @@ export function parseUsageArgs(argv: string[]): Invocation {
   }
   if (version && argv.some(arg => !['--version', '-v', '--json'].includes(arg)))
     invalid(t("cli.usage-app-cli.version_cannot_be_combined_with_query"));
-  if (action === 'refresh' && unknownFlags.size) invalid(t("cli.usage-app-cli.refresh_does_not_support_query_filters"));
   const request: UsageRequest = { action };
   if (liveFlags.has('--compact')) {
-    if (!json || action === 'refresh') invalid(t('cli.usage-app-cli.compactRequiresJson'));
+    if (!json) invalid(t('cli.usage-app-cli.compactRequiresJson'));
     request.compact = true;
   }
   const waitText = values.get('wait-ms');
@@ -93,7 +86,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
   const rebuild = liveFlags.has('--rebuild');
   if ((waitText !== undefined || rebuild) && (liveFlags.has('--cached') || liveFlags.has('--watch') || values.has('snapshot'))) invalid(t('cli.usage-app-cli.wait_invalid'));
   const scope: NonNullable<UsageRequest['scope']> = {};
-  const allowed = action === 'refresh' ? new Set(['root']) : new Set(['root', 'snapshot', 'agent', 'source', 'timezone', 'since', 'until', 'model', 'effort', 'project', 'thread', 'limit', 'offset', ...(action === 'compare' ? ['baseline-since', 'baseline-until', 'dimension', 'other-thread'] : []), ...(action === 'usage' ? ['group', 'presentation', 'sort'] : []), ...(action === 'statistics' ? ['presentation','baseline-since','baseline-until'] : []), ...(action === 'threads' ? ['sort', 'search', 'locate-thread'] : []), ...(action === 'turns' || action === 'steps' ? ['sort'] : []), ...(action === 'steps' ? ['turn','locate-operation'] : []), ...(action === 'investigate' ? ['turn'] : []), ...(action === 'turns' ? ['locate-turn'] : [])]);
+  const allowed = new Set(['root','snapshot','agent','source','timezone','since','until','model','effort','project','thread','limit','offset',...(action==='usage'?['group','presentation','sort']:[]),...(action==='statistics'?['presentation','baseline-since','baseline-until']:[]),...(action==='compare'?['baseline-since','baseline-until','dimension','other-thread']:[])]);
   for (const name of [...values.keys(), ...(roots.length ? ['root'] : [])])
     if (!allowed.has(name))
       invalid(t("cli.usage-app-cli.value_does_not_support_value", { p0: action, p1: name }));
@@ -130,16 +123,9 @@ export function parseUsageArgs(argv: string[]): Invocation {
   if (unknownFlags.has('--model-unknown')) { if (scope.model) invalid(t("cli.usage-app-cli.model_unknown_cannot_be_combined_with")); scope.modelUnknown = true; }
   if (unknownFlags.has('--effort-unknown')) { if (scope.reasoningEffort) invalid(t("cli.usage-app-cli.effort_unknown_cannot_be_combined_with")); scope.effortUnknown = true; }
   if (unknownFlags.has('--project-unknown')) { if (scope.project) invalid(t('webui.projectConflict')); scope.projectUnknown = true; }
-  if (values.get('locate-thread')) request.locateThreadId = values.get('locate-thread');
-  if(values.get('locate-operation'))request.locateOperationId=values.get('locate-operation');
-  if (values.get('locate-turn')) request.locateTurnId = values.get('locate-turn');
-  if (unknownFlags.has('--matched-only')) {
-    if (action !== 'turns') invalid(t('cli.usage-app-cli.value_does_not_support_value', {p0:action,p1:'matched-only'}));
-    request.matchedOnly = true;
-  }
   const thread = values.get('thread');
   if (thread && action !== 'compare') {
-    if (action === 'turns' || action === 'steps' || action === 'statistics')
+    if (action === 'statistics')
       request.threadId = thread;
     else
       scope.threadId = thread;
@@ -160,19 +146,6 @@ export function parseUsageArgs(argv: string[]): Invocation {
     if(!baselineSince||!baselineUntil||!scope.since||!scope.until)invalid(t('comparison.invalid'));
     request.comparison={kind:'periods',baselineSince,baselineUntil,dimension:'thread'};
   }
-  const turn = values.get('turn');
-  if (turn) {
-    if (action === 'investigate') {
-      if (!thread) invalid(t('cli.usage-app-cli.value_requires_thread_id',{p0:action}));
-      scope.turnId = turn;
-    } else request.turnId = turn;
-  }
-  if (!help && (action === 'turns' || action === 'steps') && !request.threadId)
-    invalid(t("cli.usage-app-cli.value_requires_thread_id", { p0: action }));
-  if(!help&&action==='trajectory'&&!thread)invalid(t('cli.usage-app-cli.value_requires_thread_id',{p0:action}));
-  if(!help&&action==='review'&&(scope.allTime||scope.undated||values.has('limit')||values.has('offset')||!!scope.since!==!!scope.until))invalid(t('cli.config.invalid',{value:action}));
-  if (!help && action === 'steps' && !request.turnId)
-    invalid(t("cli.usage-app-cli.steps_requires_turn_id"));
   const group = values.get('group');
   if (group) {
     if (!['day', 'week', 'month'].includes(group))
@@ -183,7 +156,7 @@ export function parseUsageArgs(argv: string[]): Invocation {
   if (presentation) { if (!['distribution', 'details', 'projects', 'models'].includes(presentation)) invalid(t('cli.usage-app-cli.presentation_invalid')); request.presentation = presentation as UsageRequest['presentation']; }
   const sort = values.get('sort');
   if (sort) {
-    const choices = action === 'threads' ? ['tokens', 'cost', 'recent'] : action === 'turns' ? ['tokens', 'cost', 'time', 'recent'] : ['tokens', 'cost', 'time'];
+    const choices = ['tokens','cost','time'];
     if (!choices.includes(sort))
       invalid(t("cli.usage-app-cli.sort_accepts_value", { p0: choices.join('、') }));
     request.sort = sort as UsageRequest['sort'];
@@ -199,26 +172,18 @@ export function parseUsageArgs(argv: string[]): Invocation {
   }
   if (values.get('snapshot'))
     request.snapshotId = values.get('snapshot');
-  if (values.get('search'))
-    request.search = values.get('search');
   if (roots.length)
     request.roots = roots;
   if (Object.keys(scope).length)
     request.scope = scope;
   if (liveFlags.has('--fresh') && liveFlags.has('--cached')) invalid(t("cli.usage-app-cli.fresh_and_cached_cannot_be_combined"));
   if (liveFlags.has('--watch') && (action !== 'usage' || liveFlags.has('--cached') || request.snapshotId)) invalid(t("cli.usage-app-cli.watch_only_supports_live_usage_queries"));
-  if (liveFlags.has('--verify') && action !== 'refresh') invalid(t("cli.usage-app-cli.verify_only_supports_refresh"));
-  if (request.snapshotId && (liveFlags.has('--fresh') || roots.length)) invalid(t("cli.usage-app-cli.snapshot_cannot_be_combined_with_fresh"));
-  if (action === 'refresh' && liveFlags.has('--cached')) invalid(t("cli.usage-app-cli.refresh_cannot_use_cached"));
-  return { request, json, help, version, ...(waitText !== undefined ? {waitMs: Number(waitText)} : {}), ...(rebuild ? {rebuild:true} : {}), ...(liveFlags.has('--include-history') ? {includeHistory:true} : {}), mode: waitText !== undefined || rebuild ? 'fresh' : liveFlags.has('--cached') ? 'cached' : liveFlags.has('--fresh') ? 'fresh' : ['compare','investigate','trajectory','resources','review','context'].includes(action) ? 'cached' : 'auto', watch: liveFlags.has('--watch'), verify: liveFlags.has('--verify') };
+  if (request.snapshotId && (liveFlags.has('--fresh') || roots.length)) invalid(t('cli.usage-app-cli.snapshot_cannot_be_combined_with_fresh'));
+  return {request,json,help,version,...(waitText!==undefined?{waitMs:Number(waitText)}:{}),...(rebuild?{rebuild:true}:{}),...(liveFlags.has('--include-history')?{includeHistory:true}:{}),mode:waitText!==undefined||rebuild?'fresh':liveFlags.has('--cached')?'cached':liveFlags.has('--fresh')?'fresh':action==='compare'?'cached':'auto',watch:liveFlags.has('--watch')};
 }
 export { resultExitCode } from './exit-codes.js';
 export async function runUsageCli(argv = process.argv.slice(2)): Promise<number> {
-  // Timing owns its default JSON and safe error envelope, including language errors.
   const commandIndex = firstCommandIndex(argv);
-  if (argv[commandIndex] === 'timing') {
-    return (await import('./timing-cli.js')).runTimingCli([...argv.slice(0, commandIndex), ...argv.slice(commandIndex + 1)]);
-  }
   if (argv[commandIndex] === 'api' || argv[commandIndex] === 'call') {
     return (await import('./agent-cli.js')).runAgentCli(argv[commandIndex] as 'api'|'call', [...argv.slice(0, commandIndex), ...argv.slice(commandIndex + 1)]);
   }
@@ -243,12 +208,10 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
     try {
       let lastRevision = '';
       for (;;) {
-        const queryOptions = { signal: controller.signal, onProgress: (stage: string) => {
-          if (invocation.request.action === 'refresh') process.stderr.write(`Wombat · ${progressText(stage)}\n`);
-        } };
+        const queryOptions = {signal:controller.signal};
         const result = invocation.request.snapshotId && !invocation.request.snapshotId.startsWith('live:')
           ? await client.query(invocation.request, queryOptions)
-          : (await client.live!({ query: invocation.request, mode: invocation.mode, verify: invocation.verify, waitMs:invocation.waitMs, rebuild:invocation.rebuild, includeHistory:invocation.includeHistory }, queryOptions)).result;
+          : (await client.live!({ query: invocation.request, mode: invocation.mode, waitMs:invocation.waitMs, rebuild:invocation.rebuild, includeHistory:invocation.includeHistory }, queryOptions)).result;
         const revision = JSON.stringify([result.snapshotRef.snapshotId, result.scope, result.freshness?.status, result.quality]);
         if (!invocation.watch || revision !== lastRevision) {
           if (!invocation.json && result.freshness && !['current', 'fixed'].includes(result.freshness.status)) process.stderr.write(`Wombat · ${result.freshness.status === 'failed' && result.freshness.error ? result.freshness.error : result.freshness.projectLoads?.length ? t('webui.projectsProgress',{ready:result.freshness.projectLoads.filter(p=>p.state==='ready').length,total:result.freshness.projectLoads.length}) : result.freshness.initialScan ? t('webui.initialTasks') : result.freshness.status === 'syncing' ? t("cli.usage-app-cli.syncing_showing_committed_data") : result.freshness.error ?? t("cli.usage-app-cli.showing_cached_data")}\n`);

@@ -18,6 +18,8 @@ mod account;
 pub mod account_dto;
 pub mod adapters;
 pub mod agent_dto;
+mod artifacts;
+pub mod artifacts_dto;
 pub mod collection;
 mod config;
 pub mod config_dto;
@@ -28,6 +30,7 @@ pub mod directories;
 pub mod dto;
 mod file_metadata;
 pub mod host_environment;
+mod host_process;
 pub mod live;
 mod live_index;
 #[cfg(windows)]
@@ -92,6 +95,16 @@ pub fn absolute(path: impl AsRef<Path>) -> Result<PathBuf> {
 
 pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
     match op {
+        "schema_artifacts_request" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<artifacts_dto::Request>(),
+        )?),
+        "schema_artifacts_response" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<artifacts_dto::Response>(),
+        )?),
         "monitor" => Ok(serde_json::to_value(monitor::dispatch(
             serde_json::from_value(args.clone())
                 .map_err(|_| dto::operation_error("INVALID_ARGUMENT", "Invalid monitor request"))?,

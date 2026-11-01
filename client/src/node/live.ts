@@ -6,6 +6,7 @@ import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { CoreError } from "../errors.js";
 import type {
+  ArtifactsRequest,
   ConfigRequest,
   OptimizeRequest,
   LiveRequest,
@@ -27,6 +28,7 @@ import path from "node:path";
 import os from "node:os";
 
 type ProductRequest =
+  | { artifacts: ArtifactsRequest }
   | { service: ServiceRequest }
   | { conversation: ConversationRequest }
   | { monitor: MonitorRequest }

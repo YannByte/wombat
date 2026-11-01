@@ -1,3 +1,8 @@
+import type { Request as ArtifactsRequest } from './generated/artifacts-request.js';
+import type { Response as ArtifactsResult } from './generated/artifacts-response.js';
+export type { Request as ArtifactsRequest } from './generated/artifacts-request.js';
+export type { Response as ArtifactsResult, Item as ArtifactItem } from './generated/artifacts-response.js';
+export type ArtifactsTransport = (request: ArtifactsRequest, options: QueryOptions) => Promise<unknown>;
 import type { Request as ServiceRequest } from './generated/service-request.js';
 import type { Response as ServiceResult } from './generated/service-response.js';
 export type { Request as ServiceRequest } from './generated/service-request.js';
@@ -107,6 +112,7 @@ export type PricingTransport = (request: PricingRequest, options: QueryOptions) 
 export type LiveTransport = (request: LiveRequest, options: QueryOptions) => Promise<unknown>;
 
 export interface UsageClient {
+  artifacts?(request:ArtifactsRequest,options?:QueryOptions):Promise<ArtifactsResult>;
   service?(request:ServiceRequest,options?:QueryOptions):Promise<ServiceResult>;
   conversation?(request: ConversationRequest, options?: QueryOptions): Promise<ConversationResult>;
   monitor?(request: MonitorRequest, options?: QueryOptions): Promise<MonitorResult>;
@@ -124,6 +130,7 @@ export interface UsageClient {
 }
 
 export interface ClientTransports extends HostTransports {
+  artifacts?: ArtifactsTransport;
   service?:ServiceTransport;
   conversation?: ConversationTransport;
   monitor?: MonitorTransport;
@@ -155,6 +162,15 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
   } = transports;
   const hosts = transports;
   return {
+    ...(transports.artifacts ? {async artifacts(request:ArtifactsRequest,options:QueryOptions={}):Promise<ArtifactsResult>{
+      const [{validate:input},{validate:output}]=await Promise.all([import('./generated/validate-artifacts-request.js'),import('./generated/validate-artifacts-response.js')]);
+      throwIfCancelled(options);
+      if(!input(request))throw new CoreError('INVALID_ARGUMENT','Invalid artifacts request');
+      const result=await transports.artifacts!(request,options);
+      throwIfCancelled(options);
+      if(!output(result)||result.outputVersion!==2||result.policyVersion!==2||result.action!==request.action||request.action!=='inspect'&&(result.readView!==request.readView||result.baselineId!==request.baselineId))throw new CoreError('PROTOCOL_ERROR','Invalid artifacts response');
+      return result;
+    }}:{}),
     ...(transports.service ? {async service(request:ServiceRequest,options:QueryOptions={}):Promise<ServiceResult>{
       const [{validate:input},{validate:output}]=await Promise.all([import('./generated/validate-service-request.js'),import('./generated/validate-service-response.js')]);
       throwIfCancelled(options);

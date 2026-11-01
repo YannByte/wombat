@@ -10,12 +10,16 @@
       "en": "1e43e6645e6a9220e44c914a7f611ce8386c12eb9bc4024774551213bc7c68ca"
     },
     "/rust-core/internal-business-modules": {
-      "zh": "76f73d3dc4cc22114310947b79bc80808e108df1cfb40dfff8789369a06e34c3",
-      "en": "dae3e41de20969539364aee3c8069f55933c3b0f58d651aea6eda7fce26217e1"
+      "zh": "f05a5baf956b3c74749b96aa963f949c88be6fd37f06475423cc3c2660c59165",
+      "en": "3d62c65b8054a6e462207a62a46fa1c8d4ddd4fb9b11dd1d410a3e8464dd986e"
+    },
+    "/rust-core/artifact-observations": {
+      "zh": "6d51bec5e772c64c5ac79230958573acc6816bb2aeceaddf1524e9254ca30c45",
+      "en": "5bbb4954516159928b051bd2fc61e259d7f95b4807ea11db7932460bc023ebc9"
     },
     "/rust-core/limits-and-verification": {
-      "zh": "8dcf5eda0c99d266a38a4baeef8cd2edb00ecf4aa3d19a4f9aabbc85f532473c",
-      "en": "3634154b3bbd88ea28973dd534e81f97fff7434c8e55c51cf15a9a67b1ac5b2a"
+      "zh": "b3fe4a7ace9bb8382c646fe2dbf9336a642a2a2e68a92c1e903a25c6eba3201b",
+      "en": "1826738a7c8cccbafb5b431552ad185c5f1401ab0222f5b94b638aa55e199e1d"
     },
     "/rust-core/storage-and-service-lifecycle": {
       "zh": "ade9de5b4b270c1a728aadd8340e4f32ca9369b9bc34308053e368b00b1f5dc8",
@@ -30,8 +34,8 @@
       "en": "2b853b98df5be8becac0c3a4685aa05eef20a3766fdd55bcf74c8eb54152344f"
     },
     "/rust-core/conversation-evidence": {
-      "zh": "22b9a0a1f781936002176372aaf7be78488b7c9056e3d424dcf5316ff19193e6",
-      "en": "7b60d4078db546ffe44c32d6df17a0551c9c2f4cbeb0ba65e000d72a7fc58afc"
+      "zh": "4964b31de989480aa4d79f31e0b33b6ea44b306c707839ebe8ac81a4405b8931",
+      "en": "26055e61bf6b41fa0fee840d3f6b945e695facd9d8445d873ec049d275d4e393"
     }
   }
 }

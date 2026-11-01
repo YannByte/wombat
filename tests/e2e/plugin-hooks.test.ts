@@ -50,7 +50,7 @@ test('plugin Hook identity, project coverage, retained declarations and rechecks
         assert.equal(first.hookRegistry.contexts[0].registrations[0].pluginId, 'sample.tools@test');
         assert.equal(first.hookRegistry.contexts[0].registrations[0].nativeKey, metadata.key);
         assert.equal(first.hookRegistry.contexts[1].registrations[0].enabled, false);
-        const args = [path.resolve('dist/wombat.js'), 'optimize', 'inventory', '--root', root, ...[a, b, c].flatMap(p => ['--project-root', p]), '--kind', 'hook', '--read-view', first.readView!];
+        const args = [path.resolve('dist/wombat.js'), "check", 'inventory', '--root', root, ...[a, b, c].flatMap(p => ['--project-root', p]), '--kind', 'hook', '--read-view', first.readView!];
         const cli = spawnSync(process.execPath, [...args, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.ok(cli.status === 0 || cli.status === 2, cli.stderr);
         assert.deepEqual(JSON.parse(cli.stdout).hookRegistry, first.hookRegistry);

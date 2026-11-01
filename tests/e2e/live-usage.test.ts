@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, appendFile, rm, readdir, chmod } from 'node:fs/promises';
@@ -21,7 +22,7 @@ test('default source uses the user profile without CODEX_HOME', { timeout: 40_00
   delete env.CODEX_HOME; delete env.WOMBAT_CORE_BIN;
   if (process.platform === 'win32') delete env.HOME; else env.HOME = profile;
   try {
-    const result = spawnSync(process.execPath, [cli, 'usage', '--fresh', '--all-time', '--json'], { env, encoding: 'utf8', timeout: 15000 });
+    const result = spawnProductCli(cli, ['usage', '--fresh', '--all-time', '--json'], { env, encoding: 'utf8', timeout: 15000 });
     assert.ifError(result.error);
     assert.ok([0, 2].includes(result.status!), result.stdout + result.stderr);
     assert.equal(JSON.parse(result.stdout).summary.tokens.total, 110);
@@ -37,8 +38,8 @@ test('live CLI resumes, keeps fixed views, exports only explicitly and streams a
   let service: ReturnType<typeof spawn> | undefined;
   const start = async () => { service = spawn(binary,['--serve-usage'],{env,stdio:'ignore'}); await delay(100); };
   const stop = async () => { if(service && service.exitCode === null) { const exited=new Promise(resolve=>service!.once('exit',resolve)); service.kill(); await exited; } };
-  const run = (args: string[]) => {
-    const p=spawnSync(process.execPath,[cli,...args,...(args[0]==='usage'?['--all-time']:[]),'--json'],{env,encoding:'utf8',timeout:15_000});
+  const run = (args: CliInput) => {
+    const p=spawnProductCli(cli, Array.isArray(args) ? [...args, ...(args[0]==='usage'?['--all-time']:[]), '--json'] : args, {env,encoding:'utf8',timeout:15_000});
     assert.ifError(p.error); const value=JSON.parse(p.stdout); assert.ok([0,2].includes(p.status!),p.stdout+p.stderr); return value;
   };
   try {
@@ -60,7 +61,7 @@ test('live CLI resumes, keeps fixed views, exports only explicitly and streams a
     await appendFile(log,'\n');
     const second=run(['usage','--fresh']); assert.equal(second.summary.tokens.total,220); assert.equal(second.quality.status,'complete');
     const fixed=run(['usage','--snapshot',first.snapshotRef.snapshotId]); assert.equal(fixed.summary.tokens.total,110);
-    const snapshot=run(['refresh','--verify']); assert.equal(snapshot.summary.tokens.total,220); assert.ok(!snapshot.snapshotRef.snapshotId.startsWith('live:'));
+    const snapshot=run({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto","verify":true}}); assert.equal(snapshot.summary.tokens.total,220); assert.ok(!snapshot.snapshotRef.snapshotId.startsWith('live:'));
     const watch=spawn(process.execPath,[cli,'usage','--watch','--all-time','--json'],{env,stdio:['ignore','pipe','pipe']});
     try {
       const results: any[]=[]; let buffer=''; let error='';
@@ -98,7 +99,7 @@ test('failed source retains facts while healthy source advances, survives restar
   const stop = async () => { if (service && service.exitCode === null) { const closed = new Promise(resolve => service.once('close', resolve)); service.kill(); await closed; } };
   const run = (mode: string, snapshot?: string) => {
     const args = snapshot ? ['--snapshot', snapshot] : [mode, ...roots.flatMap(root => ['--root', root])];
-    const result = spawnSync(process.execPath, [cli, 'usage', ...args, '--since', '2026-09-29', '--until', '2026-09-30', '--timezone', 'UTC', '--json'], { env, encoding: 'utf8', timeout: 15000 });
+    const result = spawnProductCli(cli, ['usage', ...args, '--since', '2026-09-29', '--until', '2026-09-30', '--timezone', 'UTC', '--json'], { env, encoding: 'utf8', timeout: 15000 });
     assert.ifError(result.error);
     return { status: result.status, value: JSON.parse(result.stdout) };
   };
@@ -141,10 +142,10 @@ test('active and archived task metadata is discoverable without inventing measur
  const env={...process.env,WOMBAT_AUTO_PRICES:'0',WOMBAT_DATA_HOME:data,CODEX_HOME:root};
  const service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});
  try {
-  const run=(args:string[])=>{const p=spawnSync(process.execPath,[cli,...args,'--json'],{env,encoding:'utf8',timeout:10000});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
+  const run=(args: CliInput)=>{const p=spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, {env,encoding:'utf8',timeout:10000});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
   const empty=run(['usage','--fresh','--since','2026-09-01','--until','2026-10-01']);
   assert.equal(empty.summary.measurementCount,0);assert.equal(empty.facets.discoveredThreadCount,2);
-  const tasks=run(['threads','--snapshot',empty.snapshotRef.snapshotId]);
+  const tasks=run(queryInvocation({"action":"threads","snapshotId":empty.snapshotRef.snapshotId}, {mode:"auto"}));
   assert.equal(tasks.items.length,2);assert.equal(tasks.summary.measurementCount,0);assert.equal(tasks.items.every((t:any)=>t.matchedUsage.measurementCount===0),true);
  }finally{const exit=new Promise(resolve=>service.once('close',resolve));service.kill('SIGTERM');await exit;await rm(dir,{recursive:true,force:true});}
 });

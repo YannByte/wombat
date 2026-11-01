@@ -1,3 +1,5 @@
+import {cliInvocation,type CliInput} from './cli-invocation.ts';
+import type {AgentRequest} from '@wombat/client';
 /** Deterministic synthetic CLI query benchmark; never reads real Agent logs. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -27,13 +29,14 @@ const verify = (summary: any, tokens: number, cost: bigint) => {
   assert.equal(summary.price.status, 'priced');
   assert.equal(moneyMicros(summary.price.cost), cost);
 };
-const query = (env: NodeJS.ProcessEnv, args: string[]) => json(run(process.execPath, [cli, ...args, '--json'], env).stdout);
+const query = (env:NodeJS.ProcessEnv,request:AgentRequest)=>{const i=cliInvocation(request);return json(run(process.execPath,[cli,...i.args],env,120000,i.input).stdout);};
 const p95 = (values: number[]) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1];
 const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); return (sorted[(sorted.length - 1) >> 1] + sorted[sorted.length >> 1]) / 2; };
 const round = (value: number) => Math.round(value * 1000) / 1000;
-function measure(env: NodeJS.ProcessEnv, args: string[]) {
+function measure(env: NodeJS.ProcessEnv, args: CliInput) {
+  const i=cliInvocation(args);
   const timer = process.platform === 'darwin' ? ['/usr/bin/time', '-l'] : ['/usr/bin/time', '-f', 'WB_MAX_RSS_KIB=%M'];
-  const result = run(timer[0], [...timer.slice(1), process.execPath, cli, ...args], env);
+  const result = run(timer[0], [...timer.slice(1), process.execPath, cli, ...i.args], env,120000,i.input);
   const rss = process.platform === 'darwin'
     ? /(?:^|\n)\s*(\d+)\s+maximum resident set size/.exec(result.stderr)?.[1]
     : /WB_MAX_RSS_KIB=(\d+)/.exec(result.stderr)?.[1];
@@ -89,8 +92,8 @@ try {
   const totalCost = BigInt(measurements) * 2835n;
   const corpus = { threads, turnsPerThread: turns, responsesPerTurn: 2, operationsPerTurn: 1, measurements, files: files.length, bytes, sha256: corpusHash.digest('hex'), expectedTotalTokens: totalTokens, expectedCostUsd: formatMicros(totalCost) };
   const env = { ...process.env, WOMBAT_DATA_HOME: path.join(temporary, 'data'), WOMBAT_CORE_BIN: core };
-  const refreshedRun = measure(env, ['refresh', '--root', source, '--json']);
-  const refreshed = json(refreshedRun.stdout);
+  const refreshedRun = measure(env, {"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});
+  const refreshed = json(refreshedRun.stdout).result;
   verify(refreshed.summary, totalTokens, totalCost);
   const snapshot = refreshed.snapshotRef.snapshotId;
   const common = ['--snapshot', snapshot, '--timezone', 'UTC'];
@@ -98,12 +101,12 @@ try {
   const selected = json(readFileSync(path.join(generation, 'manifest.json'), 'utf8')).threads[0];
   const thread = selected.thread.id;
   const turn = Object.keys(selected.turns)[0];
-  const commands: Record<string, string[]> = {
-    usage: ['usage', ...common, '--since', '2026-09-28', '--until', '2026-09-30'],
-    threads: ['threads', ...common, '--sort', 'tokens'],
-    turns: ['turns', ...common, '--thread', thread, '--sort', 'tokens'],
-    steps: ['steps', ...common, '--thread', thread, '--turn', turn, '--sort', 'tokens'],
-  };
+  const commands = {
+    usage:{method:'snapshot',params:{action:'usage',snapshotId:snapshot,scope:{since:'2026-09-28',until:'2026-09-30',timezone:'UTC'}}},
+    threads:{method:'snapshot',params:{action:'threads',snapshotId:snapshot,sort:'tokens',scope:{timezone:'UTC'}}},
+    turns:{method:'snapshot',params:{action:'turns',snapshotId:snapshot,threadId:thread,sort:'tokens',scope:{timezone:'UTC'}}},
+    steps:{method:'snapshot',params:{action:'steps',snapshotId:snapshot,threadId:thread,turnId:turn,sort:'tokens',scope:{timezone:'UTC'}}},
+  } satisfies Record<string,AgentRequest>;
   const measured = [];
   for (const [name, command] of Object.entries(commands)) {
     console.error(`Measuring ${name}: first invocation + ${samples} fresh-process warm samples`);
@@ -116,7 +119,7 @@ try {
       warmSamples.push(current.sample);
     }
     const latencies = warmSamples.map(value => value.wallMs);
-    measured.push({ command: name, output: 'Chinese text, default 120 columns, piped stdout', firstInvocation: first.sample, warmSamples,
+    measured.push({ command: name, output: 'Generated JSON, piped stdout', firstInvocation: first.sample, warmSamples,
       warmP50Ms: round(median(latencies)), warmP95Ms: p95(latencies),
       maxObservedRssBytes: Math.max(first.sample.peakRssBytes, ...warmSamples.map(value => value.peakRssBytes)),
       warmP95Within300Ms: p95(latencies) <= 300, firstInvocationWithin1000Ms: first.sample.wallMs <= 1000 });
@@ -127,7 +130,7 @@ try {
   assert.equal(subtotal.reduce((sum: bigint, value: any) => sum + moneyMicros(value.usage.price.cost), 0n), totalCost);
   const seen = new Set<string>(); let pageTokens = 0; let pageCost = 0n; let offset = 0;
   do {
-    const page = query(env, [...commands.threads, '--limit', '50', '--offset', String(offset)]);
+    const page = query(env, {...commands.threads,params:{...commands.threads.params,limit:50,offset}});
     verify(page.summary, totalTokens, totalCost); assert.equal(page.page.total, threads);
     for (const item of page.items) {
       assert(!seen.has(item.id)); seen.add(item.id);
@@ -139,14 +142,14 @@ try {
   const turnCost = BigInt(turns) * 5670n;
   const turnResult = query(env, commands.turns); verify(turnResult.summary, turns * 2200, turnCost); assert.equal(turnResult.items.length, turns);
   for (const item of turnResult.items) { verify(item.usage, 2200, 5670n); assert(Math.abs(item.share - 1 / turns) < 1e-12); }
-  const pagedTurn = query(env, [...commands.turns, '--limit', '1']);
+  const pagedTurn = query(env, {...commands.turns,params:{...commands.turns.params,limit:1}});
   assert.deepEqual(pagedTurn.summary, turnResult.summary); assert.deepEqual(pagedTurn.items[0], turnResult.items[0]);
   const steps = query(env, commands.steps); verify(steps.summary, 2200, 5670n); assert.equal(steps.items.length, 3);
   for (const item of steps.items) {
     if (item.kind === 'measurement') { verify(item.usage, 1100, 2835n); assert.equal(item.share, 0.5); }
     else { assert(!('usage' in item) && !('price' in item)); }
   }
-  const pagedStep = query(env, [...commands.steps, '--limit', '1']);
+  const pagedStep = query(env, {...commands.steps,params:{...commands.steps.params,limit:1}});
   assert.deepEqual(pagedStep.summary, steps.summary); assert.deepEqual(pagedStep.items[0], steps.items[0]);
   assert.deepEqual({ coreSha256: fileSha256(core), cliSha256: fileSha256(cli) }, hashes, 'Build changed during benchmark');
   const snapshotBytes = filesUnder(generation).reduce((sum, file) => sum + statSync(file).size, 0);

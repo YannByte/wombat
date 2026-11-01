@@ -1,3 +1,4 @@
+import {spawnProductCli, type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from './project-client.js';
 import type { UsageClient } from '@wombat/client';
 import assert from "node:assert/strict";
@@ -115,8 +116,8 @@ async function localProduct() {
         close,
         write: (id: string, values: unknown[]) => writeFile(path.join(root, "sessions", id + ".jsonl"), rows(values)),
         append: (id: string, values: unknown[]) => appendFile(path.join(root, "sessions", id + ".jsonl"), rows(values)),
-        cli(args: string[], input = "", status = 0) {
-            const result = spawnSync(process.execPath, [entry, ...args], {
+        cli(args: CliInput, input = "", status = 0) {
+            const result = spawnProductCli(entry, args, {
                 env: process.env,
                 input,
                 encoding: "utf8",

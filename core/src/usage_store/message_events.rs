@@ -6,66 +6,6 @@ use serde::de::{SeqAccess, Visitor};
 use serde_json::value::RawValue;
 use std::{borrow::Cow, fmt, sync::atomic::AtomicBool};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct MessageTimeRange {
-    pub first: Option<String>,
-    pub last: Option<String>,
-    pub undated: bool,
-}
-impl MessageTimeRange {
-    pub(crate) fn build(events: &[Arc<Event>]) -> Self {
-        let mut range = Self::default();
-        for event in events {
-            if !matches!(event.payload(), Payload::Message { .. }) {
-                continue;
-            }
-            let time = event.time().timestamp.as_deref().and_then(|s| {
-                chrono::DateTime::parse_from_rfc3339(s).ok().map(|t| {
-                    t.to_utc()
-                        .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
-                })
-            });
-            if let Some(time) = time {
-                if range.first.as_ref().is_none_or(|first| time < *first) {
-                    range.first = Some(time.clone());
-                }
-                if range.last.as_ref().is_none_or(|last| time > *last) {
-                    range.last = Some(time);
-                }
-            } else {
-                range.undated = true;
-            }
-        }
-        range
-    }
-    pub(super) fn validate(&self, count: usize) -> Result<()> {
-        let valid_time = |s: &str| {
-            chrono::DateTime::parse_from_rfc3339(s)
-                .ok()
-                .is_some_and(|t| {
-                    t.to_utc()
-                        .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
-                        == s
-                })
-        };
-        if self.first.is_some() != self.last.is_some()
-            || self.first.as_deref().is_some_and(|s| !valid_time(s))
-            || self.last.as_deref().is_some_and(|s| !valid_time(s))
-            || self
-                .first
-                .as_ref()
-                .zip(self.last.as_ref())
-                .is_some_and(|(a, b)| a > b)
-            || count == 0 && self != &Self::default()
-            || count > 0 && self.first.is_none() && !self.undated
-        {
-            return Err(corrupt("message time summary invalid"));
-        }
-        Ok(())
-    }
-}
-
 #[derive(Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
 struct BorrowedPosition<'a> {
@@ -289,7 +229,11 @@ mod tests {
             make(1, None),
             make(2, Some("2026-10-13T16:00:00Z")),
         ];
-        let range = MessageTimeRange::build(&rows);
+        let range = TimeRange::build(
+            rows.iter()
+                .filter(|e| matches!(e.payload(), Payload::Message { .. }))
+                .map(|e| e.time().timestamp.as_deref()),
+        );
         assert_eq!(
             range.first.as_deref(),
             Some("2026-10-13T16:00:00.000000000Z")

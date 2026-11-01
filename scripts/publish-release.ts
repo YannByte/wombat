@@ -352,7 +352,7 @@ async function cleanInstall(version: string, source: string, repository: string,
   if (!record(installedRelease) || installedRelease.version !== version || installedRelease.source !== source) {
     throw new Error('Clean installation differs from the published release identity');
   }
-  const update = parsedJson(runtime, [entryFile, 'update', '--check', '--json', ...(version.includes('-') ? ['--version', version] : [])]);
+  const update = parsedJson(runtime, [entryFile, "system","update", '--check', '--json', ...(version.includes('-') ? ['--version', version] : [])]);
   if (!record(update)) throw new Error('Installed updater returned an invalid response');
   if (!update.checked || update.updated || update.updateAvailable
     || update.currentVersion !== version || update.availableVersion !== version) {

@@ -14,10 +14,10 @@ test('help discovers every supported command without duplicates or removed hosts
   try {
     assert.equal(await runUsageCli(['--lang', 'en', '--help', '--json']), 0);
     const result = JSON.parse(chunks.join(''));
-    const expected = ['service','refresh','usage','threads','turns','steps','prices','optimize','directories','account','update','doctor','timing','compare','investigate','trajectory','resources','review','context','collection','hook','setup','api','call','statistics','monitor'];
+    const expected = ['usage','check','system','api','call'];
     assert.deepEqual([...result.commands].sort(), expected.sort());
     assert.match(result.help, /^Wombat\n\nUsage/);
-    for (const command of ['update', 'setup', 'collection', 'doctor', 'timing']) assert.match(result.help, new RegExp('wombat '+command+'\\b'));
+    for (const command of expected) assert.match(result.help, new RegExp('wombat '+command+'\\b'));
   } finally { process.stdout.write = write; }
 });
 

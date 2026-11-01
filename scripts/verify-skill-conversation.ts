@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from './cli-invocation.ts';
 /** Selected real native Codex conversations over independent synthetic truth; no trust mutation. */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
@@ -95,8 +96,8 @@ try {
                 service = spawn(path.join(runtime, 'wombat-core'), ['--daemon'], { cwd: project, env, stdio: 'ignore', detached: true });
                 await once(service, 'spawn');
                 const cli = path.join(runtime, 'wombat.js');
-                const query = <T extends UsageResult | OptimizeResult | AccountResult>(args: string[]): T => { const r = spawnSync(process.execPath, [cli, ...args, '--json'], { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' }); assert.ok([0, 2].includes(r.status ?? -1), r.stderr + r.stdout); const v = JSON.parse(r.stdout); assert.ok(!(v && typeof v === 'object' && 'error' in v), r.stdout); return v as T; };
-                const snapshot = query<UsageResult>(['refresh', '--root', source]).snapshotRef.snapshotId, threads = query<UsageResult>(['threads', '--snapshot', snapshot, '--all-time']), thread = threads.items.find(v => v.kind === 'thread' && v.upstreamId === 'qualification');
+                const query = <T extends UsageResult | OptimizeResult | AccountResult>(args: CliInput): T => { const r = spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' }); assert.ok([0, 2].includes(r.status ?? -1), r.stderr + r.stdout); const v = JSON.parse(r.stdout); assert.ok(!(v && typeof v === 'object' && 'error' in v), r.stdout); return v as T; };
+                const snapshot = query<UsageResult>({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}}).snapshotRef.snapshotId, threads = query<UsageResult>(queryInvocation({"action":"threads","snapshotId":snapshot,"scope":{"allTime":true}}, {mode:"auto"})), thread = threads.items.find(v => v.kind === 'thread' && v.upstreamId === 'qualification');
                 assert.ok(thread && thread.kind === 'thread');
                 const prepared = await createNodeClient({ binaryPath: path.join(runtime, 'wombat-core'), codexBinaryPath: native.binary, automaticPrices: false }).service!({ action: 'status' }, { signal: AbortSignal.any([cancellation.signal, AbortSignal.timeout(10000)]) });
                 assert.ok(prepared.running && prepared.resident, 'Conversation fixture requires its isolated resident service');
@@ -105,7 +106,7 @@ try {
                 const schema = (name: string, properties: Record<string, unknown>) => { const file = path.join(temp, name + '.schema.json'); writeFileSync(file, JSON.stringify({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties })); return file; };
                 const run = async (stage: string, args: string[], answer: string) => { console.log(JSON.stringify({ stage, language: lang, scenario, status: 'running' })); const log = path.join(output, `${lang}-${scenario}-${stage}.log`), r = await runBoundedCommand({ command: [options.agentBin, ...args], cwd: project, env: agentEnv, logFile: log, timeoutMs: 360000, maxBytes: 4 * 1024 * 1024, signal: cancellation.signal }); assert.equal(r.exitCode, 0, `${stage} did not complete`); assert.ok(!r.timedOut && !r.outputLimit && !r.interrupted && !r.closeTimedOut && !r.spawnError && !r.logError); const events = stdoutFromLog(readFileSync(log, 'utf8')), metrics = agentMetrics(events); assert.equal(metrics.unsupportedToolCalls, 0); assert.ok(metrics.commands.some(c => c.includes(cli))); return { answer: JSON.parse(readFileSync(answer, 'utf8')), events, metrics }; };
                 if (isFocusedScenario(scenario)) {
-                    const turns = query<UsageResult>(['turns', '--snapshot', snapshot, '--all-time', '--thread', thread.id]), turn = turns.items.find(t => t.kind === 'turn' && t.ordinal !== null);
+                    const turns = query<UsageResult>(queryInvocation({"action":"turns","threadId":thread.id,"snapshotId":snapshot,"scope":{"allTime":true}}, {mode:"auto"})), turn = turns.items.find(t => t.kind === 'turn' && t.ordinal !== null);
                     assert.ok(turn && turn.kind === 'turn');
                     writeFileSync(native.calls, '');
                     const focusedSchema = schema('focused', { answer: { type: 'string' } }), focusedAnswer = path.join(temp, 'focused.answer.json');
@@ -133,22 +134,22 @@ try {
                         assert.equal(readFileSync(native.calls, 'utf8'), '', 'Unrelated native account/configuration capture');
                     if (scenario === 'config-review') {
                         const configArgs = ['--root', source, '--project-root', project, '--project', project];
-                        const suggestions = query<OptimizeResult>(['optimize', ...configArgs]), suggestion = suggestions.suggestions.find(s => s.item.path === sample);
+                        const suggestions = query<OptimizeResult>(["check", ...configArgs]), suggestion = suggestions.suggestions.find(s => s.item.path === sample);
                         assert.ok(suggestion);
                         const session = nativeSessionId(response.events), answerFile = path.join(temp, 'config-recheck.answer.json');
                         const instruction = lang === 'zh' ? '现在只授权精简刚才选定合成 Skill 的 description，其余内容与文件不变。改成 Synthetic review helper for this fixture.，然后按原建议复查，说明结果和限制。' : 'You may now change only the selected synthetic Skill description to Synthetic review helper for this fixture. Preserve all other content and files. Recheck the original suggestion and explain the result and limits.';
                         const next = await run('recheck', ['exec', 'resume', session, '--config', 'mcp_servers={}', '--skip-git-repo-check', '--json', '--output-schema', focusedSchema, '--output-last-message', answerFile, instruction + ` Target ${sample}; original suggestion ${suggestion.id}, readView ${suggestions.readView}, baseline ${suggestion.baselineId}. Use the same runtime prefix ${prefix}, roots, project and original decision scope. Do not create or change keep/not-applicable decisions, scan raw logs or write other files. Answer in ${lang === 'zh' ? 'Chinese' : 'English'}.`], answerFile);
                         assertConfiguration(expected);
                         assert.equal(readFileSync(sourceFile, 'utf8'), sourceBody);
-                        const recheck = query<OptimizeResult>(['optimize','recheck','--read-view',suggestions.readView!,'--baseline',suggestion.baselineId!,...configArgs]);
+                        const recheck = query<OptimizeResult>(["check",'recheck','--read-view',suggestions.readView!,'--baseline',suggestion.baselineId!,...configArgs]);
                         assert.ok(recheck.checks.some(c=>c.rule==='descriptionSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
                         assert.equal(recheck.decisionRevision,suggestions.decisionRevision);
                         assert.equal(query<UsageResult>(['usage', '--snapshot', snapshot, '--all-time']).summary.tokens.total, 1100000);
                         result.followup = { answer: next.answer, metrics: next.metrics, originalSuggestionVerified: true, descriptionOnly: true };
                     }
-                    const decisions = query<OptimizeResult>(['optimize', 'list', '--root', source, '--project-root', project, '--project', project]);
+                    const decisions = query<OptimizeResult>(["check", 'list', '--root', source, '--project-root', project, '--project', project]);
                     assert.ok(decisions.suggestions.every(s => s.decision === null));
-                    const plansRun = spawnSync(process.execPath, [cli, 'monitor', 'list', '--json'], { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' });
+                    const plansRun = spawnProductCli(cli, {method:'monitor',params:{action:'list'}}, { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' });
                     assert.equal(plansRun.status, 0);
                     assert.deepEqual(JSON.parse(plansRun.stdout).plans, [], 'Read-only question created a budget');
                     result.status = 'passed';

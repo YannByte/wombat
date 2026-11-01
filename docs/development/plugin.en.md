@@ -2,7 +2,7 @@
 
 [中文](plugin.md) | English
 
-`plugin/skills/wombat/` is the single user Skill, with task references loaded as needed. Development workflows stay in `.agents/skills/`. `plugin/package.json` and `agents/openai.yaml` own metadata; the root manifest alone owns the version. Shared [expression rules](../../plugin/skills/wombat/references/expression.md) favor clear, concise Chinese and English without strict dictionary matching.
+`plugin/skills/wombat/` is the single user Skill, with task references loaded as needed. Development workflows stay in `.agents/skills/`. `plugin/package.json` and `agents/openai.yaml` own metadata; the root manifest alone owns the version. The main Skill’s [shared rules](../../plugin/skills/wombat/SKILL.md) favor clear, concise Chinese and English without strict dictionary matching.
 
 ## Build and install
 
@@ -12,7 +12,7 @@ codex plugin marketplace add ./dist/skill
 codex plugin add wombat@wombat-local
 ```
 
-Build produces only `dist/skill/plugin` and one local marketplace entry. Archives use `lib/skill`. `wombat-runtime.json` binds content hashes, version and required capabilities. There is no standalone Skill copy or collection-plugin resource package. Codex manages installation, updates and removal. `wombat update` updates only the runtime; see [installation](../guides/installation.en.md) for complete updates.
+Build produces only `dist/skill/plugin` and one local marketplace entry. Archives use `lib/skill`. `wombat-runtime.json` binds content hashes, version and required capabilities. There is no standalone Skill copy or collection-plugin resource package. Codex manages installation, updates and removal. `wombat system update` updates only the runtime; see [installation](../guides/installation.en.md) for complete updates.
 
 ## Verification boundaries
 

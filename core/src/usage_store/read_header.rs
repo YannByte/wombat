@@ -69,7 +69,7 @@ pub(crate) fn load(
             "Unsupported query header version",
         ));
     }
-    if raw["manifest"]["schemaVersion"] != 4 {
+    if raw["manifest"]["schemaVersion"] != 5 {
         return Err(operation_error(
             "UNSUPPORTED_VERSION",
             "Unsupported query manifest version",

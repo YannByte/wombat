@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-guard-selected-codex-cleanup-at-execution": {
+      "zh": "6775c0e8f5aaac9db72f7f14b9846bd94ce823098c64a6a1534c1d8f0a944f3e",
+      "en": "3ac40bcd397aaaf77389ed5e6a9aaf6f2098ca4fbf3375093c7175f359e4ae8f"
+    },
+    "/decision-guard-selected-codex-cleanup-at-execution/problem": {
+      "zh": "796b530b7cac36ac6ebfa2abf6ada6e4ad9ab3df6c9a03cc1628d6f863557ed6",
+      "en": "1f149d95b2b5d1c6a18c9c34deca556c7a25b91dfe4d0d8451aaf23453fba76d"
+    },
+    "/decision-guard-selected-codex-cleanup-at-execution/decision": {
+      "zh": "dad6713f5f036d588f17c7cb6f90e7dc8922fead26fb8cf4e8b44dec66d08e11",
+      "en": "8671d50f1c3b0eb16f63e0ef1badae6e86c5bb4807558692497e8b7901a65d37"
+    },
+    "/decision-guard-selected-codex-cleanup-at-execution/alternatives-considered": {
+      "zh": "d857188754d0922e44b3e00b2d2b5075fb3a857efbd536287907df58eeecd300",
+      "en": "07f9ce94bac797c377dc8bd7e297cd5a3a71b7778a4c2f5195f61bee074c0e02"
+    },
+    "/decision-guard-selected-codex-cleanup-at-execution/consequences-and-verification": {
+      "zh": "eed09300a0d78736a709092253ff003d496225c655c46732a26c7c323ace5de3",
+      "en": "4beb9827bd81db9a41ddfd8a6f297cf82fc9e69040a65efc964816cf1f32db5b"
+    }
+  }
+}

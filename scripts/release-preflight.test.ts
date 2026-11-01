@@ -45,8 +45,9 @@ test('rejects stale or incomplete root README release facts', () => {
   const release = `https://github.com/${repository}/releases/tag/v${version}`;
   const raw = `https://raw.githubusercontent.com/${repository}/main`;
   const platforms = 'macOS arm64/x64, Linux glibc arm64/x64, Windows x64';
-  const english = `Development Preview: [\`v${version}\`](${release})\n${raw}/scripts/install/install.sh --version ${version}\n${raw}/scripts/install/install.ps1 -Version ${version}\n${platforms}`;
-  const chinese = `开发者预览版：[\`v${version}\`](${release})\n${raw}/scripts/install/install.sh --version ${version}\n${raw}/scripts/install/install.ps1 -Version ${version}\n${platforms}`;
+  const installers = `curl -fsSL ${raw}/scripts/install/install.sh | sh -s -- --version ${version} --plugin\n& ([scriptblock]::Create((irm ${raw}/scripts/install/install.ps1))) -Version ${version} -Plugin`;
+  const english = `Development Preview: [\`v${version}\`](${release})\n${installers}\n${platforms}\n## Update\n[Installation](docs/guides/installation.en.md)`;
+  const chinese = `开发者预览版：[\`v${version}\`](${release})\n${installers}\n${platforms}\n## 更新\n[安装](docs/guides/installation.md)`;
   assert.deepEqual(rootReadmeReleaseErrors({ english, chinese }, version, repository), []);
   const errors = rootReadmeReleaseErrors({
     english: `${english}\nThe URL becomes available after the release workflow completes.`,
@@ -65,14 +66,16 @@ test('requires the README stage to match beta versions', () => {
   const version = '0.1.0-beta.1';
   const url = `https://github.com/${repository}/releases/tag/v${version}`;
   const raw = `https://raw.githubusercontent.com/${repository}/main`;
-  const common = `[\`v${version}\`](${url}) ${raw}/scripts/install/install.sh --version ${version} ${raw}/scripts/install/install.ps1 -Version ${version} macOS arm64/x64 Linux glibc arm64/x64 Windows x64`;
+  const common = `[\`v${version}\`](${url})\ncurl -fsSL ${raw}/scripts/install/install.sh | sh -s -- --version ${version} --plugin\n& ([scriptblock]::Create((irm ${raw}/scripts/install/install.ps1))) -Version ${version} -Plugin\nmacOS arm64/x64 Linux glibc arm64/x64 Windows x64`;
+  const english = `Beta: ${common}\n## Update\n[Installation](docs/guides/installation.en.md)`;
+  const chinese = `Beta 测试版：${common}\n## 更新\n[安装](docs/guides/installation.md)`;
   assert.deepEqual(rootReadmeReleaseErrors({
-    english: `Beta: ${common}`,
-    chinese: `Beta 测试版：${common}`,
+    english,
+    chinese,
   }, version, repository), []);
   assert.match(rootReadmeReleaseErrors({
-    english: `Development Preview: ${common}`,
-    chinese: `开发者预览版：${common}`,
+    english: english.replace('Beta:', 'Development Preview:'),
+    chinese: chinese.replace('Beta 测试版：', '开发者预览版：'),
   }, version, repository).join('\n'), /missing Beta/);
 });
 
@@ -80,9 +83,18 @@ test('requires stable README installation and update facts without preview flags
   const repository = 'owner/repo', version = '0.1.0';
   const url = `https://github.com/${repository}/releases/tag/v${version}`;
   const raw = `https://raw.githubusercontent.com/${repository}/main`;
-  const common = `[\`v${version}\`](${url}) ${raw}/scripts/install/install.sh ${raw}/scripts/install/install.ps1 macOS arm64/x64 Linux glibc arm64/x64 Windows x64\nwombat update --check\nwombat update\n`;
-  assert.deepEqual(rootReadmeReleaseErrors({english: `Stable: ${common}`, chinese: `正式版：${common}`}, version, repository), []);
-  assert.match(rootReadmeReleaseErrors({english: `Beta: ${common}`, chinese: `Beta 测试版：${common}`}, version, repository).join('\n'), /missing Stable/);
+  const common = `[\`v${version}\`](${url})\ncurl -fsSL ${raw}/scripts/install/install.sh | sh -s -- --plugin\n& ([scriptblock]::Create((irm ${raw}/scripts/install/install.ps1))) -Plugin\nmacOS arm64/x64 Linux glibc arm64/x64 Windows x64`;
+  const english = `Stable: ${common}\n## Update\n[Installation](docs/guides/installation.en.md)`;
+  const chinese = `正式版：${common}\n## 更新\n[安装](docs/guides/installation.md)`;
+  assert.deepEqual(rootReadmeReleaseErrors({english, chinese}, version, repository), []);
+  assert.match(rootReadmeReleaseErrors({english: english.replace('Stable:', 'Beta:'), chinese: chinese.replace('正式版：', 'Beta 测试版：')}, version, repository).join('\n'), /missing Stable/);
+  for (const [good, bad] of [
+    [' --plugin', ''], [' -Plugin', ''],
+    ['| sh -s -- --plugin', `| sh -s -- --version ${version}-beta.1 --plugin`],
+    ['## Update', 'Update text'],
+    ['(docs/guides/installation.en.md)', '(missing-guide)'],
+  ]) assert.ok(rootReadmeReleaseErrors({english: english.replace(good, bad), chinese}, version, repository).length > 0, good);
+  assert.ok(rootReadmeReleaseErrors({english, chinese: chinese.replace('(docs/guides/installation.md)', '(missing-guide)')}, version, repository).length > 0);
 });
 
 test('requires immutable external Action references', () => {

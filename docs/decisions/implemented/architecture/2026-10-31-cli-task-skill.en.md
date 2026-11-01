@@ -10,7 +10,9 @@ Separate task Skills, Web startup and browser-specific delivery duplicated the u
 
 ## Decision
 
-Ship one main Wombat Skill with five on-demand task flows: resume, investigate, delivery verification, period review and project improvement. Reuse existing generated CLI contracts for exact facts and bounded history. Static project inspection uses Codex file tools directly, without an initialization phase. Keep accounting, prices, scope and version rules in the core.
+Ship one main Wombat Skill with three direct task references: query, diagnose and verify. These cover resuming work, investigation, delivery acceptance, period review and project improvement without separate nested procedures. Reuse existing generated CLI contracts for exact facts and bounded history. Static project inspection uses Codex file tools directly, without an initialization phase. Keep accounting, prices, scope and version rules in the core.
+
+Expose five CLI entries: `usage`, `check`, `system`, `api` and `call`. Usage groups statistics and comparisons; check groups project inspection and original-condition rechecks; system retains host-specific behavior. Detailed capabilities use existing generated methods. Separate human wrappers had repeated argument parsing, help and failure paths without adding domain behavior. Remove those wrappers and old aliases; keep the underlying contracts, accounting, saved-snapshot refresh and explicit user decisions unchanged.
 
 Remove Web, UI, HTTP transport, browser-only schemas, build assets and acceptance stages. Do not add old command aliases or format migration. Keep the local core query service and optional collection, budgets, native handoff, user decisions and original-issue rechecks used by CLI consumers.
 
@@ -24,4 +26,4 @@ Retaining Web or four task Skills preserves duplicate maintenance. Adding a univ
 
 ## Impact and verification
 
-Source-only repository guards reject removed delivery dependencies and enforce one shipped Skill. Product tests use real native clients and assembled CLI entries with independent synthetic accounting expectations. Real-source acceptance uses a frozen read-only corpus, separate empty product homes and the same queries before and after the change. Functional outcomes and partial coverage are reported outside the repository. Performance is outside this acceptance scope. These checks do not establish causal savings or later adoption.
+Source-only repository guards reject removed delivery dependencies, enforce the five entries and three directly linked references, and retain one shipped Skill. Product tests use real native clients and assembled CLI entries with independent synthetic accounting expectations. Real-source acceptance uses a frozen read-only corpus, separate empty product homes and the same queries before and after the change. Functional outcomes and partial coverage are reported outside the repository. Performance is outside this acceptance scope. These checks do not establish causal savings or later adoption.

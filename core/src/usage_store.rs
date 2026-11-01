@@ -36,6 +36,7 @@ pub struct Slice {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnEntry {
+    pub operation_time: TimeRange,
     pub turn: Option<Turn>,
     pub slice: Slice,
 }
@@ -72,6 +73,7 @@ pub struct TurnData {
 }
 #[derive(Clone, Default)]
 struct MemoryTurn {
+    operation_time: TimeRange,
     measurements: Vec<usize>,
     operations: Vec<Arc<Operation>>,
     cold_operations: Vec<crate::live_index::FactLocation>,
@@ -134,7 +136,9 @@ mod event_tests;
 mod files;
 mod memory;
 pub(crate) mod message_events;
-pub use message_events::MessageTimeRange;
+mod time_range;
+pub use time_range::TimeRange;
+pub(crate) mod inspection_index;
 mod native_boundary;
 pub use native_boundary::NativeBoundaryIndex;
 mod price_pool;

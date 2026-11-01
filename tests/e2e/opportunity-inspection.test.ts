@@ -1,3 +1,4 @@
+import {queryInvocation,spawnProductCli,type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -80,14 +81,10 @@ test('opportunity rules run through actual native sources, CLI and native withou
             assert.equal(priced.checks.find(c => c.rule === rule)!.status, 'hit', JSON.stringify(priced));
         const period = (await nodeQuery({ action: 'review', snapshotId, scope: { since: prior, until, timezone: 'UTC', model: 'gpt-5.4' } })).inspection!.opportunities!;
         assert.equal(period.checks.find(c => c.rule === 'estimate_increase')!.status, 'hit');
-        const args = [path.resolve('dist/wombat.js'), 'investigate', '--snapshot', snapshotId, '--all-time', '--timezone', 'UTC'];
-        const json = spawnSync(process.execPath, [...args, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const request: CliInput = queryInvocation({action:'investigate',snapshotId,scope:{allTime:true,timezone:'UTC'}},{mode:'cached'});
+        const json = spawnProductCli(path.resolve('dist/wombat.js'), request, { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.ok([0, 2].includes(json.status!), json.stderr + json.stdout);
         assert.deepEqual(JSON.parse(json.stdout).inspection.opportunities, review);
-        const text = spawnSync(process.execPath, [...args, '--lang', 'en'], { env: process.env, encoding: 'utf8', timeout: 15000 });
-        assert.ok([0, 2].includes(text.status!), text.stderr + text.stdout);
-        assert.match(text.stdout, /Root or home deletion request/);
-        assert.match(text.stdout, /Question missing from returned answers/);
         for (const check of review.checks)
             for (const finding of check.findings)
                 for (const proof of finding.evidence) {

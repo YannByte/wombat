@@ -53,7 +53,7 @@ try {
   await delay(100);
   assert.equal(service.exitCode, null, diagnostics || 'shared service exited before the probe');
   assert.equal(service.signalCode, null, diagnostics || 'shared service exited before the probe');
-  const result = spawnSync(process.execPath, [path.join(root, 'dist', 'wombat.js'), 'optimize', 'capabilities', '--json'], {
+  const result = spawnSync(process.execPath, [path.join(root, 'dist', 'wombat.js'), "check", 'capabilities', '--json'], {
     cwd: temporary,
     env,
     encoding: 'utf8',

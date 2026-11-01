@@ -1,3 +1,4 @@
+import {queryInvocation,spawnProductCli,type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -53,15 +54,10 @@ test('six workflow signals share CLI, native and fixed-view evidence without raw
         assert.equal(a.findings[0].baseline!.operations, 20);
         assert.equal(a.findings[0].baseline!.medianDurationMs, 3000);
         assert.doesNotMatch(JSON.stringify(result), /SYNTHETIC_PRIVATE_/);
-        const args = [path.resolve('dist/wombat.js'), 'investigate', '--snapshot', snapshotId, '--project', project, '--since', scope.since, '--until', scope.until, '--timezone', 'UTC'];
-        const json = spawnSync(process.execPath, [...args, '--json'], { encoding: 'utf8', env: process.env, timeout: 15000 });
+        const request: CliInput = queryInvocation({action:'investigate',snapshotId,scope:{project,since:scope.since,until:scope.until,timezone:'UTC'}},{mode:'cached'});
+        const json = spawnProductCli(path.resolve('dist/wombat.js'), request, { encoding: 'utf8', env: process.env, timeout: 15000 });
         assert.ok([0, 2].includes(json.status!), json.stderr + json.stdout);
         assert.deepEqual(JSON.parse(json.stdout).inspection.activity, a);
-        const text = spawnSync(process.execPath, [...args, '--lang', 'en'], { encoding: 'utf8', env: process.env, timeout: 15000 });
-        assert.ok([0, 2].includes(text.status!), text.stderr + text.stdout);
-        assert.match(text.stdout, /Recurring workflow/);
-        assert.match(text.stdout, /project command, script or Skill/);
-        assert.match(text.stdout, /Previous period evidence/);
         for (const proof of [...a.findings[0].evidence, ...a.findings[0].baselineEvidence]) {
             const steps = await query({ action: 'steps', snapshotId, threadId: proof.threadId, turnId: proof.turnId!, scope: proof.scope });
             assert.ok(steps.items.some(i => i.kind === 'operation' && i.id === proof.operationId));

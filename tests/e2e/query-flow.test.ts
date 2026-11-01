@@ -1,3 +1,4 @@
+import {queryInvocation}from '../../scripts/cli-invocation.js';
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -57,12 +58,12 @@ test(
         return JSON.parse(run.stdout);
       };
       const prose = await readFile(
-        "plugin/skills/wombat/references/query-flow.md",
+        "plugin/skills/wombat/references/query.md",
         "utf8",
       );
-      const template = JSON.parse(prose.match(/```json\n([^]*?)\n```/)![1]);
-      template.params.query.scope.project = f.project;
-      for (const q of template.params.also) q.scope.project = f.project;
+      assert.match(prose, /also/);
+      const scope = {since:'2026-01-02',until:'2026-01-03',timezone:'Asia/Shanghai',project:f.project};
+      const template: Extract<AgentRequest,{method:'usage'}> = {method:'usage',params:{query:{action:'usage',scope,compact:true},mode:'cached',also:[{action:'statistics',scope,compact:true},{action:'threads',scope,sort:'tokens',compact:true}]}};
       await f.client.live!({
         query: { ...template.params.query, roots: [f.root] },
         mode: "fresh",
@@ -81,10 +82,7 @@ test(
       assert.equal(selected.kind, "thread");
       if (selected.kind !== "thread") assert.fail("Expected task");
       assert.equal(selected.upstreamId, "focus");
-      const turns: LiveResult = invoke({
-        method: "usage",
-        params: {
-          query: {
+      const turns: LiveResult = invoke(queryInvocation({
             action: "turns",
             snapshotId: batch.result.snapshotRef.snapshotId,
             threadId: selected.id,
@@ -92,10 +90,7 @@ test(
             matchedOnly: true,
             compact: true,
             limit: 1,
-          },
-          mode: "cached",
-        },
-      });
+          }, {mode:"cached"}));
       const turn = turns.result.items[0];
       assert.equal(turn.kind, "turn");
       const request = {

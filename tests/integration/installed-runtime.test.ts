@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { accessSync, constants, cpSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -62,33 +63,33 @@ test('installed runtime queries synthetic usage, fixed drill-down and configurat
     });
     await delay(100);
     assert.equal(service.exitCode, null, 'installed runtime service exited during startup');
-    const invoke = (args: string[]): any => {
-      const result = spawnSync(process.execPath, [path.join(installed, 'wombat.js'), ...args, '--json'], {
+    const invoke = (args: CliInput): any => {
+      const result = spawnProductCli(path.join(installed, 'wombat.js'), Array.isArray(args) ? [...args, '--json'] : args, {
         cwd: temp, env,
         encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
       });
       assert.ok(result.status !== null && [0, 2].includes(result.status), result.stderr + result.stdout);
       const value = JSON.parse(result.stdout); assert.ok(!value.error, result.stdout); return value;
     };
-    const fixed = invoke(['refresh']);
+    const fixed = invoke({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto"}});
     const scope = ['--snapshot', fixed.snapshotRef.snapshotId, '--since', '2026-10-03', '--until', '2026-10-04', '--timezone', 'Asia/Shanghai'];
     assert.equal(invoke(['usage', ...scope]).summary.tokens.total, 330);
-    const threads = invoke(['threads', ...scope, '--sort', 'tokens', '--limit', '1']);
+    const threads = invoke(queryInvocation({"action":"threads","sort":"tokens","limit":1,"snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(threads.page.total, 2); assert.equal(threads.summary.tokens.total, 330); assert.equal(threads.items[0].matchedUsage.tokens.total, 220);
-    const turns = invoke(['turns', ...scope, '--thread', threads.items[0].id, '--matched-only', '--sort', 'tokens']);
+    const turns = invoke(queryInvocation({"action":"turns","matchedOnly":true,"threadId":threads.items[0].id,"sort":"tokens","snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(turns.items[0].usage.tokens.total, 220);
-    const steps = invoke(['steps', ...scope, '--thread', threads.items[0].id, '--turn', turns.items[0].id]);
+    const steps = invoke(queryInvocation({"action":"steps","threadId":threads.items[0].id,"turnId":turns.items[0].id,"snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(steps.items.filter((item: { kind: string }) => item.kind === 'measurement').length, 1);
     const configArgs = ['--root', source, '--project-root', project];
-    const inventory = invoke(['optimize', 'inventory', ...configArgs]);
+    const inventory = invoke(["check", 'inventory', ...configArgs]);
     assert.ok(
       inventory.items.some((item: { path: string }) => canonicalPath(item.path) === canonicalSkill),
       `installed inventory did not include ${skill}: ${JSON.stringify(inventory.items.map((item: { path: string }) => item.path))}`,
     );
-    const suggestions = invoke(['optimize', 'list', ...configArgs, '--read-view', inventory.readView]);
+    const suggestions = invoke(["check", 'list', ...configArgs, '--read-view', inventory.readView]);
     assert.ok(suggestions.suggestions.some((item: { item: { path: string }; findings: { rule: string }[] }) => canonicalPath(item.item.path) === canonicalSkill && item.findings.some(finding => finding.rule === 'descriptionSize')));
     await stopService(service); service = undefined;
-    assert.ok(invoke(['--help']).commands.includes('optimize'));
+    assert.ok(invoke(['--help']).commands.includes('check'));
   } finally {
     if (service) await stopService(service);
     rmSync(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });

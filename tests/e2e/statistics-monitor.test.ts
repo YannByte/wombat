@@ -1,3 +1,4 @@
+import {spawnProductCli,type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -32,7 +33,7 @@ test('task statistics and budgets share exact facts across Agent CLI and native 
     await once(service, 'spawn');
     const client = createNodeClient({ binaryPath: binary, automaticPrices: false });
     let nativeEntry: UsageClient | undefined;
-    const run = (args: string[], input = '') => { const result = spawnSync(process.execPath, [entry, ...args], { env: process.env, input, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }); assert.ifError(result.error); assert.equal(result.status, 0, result.stderr); return JSON.parse(result.stdout); };
+    const run = (args: CliInput, input = '') => { const result = spawnProductCli(entry, args, { env: process.env, input, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }); assert.ifError(result.error); assert.equal(result.status, 0, result.stderr); return JSON.parse(result.stdout); };
     try {
         const live = await client.live!({ query: { action: 'threads', roots: [source], scope: { allTime: true }, limit: 3 }, mode: 'fresh' }), snapshotId = live.result.snapshotRef.snapshotId;
         const scope = { project, since: today, until: tomorrow, timezone: 'UTC' }, comparison = { kind: 'periods' as const, baselineSince: yesterday, baselineUntil: today, dimension: 'thread' as const };
@@ -49,15 +50,15 @@ test('task statistics and budgets share exact facts across Agent CLI and native 
         assert.equal(typical.percentileRank, 5 / 6);
         const agent = run(['call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: request } }));
         assert.deepEqual(agent.result.statistics, stats);
-        const human = run(['statistics', '--snapshot', snapshotId, '--project', project, '--since', today, '--until', tomorrow, '--baseline-since', yesterday, '--baseline-until', today, '--presentation', 'models', '--limit', '1', '--json']);
+        const human = run(["usage", "stats", '--snapshot', snapshotId, '--project', project, '--since', today, '--until', tomorrow, '--baseline-since', yesterday, '--baseline-until', today, '--presentation', 'models', '--limit', '1', '--json']);
         assert.deepEqual(human.statistics, stats);
-        run(['monitor', 'set', '--id', 'daily', '--period', 'day', '--tokens', '400', '--review', '--project', project, '--timezone', 'UTC', '--json']);
-        const first = run(['monitor', 'check', '--id=daily', '--root', source, '--json']);
+        run({method:'monitor',params:{action:'upsert',plan:{id:'daily',enabled:true,period:'day',tokenLimit:Number('400'),review:true,scope:{project:project,timezone:'UTC'}}}});
+        const first = run(['system','watch','--once','--id=daily','--root',source,'--json']);
         assert.equal(first.notifications.length, 2);
         assert.ok(first.notifications.some((n: {
             kind: string;
         }) => n.kind === 'budget_exceeded'));
-        assert.equal(run(['monitor', 'check', '--id', 'daily', '--root', source, '--json']).notifications.length, 0);
+        assert.equal(run(['system','watch','--once','--id','daily','--root',source,'--json']).notifications.length, 0);
         const foreignView = (await client.live!({ query: { action: 'usage', roots: [foreign], scope: { allTime: true } }, mode: 'fresh' })).result;
         await client.monitor!({ action: 'upsert', plan: { id: 'foreign', enabled: true, period: 'day', review: false, tokenLimit: 500, scope: { project, sourceInstanceId: foreignView.quality.sources[0].source.id, timezone: 'UTC' } } });
         await client.monitor!({ action: 'check', snapshotId: foreignView.snapshotRef.snapshotId, ids: ['foreign'] });

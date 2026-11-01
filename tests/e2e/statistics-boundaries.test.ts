@@ -52,7 +52,7 @@ test('statistics keep zero, missing totals, ties, unassigned facts and empty win
     assert.equal(fresh.statistics!.population.completeTaskTokens, 250);
     const pinned = (await nativeApi.live!({ query, mode: 'cached' })).result;
     assert.deepEqual(pinned.statistics, stats, 'A later scan cannot rewrite an existing snapshot');
-    const cli = JSON.parse(f.cli(['statistics', '--snapshot', snapshotId, '--all-time', '--presentation', 'models', '--limit', '1', '--json']));
+    const cli = JSON.parse(f.cli(["usage", "stats", '--snapshot', snapshotId, '--all-time', '--presentation', 'models', '--limit', '1', '--json']));
     assert.deepEqual(cli.statistics, stats, 'CLI retains missing measurement fields in a successfully read source');
   });
 });

@@ -52,7 +52,7 @@ export function renderReleaseNotes(input: ReleaseNotesInput, set: GitHubReleaseS
   const windowsCommand = prerelease
     ? `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/${repository}/main/scripts/install/install.ps1))) -Version ${set.version}`
     : `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/${repository}/main/scripts/install/install.ps1)))`;
-  const update = prerelease ? `wombat update --check --version ${set.version}` : 'wombat update --check\nwombat update';
+  const update = prerelease ? `wombat system update --check --version ${set.version}` : 'wombat system update --check\nwombat system update';
   const compare = previousTag
     ? `Changes since [${previousTag}](https://github.com/${repository}/releases/tag/${previousTag}): [compare ${previousTag}...${tag}](https://github.com/${repository}/compare/${previousTag}...${tag})`
     : `See the [commit history](https://github.com/${repository}/commits/${tag}).`;

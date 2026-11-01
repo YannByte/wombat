@@ -1,7 +1,7 @@
 {
   "interface": {
     "display_name": "Wombat",
-    "short_description": "Diagnose project obstacles and verify improvements",
-    "default_prompt": "Use $wombat to investigate this project task with evidence and recommend a concrete, verifiable next step."
+    "short_description": "Explore work history, usage and project improvements",
+    "default_prompt": "Use $wombat to answer my task with local evidence and, when a change is needed, recommend a concrete action and a way to verify it."
   }
 }

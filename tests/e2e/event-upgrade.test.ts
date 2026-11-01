@@ -1,3 +1,4 @@
+import { spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -186,8 +187,8 @@ async function pages(client: UsageClient, request: EvidenceRequest): Promise<Evi
     }
     throw new Error('Synthetic evidence pagination exceeded 100 pages');
 }
-function cli(args: string[]): unknown {
-    const result = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), ...args, '--json'], {
+function cli(args: CliInput): unknown {
+    const result = spawnProductCli(path.resolve('dist/wombat.js'), Array.isArray(args) ? [...args, '--json'] : args, {
         env: process.env, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024,
     });
     assert.ifError(result.error);
@@ -282,7 +283,7 @@ test('fixed native events have independent token/time/work/use truth through Nod
         assert.deepEqual(node.time, initial.time);
         assert.deepEqual(node.work, initial.work);
         assert.deepEqual(node.uses, initial.uses);
-        const args = ['timing', 'summary', '--snapshot', snapshotId, '--thread', thread.id, '--turn', turn.id, '--cached'];
+        const args: CliInput = {"method":"timing","params":{"action":"summary","privacyProfile":"local","mode":"cached","snapshotId":snapshotId,"threadId":thread.id,"turnId":turn.id}};
         assert.deepEqual(cli(args), initial, 'all entries use the same fixed evidence, not separately selected latest views');
         const evidence = { action: 'evidence', snapshotId, threadId: thread.id, turnId: turn.id, limit: 2 } as const;
         const events = await pages(env.nativeTransport, { ...evidence, collection: 'turn_events' });
@@ -330,11 +331,11 @@ test('fixed native events have independent token/time/work/use truth through Nod
         assert.equal(skillRows.length, 3);
         assert.ok(skillRows.every(item => item.objectRef === skill.objectRef));
         assert.equal(skillRows.filter(item => item.outcome === 'failed').length, 1);
-        const cliPage = cli(['timing', 'evidence', '--snapshot', snapshotId, '--thread', thread.id, '--turn', turn.id, '--collection', 'use_records', '--object', skill.objectRef, '--limit', '2']);
+        const cliPage = cli({"method":"timing","params":{"action":"evidence","snapshotId":snapshotId,"threadId":thread.id,"turnId":turn.id,"collection":"use_records","objectRef":skill.objectRef,"limit":2}});
         assert.deepEqual(cliPage, filtered[0]);
         const shared = share(await timing(env.nativeTransport, { ...request, privacyProfile: 'share-v1' }));
         whitelist(shared, [body, title, server, tool, env.dir, env.skill, nativeThread, nativeTurn, 'synthetic-native-command', 'synthetic-native-patch', 'synthetic-native-mcp', 'synthetic-native-read-one', 'synthetic-native-message']);
-        const cliShared = cli([...args, '--share']);
+        const cliShared = cli({"method":"timing","params":{"action":"summary","privacyProfile":"share-v1","mode":"cached","snapshotId":snapshotId,"threadId":thread.id,"turnId":turn.id}});
         assert.ok(cliShared && typeof cliShared === 'object' && 'scope' in cliShared);
         const cliScope = cliShared.scope;
         assert.ok(cliScope && typeof cliScope === 'object' && 'taskAlias' in cliScope && typeof cliScope.taskAlias === 'string');

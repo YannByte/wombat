@@ -55,7 +55,7 @@ for (const array of [false, true])
             assert.ok(inventory.hookRegistry.contexts.every(c => c.registrations.length === 2 && c.registrations.every(r => r.pluginId === 'sample@test')));
             for (const privateText of ['PRIVATE_ARG', 'UNLISTED_PRIVATE', 'UNRESOLVED'])
                 assert.ok(!JSON.stringify(inventory).includes(privateText));
-            const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'inventory', '--root', root, ...[a, b].flatMap(p => ['--project-root', p]), '--kind', 'hook', '--read-view', inventory.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+            const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'inventory', '--root', root, ...[a, b].flatMap(p => ['--project-root', p]), '--kind', 'hook', '--read-view', inventory.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
             assert.ok(cli.status === 0 || cli.status === 2, cli.stderr);
             assert.deepEqual(JSON.parse(cli.stdout).hookRegistry, inventory.hookRegistry);
             const suggestions = await nativeTransport.optimize!({ action: 'list', project: a });

@@ -29,18 +29,20 @@ export function rootReadmeReleaseErrors(
     : version.includes('-beta.') ? ['Beta:', 'Beta 测试版：']
       : version.includes('-rc.') ? ['Release Candidate:', 'RC 候选版：']
         : ['Stable:', '正式版：'];
-  const versionRequirements = version.includes('-')
-    ? [`--version ${version}`, `-Version ${version}`]
-    : ['wombat update --check\nwombat update\n'];
+  const preview = version.includes('-');
+  const installers = [
+    `curl -fsSL ${raw}/scripts/install/install.sh | sh -s --${preview ? ` --version ${version}` : ''} --plugin`,
+    `& ([scriptblock]::Create((irm ${raw}/scripts/install/install.ps1)))${preview ? ` -Version ${version}` : ''} -Plugin`,
+  ];
   const requirements = [
     ['README.md', readmes.english, [
       `[\`v${version}\`](${releaseUrl})`,
-      `${raw}/scripts/install/install.sh`, `${raw}/scripts/install/install.ps1`, ...versionRequirements,
+      ...installers, '## Update', '(docs/guides/installation.en.md)',
       'macOS arm64/x64', 'Linux glibc arm64/x64', 'Windows x64',
     ]],
     ['README.zh-CN.md', readmes.chinese, [
       `[\`v${version}\`](${releaseUrl})`,
-      `${raw}/scripts/install/install.sh`, `${raw}/scripts/install/install.ps1`, ...versionRequirements,
+      ...installers, '## 更新', '(docs/guides/installation.md)',
       'macOS arm64/x64', 'Linux glibc arm64/x64', 'Windows x64',
     ]],
   ] as const;

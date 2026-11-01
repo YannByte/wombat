@@ -94,7 +94,7 @@ for (const scenario of ['fresh', 'upgrade', 'slow-hooks']) test('plugin installe
   assert.deepEqual(trace.at(-2), ['plugin', 'marketplace', 'add', f.marketplace]);
   assert.deepEqual(trace.at(-1), ['plugin', 'add', name + '@wombat-local', '--json']);
   assert.equal(trace.some(args => args.includes('hooks') || args.includes('trust')), false);
-  assert.deepEqual(JSON.parse(readFileSync(f.trace+'.verify', 'utf8')), {args: ['setup', '--project', process.cwd(), '--json'], binary: f.binary});
+  assert.deepEqual(JSON.parse(readFileSync(f.trace+'.verify', 'utf8')), {args: ["system", "doctor", "--plugin", '--project', process.cwd(), '--json'], binary: f.binary});
 });
 for (const [scenario, message] of [['conflict', /Multiple Wombat/], ['foreign', /not local/], ['invalid', /Unrecognized/], ['failure', /Wombat is installed/], ['large', /Wombat is installed/], ['timeout', /Wombat is installed/]] as const) test('plugin installer stops on ' + scenario, async t => {
   const f = fixture(t, scenario);
@@ -147,7 +147,7 @@ for(const [scenario, expected] of [
   assert.equal(result.report.project, process.cwd());
   assert.match(result.message, /Do not reinstall the runtime/);
   if (['verify-denied', 'verify-disconnected', 'verify-timeout'].includes(scenario)) {
-    assert.match(result.message, /read-only check: wombat setup/);
+    assert.match(result.message, /read-only check: wombat system doctor --plugin/);
     assert.doesNotMatch(result.message, /--plugin-only/);
   }
   assert.ok(!JSON.stringify(result).includes('PRIVATE_'), 'diagnostics must exclude native output and unrelated Hook content');

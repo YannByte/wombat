@@ -1,3 +1,4 @@
+import {spawnProductCli,type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -28,18 +29,18 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
     await once(service, 'spawn');
     const client = createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false });
     let nativeEntry: UsageClient | undefined;
-    const run = (args: string[], input = '') => { const result = spawnSync(process.execPath, [entry, ...args], { env: process.env, input, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }); assert.ifError(result.error); assert.ok(!/PRIVATE_INPUT|PRIVATE_OUTPUT|PRIVATE_PROMPT/.test(result.stdout + result.stderr)); return result; };
+    const run = (args: CliInput, input = '') => { const result = spawnProductCli(entry, args, { env: process.env, input, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }); assert.ifError(result.error); assert.ok(!/PRIVATE_INPUT|PRIVATE_OUTPUT|PRIVATE_PROMPT/.test(result.stdout + result.stderr)); return result; };
     try {
         await client.setup!({ project });
         await assert.rejects(client.live!({ query: { action: 'usage', roots: [source] }, mode: 'cached' }), { code: 'NO_SNAPSHOT' });
         const before = (await client.live!({ query: { action: 'usage', roots: [source], scope: { allTime: true }, limit: 1 }, mode: 'fresh' })).result;
         assert.equal(before.summary.tokens.total, 110);
         assert.equal((await client.collection!({})).state, 'logs_only');
-        const mode = run(['collection', 'mode', 'hooks', '--json']);
+        const mode = run({method:'collection',params:{action:'configure',mode:'hooks'}});
         assert.equal(mode.status, 0);
         assert.equal(JSON.parse(mode.stdout).state, 'waiting');
         const body = { hook_event_name: 'PostToolUse', session_id: 'synthetic-session', turn_id: 'turn-1', tool_use_id: 'call-1', cwd: project, tool_input: { secret: 'PRIVATE_INPUT' }, tool_response: 'PRIVATE_OUTPUT', prompt: 'PRIVATE_PROMPT' };
-        assert.equal(run(['hook', 'codex'], JSON.stringify(body)).stdout, '');
+        assert.equal(run(["system", "hook", 'codex'], JSON.stringify(body)).stdout, '');
         await Promise.all(Array.from({ length: 8 }, () => receiveCodexHook(body, {}, { binaryPath: binary })));
         assert.equal((await client.collection!({})).received, 1);
         await client.collection!({ action: 'pause' });
@@ -48,11 +49,8 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
         const resumed = await client.collection!({ action: 'resume' });
         assert.equal(resumed.buffered, 0);
         assert.equal(resumed.received, 2);
-        for (const lang of ['zh', 'en']) {
-            const text = run(['collection', 'status', '--lang', lang]);
-            assert.equal(text.status, 0);
-            assert.match(text.stdout, lang === 'zh' ? /已收到事件/ : /Events received/);
-        }
+        const status = run({method:'collection',params:{action:'status'}});
+        assert.equal(status.status,0);assert.equal(JSON.parse(status.stdout).received,2);
         nativeEntry = projectTestClient(client, [source], [project]);
 
         const nativeApi = nativeEntry;
@@ -88,8 +86,8 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
         const after = (await client.live!({ query: { action: 'usage', roots: [source], scope: { allTime: true }, limit: 1 }, mode: 'fresh' })).result;
         assert.equal(after.summary.tokens.total, 110);
         assert.equal(after.summary.measurementCount, before.summary.measurementCount);
-        assert.equal(run(['hook', 'codex'], '{"PRIVATE_INPUT":').status, 0);
-        assert.equal(run(['hook', 'codex'], 'x'.repeat(64 * 1024 + 1)).status, 0);
+        assert.equal(run(["system", "hook", 'codex'], '{"PRIVATE_INPUT":').status, 0);
+        assert.equal(run(["system", "hook", 'codex'], 'x'.repeat(64 * 1024 + 1)).status, 0);
         nativeEntry = undefined;
         const bytes = await readFile(path.join(dir, 'data/collection-v1/observations.sqlite'));
         assert.ok(!/PRIVATE_INPUT|PRIVATE_OUTPUT|PRIVATE_PROMPT/.test(bytes.toString()));

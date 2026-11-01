@@ -329,6 +329,11 @@
       "zh": "docs/decisions/implemented/architecture/2026-10-31-on-demand-checks.md",
       "en": "docs/decisions/implemented/architecture/2026-10-31-on-demand-checks.en.md",
       "record": "docs/decisions/implemented/architecture/2026-10-31-on-demand-checks.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/implemented/architecture/2026-10-31-codex-cleanup-guards.md",
+      "en": "docs/decisions/implemented/architecture/2026-10-31-codex-cleanup-guards.en.md",
+      "record": "docs/decisions/implemented/architecture/2026-10-31-codex-cleanup-guards.i18n.json"
     }
   ],
   "legacyUnpaired": [],

@@ -9,7 +9,7 @@ Agent calls use `api` for local method/Schema discovery and `call` for one bound
 ## Public entries
 
 - The package root exports argument parsing and `runUsageCli`; `./format` exports result text formatting.
-- `refresh`, `usage`, `threads`, `turns`, `steps`, `prices`, `optimize`, and `timing` call the shared core through `@wombat/client/node`.
+- Five top-level entries are `usage`, `check`, `system`, `api` and `call`. Detailed capabilities retain the generated methods through `call`; old command aliases are rejected.
 - With no subcommand, the CLI prints usage text, just like `usage`.
 
 
@@ -34,34 +34,30 @@ Schema validation proves structure only. Product validation still checks support
 
 ## Limits and verification
 
-`optimize` text separates user decisions and reasons from current checks and the original assessment, and presents core recheck comparability directly. Keep, not applicable, and missing evidence do not imply resolution.
+`check` text separates user decisions and reasons from current checks and the original assessment, and presents core recheck comparability directly. Keep, not applicable, and missing evidence do not imply resolution.
 
 The CLI owns arguments, output, progress, and exit codes, not pricing or snapshot semantics. JSON progress goes to stderr and results to stdout; after a build, verify argument errors, partial results, and complete command paths under the [CLI rules](../../cli/AGENTS.md).
 
 ## Whole-turn timing
 
-`wombat timing` (or `timing summary`) requires full task and turn identities. It defaults to one JSON object; `--text` selects localized text and conflicts with `--json`. `--share` requests the core's separate projection. `timing evidence` requires the same target and a fixed snapshot, with opaque cursors and pages of 1..200 rows. `--collection` selects `turn_events` (default), `use_objects`, or `use_records`; only `use_records` accepts `--object` to select an object. Cursors retain the same snapshot, target, and collection. Whole-turn and associated use counts remain separate, and missing membership evidence is not replaced with zero; `timing capabilities` accepts no target or source paths and performs no scan. Timing bypasses automatic prices, configuration, Hook capture, and account observations.
+Use method `timing` through `call`. Summary requires full task and turn identities. Evidence navigation pins the same snapshot, target and collection, with opaque cursors and pages of 1..200 rows. Collections are `turn_events`, `use_objects` and `use_records`; only `use_records` accepts an object filter. Capability queries perform no scan. Local and `share-v1` projections retain independent privacy boundaries.
 
-Summary exit codes follow core quality: 0 for complete inspected scope even when optional values are unknown, 2 for partial or provisional results, 1 for errors, and 130 for cancellation. Successful evidence navigation and capability queries return 0 without inferring turn completeness. JSON errors use safe v1 templates; source paths and underlying error details are not printed. Independent synthetic CLI tests do not establish real-core or installed acceptance.
+Exit codes follow core quality: complete summaries return 0 even when optional measures are unknown; partial, running or censored summaries return 2. Successful evidence and capability queries return 0 without establishing turn completeness. Errors return 1 and cancellation 130. Timing bypasses automatic prices, configuration, Hook receipt and account observations. Unknown membership, durations and repository baselines are not replaced with zero. The [core reference](core.en.md) owns calculations and sharing.
 
-Localized `--text` summaries show command, compaction, reasoning and MCP interval unions and sums, covered and unclassified durations, and overlapping-category durations from the core. They also print the core Work metrics: operation outcomes, file-change records and reported paths, and user-input/injected-context/reasoning records. Command-classified duration is currently unsupported; added and removed line counts are unknown because no historical repository baseline is available. Values keep their core-provided status and basis; unknown is not zero. Reported paths may include failed or declined terminal outcomes and do not prove writes or net changes. User-input totals count physical records, not requests, and failed outcomes are not code-defect judgments. Source coverage is shown by the existing coverage line.
+<a id="unsupported-formats-and-recovery"></a>
 
 ## Unsupported formats and recovery
 
-Wombat rejects unknown snapshot and index formats without migrating or deleting the original data. An explicit `wombat usage --rebuild --wait-ms 600000 --json` scans the selected source roots into a new current-format database. It switches the active generation only after durable publication succeeds. Failure retains the original index; the original database remains available as a recovery copy. User decisions, identities, grants, account observations and handling records stay in their separate stores. Rebuild does not transform old snapshots and cannot recover source records that are no longer available. `refresh` alone does not repair incompatible live state. A different `WOMBAT_DATA_HOME` creates an isolated store and does not carry existing user records.
+Wombat rejects unknown snapshot and index formats without migrating or deleting the original data. An explicit `wombat usage --rebuild --wait-ms 600000 --json` scans the selected source roots into a new current-format database. It switches the active generation only after durable publication succeeds. Failure retains the original index; the original database remains available as a recovery copy. User decisions, identities, grants, account observations and handling records stay in their separate stores. Rebuild does not transform old snapshots and cannot recover source records that are no longer available. A saved-snapshot refresh alone does not repair incompatible live state. A different `WOMBAT_DATA_HOME` creates an isolated store and does not carry existing user records.
 
 `--wait-ms 1..600000` implies `--fresh` and keeps one caller waiting for its synchronization ticket. Cancellation releases that waiter; shared synchronization continues. Recent requests prioritize files modified within 30 days, previously indexed files, and complete declared fork/copy families. Modification time is a scheduling hint, never usage time. Unrecognized headers force a full scan. `historyDeferred` marks provisional source coverage; recent totals and rankings can change when history loads. Older ranges, all-time requests, `refresh`, verification, explicit `--include-history`, and rebuild include the full available source set. Already indexed history is never narrowed by a later recent request. The Agent `usage` request accepts up to eight `also` queries. They cannot select roots or another snapshot, or refresh. All results share the base query revision; the complete batch has a 2 MiB output budget.
 
 
 Timing text shows repeated behavior, timing basis, request observations and localized coverage. JSON retains the generated response. Calculation and sharing rules belong in the [core reference](core.en.md).
 
-## Collection entries
+## Local host operations
 
-`setup` reports separate runtime, discovery and registration observations without installation or model execution. `collection` exposes core preferences, status, safe event pages and pause/resume; JSON is the generated version 1 response. Machine-wide preference changes are distinct from project-filtered reads. `hook codex` is a bounded advisory stdin entry: it emits no stdout and exits 0 even when receipt fails, so it cannot supply model context or permission decisions. The [CLI guide](../guides/cli.en.md) owns commands and limits.
-
-`statistics` queries task distributions and period growth; `monitor` manages budgets and drives explicit periodic checks. The generated Agent API exposes monitoring as its own method. The [CLI guide](../guides/cli.en.md) owns commands and running requirements; the [core](core.en.md) owns calculations.
-
-`monitor watch` reports temporary check failures on stderr and reloads plans on the next iteration, including `MONITOR_CHANGED` after a concurrent edit. Invalid requests remain terminal errors.
+`system doctor` checks installation. `system doctor --plugin` inspects native Skill discovery; `--hooks` requests optional registration evidence. `system update` updates the runtime. Generated `call` methods own service, account, prices, collection, directory grants and budgets. `system watch` owns active fresh budget checks and cancellation; it reports temporary failures on stderr and reloads plans on the next iteration. `system hook codex` retains bounded advisory receipt, silent stdout and exit 0 on receipt failure. The [CLI guide](../guides/cli.en.md) owns syntax and operating limits.
 
 ## Release updates
 

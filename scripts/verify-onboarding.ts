@@ -1,3 +1,4 @@
+import {spawnProductCli,type CliInput} from './cli-invocation.ts';
 /** Real installed runtime, native plugin manager and optional native model journey. */
 import assert from 'node:assert/strict';
 import {spawn, type ChildProcess} from 'node:child_process';
@@ -58,18 +59,18 @@ try {
   assert.equal(release.sourceSha256, report.sourceSha256);
   const version = JSON.parse(await run('bundled-no-system-runtime', ['/usr/bin/env', 'PATH=', launcher, '--version', '--json']));
   assert.equal(version.version, release.version);
-  const setup = JSON.parse(await run('native-discovery', [launcher, 'setup', '--project', cwd, '--json']));
+  const setup = JSON.parse(await run('native-discovery', [launcher, 'system','doctor','--plugin', '--project', cwd, '--json']));
   assert.equal(setup.discovery.status, 'available'); assert.equal(setup.discovery.instances[0].name, 'wombat:wombat');
   assert.equal(setup.runtimeChecks[0].status, 'compatible');
   pass('fresh-install-plugin', {release, invocation:'wombat:wombat', noSystemNodeOrRust:true});
-  const query = async (name: string, args: string[]) => JSON.parse(await run(name, [launcher,...args,'--json']));
+  const query = async (name:string,args:CliInput)=>{if(Array.isArray(args))return JSON.parse(await run(name,[launcher,...args,'--json']));const r=spawnProductCli(path.join(destination,'lib/wombat.js'),args,{cwd,env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024},[],path.join(destination,'runtime/node'));writeFileSync(path.join(output,name+'.log'),r.stdout+r.stderr);assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);return JSON.parse(r.stdout);};
   const empty = await query('empty', ['usage','--all-time','--fresh','--wait-ms','60000']);
   assert.equal(empty.summary.measurementCount,0);
   writeFileSync(fixtureFile,sourceBody);
   const first = await query('first',['usage','--all-time','--fresh','--wait-ms','60000']);
   assert.equal(first.summary.tokens.total,110);
   for (const language of ['zh','en']) {
-    const tasks = await query('tasks-'+language, ['--lang',language,'threads','--all-time']);
+    const tasks = await query('tasks-'+language, {method:'usage',params:{query:{action:'threads',scope:{allTime:true}},mode:'cached'}});
     assert.equal(tasks.summary.tokens.total,110);
     assert.ok(tasks.items.some((v: {kind:string})=>v.kind==='thread'));
   }

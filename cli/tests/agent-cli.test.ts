@@ -8,6 +8,7 @@ import { describeAgentApi } from '../src/agent-description.js';
 import { local, capabilityResult } from './timing-fixtures.js';
 
 const requests = [
+  { method: "artifacts", params: { action: "inspect", projectRoot: "/synthetic" } },
   {
     method: 'usage',
     params: {
@@ -120,7 +121,7 @@ test('structured calls retain nested selection, emit unmodified product JSON and
                 scope: { sourceInstanceId: 'source' },
               },
             }
-          : requests[4];
+          : requests.find(r => r.method === 'timing')!;
     let calls = 0;
     const code = await runAgentCli('call', [], {
       ...io,
@@ -213,7 +214,7 @@ test('oversized product output returns one recovery error without a partial JSON
   assert.equal(
     await runAgentCli('call', [], {
       ...io,
-      stdin: Readable.from([JSON.stringify(requests[4])]),
+      stdin: Readable.from([JSON.stringify(requests.find(r => r.method === 'timing')!)]),
       createClient: () => ({ timing: async () => result }),
     }),
     1,
@@ -236,7 +237,7 @@ test('errors retain stable product codes and actionable recovery without private
     assert.equal(
       await runAgentCli('call', [], {
         ...io,
-        stdin: Readable.from([JSON.stringify(requests[4])]),
+        stdin: Readable.from([JSON.stringify(requests.find(r => r.method === 'timing')!)]),
         createClient: () => ({
           timing: async () => {
             throw new CoreError(code, '/private/canary', { secret: 'private canary' });

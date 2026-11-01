@@ -2,247 +2,117 @@
 
 [中文](cli.md) | English
 
-Wombat synchronizes local Codex logs incrementally by default and updates queries incrementally. An explicit refresh also saves a fixed snapshot. Current functionality includes usage, tasks, whole-turn timing, configuration measurements and manual review queries. Every subcommand works without a TTY; JSON uses the shared Rust queries.
+Wombat has five command entries. With no command, it prints usage. Queries prepare local data only when needed; installation needs no initialization or scan. Detailed operations use the generated JSON interface.
+
+## Choose an entry
+
+| Entry | Purpose |
+|---|---|
+| `usage [stats\|compare]` | Usage totals, task distributions and comparisons |
+| `check` | Project inspection, explicit decisions and original-condition rechecks |
+| `system` | Installation checks, updates, active budget checks and advisory Hook input |
+| `api` | Discover local methods and schemas |
+| `call` | Execute one generated JSON request |
+
+## Usage and statistics
 
 ```sh
-wombat prices --json
-wombat prices update --json
-wombat refresh --root /path/to/codex-home --json
-wombat usage --since 2026-09-23 --until 2026-09-30 --timezone Asia/Shanghai --json
-wombat threads --sort tokens --json
-wombat turns --thread THREAD_ID --sort tokens --json
-wombat steps --thread THREAD_ID --turn TURN_ID --sort time --json
+wombat usage --since 2026-10-01 --until 2026-10-08 --timezone Asia/Shanghai --json
+wombat usage stats --project /absolute/project --since 2026-10-01 --until 2026-10-08 --json
+wombat usage compare --since 2026-10-08 --until 2026-10-15 --baseline-since 2026-10-01 --baseline-until 2026-10-08 --dimension project --json
+wombat usage compare --thread THREAD_ID --other-thread OTHER_THREAD_ID --family --all-time --json
 ```
 
-Repeat `--root` to include multiple roots. Without it, use CODEX_HOME or `~/.codex`. Both sessions and archived_sessions are read; the display range does not limit historical collection. Refresh rejects query filters.
+The start date is inclusive and the end exclusive. The timezone defaults to UTC. Exact project, model, effort, agent and source filters retain their meaning. Unknown filters select missing values, not zero. `--all-time` includes undated records and excludes date bounds and `--undated`. Project attribution uses observed directories, never path substrings.
 
+`--group day|week|month` selects calendar periods. Without dates, day covers the last 30 calendar days, week this month and the previous five months, and month this month and the previous eleven. Explicit dates take precedence; a task without dates uses its full range. Weeks start on Monday. Events use their timestamps and the selected timezone.
 
+`--presentation distribution|details|projects|models` selects the returned grouping. Explicit distribution/details pages count periods, retaining every model row in each selected period. Otherwise paging counts rows. `--sort time|tokens|cost` orders usage; `--limit 1..500 --offset N` defaults to 50 rows. Totals, shares, categories and distribution scales cover the complete matching scope before paging. Unknown costs sort after known costs.
 
-Hook inventory JSON exposes per-project native registration and plugin identity; text output also names the plugin. Registration does not establish execution. See the [configuration contract](../development/contracts.en.md) for supported declaration forms and unknown states.
+Statistics defaults to the last 30 calendar days. Complete task totals provide mean, median and P90; incomplete tasks and unassigned measurements remain separate. A selected task is ranked against that population. Model populations can overlap. Comparison periods must have equal lengths and no overlap. Comparisons use committed data unless `--fresh` is explicit. Get full task IDs through the structured task query.
 
+## Review cleanup candidates
 
-## Agent interface
+```sh
+wombat check cleanup --project-root /absolute/project --json
+wombat check cleanup --project-root /absolute/project --path target --keep dist --json
+wombat check cleanup recheck --read-view VIEW --baseline BASELINE --item ITEM_ID --json
+```
 
-Use `wombat api --json` to read the installed method names, descriptions and limits without scanning data. Use `wombat api --method usage --json` for one input Schema; add `--output-schema` when response fields are needed. Both schemas derive from Rust. Reuse them for the same runtime version.
+The check is read-only. Default discovery looks for build directories under projects with supported manifests, up to three levels below the selected project. Repeated `--path` selects exact current-task temporary paths instead; repeated `--keep` preserves pending outputs or other selected material. Relative paths resolve from `--project-root`, which defaults to the current directory. Add `--product-temporary` to include Wombat pending snapshot stages. It excludes committed snapshots, indexes and recovery generations.
+
+Results separate candidates, review, protected, unknown and absent paths. They report the owner, rebuild evidence, current-use observations and measured logical bytes. A candidate does not authorize deletion. Missing use records or old timestamps do not prove inactivity. Codex reviews dependencies and performs only authorized cleanup with trusted tools; Wombat applies only supported Codex candidates through the guarded operation.
+
+Retain the original view, baseline and item IDs. Recheck selected items immediately before and after cleanup; a recheck cannot broaden the selection. Changed or unavailable evidence needs another review. An expired view needs a new inspection. Absence at the original path does not prove permanent deletion or freed disk space, including after movement to Trash. See [core limits](../reference/core.en.md#artifact-observations).
+
+```sh
+wombat check cleanup --codex --json
+wombat check cleanup --codex --path /absolute/codex/packages/app-server-daemon --json
+wombat check cleanup apply --read-view VIEW --baseline BASELINE --item ITEM_ID --json
+```
+
+Codex mode discovers supported macOS caches, stale stages and obsolete packages. Inspect is read-only. After reviewing the concrete candidates and obtaining authorization, apply permanently removes only the selected original Codex candidates. It performs the final checks and holds the installer lock where required. Keep the returned view, baseline and IDs for a later recheck. Do not bypass a blocked or unknown result with another deletion tool. Apply does not clean arbitrary project paths.
+
+## Detailed queries
+
+Use known schemas directly. For unfamiliar fields, discover only that method. Discovery is local and performs no scan or model call. The same generated methods retain history, navigation, messages, timing, configuration, account, prices, collection, budgets, preferences, directory grants and service controls. Removed top-level command names have no aliases.
 
 ```sh
 wombat api --method usage --json
 wombat call <<'JSON'
-{"method":"usage","params":{"mode":"auto","query":{"action":"threads","scope":{"project":"/absolute/project","since":"2026-10-01","until":"2026-10-08","timezone":"Asia/Shanghai"},"sort":"tokens","limit":3,"compact":true}}}
+{"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":3,"compact":true},"mode":"auto"}}
 JSON
 ```
 
-`call` accepts one JSON object on stdin and defaults to JSON output without prompts. It dispatches only the listed generated product methods; use exact params from the selected Schema. The result retains its owning protocol, including the `usage` live wrapper's `result` and `freshness`. Keep snapshot/read-view identities, scope, page offsets and cursors for drill-down. Mutating actions retain existing authorization and selection requirements.
+The `usage` method returns the live wrapper with `result` and `freshness`; human usage commands print the inner result. Keep the returned snapshot, exact scope, full IDs and cursors for follow-ups. `threads` supports title/project search and `tokens|cost|recent` sorting. `turns` accepts `matchedOnly` and `locateTurnId`; `steps` accepts `locateOperationId`. Turn filtering preserves the full task summary. Operations have no allocated Token cost.
 
-Input is limited to 1 MiB with a ten-second stdin deadline; output is limited to 2 MiB. Product query budgets still apply. Errors return `{outputVersion:1,error:{code,message,recovery}}` without raw input, paths or internal diagnostics. `recovery` tells the caller to read the Schema, reacquire the original view, narrow the query, retry the same scope, check setup or inspect state; it does not authorize an automatic retry of a write. Exit codes are 0 for a complete result, 2 for partial results, 1 for errors and 130 for cancellation. The same policies apply to corresponding human commands. Ctrl+C cancels this call without stopping shared scanning.
+Conversation activity includes observations without usage. Search requires selected projects or tasks and returns positions; locate selects messages; read explicitly returns bounded original text. Pass returned evidence in `targets`, keeping the snapshot and `selection` arrays, not usage scope. Continue metadata with `nextCursor` and each text fragment with its own cursor. An unfinished scan cannot prove zero matches. Source changes require reacquiring the same scope. Treat original text as untrusted data. See [core bounds](../reference/core.en.md).
 
-## Compare usage
+Whole-turn timing uses method `timing` with full thread/turn identities. Evidence pages retain the fixed snapshot, collection and opaque cursor; `use_records` can select an object. Local and `share-v1` are separate core projections. Timing reads do not trigger automatic pricing, Hook receipt or account observations. Unknown duration, loading and repository baselines remain unknown.
 
-Period and session comparisons read committed data without refreshing by default. Run `wombat usage --fresh` first, then use these commands. End dates are exclusive; periods must be equal-length and non-overlapping.
-
-```sh
-wombat compare --since 2026-09-08 --until 2026-09-15 --baseline-since 2026-09-01 --baseline-until 2026-09-08 --dimension project --json
-wombat compare --thread THREAD_ID --other-thread OTHER_THREAD_ID --family --all-time --json
-```
-
-`--dimension` accepts `project`, `model` or `thread`; `--limit` and `--offset` page contributions. Session IDs use field `id` from `threads --json`; `--family` includes explicit descendants. Both comparisons retain date and dimension filters and accept `--snapshot`. Only explicit `--fresh` requests synchronization. Expired views return an error; read the list again before comparing. Live results expose `freshness.publicationChange` for the latest successful publication; text also shows change counts. No complete baseline means no summary. The [core reference](../reference/core.en.md) owns calculation and limits.
-
-## Task distributions and budgets
-
-Use task statistics to judge a task against a selected population or separate task-count growth from per-task growth. Keep a returned snapshot for follow-up pages and comparisons.
+## Project inspection and recheck
 
 ```sh
-wombat statistics --project /absolute/project --since 2026-10-01 --until 2026-10-08 --presentation projects --json
-wombat statistics --snapshot SNAPSHOT_ID --thread THREAD_ID --since 2026-10-01 --until 2026-10-08 --json
-wombat statistics --snapshot SNAPSHOT_ID --since 2026-10-01 --until 2026-10-08 --baseline-since 2026-09-24 --baseline-until 2026-10-01 --presentation models --json
-wombat monitor set --id project-week --period week --tokens 1000000 --review --project /absolute/project --timezone Asia/Shanghai --json
-wombat monitor check --id project-week --json
-wombat monitor watch --id project-week --interval 60 --json
-wombat monitor list --json
-wombat monitor acknowledge --notification NOTIFICATION_ID --json
-wombat monitor remove --id project-week --json
+wombat check list --project-root /absolute/project --json
+wombat check inventory --project-root /absolute/project --json
+wombat check checks --item ITEM_ID --read-view READ_VIEW --json
+wombat check recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /absolute/project --json
 ```
 
-Statistics defaults to the last thirty calendar days; `--all-time` selects all available dates. Project/model groups accept `--limit` and `--offset`; the population covers the full scope. A selected `--thread` is ranked against that population. Complete task totals provide the mean, median and P90; incomplete tasks and unassigned measurements remain separate. Model populations can overlap when a task used multiple models. Equal-length, disjoint comparison periods retain all other filters. The [core reference](../reference/core.en.md) owns calculation methods and limits.
+`--root` selects source logs; `--project-root` selects configuration. Inventory supports kind, observation, search, sort and paging; pages default to 50, maximum 200. Detail, evidence and related scopes keep `--item` and `--read-view`. Pin the original source/project roots, scope, rules, read view and baseline ID for recheck. Only `miss` with `comparison.status=comparable` establishes that the original check passed. Missing or expired evidence cannot prove repair.
 
-A monitor plan saves its identity filters, timezone, calendar period and optional Token threshold. `--review` also requests the most recently closed period's statistics. Add `--disabled` to save a paused plan; reuse its ID to change settings. Default warning is 80% of the threshold, configurable with `--warning 0.9`. These are user budgets, separate from account allowances. `check` checks all enabled plans unless `--id` selects one; repeated `--root` selects sources. A recent pinned check uses `--snapshot ID --id PLAN_ID` without source roots. An expired view requires a fresh check of the original scope.
+Inspection and recheck are read-only. Codex owns authorized project edits and tests. Only explicit `keep` or `not-applicable` writes a user decision; provide the suggestion, read view, reason and decision revision. Decisions survive index rebuilds. No automatic adoption tracking, review history or overall score is created. File reads do not prove Skill calls; related-turn usage is not configuration-owned cost.
 
-`watch` checks while this command runs and emits only new notifications. It does not install a background service or send messages; Ctrl+C stops it with exit130. `--interval` accepts 5–3600 seconds. Monitoring needs an active host, and source logs must record usage before thresholds can be detected. Partial facts can prove a threshold crossing but cannot prove remaining budget. Acknowledgement is stored separately from the original facts. Period reviews cover the latest closed period, without catching up every missed period.
+## Synchronization and saved snapshots
 
-## Usage inspection and review
+Ordinary usage queries wait up to two seconds; `--fresh` waits up to ten seconds. `--wait-ms 1..600000` implies fresh and changes this caller’s deadline. `--cached` reads committed data without a scan. `--watch --json` emits NDJSON when results change. Ctrl+C cancels this caller, not shared scanning. `--root` is repeatable; its default is CODEX_HOME or `~/.codex`. Roots never inherit another window’s selection. Sources remain read-only.
 
-Read or refresh usage first, then pin these queries with the returned `snapshotRef.snapshotId`. They read committed data without synchronization by default.
+A fresh read does not save a snapshot. Explicit saved snapshots use method `snapshot`, action `refresh`; full prefix verification uses method `usage` with query action `refresh` and `verify:true`. Later reads can pin either saved or live views. Saved snapshots bind their original roots. Unknown versions are rejected without migration or deletion. `usage --rebuild --wait-ms 600000 --json` explicitly rebuilds derived data, retaining user records and the previous database until publication succeeds. See [format recovery](../reference/cli.en.md#unsupported-formats-and-recovery).
+
+## Local host and optional integrations
 
 ```sh
-wombat investigate --snapshot SNAPSHOT_ID --all-time --limit 3 --compact --json
-wombat investigate --snapshot SNAPSHOT_ID --thread THREAD_ID --turn TURN_ID --all-time --compact --json
-wombat context --snapshot SNAPSHOT_ID --all-time --json
-wombat trajectory --snapshot SNAPSHOT_ID --thread THREAD_ID --all-time --json
-wombat resources --snapshot SNAPSHOT_ID --project /absolute/project --all-time --json
-wombat review --snapshot SNAPSHOT_ID --since 2026-09-08 --until 2026-09-15 --json
-wombat steps --snapshot SNAPSHOT_ID --thread THREAD_ID --turn TURN_ID --locate-operation OPERATION_ID --json
-wombat account history --json
+wombat system doctor --json
+wombat system doctor --plugin --project /absolute/project --json
+wombat system update --check
+wombat system watch --once --id PLAN_ID --json
+wombat system watch --id PLAN_ID --interval 60 --json
 ```
 
-Review does not accept pagination. Without dates, it selects the fixed view cutoff's week, starting Monday. Other inspections accept `--limit` and `--offset` while retaining scope. Drill with returned complete evidence identities. An absent operation returns `NOT_FOUND`; after view expiry, reacquire the original scope and locate identities again. Allowance history needs no native process and reads stored observations only. The [core reference](../reference/core.en.md) owns thresholds, calculation and budgets. Signals do not establish waste, input is not context occupancy, and change reports are not verified file changes.
+Ordinary doctor checks the installation without project discovery. Add `--plugin` to check the selected Skill; add `--hooks` only when native registration matters. These checks install nothing and invoke no model. They are not prerequisites for queries. Update changes only the runtime; the [plugin guide](plugin.en.md) owns plugin installation.
 
-## Codex Skill
+Use `call` methods `service`, `monitor`, `account`, `prices`, `directories`, `collection` and `preferences` for their generated actions. Service controls preserve status, pause/resume, stop and explicit autostart enable/disable. One data directory shares one core service. Startup and file notifications do not index without requests. Budget plans use identity filters, timezone and calendar period; partial usage can prove a crossing, not remaining allowance. Account allowances, user budgets and API-equivalent amounts remain separate. Directory grants require explicit selected paths and purposes.
 
-Install the single plugin through the [installation guide](installation.en.md), then invoke `$wombat:wombat` in a new project conversation. Check discovery and runtime with:
+`system watch` reloads enabled plans and emits only new notices while running. `--once` performs one fresh check; `--interval` accepts 5..3600 seconds. It installs no service and sends no messages. Ctrl+C returns 130. Temporary errors go to stderr and retry on the next iteration; invalid input is terminal. For fixed-view checks, pass the snapshot and plan IDs to method `monitor`. Acknowledgement is separate from facts; period reviews cover only the latest closed period.
 
-```sh
-wombat setup --project /path/to/project --json
-```
+Collection preferences are machine-wide; status/events can filter authorized source and project identities. Logs mode ignores new Hook input while retaining data. Hooks mode does not establish registration, loading or trust; no Hook plugin or bridge is shipped. Pause retains up to 4,096 buffered observations, within 100,000 total. Rejected receipts cannot establish complete coverage. `system hook codex` accepts up to 64 KiB within four seconds, emits no stdout and returns 0 on advisory receipt failure. It cannot control permissions or supply model context.
 
-Default setup does not query optional Hooks. Add `--hooks` when needed.
+Live queries can automatically repair missing official prices unless WOMBAT_AUTO_PRICES=0. Cached or fixed-view reads never trigger it. Explicit `prices` update through `call` bypasses retry throttling; failed updates retain prices. New views use updated prices; old snapshots retain their amounts. See [pricing](../reference/pricing.en.md).
 
-## Language
+## Output and recovery
 
-Choose presentation language with `--lang zh` or `--lang en`, or set `WOMBAT_LANG`. JSON fields and source content retain their original values. See [product language](../i18n/product.en.md) for precedence.
+Select `--lang en|zh` or WOMBAT_LANG. Source content and protocol values are unchanged. JSON uses stdout; progress and watch errors use stderr. `call` accepts one object up to 1 MiB within ten seconds and emits up to 2 MiB. `api --output-schema` exposes generated output contracts. Error recovery can require the schema, the original view, a narrower query or runtime checks; it never authorizes repeating a write.
 
-## Automatic synchronization
+`--compact --json` bounds retained quality examples to three per list and omits facets while retaining full summary counts, totals and requested rows. Removing it returns full details. Narrow a resource-limited query to a selected turn at the same view and filters. Samples cannot establish whole-task rankings. Amounts are decimal strings; Tokens are safe integers or null. Unknown and incomplete amounts retain `knownCost` separately. Reported costs are not added to API equivalents.
 
-- Ordinary queries synchronize by default, waiting up to 2 seconds. Existing results are returned with `freshness`; without data, return `SYNC_PENDING`. Building a large initial index can take longer.
-- `--fresh` waits up to 10 seconds for this synchronization and reports failure or timeout. `--cached` returns the committed index without scanning sources; it fails if no index exists.
-- `usage --watch --json` emits one JSON object per line when the revision, date range, or status changes. Ctrl+C exits with 130. Ordinary `--json` still emits one object.
-- `refresh --verify` rereads the full source before saving a snapshot, checking historical prefix edits that the append fast path cannot establish. Ordinary refresh uses incremental cursors.
-- `--snapshot ID` pins a current snapshot. Continue pagination with the same snapshotId instead of resolving latest again. Unknown formats are explicitly rejected.
-- Live queries accept `--root`. Omitting it always selects the default Codex source; another window's roots do not change this. Fixed usage snapshots cannot also specify source roots; timing roots bind the requested source scope to the fixed version.
-
-One data directory shares a Rust service. Queries trigger indexing; service startup, file notifications and idle time do not. `usage --watch` explicitly requests repeated reads. Accounting uses complete log records and cannot show tokens the model has not yet logged. Service lifecycle and resource limits belong in the [core reference](../reference/core.en.md).
-
-## Query service controls
-
-```sh
-wombat service status --json
-wombat service pause --json
-wombat service resume --json
-wombat service stop --json
-wombat service start --json
-wombat service disable --json
-wombat service enable --json
-```
-
-`status` reports the running instance, preparation, committed-data readiness and configured automatic startup separately. `pause` takes effect at the current transaction boundary and preserves queries; `resume` allows later queries to update the index; it does not prepare data itself. `stop` waits boundedly for this instance to exit; later queries or login can start it again. `disable` removes current-user automatic startup and stops the service. `enable` registers and starts it. Automatic startup needs a managed installation and an available native user-session manager.
-
-## Whole-turn timing
-
-```sh
-wombat timing --thread THREAD_ID --turn TURN_ID
-wombat timing summary --thread THREAD_ID --turn TURN_ID --text --lang en
-wombat timing --thread THREAD_ID --turn TURN_ID --snapshot SNAPSHOT_ID --share
-wombat timing evidence --thread THREAD_ID --turn TURN_ID --snapshot SNAPSHOT_ID --limit 50
-wombat timing evidence --thread THREAD_ID --turn TURN_ID --snapshot SNAPSHOT_ID --limit 50 --cursor OPAQUE_TOKEN
-wombat timing capabilities
-```
-
-`timing` and `timing summary` are equivalent. Default output is one final v6 JSON object; `--text` selects localized human text and cannot accompany `--json`. Use complete Wombat thread and turn identities from the task query. Missing values remain null in JSON; text explains required records or the available scope; native duration, derived duration, native TTFT, and first-content record delay remain separate. Interval unions and sums may overlap and are not added together.
-
-Summary supports repeated `--root`, `--source`, and one of `--fresh` or `--cached`. `--snapshot` pins the result and cannot accompany `--fresh`. When roots or source are supplied with a fixed version, they must match its authorized scope. Use the returned snapshot identity for subsequent evidence pages; a missing or expired version never falls back to latest. Evidence is local only, requires that snapshot and the same target/scope, accepts `--limit 1..200` (default50) and the unchanged `nextCursor.token`, and accepts no refresh mode. Paging does not change the whole-turn summary. Capabilities accepts only output/language options and optional `--share`, reports parser support without scanning, and does not establish availability in a particular turn.
-
-`--share` asks Rust for a separate safe summary projection; CLI does not remove fields from local JSON. Timing bypasses automatic prices, configuration scans, Hook capture, and account observation. Date, Token, cost, offset, compare, and watch options are rejected. A resource-limited result can retain verified native scalars while affected derived values are omitted with calculation limits.
-
-Summary exits0 when the core marks the inspected scope complete, even if optional fields are not recorded; partial or provisional results exit2. Successful evidence navigation and capabilities exit0 without establishing whole-turn completeness. Errors exit1 and cancellation exits130. JSON errors use `{outputVersion:1,error:{code,message}}` with localized safe templates, including NOT_FOUND and VIEW_EXPIRED, without source paths or underlying error details. Status stays on stderr. Ctrl+C cancels this call and does not stop shared synchronization. Use `corepack pnpm verify:e2e` for real-core and CLI acceptance; results cover only the selected platform and scope.
-
-## Official price catalog
-
-Live queries automatically check the official catalog when repairable missing rates are found. Failures retain results and expose `priceUpdate`. Downloads are throttled for 15 minutes after failure and 24 hours after success. Set `WOMBAT_AUTO_PRICES=0` to disable automatic networking; `--cached` and `--snapshot` never trigger it. Manual `prices update` bypasses the automatic retry interval.
-
-`prices` (or `prices status`) reads the current full catalog offline. `prices update` explicitly downloads and validates a fixed official source. Its default output is a short result; `--json` returns `outputVersion:1`, action, origin, updated, source, sourceHash, catalogHash, and the complete catalog. Price responses and errors are versioned separately from usage v5. Errors use `{outputVersion:1,error:{code,message}}`, with exit code 1 or cancellation code 130. Common failures include PRICE_FETCH_FAILED, PRICE_SOURCE_CHANGED, PRICE_CACHE_INVALID, OUTPUT_LIMIT, TIMEOUT, and UPDATE_BUSY.
-
-After a successful update, the next live synchronization creates a complete read revision using the new catalog. `refresh` can save another snapshot; old snapshots retain their amounts. Updates reject custom URLs, import paths, and usage filters. See [pricing](../reference/pricing.en.md#联网更新价表) for network scope, proxies, supported tables, and persistence.
-
-## Filtering and pagination
-
-- `usage --group day|week|month`: without dates, day selects the last 30 calendar days, week selects this month and the previous 5 months, and month selects this month and the previous 11. All end today; response until is tomorrow, exclusively. Explicit since/until takes precedence, and changing grouping preserves a manual range. A task filter without dates selects its full range. Weeks start on Monday; events are assigned by timestamp and selected timezone.
-- `--since` is inclusive and `--until` exclusive. `--all-time` includes unknown dates and cannot accompany date bounds or --undated. CLI timezone defaults to UTC.
-- `--model`, `--effort`, and `--project` match exactly. A project is observed directory evidence, not a path substring. `--model-unknown`, `--effort-unknown`, and `--undated` select missing model, effort, and date respectively, and cannot accompany corresponding explicit values or date ranges.
-- `threads --search TEXT` searches titles or projects; its sorts are `tokens|cost|recent`, using matching usage or latest matching measurement. Turns and steps use `tokens|cost|time`.
-- `--snapshot ID` pins a current snapshot. Continue pagination with the same snapshotId instead of resolving latest again. Unknown formats are explicitly rejected.
-- `usage --presentation distribution|details`: defaults to details for category breakdowns; distribution returns only period subtotals. Explicitly setting this option pages by period: limit counts periods and details retain every model row in each selected period. Omitting it preserves row pagination. `--sort time|tokens|cost` orders by descending date or consumption. Complete-range distribution scales, peak scopes, unpriced tokens, and cost shares are computed before pagination; unknown costs sort after known costs.
-- `--limit 1..500 --offset N`, default 50. Sorting, amounts, categories, and shares are computed over the full matching range before pagination.
-
-## JSON
-
-`--compact --json` bounds quality detail to three examples per retained list and omits facets; `quality.detailSummary` retains full issue/source counts, grouped counts and omitted-detail counts. Totals, requested rows, pagination, scope and snapshot remain unchanged. Remove `--compact` for full detail. `--limit` changes returned pages, not whole-task computation. On RESOURCE_LIMIT, select a turn with `turns --matched-only`, then investigate that exact turn at the same snapshot and filters. Selected-turn findings do not establish whole-task rankings.
-
-
-Usage uses `outputVersion: 5`. Success includes action, snapshotRef, scope, availableRange, summary, items, page, and quality. Generated schemas validate runtime data; unknown arguments are rejected. Ordinary queries emit exactly one final JSON object on stdout, while watch emits NDJSON. Status goes to stderr. Live results also contain freshness; status distinguishes current, syncing, stale, failed, and fixed, and checkedAt is the last successful check. Current only means the observed log range has been processed.
-
-Amounts are decimal strings; tokens are safe integers or null. `price.cost=null` means an incomplete amount; `knownCost` is the known subtotal, with priced, partial, and unknown statuses. Missing is not zero, and reportedCost is not added to the standard equivalent. Never sum amounts already rounded to two display decimals.
-
-Tasks return matchedUsage and threadUsage. Turns cover the whole task by default while matchedUsage preserves incoming filters. Add --matched-only to turns to return only turns with matching measurements; --locate-turn ID locates its page, taking precedence over offset when found and otherwise using offset. Filtering turns does not change the full-task summary. Turn shares use the full task denominator; step shares use the full turn. Operations without exclusive accounting do not display a cost. `unassigned` holds records without a turn within the task.
-
-Exit codes: 0 for success or an empty range; 2 for usable but incomplete reads or unconfirmed synchronization; 1 for errors; 130 for cancellation. Errors use `{outputVersion:5,error:{code,message}}`. Common codes include INVALID_ARGUMENT, NO_SNAPSHOT, SOURCE_UNREADABLE, SNAPSHOT_CORRUPT, UNSUPPORTED_VERSION, UPDATE_BUSY, CANCELLED, RESOURCE_LIMIT, and DETAIL_UNAVAILABLE. Partial results can still be queried using the returned fixed snapshot.
-
-## Current formats
-
-Only current usage-v4 snapshots (schema4) are readable. Usage JSON v5 and timing JSON v6 are independent output formats. Unknown versions are rejected while existing files and user records remain intact. No migration or old-command/output compatibility is provided. Retired scan/report/checkup/quota/codex/observe/compare commands have no placeholder entries.
-
-
-## Read-only configuration
-
-`--project-root` explicitly selects project configuration roots; `--root` selects Codex source roots.
-
-`wombat optimize inventory --json` provides equivalent non-TTY queries. Filter and sort with `--kind rule|skill|mcp`, `--observation used|loaded_only|unknown`, `--search`, and `--sort tokens|activity|size|name|content_tokens|characters|recent`. `--limit` defaults to50, maximum200; `--offset` starts at0. `--since` / `--until` include the start and exclude the end; `--timezone` defaults to UTC.
-
-Details and evidence use `--action detail|evidence|related_scopes --item ID --read-view VERSION`; a new view can use `--snapshot live:…` to pin usage. Continued queries must keep the same source and project-root arguments; query the list again after expiry. `--thread ID` lists only configuration with evidence linked to that task. `--action capabilities` does not scan configuration. See `wombat optimize inventory --help` for all options.
-
-Responses use configuration v1 JSON. Incomplete historical coverage currently returns exit code2 with usable results; argument/service errors return1 and cancellation130. File reads are not Skill calls; associated tokens are not exclusive configuration costs. Full-content tokens use a fixed reference method; static suggestions and manual rechecks are connected, while source changes remain closed. See the [configuration contract](../development/contracts.en.md) for scope and data semantics.
-
-## Static suggestions and manual rechecks
-
-```sh
-wombat optimize list --project-root /path/to/project --json
-wombat optimize detail --suggestion SUGGESTION_ID --read-view READ_VIEW --json
-wombat optimize checks --item ITEM_ID --read-view READ_VIEW --json
-wombat optimize keep --suggestion SUGGESTION_ID --reason necessary --read-view READ_VIEW --decision-revision REVISION --json
-wombat optimize recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /path/to/project --json
-```
-
-Retain the original authorized roots, project/source scope, rule parameters, returned `readView` and suggestion `baselineId`. Codex edits files after authorization. Recheck returns independent `checks` for the original problem. Only `miss` with `comparison.status=comparable` establishes that check passed. Missing or incomparable evidence cannot establish repair. An expired view requires a new inspection; it cannot reconstruct the original baseline.
-
-Checks and rechecks write no review history. Only explicit `keep` or `not-applicable` saves a user decision; the latter uses `object_changed` or `incorrect_evidence`. Decisions bind the original problem and evidence version and survive index rebuilds. Lists support `repair`/`trim` and pages up to 200, default 50. There is no history, redisplay, adoption tracking or handoff send interface.
-
-Read configuration evidence with `optimize inventory --action evidence --item ITEM_ID --read-view READ_VIEW`. Its `usageRevision` and task/turn locators support subsequent queries. Related-turn usage is not configuration-owned cost. Optimize response version is 5; configuration remains version 1. Evidence gaps exit 2, errors 1 and cancellation 130. The rule catalog lists implemented checks only.
-
-## Local account observations
-
-```sh
-wombat account --json
-wombat account history --json
-```
-
-Account allowance, API-equivalent amounts and local Tokens remain separate. They cannot establish project-owned allowance consumption. Wombat does not create Codex tasks; Codex uses its native task tools with selected evidence when requested.
-
-## Setup and collection
-
-`wombat setup --project /path/to/project --json` checks native discovery and registration, preserving each state independently. It reports the full Codex version, Wombat bundle version, and each discovered copy’s declared capabilities and content verification. Text output includes partial error codes. Log queries need no Hook trust; an available and compatible Skill can be used in a new Codex conversation. It does not install, trust, scan account credentials or invoke a model. `--root` selects source directories. A missing Skill does not block viewing existing data.
-
-```sh
-wombat collection status --json
-wombat collection mode hooks --json
-wombat collection events --project /path/to/project --limit 50 --json
-wombat collection pause --json
-wombat collection resume --json
-wombat collection mode logs --json
-wombat usage --watch --json
-```
-
-Preferences are machine-wide; `--project` and repeated `--root` filter status and events only. Mode `logs` ignores new Hook input and preserves data. Mode `hooks` permits safe receipt but establishes neither registration nor trust. Install the [local collection package](plugin.en.md), then review its declarations in Codex `/hooks`. The POSIX bridge resolves the managed launcher or Codex PATH; Windows remains unaccepted. Plugin removal does not delete observations.
-
-Pause retains up to 4,096 safe observations; resume makes them available. History viewing continues. Total retained observations are bounded to 100,000; known overflow or conflicting identities contribute to gaps. Missing native identity stays unknown, and rejected input or runtime failures are not reflected in persisted gaps. No lossless delivery or complete coverage is claimed. Source event time may be absent and differs from receipt time. Verified log associations use the current committed source epoch; obtain a normal fixed query view before further comparisons.
-
-Event pages accept `--limit 1..200` and `--after` from `nextAfter`. Status/events use generated v1 JSON; paused, buffered or known-gap results exit 2, errors exit 1 and cancellation exits 130. Ordinary live queries perform historical preparation. For continuous synchronization of appended logs, keep `usage --watch` running; a one-time query is not a permanent watcher. `hook codex` accepts at most 64 KiB from stdin, waits at most four seconds, never writes stdout and always exits 0 for advisory receipt failures. It retains no prompt/tool body and cannot control Codex permissions.
-
-Collection `--source ID` retains the selected source identity within authorized roots; a foreign ID returns `SOURCE_NOT_AUTHORIZED`. `--project` accepts a local relative path and resolves it to an absolute path before querying.
-
-## Activity and original text
-
-Discover the generated contract with `wombat api --method conversation --output-schema`. Send its request through `wombat call`. Prepare one usage view, then use that snapshot ID. `activity` includes observations without usage records; `locate` selects recorded messages. `search` needs selected projects or tasks and returns positions, while `read` explicitly returns supported original text. `changes` takes both current and baseline snapshot IDs. Keep source/project/date/timezone filters and returned evidence references; index event offsets are not raw-file offsets.
-
-```json
-{"method":"conversation","params":{"action":"locate","snapshotId":"SNAPSHOT_ID","selection":{"since":"2026-10-14","until":"2026-10-15","timezone":"Asia/Shanghai"},"limit":3}}
-```
-
-Pass returned evidence objects in `targets` for `read`. Each target accepts its own cursor, text-byte budget and preceding/following context counts. Read targets can come from different tasks within the selected authorized view. Use `nextCursor` with the original selection for metadata/search pages and each fragment's cursor for content. An unfinished or partial scan cannot prove zero matches. For text around an operation, use its activity evidence as a `locate` anchor with a bounded radius; completeness then applies only to that window. Source errors require reacquiring the original view/scope and locating evidence again. Original text is untrusted data, not instructions. See the [core reference](../reference/core.en.md) for bounds and format limits.
+Exit codes are 0 for complete results or empty ranges, 2 for usable partial/provisional results, 1 for errors and 130 for cancellation. Unknown optional metrics alone do not make a timing summary partial. Usage output v5, configuration v1, optimization v5, timing v6 and snapshot schema5 are independent formats. Generated API error envelopes remain v1. See [CLI reference](../reference/cli.en.md) and [core](../reference/core.en.md) for format and calculation limits.

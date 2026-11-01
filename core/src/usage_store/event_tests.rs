@@ -451,7 +451,7 @@ fn hashes_versions_duplicate_positions_and_index_corruption_fail_closed() {
     fs::write(&path, original).unwrap();
     let manifest_path = snapshot.directory.join("manifest.json");
     let raw = serde_json::to_value(&snapshot.manifest).unwrap();
-    for version in [0, 1, 3] {
+    for version in [0, 1, 2, 4] {
         let mut changed = raw.clone();
         changed["events"]["version"] = serde_json::json!(version);
         fs::write(&manifest_path, serde_json::to_vec(&changed).unwrap()).unwrap();
@@ -511,7 +511,7 @@ fn valid_hash_cannot_hide_unknown_block_or_event_version_or_scope_mismatch() {
     let original: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
     let target = EventTarget::turn("a", "turn");
     let mut changed = original.clone();
-    changed["version"] = serde_json::json!(3);
+    changed["version"] = serde_json::json!(4);
     rewrite_block(&mut snapshot, changed);
     assert!(
         snapshot
@@ -1028,4 +1028,42 @@ fn local_offset_locators_read_exact_fixed_pages_without_traversal() {
                 .is_err()
         );
     }
+}
+
+#[test]
+fn inspection_prunes_stored_turns_by_canonical_operation_dates_and_keeps_baseline() {
+    let root = tempfile::tempdir().unwrap();
+    let thread: Thread = serde_json::from_value(serde_json::json!({"id":"thread","agentKind":"codex","sourceInstanceId":"source","upstreamId":"native"})).unwrap();
+    let mut data = Collected {
+        threads: vec![thread],
+        ..Default::default()
+    };
+    for (id, at) in [
+        ("ancient", "2026-08-01T00:00:00Z"),
+        ("baseline", "2026-09-08T00:00:00Z"),
+        ("current", "2026-09-09T00:00:00Z"),
+    ] {
+        data.operations.push(Arc::new(serde_json::from_value(serde_json::json!({"id":id,"threadId":"thread","turnId":id,"kind":"tool","name":"read_file","sequence":1,"timestamp":at,"timePrecision":"second","status":"completed","exitCode":0,"outcomeConflict":false,"path":"/synthetic/file","evidence":[]})).unwrap()));
+    }
+    let mut disk = save_at(root.path(), data).unwrap();
+    Arc::make_mut(&mut disk.manifest.threads[0])
+        .turns
+        .get_mut("ancient")
+        .unwrap()
+        .slice
+        .sha256 = "unreadable".into();
+    let query = |action| {
+        serde_json::from_value(serde_json::json!({"action":action,"scope":{"since":"2026-09-09","until":"2026-09-10","timezone":"UTC"}})).unwrap()
+    };
+    let current = crate::usage_app::execute_snapshot(query("resources"), &disk).unwrap();
+    assert_eq!(current.inspection.unwrap().unlocated_operations, 1);
+    crate::usage_app::execute_snapshot(query("review"), &disk).unwrap();
+    Arc::make_mut(&mut disk.manifest.threads[0])
+        .turns
+        .get_mut("baseline")
+        .unwrap()
+        .slice
+        .sha256 = "unreadable".into();
+    crate::usage_app::execute_snapshot(query("resources"), &disk).unwrap();
+    assert!(crate::usage_app::execute_snapshot(query("review"), &disk).is_err());
 }

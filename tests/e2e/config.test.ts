@@ -1,3 +1,4 @@
+import {queryInvocation,spawnProductCli, type CliInput} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -132,14 +133,14 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
         assert.equal(turns.result.items[0].kind, 'turn');
         assert.equal(turns.result.items[0].id, turnId);
         assert.equal(turns.result.summary.tokens.total, 110, 'configuration retains its usage revision after normal view eviction');
-        const cliTurn = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'turns', '--snapshot', result.usageRevision!, '--thread', threadId, '--json'], { encoding: 'utf8', env: process.env, timeout: 10000 });
+        const cliTurn = spawnProductCli(path.resolve('dist/wombat.js'), queryInvocation({"action":"turns","threadId":threadId,"snapshotId":result.usageRevision!}, {mode:"auto"}), { encoding: 'utf8', env: process.env, timeout: 10000 });
         assert.equal(cliTurn.status, 0, cliTurn.stderr + cliTurn.stdout);
         assert.equal(JSON.parse(cliTurn.stdout).summary.tokens.total, 110, 'CLI fixed queries also resolve the retained usage revision without roots');
         const reverse = await nativeApi.config!({ action: 'list', readView: result.readView, scope: { ...scope, threadId } });
         assert.equal(reverse.items.length, 4);
         await assert.rejects(nativeApi.config!({action:'list',readView:'config:foreign'}),{code:'VIEW_EXPIRED'});
         await assert.rejects(nativeApi.config!({action:'list',snapshotId:'live:foreign'}),{code:'INVALID_ARGUMENT'});
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'inventory', '--root', root, '--project-root', project, '--read-view', result.readView!, '--since', scope.since, '--until', scope.until, '--timezone', 'UTC', '--json'], { encoding: 'utf8', env: process.env, timeout: 10000 });
+        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'inventory', '--root', root, '--project-root', project, '--read-view', result.readView!, '--since', scope.since, '--until', scope.until, '--timezone', 'UTC', '--json'], { encoding: 'utf8', env: process.env, timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         assert.deepEqual(JSON.parse(cli.stdout).summary, result.summary);
         await writeFile(skill, 'Changed synthetic review instruction');

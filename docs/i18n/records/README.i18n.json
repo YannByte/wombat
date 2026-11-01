@@ -5,35 +5,47 @@
       "zh": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562",
       "en": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562"
     },
-    "/wombat-diagnose-and-improve-agent-work": {
-      "zh": "3f8738acf5a8fc83621eb534d1596c5f156fb1be25131da5d6116ad0fdd01d80",
-      "en": "5c6888e30d17e70485d55cdc855a6e67e4daddea3422d77d2e00b31e5abe4009"
+    "/wombat": {
+      "zh": "d5fad2ad1e95c1d8e1a06ccbbf3654ff596637b3462d96fe74b10dc8a07a250c",
+      "en": "90e08b0e87adb1bc184f979244677ccad7a29f4c5d6fccbc5af4c228b7cf78c9"
     },
-    "/wombat-diagnose-and-improve-agent-work/get-started": {
-      "zh": "00b2421aa0022293eb34fb9d1e5b6ebd52907237bcfccaffaf011cfb0b7960e3",
-      "en": "33ef19b08848f6c7a9b4f53365757080aad979869bcf27cd4c9217d4197573fd"
+    "/wombat/see-the-result": {
+      "zh": "b8386d417b1ede491e9638b58eec5c2d5450c9eb75e42c230ec48d4121d31e83",
+      "en": "6565c23a3e1523ac373ecc4020b4ba4fbe2f8343535e446db8e8a00b4d41a7cc"
     },
-    "/wombat-diagnose-and-improve-agent-work/choose-a-task": {
-      "zh": "4ccc3ab2c3faaf5f75039af1048188026660b0b036b0174994cf736e6e76f1b3",
-      "en": "1f5bdfaa32141476265bd425c1765ace124cdf6928a8cd33bfd75383ef9a63e3"
+    "/wombat/see-the-result/check-usage": {
+      "zh": "0b4ab7d8f5fe1647841313077aad4ee84e06d9f09566cbfd2cd2c3b389f6eb86",
+      "en": "71aa75877c9737d24ed6a20c7fe87e1f9b1a4d1e5a137f0c373a033e32216be7"
     },
-    "/wombat-diagnose-and-improve-agent-work/first-preparation-and-results": {
-      "zh": "d12dc55a682a895edc373da20a25cc7d2af2b0522f38d982af127333cab2a280",
-      "en": "6ce59e9c3fb0a969da4851d08dd1bae7728fac4edc8df9885798086ad78dd2b2"
+    "/wombat/see-the-result/find-a-concrete-improvement": {
+      "zh": "ac123d1922537cbae37b06ee86dafc98975788ac8d35543b102d6e40a7b50f4b",
+      "en": "fb086e60c3112c8c3472433b00e420345f0a735c0368c6a53eb234b153fa88c7"
     },
-    "/wombat-diagnose-and-improve-agent-work/update": {
-      "zh": "db3b0b730796d179dcc315189c7ca7adc35ca0a444681ccdcaac010fdc87412e",
-      "en": "8582e594d80456980adaae6d7565bfac7064a71a5c65f51fd8bda67a1b889ca7"
+    "/wombat/see-the-result/cleanup": {
+      "zh": "88807737f6de26d609ddeb123793f51693769ebc56e5e1ee8bc7c7f0f3c0ea40",
+      "en": "24b4abd9df5ffa91b51a0716201a28ab619386b686c1b9ac23288bbb0f4b4a09"
     },
-    "/wombat-diagnose-and-improve-agent-work/scope-and-limits": {
-      "zh": "0f39ad9f7caf2db20dd18d4442af05a6a9bc8e8a9cf6c7e0f89ff256ed7c298a",
-      "en": "fc45c7b635632ff792e764805b73942446c9f3617dece5a5198e0328c004993b"
+    "/wombat/get-started": {
+      "zh": "6506fcf631e3fc26a5f29cdd3fddd006b8621aa10f7e4aee9d14827591101000",
+      "en": "5a54654dc8b4425288faf657829a3faea4cc31ac9647c981afe9b47e1cb77c53"
     },
-    "/wombat-diagnose-and-improve-agent-work/help-and-contribution": {
-      "zh": "dd2b2faa1a163b3d827f6e9c38e973303b2b9c6d2034740ebdc7008269f016be",
-      "en": "05d93b4f94763b0499d6d4b4914c58c73cd23f1891bb45d2b9f7149b839342f9"
+    "/wombat/more-ways-to-use-it": {
+      "zh": "68904d83449224ca51897961e671b25f1d6b75b9477e12df3025e6e1c0916292",
+      "en": "a56dc273baa684dcbf11707944ae37d57e359cebbc3cda2e6c2895dbf581ecfa"
     },
-    "/wombat-diagnose-and-improve-agent-work/license": {
+    "/wombat/before-you-use-it": {
+      "zh": "30675befb3a368e70d4abc18f109808b843a636d7e88f61e9a598c92476ee095",
+      "en": "cb070425b91c3c39e9da38d96bcaf81896bf4fb4d24f6d938c8c5384c1fd1ea0"
+    },
+    "/wombat/update": {
+      "zh": "eb3aac893b74b463367812d1d741fd8003a9498496a5548a39563ad33642bf11",
+      "en": "c76ae081dcfefcb0cf5e9c5431fd83814d72f7118a9f61c0acaf97ec4b541bf1"
+    },
+    "/wombat/help-and-contribution": {
+      "zh": "b62520d7bfa4b8986a88fd71d51b751f683d0d2a03ffcd8990ce698df9ec498d",
+      "en": "486daa80433a71bf04ff954bb2d5c217e969b0bf803549ce75ad6bdc43942ad9"
+    },
+    "/wombat/license": {
       "zh": "3ae9b43b0b2ab0253c26742d9a180634319a002755081eaed0bdb18ba4a3c29d",
       "en": "1a044ed47f1540e7d83b3f35501b9a3475aa043c07bf24dbfd4d6cd9fabba51d"
     }

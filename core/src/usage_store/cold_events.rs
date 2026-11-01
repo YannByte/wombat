@@ -543,6 +543,7 @@ impl Snapshot {
                         .turns
                         .entry(turn)
                         .or_insert_with(|| TurnEntry {
+                            operation_time: TimeRange::default(),
                             turn: None,
                             slice: Slice {
                                 offset: 0,

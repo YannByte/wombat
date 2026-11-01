@@ -9,7 +9,7 @@
 ```sh
 wombat --lang en
 wombat usage --lang zh
-wombat prices --lang en
+wombat system doctor --lang en
 WOMBAT_LANG=en wombat --help
 ```
 

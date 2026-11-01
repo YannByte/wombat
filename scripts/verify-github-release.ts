@@ -1,3 +1,4 @@
+import {spawnProductCli,type CliInput} from './cli-invocation.ts';
 /** Extract and exercise the exact GitHub Release archive for the current platform. */
 import assert from 'node:assert/strict';
 import {spawn, spawnSync, type ChildProcess} from 'node:child_process';
@@ -138,12 +139,12 @@ try {
       windowsVerbatimArguments: process.platform === 'win32' && /cmd\.exe$/i.test(program)});
     assert.ifError(result.error); assert.equal(result.status, status, result.stderr + result.stdout); return result.stdout;
   };
-  const query = (args: string[], status = 0) => JSON.parse(run(runtime, [cli, ...args, '--json'], status));
+  const query = (args: CliInput, status = 0) => {const r=spawnProductCli(cli,Array.isArray(args)?[...args,'--json']:args,{cwd:scratch,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024},[],runtime);assert.ifError(r.error);assert.equal(r.status,status,r.stdout+r.stderr);return JSON.parse(r.stdout);};
   assert.equal(query(['--version']).version, set.version);
-  const emptyPathDoctor = query(['doctor'], 1);
+  const emptyPathDoctor = query(["system", "doctor"], 1);
   assert.equal(emptyPathDoctor.checks.find((check: {id: string}) => check.id === 'path')?.status, 'fail');
   assert.equal(emptyPathDoctor.scannedSources, false); assert.equal(emptyPathDoctor.networkUsed, false);
-  const doctor = JSON.parse(run(runtime, [cli, 'doctor', '--json'], 2, {...env, PATH: path.join(prefix, 'bin')}));
+  const doctor = JSON.parse(run(runtime, [cli, 'system','doctor', '--json'], 2, {...env, PATH: path.join(prefix, 'bin')}));
   assert.equal(doctor.action, 'doctor'); assert.equal(doctor.scannedSources, false); assert.equal(doctor.networkUsed, false);
   assert.equal(doctor.checks.find((check: {id: string}) => check.id === 'installation')?.status, 'pass');
   assert.equal(doctor.checks.find((check: {id: string}) => check.id === 'path')?.status, 'pass');
@@ -158,10 +159,10 @@ try {
   const row = (id: string) => JSON.stringify({timestamp: new Date().toISOString(), type: 'event_msg', payload: {type: 'token_usage_record', thread_id: 'thread', turn_id: 'turn', response_id: id, usage: {input_tokens: 100, cached_input_tokens: 0, output_tokens: 10, total_tokens: 110}}}) + '\n';
   writeFileSync(log, JSON.stringify({type: 'session_meta', payload: {id: 'thread'}}) + '\n' + JSON.stringify({type: 'turn_context', payload: {turn_id: 'turn', model: 'gpt-5.4', model_provider: 'openai'}}) + '\n' + row('one'));
   assert.equal(query(['usage', '--fresh']).summary.tokens.total, 110);
-  const snapshot = query(['refresh']); appendFileSync(log, row('two'));
+  const snapshot = query({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto"}}); appendFileSync(log, row('two'));
   assert.equal(query(['usage', '--fresh']).summary.tokens.total, 220);
   assert.equal(query(['usage', '--snapshot', snapshot.snapshotRef.snapshotId]).summary.tokens.total, 110);
-  assert.equal(query(['threads', '--fresh']).summary.tokens.total, 220);
+  assert.equal(query({"method":"usage","params":{"query":{"action":"threads"},"mode":"fresh"}}).summary.tokens.total, 220);
 
   if (process.platform === 'win32') {
     const command = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');

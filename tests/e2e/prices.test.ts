@@ -1,3 +1,4 @@
+import { spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
@@ -24,8 +25,7 @@ test('first offline scan prices Sol 6.1 at request boundaries without a download
     await writeFile(path.join(source, 'sessions', 'source.jsonl'), rows.map(row => JSON.stringify(row)).join('\n') + '\n');
     const env = { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: path.join(root, 'data'),
       CODEX_HOME: source, WOMBAT_CORE_BIN: '', NODE_OPTIONS: '' };
-    const result = spawnSync(process.execPath, [entry, 'refresh', '--root', source, '--json'],
-      { env, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+    const result = spawnProductCli(entry, {"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}}, { env, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const value = JSON.parse(result.stdout);
@@ -50,13 +50,13 @@ test('built CLI price update changes new snapshots only, is idempotent, and fail
     };`);
     const env: NodeJS.ProcessEnv = { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_LANG: 'zh', WOMBAT_DATA_HOME: path.join(root, 'data'), NODE_OPTIONS: '', NO_COLOR: '1' };
     delete env.WOMBAT_CORE_BIN;
-    const run = (args: string[], extra: NodeJS.ProcessEnv = {}) => {
-      const result = spawnSync(process.execPath, ['--import', pathToFileURL(hook).href, entry, ...args, '--json'], { env: { ...env, ...extra }, encoding: 'utf8', timeout: 15_000 });
+    const run = (args: CliInput, extra: NodeJS.ProcessEnv = {}) => {
+      const result = spawnProductCli(entry, Array.isArray(args)?[...args,'--json']:args, { env: { ...env, ...extra }, encoding: 'utf8', timeout: 15_000 }, ['--import',pathToFileURL(hook).href]);
       assert.ifError(result.error);
       assert.equal(result.stdout.trim().split('\n').length, 1);
       return { ...result, value: JSON.parse(result.stdout) };
     };
-    const initial = run(['prices']);
+    const initial = run({"method":"prices","params":{"action":"status"}});
     assert.equal(initial.status, 0);
     assert.equal(initial.value.origin, 'bundled');
     const source = path.join(root, 'source');
@@ -67,34 +67,34 @@ test('built CLI price update changes new snapshots only, is idempotent, and fail
       { type: 'event_msg', payload: { type: 'token_usage_record', thread_id: 'price-case', turn_id: 'turn', response_id: 'response', usage: { input_tokens: 160000, cached_input_tokens: 50000, cache_write_input_tokens: 10000, output_tokens: 20000, reasoning_output_tokens: 0, total_tokens: 180000 } } },
     ].map(row => ({ timestamp: '2026-09-29T00:00:00Z', ...row }));
     await writeFile(path.join(source, 'sessions', 'source.jsonl'), rows.map(row => JSON.stringify(row)).join('\n') + '\n');
-    const before = run(['refresh', '--root', source]);
+    const before = run({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});
     assert.equal(before.status, 0);
     assert.equal(before.value.summary.price.cost, '0.435');
-    const updated = run(['prices', 'update']);
+    const updated = run({"method":"prices","params":{"action":"update"}});
     assert.equal(updated.status, 0, updated.stderr);
     assert.equal(updated.value.updated, true);
     assert.equal(updated.value.catalog.models.length, 10);
     assert.equal(updated.value.catalog.models.find((m: { id: string }) => m.id === 'synthetic-new').rates.input, '1.23');
-    assert.match(updated.stderr, /校验并保存/);
-    assert.equal(run(['prices', 'update']).value.updated, false);
-    const status = run(['prices', 'status']);
+    assert.equal(updated.stdout.trim().split('\n').length,1);
+    assert.equal(run({"method":"prices","params":{"action":"update"}}).value.updated, false);
+    const status = run({"method":"prices","params":{"action":"status"}});
     assert.equal(status.value.catalogHash, updated.value.catalogHash);
     assert.equal(status.stderr, '');
     const old = run(['usage', '--snapshot', before.value.snapshotRef.snapshotId, '--since', '2026-09-29', '--until', '2026-09-30']);
     assert.equal(old.value.summary.price.cost, '0.435');
-    const after = run(['refresh', '--root', source]);
+    const after = run({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});
     assert.equal(after.value.summary.price.cost, '0.4125');
     assert.equal(after.value.summary.price.priceRevision, updated.value.catalog.revision);
     assert.equal(after.value.summary.tokens.total, before.value.summary.tokens.total);
     for (const [extra, code] of [[{ TEST_PRICE_ERROR: '1' }, 'PRICE_FETCH_FAILED'], [{ TEST_PRICE_BAD: '1' }, 'PRICE_SOURCE_CHANGED']] as const) {
-      const failed = run(['prices', 'update'], extra);
+      const failed = run({"method":"prices","params":{"action":"update"}}, extra);
       assert.equal(failed.status, 1);
       assert.equal(failed.value.error.code, code);
-      assert.equal(run(['prices']).value.catalogHash, updated.value.catalogHash);
+      assert.equal(run({"method":"prices","params":{"action":"status"}}).value.catalogHash, updated.value.catalogHash);
     }
     assert.equal(run(['prices', '--url', 'https://example.com']).value.error.code, 'INVALID_ARGUMENT');
     // Ordinary refresh must not touch the network even after a live catalog is installed.
-    assert.equal(run(['refresh', '--root', source], { TEST_PRICE_ERROR: '1' }).status, 0);
+    assert.equal(run({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}}, { TEST_PRICE_ERROR: '1' }).status, 0);
   } finally { await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
 
@@ -119,12 +119,12 @@ test('missing model prices trigger one official fetch across processes, preserve
     ].map(row => ({ timestamp: '2026-09-29T00:00:00Z', ...row }));
     await writeFile(path.join(source, 'sessions', 'source.jsonl'), rows.map(row => JSON.stringify(row)).join('\n') + '\n');
     const env = { ...process.env, WOMBAT_AUTO_PRICES: '1', WOMBAT_LANG: 'zh', WOMBAT_DATA_HOME: path.join(root, 'data'), CODEX_HOME: source, NODE_OPTIONS: '' };
-    const run = (args: string[], extra = {}) => {
-      const p = spawnSync(process.execPath, ['--import', pathToFileURL(hook).href, entry, ...args, '--json'], { env: { ...env, ...extra }, encoding: 'utf8', timeout: 25_000 });
+    const run = (args: CliInput, extra = {}) => {
+      const p = spawnProductCli(entry, Array.isArray(args)?[...args,'--json']:args, { env: { ...env, ...extra }, encoding: 'utf8', timeout: 25_000 }, ['--import',pathToFileURL(hook).href]);
       assert.ifError(p.error); assert.ok(p.status === 0 || p.status === 2, p.stdout + p.stderr);
       return JSON.parse(p.stdout);
     };
-    const saved = run(['refresh'], { WOMBAT_AUTO_PRICES: '0' });
+    const saved = run({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto"}}, { WOMBAT_AUTO_PRICES: '0' });
     assert.equal(saved.summary.price.cost, null);
     const query = ['usage', '--since', '2026-09-29', '--until', '2026-09-30'];
     assert.equal(run([...query, '--cached']).priceUpdate, undefined);

@@ -6,58 +6,86 @@ export type Request =
       params: Request1;
     }
   | {
-      method: "conversation";
+      method: "artifacts";
       params: Request2;
     }
   | {
-      method: "usage";
+      method: "conversation";
       params: Request3;
     }
   | {
-      method: "snapshot";
+      method: "usage";
       params: Request4;
     }
   | {
-      method: "config";
+      method: "snapshot";
       params: Request5;
     }
   | {
-      method: "optimize";
+      method: "config";
       params: Request6;
     }
   | {
-      method: "timing";
+      method: "optimize";
       params: Request7;
     }
   | {
-      method: "setup";
+      method: "timing";
       params: Request8;
     }
   | {
-      method: "account";
+      method: "setup";
       params: Request9;
     }
   | {
-      method: "directories";
+      method: "account";
       params: Request10;
     }
   | {
-      method: "preferences";
+      method: "directories";
       params: Request11;
     }
   | {
-      method: "prices";
+      method: "preferences";
       params: Request12;
     }
   | {
-      method: "collection";
+      method: "prices";
       params: Request13;
     }
   | {
-      method: "monitor";
+      method: "collection";
       params: Request14;
+    }
+  | {
+      method: "monitor";
+      params: Request15;
     };
 export type Action = "status" | "start" | "pause" | "resume" | "stop" | "enable" | "disable";
+export type Request2 =
+  | {
+      projectRoot: string;
+      paths?: string[];
+      keepPaths?: string[];
+      productTemporary?: boolean;
+      codex?: boolean;
+      action: "inspect";
+    }
+  | {
+      readView: string;
+      baselineId: string;
+      /**
+       * @maxItems 100
+       */
+      selection: string[];
+      action: "apply";
+    }
+  | {
+      readView: string;
+      baselineId: string;
+      selection?: string[];
+      action: "recheck";
+    };
 export type Action2 = "activity" | "locate" | "read" | "search" | "changes";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
@@ -113,7 +141,7 @@ export type Action5 =
   "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type DecisionReason = "necessary" | "object_changed" | "incorrect_evidence";
 export type Category = "repair" | "trim";
-export type Request7 =
+export type Request8 =
   | {
       threadId: string;
       turnId: string;
@@ -152,7 +180,7 @@ export type Language = "zh" | "en";
 export type Action9 = "status" | "update" | "auto_update";
 export type Action10 = "status" | "events" | "configure" | "pause" | "resume";
 export type Mode3 = "logs" | "hooks";
-export type Request14 =
+export type Request15 =
   | {
       action: "list";
     }
@@ -178,7 +206,7 @@ export type Period = "day" | "week" | "month";
 export interface Request1 {
   action: Action;
 }
-export interface Request2 {
+export interface Request3 {
   action: Action2;
   snapshotId: string;
   roots?: string[];
@@ -222,8 +250,8 @@ export interface Evidence {
    */
   eventOffset: number;
 }
-export interface Request3 {
-  query: Request4;
+export interface Request4 {
+  query: Request5;
   mode?: Mode & string;
   verify?: boolean;
   /**
@@ -245,16 +273,16 @@ export interface Request3 {
    */
   also?:
     | []
-    | [Request4]
-    | [Request4, Request4]
-    | [Request4, Request4, Request4]
-    | [Request4, Request4, Request4, Request4]
-    | [Request4, Request4, Request4, Request4, Request4]
-    | [Request4, Request4, Request4, Request4, Request4, Request4]
-    | [Request4, Request4, Request4, Request4, Request4, Request4, Request4]
-    | [Request4, Request4, Request4, Request4, Request4, Request4, Request4, Request4];
+    | [Request5]
+    | [Request5, Request5]
+    | [Request5, Request5, Request5]
+    | [Request5, Request5, Request5, Request5]
+    | [Request5, Request5, Request5, Request5, Request5]
+    | [Request5, Request5, Request5, Request5, Request5, Request5]
+    | [Request5, Request5, Request5, Request5, Request5, Request5, Request5]
+    | [Request5, Request5, Request5, Request5, Request5, Request5, Request5, Request5];
 }
-export interface Request4 {
+export interface Request5 {
   comparison?: ComparisonRequest | null;
   action: Action3;
   snapshotId?: string | null;
@@ -297,7 +325,7 @@ export interface Scope {
    */
   turnId?: string | null;
 }
-export interface Request5 {
+export interface Request6 {
   action?: Action4 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
@@ -327,7 +355,7 @@ export interface Scope2 {
   sourceInstanceId?: string | null;
   threadId?: string | null;
 }
-export interface Request6 {
+export interface Request7 {
   action?: Action5 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
@@ -364,28 +392,28 @@ export interface Scope3 {
 export interface Cursor {
   token: string;
 }
-export interface Request8 {
+export interface Request9 {
   project?: string | null;
   roots?: string[] | null;
   includeHooks?: boolean;
 }
-export interface Request9 {
+export interface Request10 {
   action?: Action6 & string;
 }
-export interface Request10 {
+export interface Request11 {
   action?: Action7 & string;
   purpose?: Purpose | null;
   path?: string | null;
   grantId?: string | null;
 }
-export interface Request11 {
+export interface Request12 {
   action: Action8;
   language?: Language | null;
 }
-export interface Request12 {
+export interface Request13 {
   action: Action9;
 }
-export interface Request13 {
+export interface Request14 {
   action?: Action10 & string;
   mode?: Mode3 | null;
   roots?: string[] | null;

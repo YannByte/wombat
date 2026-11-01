@@ -13,7 +13,7 @@ class PluginStageError extends Error {
 const code = (value: unknown): string | undefined => typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : undefined;
 const quote = (value: string): string => "'" + value.replaceAll("'", process.platform === 'win32' ? "''" : "'\\''") + "'";
 function verificationProblem(setup: unknown, name: string, requirements: Record<string, unknown>): PluginStageError | undefined {
-  const retry = `Run only the read-only check: wombat setup --project ${quote(process.cwd())} --json. Do not reinstall the runtime.`;
+  const retry = `Run only the read-only check: wombat system doctor --plugin --project ${quote(process.cwd())} --json. Do not reinstall the runtime.`;
   const fail = (value: string, reason: string, recovery = retry) => new PluginStageError(value, reason, recovery);
   if (!object(setup) || setup.outputVersion !== 1 || !object(setup.discovery) || !Array.isArray(setup.discovery.instances) || !Array.isArray(setup.runtimeChecks)) return fail('SETUP_INVALID_RESPONSE', 'The verification response is invalid.');
   const discovery = setup.discovery;
@@ -92,7 +92,7 @@ export async function installBundledPlugin(marketplace: string, options: {binary
       if (result.exitCode === null || !accepted.includes(result.exitCode) || result.timedOut || result.outputLimit || result.interrupted || result.closeTimedOut || result.spawnError || result.logError) {
         const reason=result.spawnError?'executable unavailable':result.timedOut?'timeout':result.outputLimit?'output limit':result.interrupted?'cancelled':result.closeTimedOut?'cleanup incomplete':result.logError?'log write failed':'exit '+result.exitCode;
         const failure = result.spawnError ? ('code' in result.spawnError ? code(result.spawnError.code) : undefined) ?? 'EXECUTABLE_UNAVAILABLE' : result.timedOut ? 'TIMEOUT' : result.outputLimit ? 'OUTPUT_LIMIT' : result.interrupted ? 'CANCELLED' : result.closeTimedOut ? 'CLEANUP_INCOMPLETE' : result.logError ? 'LOG_WRITE_FAILED' : 'COMMAND_FAILED';
-        const recovery = stage === 'verify' ? `Run only the read-only check: wombat setup --project ${quote(process.cwd())} --json. Do not reinstall the runtime.` : 'Retry only the plugin stage with --plugin-only (PowerShell: -PluginOnly); keep any custom prefix. Do not reinstall the runtime.';
+        const recovery = stage === 'verify' ? `Run only the read-only check: wombat system doctor --plugin --project ${quote(process.cwd())} --json. Do not reinstall the runtime.` : 'Retry only the plugin stage with --plugin-only (PowerShell: -PluginOnly); keep any custom prefix. Do not reinstall the runtime.';
         throw new PluginStageError(failure, `Codex plugin ${stage} failed (${reason}).`, recovery);
       }
       return stdoutFromLog(readFileSync(log, 'utf8'));
@@ -142,8 +142,8 @@ export async function installBundledPlugin(marketplace: string, options: {binary
     // Installation and native discovery are separate stages. Verification never rolls
     // back a successful installation or treats unrelated Hook gaps as a query failure.
     let setup: unknown;
-    const output = await run('verify',['setup','--project',process.cwd(),'--json'],[process.execPath,path.resolve(directory,'../wombat.js')],[0,2]);
-    try {setup = JSON.parse(output);} catch {throw new PluginStageError('SETUP_INVALID_RESPONSE', 'The verification response is not valid JSON.', 'Run wombat setup --json to check the installed runtime. Do not reinstall the runtime.');}
+    const output = await run('verify',["system", "doctor", "--plugin",'--project',process.cwd(),'--json'],[process.execPath,path.resolve(directory,'../wombat.js')],[0,2]);
+    try {setup = JSON.parse(output);} catch {throw new PluginStageError('SETUP_INVALID_RESPONSE', 'The verification response is not valid JSON.', 'Run wombat system doctor --plugin --json to check the installed runtime. Do not reinstall the runtime.');}
     facts = {...facts, ...verificationFacts(setup)};
     const problem = verificationProblem(setup, name, requirements);
     if (problem) throw problem;

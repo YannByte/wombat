@@ -13,7 +13,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering as AtomicOrdering},
 };
 
-pub(super) const EVENT_INDEX_VERSION: u32 = 2;
+pub(super) const EVENT_INDEX_VERSION: u32 = 3;
 pub const MAX_TARGET_EVENTS: usize = 100_000;
 pub const MAX_EVENT_PAGE_ROWS: usize = 200;
 const MAX_EVENT_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
@@ -54,7 +54,8 @@ pub struct EventChunk {
     pub file: FileRef,
     pub count: usize,
     pub message_count: usize,
-    pub message_time: super::message_events::MessageTimeRange,
+    pub message_time: TimeRange,
+    pub inspection: super::inspection_index::InspectionIndex,
     pub bytes: u64,
     pub first: Position,
     pub last: Position,
@@ -296,7 +297,15 @@ fn build_events(
                         matches!(e.payload(), crate::session_events::Payload::Message { .. })
                     })
                     .count(),
-                message_time: super::message_events::MessageTimeRange::build(&events[start..end]),
+                message_time: TimeRange::build(
+                    events[start..end]
+                        .iter()
+                        .filter(|e| {
+                            matches!(e.payload(), crate::session_events::Payload::Message { .. })
+                        })
+                        .map(|e| e.time().timestamp.as_deref()),
+                ),
+                inspection: super::inspection_index::InspectionIndex::build(&events[start..end]),
                 bytes: bytes.len() as u64,
                 first: events[start].position().clone(),
                 last: events[end - 1].position().clone(),
@@ -452,6 +461,7 @@ pub(super) fn validate_index(index: &EventIndex) -> Result<()> {
         let mut count = 0usize;
         for (number, chunk) in partition.chunks.iter().enumerate() {
             chunk.message_time.validate(chunk.message_count)?;
+            chunk.inspection.validate(chunk)?;
             if chunk.offset != count
                 || chunk.count == 0
                 || chunk.count > MAX_EVENT_PAGE_ROWS

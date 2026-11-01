@@ -4,6 +4,7 @@ use super::*;
 #[derive(Default)]
 pub(crate) struct ColdOperations {
     pub(super) turns: BTreeMap<(String, String), Vec<crate::live_index::FactLocation>>,
+    pub(super) times: BTreeMap<(String, String), TimeRange>,
     pub(super) unassigned: BTreeMap<String, UnassignedUseRecords>,
 }
 pub(crate) fn load_operations(
@@ -67,6 +68,18 @@ fn load(
                         .or_default()
                         .observe(&operation)?;
                 }
+                index
+                    .times
+                    .entry((
+                        operation.thread_id.to_string(),
+                        operation
+                            .turn_id
+                            .as_deref()
+                            .unwrap_or("unassigned")
+                            .to_owned(),
+                    ))
+                    .or_default()
+                    .observe(operation.timestamp.as_deref());
                 let target = index
                     .turns
                     .entry((

@@ -26,3 +26,5 @@ export {validate as validateAgentRequest} from './generated/validate-agent-reque
 export {schema as agentRequestSchema} from './generated/schema-agent-request.js';
 export {schemas as agentResultSchemas} from './generated/schema-agent-results.js';
 export type {ErrorOutput as AgentErrorOutput} from './generated/agent-error.js';
+
+export type { ArtifactsRequest, ArtifactsResult, ArtifactItem, ArtifactsTransport } from './client.js';

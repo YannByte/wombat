@@ -5,19 +5,49 @@
   </picture>
 </p>
 
-# Wombat — Diagnose and Improve Agent Work
+# Wombat
 
 English | [中文](README.zh-CN.md)
 
-Find what blocks an Agent task, make a concrete improvement, and check the original problem again.
+Find past decisions, understand usage, and identify project problems and disposable artifacts.
 
-Wombat combines efficient local work-history retrieval with exact usage calculations. One Skill selects the evidence needed for your task and helps Codex inspect, change and verify the project. Start with your question. No project initialization or full-history scan is required for a static engineering review.
+Use Wombat in Codex. Wombat retrieves local work records and calculates usage; Codex uses that evidence to explain problems, make authorized changes and recheck them.
+
+## See the result
+
+The tasks, numbers and findings below are synthetic, not real reports.
+
+### Check usage
+
+> **You:** How much did I use today, and where did it go?
+
+**Example answer:** 1.2 million Tokens: 900,000 for installation troubleshooting, 200,000 for test fixes and 100,000 for documentation. One model is unpriced, so the cost estimate is incomplete.
+
+### Find a concrete improvement
+
+> **You:** Review this project's publishing process. What should I improve?
+
+**Example answer:** `scripts/ship.ts` skips an existing package check before upload. Call that check before uploading. After the change, run the same publishing path with a valid archive and an archive missing a required file: the first must pass; the second must stop before upload.
+
+### Cleanup
+
+> **You:** Show which Codex files can be cleaned. Do not delete anything yet.
+
+**Example preview:**
+
+- **Candidate:** `releases/1.0.0-darwin-arm64`, observed size 240 MB; neither the current nor pending release.
+- **Keep:** Both the current and pending releases, plus desktop caches while Codex is running.
+- **Action:** Nothing has been deleted. Removing the selected old release would permanently delete it.
+
+> **You:** Permanently delete only that old release and recheck. Keep everything else.
+
+**Example follow-up:** The selected old release was removed; recheck confirms it is absent at its original path. The current release, pending release and desktop caches remain.
 
 ## Get started
 
-**Stable: [`v0.4.0`](https://github.com/YannByte/wombat/releases/tag/v0.4.0).**
+**Stable: [`v0.5.0`](https://github.com/YannByte/wombat/releases/tag/v0.5.0).**
 
-Local analysis needs no API key or development tools. Install a compatible local Codex before using the plugin.
+Install Codex first. The plugin installer needs a local `codex` command that supports native plugins. Wombat's local analysis needs no separate API key or development tools.
 
 On macOS or Linux, install Wombat and its plugin:
 
@@ -35,63 +65,41 @@ On Windows PowerShell:
 2. Start a new conversation.
 3. Ask:
 
-> $wombat:wombat Investigate why this project's delivery check failed. Show the evidence, the exact change to make, and how to verify it.
+> $wombat:wombat Show today's usage and the three tasks that used the most Tokens. Tell me whether the data is complete.
 
-## Choose a task
+The answer includes the time range, total usage, top tasks and any missing data, in your language. For installation trouble, follow the reported recovery step; see the [installation guide](docs/guides/installation.en.md). For CLI-only use, omit `--plugin` or `-Plugin`.
 
-Use the same `$wombat:wombat` entry for every task:
+## More ways to use it
+
+Use the same `$wombat:wombat` entry:
 
 | Task | Example request |
 |---|---|
-| Resume work | What did we decide about this task, and what should I do next? |
-| Investigate an obstacle | Why did this check keep failing? Point to the actual project entry. |
-| Verify a delivery | Does this result meet the original requirements? Which checks are missing? |
-| Review work and usage | What did I work on this week, and which change would help most? |
-| Improve the workflow | Connect the existing check to delivery, then verify that invalid input is blocked. |
+| Resume work | Find our last decision about this project's installer. Show the conversation location and next step. |
+| Review the week | What did I work on in this project this week? Separate verified results from work that still needs checking. |
+| Verify a change | Recheck the original installation failure after this fix. What passed, and what remains unverified? |
 
-Simple usage, cost and timing questions use the same entry. Reviews start read-only. After an authorized change, recheck the original issue. A static check, later adoption and improved outcomes are separate results. A report request does not schedule future reports.
+See the [plugin guide](docs/guides/plugin.en.md) for more uses, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
 
-Answers follow your language. See the [plugin guide](docs/guides/plugin.en.md) for invocation and optional observations, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
+## Before you use it
 
-## First preparation and results
+- CLI analysis stays local and makes no model calls. Selected Skill evidence enters the current Codex conversation and consumes Tokens. Missing prices may trigger an official catalog download; see [privacy](docs/reference/privacy.en.md).
+- Costs are API-equivalent estimates, not subscription charges. Missing prices are not zero cost; account allowance is separate. See [pricing](docs/reference/pricing.en.md).
+- Cleanup needs authorization for the selected items. It protects conversations, state, configuration and credentials; changed or unknown conditions block deletion. See the [cleanup guide](docs/guides/cli.en.md).
 
-Installation does not start indexing or enable automatic startup. The first query prepares the data it needs and reuses the local index on later queries. Recent queries prioritize the most recent 30 days; older requests can require additional preparation.
-
-Initial results can be incomplete while a requested query is preparing. Check its progress with:
-
-```sh
-wombat service status --json
-```
-
-Keep missing or partial data separate from zero usage. Reviews cannot prove waste from high usage alone, or configuration inactivity from missing use records.
-
-If the plugin stage fails, Wombat and its data remain installed. Follow the reported recovery step and the [installation guide](docs/guides/installation.en.md). The guide also covers service controls. For CLI-only use, omit `--plugin` or `-Plugin` when installing.
+Release packages support macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Codex artifact cleanup currently targets macOS layouts. For unsupported record formats, see [format recovery](docs/reference/cli.en.md).
 
 ## Update
 
-Rerun the installation command above to update Wombat and its Codex plugin. Check for updates, or update only the Wombat runtime:
+Rerun the installation command above to update Wombat and its Codex plugin. Keep any options for a specific version or custom installation directory.
 
-```sh
-wombat update --check
-wombat update
-```
-
-See the [installation guide](docs/guides/installation.en.md) for specific versions and custom installation directories.
-
-## Scope and limits
-
-- Analyzes local Codex records. Release packages support macOS arm64/x64, Linux glibc arm64/x64, and Windows x64.
-- Wombat's local queries upload no logs and make no model calls. Using these Skills in Codex consumes model Tokens.
-- Missing prices can trigger an official price download. See [privacy](docs/reference/privacy.en.md) for network and original-text access boundaries.
-- Tokens, API-equivalent estimates, and account allowance remain separate. Estimates are not subscription charges; see [pricing](docs/reference/pricing.en.md).
-
-For unsupported data formats, see [format recovery](docs/reference/cli.en.md).
+See the [installation guide](docs/guides/installation.en.md) for update options and runtime-only updates.
 
 ## Help and contribution
 
-See the [CLI guide](docs/guides/cli.en.md) for JSON queries and budget controls. See [Contributing](.github/CONTRIBUTING.md) for source setup.
+See the [CLI guide](docs/guides/cli.en.md) for direct queries, JSON output and budget controls. See [Contributing](.github/CONTRIBUTING.md) for source setup.
 
-[Report a problem or request](https://github.com/YannByte/wombat/issues). Describe what happens and the tools involved; no private logs are needed. Use the [security policy](.github/SECURITY.md) for security reports.
+[Report a problem or request](https://github.com/YannByte/wombat/issues). Describe what happened and the tools involved; no private logs are needed. Use the [security policy](.github/SECURITY.md) for security reports.
 
 ## License
 

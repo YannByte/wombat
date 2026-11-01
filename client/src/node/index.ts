@@ -12,6 +12,7 @@ export interface NodeClientOptions extends CoreProcessOptions,CodexOptions { aut
 export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
   let account: Promise<AccountTransport> | undefined;
   const client = createUsageClient({
+    artifacts:(request,queryOptions)=>queryLive({artifacts:request},queryOptions,options),
     service:async(r,q)=>(await import('./service.js')).manageService(r,q,options),
     monitor: (r,q) => r.action==='check' && r.snapshotId.startsWith('live:') ? queryLive({monitor:r},q,options) : invokeOperation('monitor',r,q,options),
     setup: async (r,q) => (await import('./setup.js')).checkSetup(r,q,options),

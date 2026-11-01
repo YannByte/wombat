@@ -21,6 +21,24 @@
       "additionalProperties": false
     },
     {
+      "description": "Inspect artifacts, recheck original selections or explicitly remove selected Codex candidates; no session indexing.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "artifacts"
+        },
+        "params": {
+          "$ref": "#/definitions/Request2"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
       "description": "Discover activity, locate messages, search selected conversations or explicitly read bounded original text.",
       "type": "object",
       "properties": {
@@ -29,7 +47,7 @@
           "const": "conversation"
         },
         "params": {
-          "$ref": "#/definitions/Request2"
+          "$ref": "#/definitions/Request3"
         }
       },
       "required": [
@@ -47,7 +65,7 @@
           "const": "usage"
         },
         "params": {
-          "$ref": "#/definitions/Request3"
+          "$ref": "#/definitions/Request4"
         }
       },
       "required": [
@@ -65,7 +83,7 @@
           "const": "snapshot"
         },
         "params": {
-          "$ref": "#/definitions/Request4"
+          "$ref": "#/definitions/Request5"
         }
       },
       "required": [
@@ -83,7 +101,7 @@
           "const": "config"
         },
         "params": {
-          "$ref": "#/definitions/Request5"
+          "$ref": "#/definitions/Request6"
         }
       },
       "required": [
@@ -101,7 +119,7 @@
           "const": "optimize"
         },
         "params": {
-          "$ref": "#/definitions/Request6"
+          "$ref": "#/definitions/Request7"
         }
       },
       "required": [
@@ -119,7 +137,7 @@
           "const": "timing"
         },
         "params": {
-          "$ref": "#/definitions/Request7"
+          "$ref": "#/definitions/Request8"
         }
       },
       "required": [
@@ -137,7 +155,7 @@
           "const": "setup"
         },
         "params": {
-          "$ref": "#/definitions/Request8"
+          "$ref": "#/definitions/Request9"
         }
       },
       "required": [
@@ -155,7 +173,7 @@
           "const": "account"
         },
         "params": {
-          "$ref": "#/definitions/Request9"
+          "$ref": "#/definitions/Request10"
         }
       },
       "required": [
@@ -173,7 +191,7 @@
           "const": "directories"
         },
         "params": {
-          "$ref": "#/definitions/Request10"
+          "$ref": "#/definitions/Request11"
         }
       },
       "required": [
@@ -191,7 +209,7 @@
           "const": "preferences"
         },
         "params": {
-          "$ref": "#/definitions/Request11"
+          "$ref": "#/definitions/Request12"
         }
       },
       "required": [
@@ -209,7 +227,7 @@
           "const": "prices"
         },
         "params": {
-          "$ref": "#/definitions/Request12"
+          "$ref": "#/definitions/Request13"
         }
       },
       "required": [
@@ -227,7 +245,7 @@
           "const": "collection"
         },
         "params": {
-          "$ref": "#/definitions/Request13"
+          "$ref": "#/definitions/Request14"
         }
       },
       "required": [
@@ -245,7 +263,7 @@
           "const": "monitor"
         },
         "params": {
-          "$ref": "#/definitions/Request14"
+          "$ref": "#/definitions/Request15"
         }
       },
       "required": [
@@ -281,6 +299,106 @@
       ]
     },
     "Request2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "projectRoot": {
+              "type": "string"
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "keepPaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "productTemporary": {
+              "type": "boolean",
+              "default": false
+            },
+            "codex": {
+              "type": "boolean",
+              "default": false
+            },
+            "action": {
+              "type": "string",
+              "const": "inspect"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "projectRoot"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "readView": {
+              "type": "string"
+            },
+            "baselineId": {
+              "type": "string"
+            },
+            "selection": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100
+            },
+            "action": {
+              "type": "string",
+              "const": "apply"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "readView",
+            "baselineId",
+            "selection"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "readView": {
+              "type": "string"
+            },
+            "baselineId": {
+              "type": "string"
+            },
+            "selection": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "action": {
+              "type": "string",
+              "const": "recheck"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "readView",
+            "baselineId"
+          ]
+        }
+      ]
+    },
+    "Request3": {
       "type": "object",
       "properties": {
         "action": {
@@ -575,11 +693,11 @@
         "eventOffset"
       ]
     },
-    "Request3": {
+    "Request4": {
       "type": "object",
       "properties": {
         "query": {
-          "$ref": "#/definitions/Request4"
+          "$ref": "#/definitions/Request5"
         },
         "mode": {
           "default": "auto",
@@ -617,7 +735,7 @@
           "description": "Additional queries share the selected immutable revision. No synchronization options.",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Request4"
+            "$ref": "#/definitions/Request5"
           },
           "maxItems": 8,
           "default": []
@@ -628,7 +746,7 @@
         "query"
       ]
     },
-    "Request4": {
+    "Request5": {
       "type": "object",
       "properties": {
         "comparison": {
@@ -996,7 +1114,7 @@
         "cached"
       ]
     },
-    "Request5": {
+    "Request6": {
       "type": "object",
       "properties": {
         "action": {
@@ -1220,7 +1338,7 @@
         "recent"
       ]
     },
-    "Request6": {
+    "Request7": {
       "type": "object",
       "properties": {
         "action": {
@@ -1427,7 +1545,7 @@
         "turnId"
       ]
     },
-    "Request7": {
+    "Request8": {
       "oneOf": [
         {
           "type": "object",
@@ -1646,7 +1764,7 @@
         "use_records"
       ]
     },
-    "Request8": {
+    "Request9": {
       "type": "object",
       "properties": {
         "project": {
@@ -1671,7 +1789,7 @@
       },
       "additionalProperties": false
     },
-    "Request9": {
+    "Request10": {
       "type": "object",
       "properties": {
         "action": {
@@ -1693,7 +1811,7 @@
         "history"
       ]
     },
-    "Request10": {
+    "Request11": {
       "type": "object",
       "properties": {
         "action": {
@@ -1744,7 +1862,7 @@
         "project"
       ]
     },
-    "Request11": {
+    "Request12": {
       "type": "object",
       "properties": {
         "action": {
@@ -1780,7 +1898,7 @@
         "en"
       ]
     },
-    "Request12": {
+    "Request13": {
       "type": "object",
       "properties": {
         "action": {
@@ -1800,7 +1918,7 @@
         "auto_update"
       ]
     },
-    "Request13": {
+    "Request14": {
       "type": "object",
       "properties": {
         "action": {
@@ -1878,7 +1996,7 @@
         "hooks"
       ]
     },
-    "Request14": {
+    "Request15": {
       "oneOf": [
         {
           "type": "object",

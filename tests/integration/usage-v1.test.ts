@@ -1,3 +1,4 @@
+import { queryInvocation, spawnProductCli, type CliInput } from '../../scripts/cli-invocation.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { appendFile, mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
@@ -64,8 +65,8 @@ async function fixture() {
   const query = (args: object) => {
     const result = raw(args); assert.equal(result.ok, true, JSON.stringify(result)); return result.value;
   };
-  const invokeCli = (args: string[]) => {
-    const result = spawnSync(process.execPath, [cli, ...args], { env, input: '', encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
+  const invokeCli = (args: CliInput) => {
+    const result = spawnProductCli(cli, args, { env, input: '', encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
     assert.ifError(result.error);
     assert.ok(!result.stdout.includes(sentinel));
     return { ...result, value: JSON.parse(result.stdout) };
@@ -142,7 +143,7 @@ test('CLI refresh reads nested Codex settings and prices a current model', async
       event('2026-09-29T03:00:01Z', { type: 'thread_settings_applied', thread_id: 'thread-c', thread_settings: { model: 'gpt-6-sol', model_provider_id: 'openai', reasoning_effort: 'high' } }),
       measurement('2026-09-29T03:00:02Z', 'thread-c', 'turn-c1', 'response-c1', usage(1_000, 100, 100)),
     ]));
-    const refreshed = f.invokeCli(['refresh', '--root', f.source, '--json']);
+    const refreshed = f.invokeCli({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
     assert.equal(refreshed.status, 0, refreshed.stdout);
     assert.equal(refreshed.value.action, 'refresh');
     const queried = f.invokeCli(['usage', '--model', 'gpt-6-sol', '--since', '2026-09-29', '--until', '2026-09-30', '--json']);
@@ -302,9 +303,9 @@ test('日期按真实时区跨夏令时和年份分组，不以固定24小时切
 test('无 TTY CLI 与 Rust 查询一致，JSON stdout 只有最终结果', async () => {
   const f = await fixture();
   try {
-    const refreshed = f.invokeCli(['refresh', '--root', f.source, '--json']);
+    const refreshed = f.invokeCli({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
     assert.equal(refreshed.status, 0, refreshed.stderr);
-    assert.match(refreshed.stderr, /Wombat/);
+    assert.equal(refreshed.stdout.trim().split('\n').length,1);
     const snapshotId = refreshed.value.snapshotRef.snapshotId;
     const flags = ['usage', '--snapshot', snapshotId, '--since', '2026-09-28', '--until', '2026-09-30', '--timezone', 'UTC', '--json'];
     const cliResult = f.invokeCli(flags);
@@ -480,7 +481,7 @@ test('matching-turn pagination finds late matches and context location preserves
   assert.equal(context.page.total,50);assert.equal(context.page.offset,40);
   assert(context.items.some((i:any)=>i.id===matching.items[0].id));
   assert.equal(context.summary.tokens.total,5500);
-  const cli=f.invokeCli(['turns','--thread',thread.id,'--snapshot',snapshotId,'--model','gpt-5.4','--matched-only','--locate-turn',matching.items[0].id,'--limit','20','--json']);
+  const cli=f.invokeCli(queryInvocation({"action":"turns","locateTurnId":matching.items[0].id,"matchedOnly":true,"threadId":thread.id,"limit":20,"snapshotId":snapshotId,"scope":{"model":"gpt-5.4"}}, {mode:"auto"}));
   assert.equal(cli.status,0);assert.equal(cli.value.page.total,1);assert.equal(cli.value.items[0].id,matching.items[0].id);
   const none=f.query({...request,scope:{model:'does-not-exist'},matchedOnly:true});
   assert.equal(none.page.total,0);assert.equal(none.summary.tokens.total,5500);

@@ -38,7 +38,7 @@ test('local resource checks retain fixed evidence, expose independent outcomes a
         assert.equal(checks.checks?.find(c => c.rule === 'localReference')?.outcome, 'hit');
         assert.equal(checks.checks?.find(c => c.rule === 'skillFormat')?.outcome, 'miss');
         assert.ok(!checks.checks.some(c=>c.rule==='skillInactivity'));
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'checks', '--root', root, '--project-root', project, '--read-view', first.readView!, '--item', suggestion.item.id, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'checks', '--root', root, '--project-root', project, '--read-view', first.readView!, '--item', suggestion.item.id, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         assert.deepEqual(JSON.parse(cli.stdout).checks, checks.checks);
         await nativeApi.optimize!({ action: 'recheck', readView: first.readView, baselineId: suggestion.baselineId, suggestionId: suggestion.id });
@@ -117,7 +117,7 @@ test('exact blocks, explicit copies, decision fingerprints and unavailable reche
         assert.equal(drift.category, 'repair');
         assert.equal(drift.findings[0].evidence?.versions.length, 2);
         assert.equal(drift.findings[0].evidence?.direction, 'sourceToCopy');
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'list', '--root', root, '--project-root', project, '--read-view', first.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'list', '--root', root, '--project-root', project, '--read-view', first.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr);
         assert.deepEqual(JSON.parse(cli.stdout).suggestions, first.suggestions);
         await nativeApi.optimize!({ action: 'keep', decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision, suggestionId: drift.id });
@@ -276,7 +276,7 @@ test('two sources share one physical configuration and one review while keeping 
         assert.equal(checkedBlock.comparison.status,'unknown');
         assert.equal(checkedBlock.comparison.reason,'problemIdentityUnavailable');
         assert.equal(checked.pending,0);
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'optimize', 'inventory', ...roots.flatMap(p => ['--root', p]), '--project-root', project, '--all-time', '--read-view', checked.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'inventory', ...roots.flatMap(p => ['--root', p]), '--project-root', project, '--all-time', '--read-view', checked.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         assert.equal(JSON.parse(cli.stdout).items.filter((i: {
             path: string;

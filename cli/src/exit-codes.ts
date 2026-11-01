@@ -36,3 +36,8 @@ export function resultExitCode(result: UsageResult): number {
     ? 2
     : 0;
 }
+
+/** Successful navigation makes no whole-turn completeness claim. */
+export function timingExitCode(result: import('@wombat/client').TimingResult): number {
+  return result.action === 'summary' && (result.quality.partial || result.quality.running || result.quality.censored) ? 2 : 0;
+}
