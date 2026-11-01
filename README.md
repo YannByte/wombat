@@ -5,29 +5,29 @@
   </picture>
 </p>
 
-# Wombat
+# Wombat: Codex history, usage and project diagnosis
 
 English | [中文](README.zh-CN.md)
 
-Find past decisions, understand usage, and identify project problems and disposable artifacts.
+Wombat is a plugin and local CLI for OpenAI Codex. Search conversation history, analyze Token usage, estimate API-equivalent costs, diagnose project problems, and review files for safe cleanup.
 
-Use Wombat in Codex. Wombat retrieves local work records and calculates usage; Codex uses that evidence to explain problems, make authorized changes and recheck them.
+Ask in natural language to recover past decisions, resume work or investigate recurring failures. Wombat retrieves local evidence and calculates usage; Codex explains the findings, makes authorized changes and rechecks the original problem.
 
 ## See the result
 
-### Check usage
+### Check Codex Token usage and estimated costs
 
 > **You:** How much did I use today, and where did it go?
 
 **Example answer:** 1.2 million Tokens: 900,000 for installation troubleshooting, 200,000 for test fixes and 100,000 for documentation. One model is unpriced, so the cost estimate is incomplete.
 
-### Find a concrete improvement
+### Diagnose project problems and verify improvements
 
 > **You:** Review this project's publishing process. What should I improve?
 
 **Example answer:** `scripts/ship.ts` skips an existing package check before upload. Call that check before uploading. After the change, run the same publishing path with a valid archive and an archive missing a required file: the first must pass; the second must stop before upload.
 
-### Cleanup
+### Preview and clean up Codex files
 
 > **You:** Show which Codex files can be cleaned. Do not delete anything yet.
 
@@ -41,7 +41,7 @@ Use Wombat in Codex. Wombat retrieves local work records and calculates usage; C
 
 **Example follow-up:** The selected old release was removed; recheck confirms it is absent at its original path. The current release, pending release and desktop caches remain.
 
-## Get started
+## Install Wombat for Codex
 
 **Stable: [`v0.5.0`](https://github.com/YannByte/wombat/releases/tag/v0.5.0).**
 
@@ -65,7 +65,7 @@ On Windows PowerShell:
 
 > $wombat:wombat Show today's usage and the three tasks that used the most Tokens. Tell me whether the data is complete.
 
-The answer uses the language of your question and includes the time range, total usage, top tasks and any missing data. For installation trouble, follow the reported recovery step; see the [installation guide](docs/guides/installation.en.md). For CLI-only use, omit `--plugin` or `-Plugin`.
+The answer uses the language of your question and includes the time range, total usage, top tasks and any missing data. For installation trouble, follow the reported recovery step; see the [installation guide](docs/guides/installation.en.md).
 
 ## More ways to use it
 
@@ -86,10 +86,23 @@ Use these examples as a starting point and explore questions from your own work.
 
 See the [plugin guide](docs/guides/plugin.en.md) for more uses, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
 
+## Common questions
+
+### How do I search Codex conversation history?
+
+Ask `$wombat:wombat` for a past discussion, decision or unfinished task. Add the project, date range or words you remember. Wombat locates relevant records and returns original conversation locations.
+
+### Does Wombat show my subscription bill?
+
+No. Wombat calculates Token usage and API-equivalent cost estimates from local Codex records. Missing prices are not zero cost; subscription allowance is separate. See [pricing](docs/reference/pricing.en.md).
+
+### Can I use Wombat without the plugin?
+
+Yes. Omit `--plugin` or `-Plugin` when installing and use the CLI directly. CLI queries support JSON output; see the [CLI guide](docs/guides/cli.en.md).
+
 ## Before you use it
 
 - CLI analysis stays local and makes no model calls. Selected Skill evidence enters the current Codex conversation and consumes Tokens. Missing prices may trigger an official catalog download; see [privacy](docs/reference/privacy.en.md).
-- Costs are API-equivalent estimates, not subscription charges. Missing prices are not zero cost; account allowance is separate. See [pricing](docs/reference/pricing.en.md).
 - Cleanup needs authorization for the selected items. It protects conversations, state, configuration and credentials; changed or unknown conditions block deletion. See the [cleanup guide](docs/guides/cli.en.md).
 
 Release packages support macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Codex artifact cleanup currently targets macOS layouts. For unsupported record formats, see [format recovery](docs/reference/cli.en.md).

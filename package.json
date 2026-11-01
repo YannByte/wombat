@@ -87,21 +87,22 @@
     }
   },
   "license": "MIT",
-  "description": "Evidence-backed project diagnosis for agents, with local work history and exact usage through one Skill and CLI.",
+  "description": "Codex plugin and local CLI for conversation history search, Token usage and cost analysis, project diagnosis, and safe cleanup. Find past decisions and verify fixes.",
   "keywords": [
     "codex",
+    "openai-codex",
+    "codex-plugin",
     "codex-skill",
+    "conversation-history",
+    "session-search",
     "token-usage",
     "usage-analysis",
     "cost-estimates",
     "task-history",
-    "agents-md",
     "agent-skills",
-    "mcp",
-    "hooks",
-    "configuration-review",
     "cli",
-    "engineering-diagnosis"
+    "engineering-diagnosis",
+    "cleanup"
   ],
   "repository": {
     "type": "git",

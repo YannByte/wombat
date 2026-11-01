@@ -5,47 +5,63 @@
       "zh": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562",
       "en": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562"
     },
-    "/wombat": {
-      "zh": "d5fad2ad1e95c1d8e1a06ccbbf3654ff596637b3462d96fe74b10dc8a07a250c",
-      "en": "90e08b0e87adb1bc184f979244677ccad7a29f4c5d6fccbc5af4c228b7cf78c9"
+    "/wombat-codex-history-usage-and-project-diagnosis": {
+      "zh": "6307fc5587dd2833ab84511dcda6bf74340fd6e727b1420aedfc27be64121167",
+      "en": "03d9d465e6f96d7337bd626353f11e0f14faf602adb18cae34629a9b06a54db4"
     },
-    "/wombat/see-the-result": {
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result": {
       "zh": "35497fb0468470974d5916fe615bf8d132b30133f0bb48e2f183553b08f6aa97",
       "en": "7ed45431bf09970914b09efd485be60dd4e62f92884ac6be4afe935aaa53ad35"
     },
-    "/wombat/see-the-result/check-usage": {
-      "zh": "0b4ab7d8f5fe1647841313077aad4ee84e06d9f09566cbfd2cd2c3b389f6eb86",
-      "en": "71aa75877c9737d24ed6a20c7fe87e1f9b1a4d1e5a137f0c373a033e32216be7"
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/check-codex-token-usage-and-estimated-costs": {
+      "zh": "857db7a31991af4a171c40097dfe22cfe2ee99756ff70569a5dd92fac9ebb1e5",
+      "en": "1ac65b9aa63f41535ed6e29c7c73f0025f834ee4f7e7c21a5d881012baa7b146"
     },
-    "/wombat/see-the-result/find-a-concrete-improvement": {
-      "zh": "ac123d1922537cbae37b06ee86dafc98975788ac8d35543b102d6e40a7b50f4b",
-      "en": "fb086e60c3112c8c3472433b00e420345f0a735c0368c6a53eb234b153fa88c7"
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/diagnose-project-problems-and-verify-improvements": {
+      "zh": "f324ddd91967635902f863b277f5db8427f02f77d96607caeeb282a1b67b3573",
+      "en": "ac32141b1a133ca2a75d94b79f04790103c14ebc39d9deb8a51f0f8a4a065d00"
     },
-    "/wombat/see-the-result/cleanup": {
-      "zh": "88807737f6de26d609ddeb123793f51693769ebc56e5e1ee8bc7c7f0f3c0ea40",
-      "en": "24b4abd9df5ffa91b51a0716201a28ab619386b686c1b9ac23288bbb0f4b4a09"
+    "/wombat-codex-history-usage-and-project-diagnosis/see-the-result/preview-and-clean-up-codex-files": {
+      "zh": "59e91cf1c8df548c168c0fec2043ed3166970b5fe54181650b186d09852bbcb7",
+      "en": "91501f16828a215b0a344ab4e866fb596abfe86f33f0f8fbebe728b67a78e6eb"
     },
-    "/wombat/get-started": {
-      "zh": "1b30966ac03ab6ccda56159b206aeadbede55dcc966e099fae9cfb39bab29106",
-      "en": "f95f01d0a490f34a79d76d873541cff77582e275b8fb69c39958352a7d9dd13f"
+    "/wombat-codex-history-usage-and-project-diagnosis/install-wombat-for-codex": {
+      "zh": "57a5bfbba9e7cf1d8de7c1b2077d43029eed3af0c1e62d30c9d0ae403e2c2ea5",
+      "en": "c8c3fb89fd4d9d9f12ead8a81b8e0cf27659deccb4c8b7ec00534f0179c60522"
     },
-    "/wombat/more-ways-to-use-it": {
+    "/wombat-codex-history-usage-and-project-diagnosis/more-ways-to-use-it": {
       "zh": "34830d41dbfe61b061213509ea26e5db7b1999d57ff627bea9dc029134745b52",
       "en": "b1105c415b715b1d74676c13a17f684b6d2fdffc0935175846cf4661bd487b6a"
     },
-    "/wombat/before-you-use-it": {
-      "zh": "30675befb3a368e70d4abc18f109808b843a636d7e88f61e9a598c92476ee095",
-      "en": "cb070425b91c3c39e9da38d96bcaf81896bf4fb4d24f6d938c8c5384c1fd1ea0"
+    "/wombat-codex-history-usage-and-project-diagnosis/common-questions": {
+      "zh": "3b30b685be5af364d8dcb66b9fbc097db7f4cf15e31d3c5289c2690594213ffb",
+      "en": "e671129eb69b047f7783e5fe07f7ede1cc402fbf166ba81912e9dc7208317005"
     },
-    "/wombat/update": {
+    "/wombat-codex-history-usage-and-project-diagnosis/common-questions/how-do-i-search-codex-conversation-history": {
+      "zh": "cea68e1574440d6fc45166674ca6bf97996983938a5ff7194b44d5d47a4de93f",
+      "en": "4154c6ebfb05e3fa43a1e7b620316e1b48f3802ecee834c5a8287c98e8b55241"
+    },
+    "/wombat-codex-history-usage-and-project-diagnosis/common-questions/does-wombat-show-my-subscription-bill": {
+      "zh": "759df755f403971b897de92afcbd8aa61ecfa85a49d2853c1f04bf233c57d2ea",
+      "en": "966324ee1251feea2f6694cb436b7c5864dbd12d12febfc82f8d4ace5e5d028d"
+    },
+    "/wombat-codex-history-usage-and-project-diagnosis/common-questions/can-i-use-wombat-without-the-plugin": {
+      "zh": "0b80a4e4ca1343c876a2af423a65a72496e580032b2bcdc37e48794f6b09c7db",
+      "en": "368e3879ca77c0b33692812038502a47b9096fd55bd453ac8a89b84148d905e5"
+    },
+    "/wombat-codex-history-usage-and-project-diagnosis/before-you-use-it": {
+      "zh": "8a7f4372d3c4964df0cd2e570e001adad906944d5d9665e4ca9b6650a1ee9d10",
+      "en": "d2ae70007abc7423a8fdcb0fb60633d9ae649d46cba5b5af708bab2bd97bdc88"
+    },
+    "/wombat-codex-history-usage-and-project-diagnosis/update": {
       "zh": "eb3aac893b74b463367812d1d741fd8003a9498496a5548a39563ad33642bf11",
       "en": "c76ae081dcfefcb0cf5e9c5431fd83814d72f7118a9f61c0acaf97ec4b541bf1"
     },
-    "/wombat/help-and-contribution": {
+    "/wombat-codex-history-usage-and-project-diagnosis/help-and-contribution": {
       "zh": "b62520d7bfa4b8986a88fd71d51b751f683d0d2a03ffcd8990ce698df9ec498d",
       "en": "486daa80433a71bf04ff954bb2d5c217e969b0bf803549ce75ad6bdc43942ad9"
     },
-    "/wombat/license": {
+    "/wombat-codex-history-usage-and-project-diagnosis/license": {
       "zh": "3ae9b43b0b2ab0253c26742d9a180634319a002755081eaed0bdb18ba4a3c29d",
       "en": "1a044ed47f1540e7d83b3f35501b9a3475aa043c07bf24dbfd4d6cd9fabba51d"
     }

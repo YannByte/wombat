@@ -5,29 +5,29 @@
   </picture>
 </p>
 
-# Wombat
+# Wombat：Codex 历史检索、用量分析与项目诊断
 
 中文 | [English](README.md)
 
-找回之前的决定，看清用量，找到项目问题和可清理的产物。
+Wombat 是 OpenAI Codex 的插件和本地 CLI。可以检索会话历史、统计 Token 用量、估算 API 等价费用、诊断项目问题，并检查哪些文件可以安全清理。
 
-在 Codex 中使用 Wombat。Wombat 检索本机工作记录、计算用量，Codex 根据证据解释问题、执行授权的修改并复查。
+用自然语言找回之前的决定、接续工作或排查反复出现的问题。Wombat 检索本机证据、计算用量，Codex 根据证据解释问题、执行授权的修改并按原场景复查。
 
 ## 看看会得到什么
 
-### 查用量
+### 查看 Codex Token 用量与估算费用
 
 > **提问：** 今天用了多少，主要花在哪里？
 
 **回答示例：** 共 120 万 Token：安装排查 90 万、测试修复 20 万、文档更新 10 万。一个模型未计价，因此费用估算不完整。
 
-### 找到具体改进点
+### 诊断项目问题并验证改进
 
 > **提问：** 看看这个项目的发布流程有什么值得改进的。
 
 **回答示例：** `scripts/ship.ts` 上传前没有执行已有的包校验。建议在上传前调用这项校验。改后用正常包和缺文件的包运行同一条发布路径：前者应通过，后者应在上传前被拦住。
 
-### 清理
+### 预览并清理 Codex 文件
 
 > **提问：** 看看 Codex 有哪些文件可以清理，先不要删除。
 
@@ -41,7 +41,7 @@
 
 **后续结果示例：** 已删除选中的旧版本，复查确认原路径已不存在。当前版本、待更新版本和桌面缓存均保留。
 
-## 开始使用
+## 为 Codex 安装 Wombat
 
 **正式版：[`v0.5.0`](https://github.com/YannByte/wombat/releases/tag/v0.5.0)。**
 
@@ -65,7 +65,7 @@ Windows PowerShell：
 
 > $wombat:wombat 看看今天的用量，列出消耗最多的三个任务，并说明数据是否完整。
 
-回答会使用提问时的语言，包含时间范围、总用量、主要任务和缺失数据。安装遇到问题时，按提示恢复，详见[安装指南](docs/guides/installation.md)。仅使用 CLI 时，安装命令省略 `--plugin` 或 `-Plugin`。
+回答会使用提问时的语言，包含时间范围、总用量、主要任务和缺失数据。安装遇到问题时，按提示恢复，详见[安装指南](docs/guides/installation.md)。
 
 ## 还可以这样问
 
@@ -86,10 +86,23 @@ Windows PowerShell：
 
 更多用法见[插件指南](docs/guides/plugin.md)，直接查询见 [CLI 指南](docs/guides/cli.md)。
 
+## 常见问题
+
+### 如何搜索 Codex 的历史对话？
+
+用 `$wombat:wombat` 查找之前的讨论、决定或未完成的任务。补充项目、时间范围或记得的关键词，Wombat 会定位相关记录并给出原对话位置。
+
+### Wombat 显示的是订阅账单吗？
+
+不是。Wombat 根据本机 Codex 记录计算 Token 用量和 API 等价费用估算。缺价不等于零费用，订阅额度单独计算。详见[计价说明](docs/reference/pricing.md)。
+
+### 不安装插件也能使用 Wombat 吗？
+
+可以。安装时省略 `--plugin` 或 `-Plugin`，直接使用 CLI。CLI 查询支持 JSON 输出，详见 [CLI 指南](docs/guides/cli.md)。
+
 ## 使用须知
 
 - CLI 在本机分析，不上传日志、不调用模型。Skill 选取的证据会进入当前 Codex 对话并消耗 Token。缺价时可能下载官方价表，详见[隐私说明](docs/reference/privacy.md)。
-- API 等价金额是估算值，不是订阅账单。缺价不等于零费用，账户额度单独计算，详见[计价说明](docs/reference/pricing.md)。
 - 清理需要对选定对象的授权；保护会话、状态、配置和凭据，条件变化或无法判断时停止。详见[清理指南](docs/guides/cli.md)。
 
 发行包支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。Codex 产物清理目前针对 macOS 目录布局。不受支持的记录格式如何处理，见[格式恢复说明](docs/reference/cli.md)。
