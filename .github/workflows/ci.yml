@@ -159,6 +159,9 @@ jobs:
         if: matrix.target != 'darwin-arm64'
         run: corepack pnpm licenses:generate
       - name: Build release core and CLI once
+        env:
+          # Explain stale Cargo artifacts instead of mistaking a cache hit for reuse.
+          CARGO_LOG: cargo::core::compiler::fingerprint=info
         run: corepack pnpm build
       - name: Verify shared-service startup
         run: corepack pnpm release:probe
