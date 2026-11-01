@@ -1117,6 +1117,11 @@
     "Request6": {
       "type": "object",
       "properties": {
+        "review": {
+          "description": "Observe native Skill metadata and order context footprint alongside use frequency.",
+          "type": "boolean",
+          "default": false
+        },
         "action": {
           "default": "list",
           "allOf": [
@@ -1335,7 +1340,10 @@
         "name",
         "content_tokens",
         "characters",
-        "recent"
+        "recent",
+        "review",
+        "context_tokens",
+        "least_activity"
       ]
     },
     "Request7": {

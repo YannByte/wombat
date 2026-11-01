@@ -12,6 +12,16 @@ For an uncertain cause, name the bounded investigation and observation that woul
 
 Before an authorized edit, retain the original condition, target version and check. Codex performs the edit and relevant tests. Wombat supplies evidence; ordinary diagnosis does not persist a handling lifecycle or authorize writes.
 
+## Review Skills and MCP
+
+For unused extensions or context burden, start with `check inventory --review --kind skill --project-root PATH --project PATH --limit 10 --json`. This fixes a read view before further evidence reads. Reuse the user's dates and timezone; the default review covers 30 local calendar days including today. Use `--sort context_tokens` or `--sort least_activity` for either dimension. Page the retained view only when more entries could change the choice.
+
+Show selected entries together: native name, origin/path, project and enabled scope, catalog Token estimate, use count, last use and recommendation. `contextFootprint.estimate` measures a reference discovery row, not the on-demand body or actual model-visible prompt. Native enabled state does not establish visibility; unmeasured or unavailable values remain unknown. MCP and Hook payloads are not measured from configuration size or tool counts. Use `--kind mcp` or `--kind hook` only when those are in scope.
+
+Prioritize large, rarely used entries for review; retain frequent or rare critical capabilities when useful. Zero records are a review lead, not proof of uselessness. A partial count is a lower bound, including zero; do not rank it as confirmed inactivity. Explain the specific task need, affected scope and smallest useful choice: keep, enable on demand, narrow scope or disable. Inspect selected content, related tasks or static findings only if they could change that choice. Do not read every Skill or run every checker before answering. Do not create a waste score, claim exact savings or change installed extensions without authorization. Use [Verify](verify.md) for authorized changes.
+
+## Cleanup candidates
+
 For project cleanup, start with `check cleanup --project-root PATH --json`. Add repeated `--path PATH` for selected current-task temporary paths and `--keep PATH` for user assets or pending consumers. Add `--product-temporary` only when Wombat temporary generations are in scope. This check needs no conversation index; do not widen it to all home or system caches.
 
 Use each item's reasons, owner, regeneration evidence, observed bytes and current-use result. A candidate needs an ownership and pending-consumer check; an open-file miss alone does not establish inactivity. Keep sources, conversations, Memory, plans, Skills, reports, shared and unknown material. Use history to locate a likely producer only when that could change the decision; it does not prove creation or accepted delivery. Name the exact path, regeneration basis, consumers and next check. Use [Verify](verify.md) to perform authorized cleanup.

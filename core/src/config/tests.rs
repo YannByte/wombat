@@ -1,4 +1,117 @@
 use super::*;
+#[test]
+fn review_catalog_metadata_is_independent_from_body_and_never_confirms_visibility() {
+    let mut v = use_view(vec![]);
+    v.projects = vec!["/project-a".into(), "/project-b".into()];
+    let path = v.items[0].path.clone();
+    let capture = review::Capture {
+        native_version: Some("0.166.0-alpha.5.1".into()),
+        checked_at: Some(Utc::now().to_rfc3339()),
+        error_code: None,
+        contexts: v
+            .projects
+            .iter()
+            .enumerate()
+            .map(|(n, p)| review::CapturedContext {
+                cwd: p.clone(),
+                complete: true,
+                skills: vec![review::CapturedSkill {
+                    name: "synthetic:skill".into(),
+                    description: "Exact local evidence".into(),
+                    path: path.clone(),
+                    enabled: n == 0,
+                    scope: "user".into(),
+                }],
+            })
+            .collect(),
+    };
+    review::bind(&mut v.items, Some(&capture), &v.projects);
+    let first = v.items[0].context_footprint.clone().unwrap();
+    assert_eq!(
+        first.estimate.as_ref().unwrap().payload,
+        "skillDiscoveryMetadata"
+    );
+    assert_eq!(
+        first.estimate.as_ref().unwrap().applicability,
+        "referenceEncodingOnly"
+    );
+    assert_eq!(first.visibility, "unconfirmed");
+    assert_eq!(first.contexts.len(), 2);
+    v.items[0].content_tokens = Some(999999);
+    v.items[0].bytes = Some(9999999);
+    review::bind(&mut v.items, Some(&capture), &v.projects);
+    assert_eq!(
+        serde_json::to_value(&first).unwrap(),
+        serde_json::to_value(&v.items[0].context_footprint).unwrap()
+    );
+    assert_eq!(review::summary(&v.items).confirmed_visible_tokens, None);
+    let before = observations::derive(&v).unwrap();
+    v.items[0].context_footprint.as_mut().unwrap().contexts[0].enabled = false;
+    let after = observations::derive(&v).unwrap();
+    assert_eq!(before.config_revision, after.config_revision);
+    assert_ne!(before.host_revision, after.host_revision);
+    assert_eq!(review::summary(&v.items).disabled_items, 1);
+    let mut conflict = capture.clone();
+    conflict.contexts[1].skills[0].description = "conflict".into();
+    review::bind(&mut v.items, Some(&conflict), &v.projects);
+    assert!(
+        v.items[0]
+            .context_footprint
+            .as_ref()
+            .unwrap()
+            .estimate
+            .is_none()
+    );
+    review::bind(&mut v.items, None, &v.projects);
+    assert_eq!(review::summary(&v.items).unconfirmed_items, 1);
+    for kind in [Kind::Mcp, Kind::Hook] {
+        v.items[0].kind = kind;
+        review::bind(&mut v.items, Some(&capture), &v.projects);
+        assert!(review::tokens(&v.items[0]).is_none());
+    }
+}
+
+#[test]
+fn review_unknowns_follow_known_zero_and_paging_preserves_totals() {
+    let mut v = use_view(vec![use_operation("read", "skillRead", "failed")]);
+    let mut other = v.items[0].clone();
+    other.id = "unobserved".into();
+    other.path = "/different/SKILL.md".into();
+    v.items.push(other);
+    review::bind(&mut v.items, None, &[]);
+    let mut r = uses_request();
+    r.review = true;
+    r.limit = Some(1);
+    let full = execute(
+        Request {
+            limit: Some(50),
+            ..r.clone()
+        },
+        "config:review".into(),
+        &v,
+    )
+    .unwrap();
+    let first = execute(r.clone(), "config:review".into(), &v).unwrap();
+    r.offset = Some(1);
+    let next = execute(r, "config:review".into(), &v).unwrap();
+    assert_eq!(full.page.total, 2);
+    assert_eq!(full.items[0].usage_count, Some(0));
+    assert_eq!(full.items[1].usage_count, Some(1));
+    assert_eq!(first.items[0].id, full.items[0].id);
+    assert_eq!(next.items[0].id, full.items[1].id);
+    assert_eq!(first.extension_review.unwrap().unconfirmed_items, 2);
+    assert_eq!(next.extension_review.unwrap().unmeasured_items, 2);
+    let mut a = full.items[0].clone();
+    let mut b = a.clone();
+    a.usage_count = None;
+    b.usage_count = Some(0);
+    assert_eq!(review::compare(&a, &b), std::cmp::Ordering::Greater);
+    a.usage_count = Some(0);
+    a.use_basis.as_mut().unwrap().status = UseBasisStatus::Partial;
+    b.usage_count = Some(1);
+    b.use_basis.as_mut().unwrap().status = UseBasisStatus::Observed;
+    assert_eq!(review::compare(&a, &b), std::cmp::Ordering::Greater);
+}
 fn view() -> View {
     View {
         observation_versions: Default::default(),

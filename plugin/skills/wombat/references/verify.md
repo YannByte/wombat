@@ -12,6 +12,12 @@ For a work-process improvement, compare later observations only when scope, work
 
 Report what the original check establishes, material gaps and the next check if needed. Do not create tasks solely to demonstrate adoption or improvement.
 
+## Extension changes
+
+Before changing a reviewed Skill or MCP, retain its original read view, exact path/identity, project/source/date scope, native enablement and estimate method. Use verified host controls or the actual configuration owner only for selected authorized entries. State any global impact and preserve minimal recovery material; prefer disabling or narrower scope over deletion. If the required control is unavailable, report that gap instead of inventing a command or removing caches.
+
+Rerun `check inventory --review` with the same scope but without the old `--read-view` to observe current native state. Use the retained view for the before value; match exact identity and method, and check capabilities the user still needs. Report catalog estimate changes as estimates; visibility remains unconfirmed unless separately observed. Historical use counts do not reset after disabling. An expired baseline requires fresh inspection. Restore only selected values without overwriting later unrelated edits. Ordinary review stores no automatic history.
+
 ## Cleanup
 
 Retain `readView`, `baselineId`, selected item IDs, paths and exclusions. Confirm ownership, pending consumers and authorization for the concrete selection. Reuse existing authorization; ask only if the choice extends it. Changed, incomplete, unavailable or expired evidence requires fresh inspection and selection within that scope.

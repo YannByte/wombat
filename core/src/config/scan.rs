@@ -46,6 +46,7 @@ mod hook_measurement;
 mod hooks_json;
 mod instructions;
 mod native_hooks;
+mod native_skills;
 mod reading;
 #[cfg(test)]
 mod tests;
@@ -92,6 +93,7 @@ fn item(
         skill_metadata: None,
         body_token_estimate: None,
         body_estimate_status: "unknown".into(),
+        context_footprint: None,
         usage_count: None,
         use_basis: None,
         last_record_at: None,
@@ -226,4 +228,14 @@ pub(super) fn append_native_hooks(
     now: &str,
 ) {
     native_hooks::append(out, capture, sources, projects, now);
+}
+
+pub(super) fn append_native_skills(
+    out: &mut Inventory,
+    capture: Option<&super::review::Capture>,
+    sources: &[SourceInstance],
+    projects: &[String],
+    now: &str,
+) {
+    native_skills::append(out, capture, sources, projects, now);
 }

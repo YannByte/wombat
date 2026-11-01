@@ -54,10 +54,20 @@ pub(super) fn publish_query(
             Sort::ContentTokens => b.content_tokens.cmp(&a.content_tokens),
             Sort::Characters => b.characters.cmp(&a.characters),
             Sort::Recent => b.last_record_at.cmp(&a.last_record_at),
+            Sort::Review => review::compare(a, b),
+            Sort::ContextTokens => review::tokens(b).cmp(&review::tokens(a)),
+            Sort::LeastActivity => a
+                .usage_count
+                .is_none()
+                .cmp(&b.usage_count.is_none())
+                .then(a.usage_count.cmp(&b.usage_count)),
         };
         order.then(a.id.cmp(&b.id))
     });
     let all_activity = extension_activity_items(&items, scope, &view.checked)?;
+    if r.review {
+        result.extension_review = Some(review::summary(&items));
+    }
     let activity_counts = (
         all_activity
             .iter()

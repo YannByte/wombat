@@ -20,7 +20,9 @@ export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
     query: (request, queryOptions) => invokeCore(request, queryOptions, options),
     prices: async (request, queryOptions) => (await import('./prices.js')).queryPrices(request, queryOptions, options),
     live: (request, queryOptions) => queryLive(request, queryOptions, options),
-    config: (request, queryOptions) => queryLive({ config: request }, queryOptions, options),
+    config: (request, queryOptions) => queryLive({ config: request.review && !request.scope?.timezone
+      ? {...request, scope: {...request.scope, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone}}
+      : request }, queryOptions, options),
     optimize: (request, queryOptions) => queryLive({ optimize: request }, queryOptions, options),
     preferences: (request, queryOptions) => invokeOperation('preferences', request, queryOptions, options),
     directories: (r,q) => invokeOperation('directories',r,q,options),

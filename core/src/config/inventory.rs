@@ -6,6 +6,7 @@ pub(crate) fn prepare_observed(
     snapshot: Option<Arc<Snapshot>>,
     history_status: String,
     native: Option<&hooks::Capture>,
+    native_skills: Option<&review::Capture>,
 ) -> Result<View> {
     // Serialize inventory refreshes, not usage queries or reads of retained views.
     static REFRESH: Mutex<()> = Mutex::new(());
@@ -30,6 +31,13 @@ pub(crate) fn prepare_observed(
             }
         }));
     scan::append_native_hooks(&mut inventory, native, &sources, &projects, &checked);
+    scan::append_native_skills(&mut inventory, native_skills, &sources, &projects, &checked);
+    if let Some(code) = native_skills.and_then(|c| c.error_code.as_ref()) {
+        inventory.issues.push(Issue {
+            code: code.clone(),
+            path: None,
+        });
+    }
     let hook_registry = hooks::bind(native, &inventory.items, &projects);
     inventory.issues.retain(|issue| {
         issue.code != "hookEffectiveRegistryUnavailable"
@@ -109,6 +117,7 @@ pub(crate) fn prepare_observed(
             item.usage = None;
             item.related_turns = 0;
             item.observation = Observation::Unknown;
+            item.context_footprint = None;
             if inventory.items.len() < 20_000 {
                 inventory.items.push(item);
             }
@@ -128,6 +137,9 @@ pub(crate) fn prepare_observed(
         });
     }
     // Native inheritance augments only this view, after the safe inventory cache was written.
+    if r.review || native_skills.is_some() {
+        review::bind(&mut inventory.items, native_skills, &projects);
+    }
     let indexes: BTreeMap<_, _> = inventory
         .items
         .iter()

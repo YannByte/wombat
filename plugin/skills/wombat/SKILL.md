@@ -1,6 +1,6 @@
 ---
 name: wombat
-description: Answer local work-history, usage and cost questions; diagnose project obstacles, assess cleanup and recheck changes with task evidence.
+description: Answer local work-history, usage and cost questions; review Skill/MCP context burden and use, diagnose obstacles, assess cleanup and recheck changes.
 ---
 
 # Wombat
@@ -10,7 +10,7 @@ Answer the user's question with exact local facts and selected historical eviden
 Start with the matching reference. Load another only when the task needs its workflow:
 
 - [Query](references/query.md): usage, costs, finding prior decisions, resuming work or a period report.
-- [Diagnose](references/diagnose.md): failures, repeated work, project improvement or cleanup candidates.
+- [Diagnose](references/diagnose.md): failures, repeated work, project improvement, Skill/MCP review or cleanup candidates.
 - [Verify](references/verify.md): delivery acceptance, authorized cleanup or rechecking a change.
 
 Use the known Wombat executable and JSON results. Discover unfamiliar fields with `api --method METHOD --json`; `call` accepts one generated request on stdin. Use `system doctor` only for runtime trouble, adding `--plugin` for discovery or `--hooks` for native registration.

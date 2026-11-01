@@ -270,6 +270,7 @@ pub(super) fn conversation_query(
 pub(super) fn config_query(
     request: crate::config_dto::Request,
     native: Option<&crate::config::hooks::Capture>,
+    native_skills: Option<&crate::config::review::Capture>,
     shared: &Shared,
     jobs: &mpsc::SyncSender<Job>,
     configs: &Mutex<crate::config::Store>,
@@ -316,7 +317,8 @@ pub(super) fn config_query(
             }
             Err(_) => (None, "unavailable".into()),
         };
-        let view = crate::config::prepare_observed(&request, snapshot, status, native)?;
+        let view =
+            crate::config::prepare_observed(&request, snapshot, status, native, native_skills)?;
         configs.lock().unwrap().insert(view)
     };
     crate::config::execute(request, id, &view)

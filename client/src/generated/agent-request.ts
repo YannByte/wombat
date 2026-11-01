@@ -136,7 +136,17 @@ export type Mode = "auto" | "fresh" | "cached";
 export type Action4 = "list" | "detail" | "evidence" | "related_scopes" | "capabilities";
 export type Kind = "rule" | "skill" | "mcp" | "hook";
 export type Observation = "used" | "loaded_only" | "unknown";
-export type Sort2 = "tokens" | "activity" | "size" | "name" | "content_tokens" | "characters" | "recent";
+export type Sort2 =
+  | "tokens"
+  | "activity"
+  | "size"
+  | "name"
+  | "content_tokens"
+  | "characters"
+  | "recent"
+  | "review"
+  | "context_tokens"
+  | "least_activity";
 export type Action5 =
   "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type DecisionReason = "necessary" | "object_changed" | "incorrect_evidence";
@@ -326,6 +336,10 @@ export interface Scope {
   turnId?: string | null;
 }
 export interface Request6 {
+  /**
+   * Observe native Skill metadata and order context footprint alongside use frequency.
+   */
+  review?: boolean;
   action?: Action4 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;

@@ -192,6 +192,22 @@ pub(super) fn derive(view: &View) -> Result<ObservationVersions> {
         members(&view.project_roots),
         members(&view.projects),
         contexts,
+        view.items
+            .iter()
+            .filter_map(|item| {
+                item.context_footprint.as_ref().map(|f| {
+                    (
+                        &item.id,
+                        &f.status,
+                        &f.estimate,
+                        &f.renderer,
+                        &f.native_version,
+                        &f.contexts,
+                        &f.visibility,
+                    )
+                })
+            })
+            .collect::<Vec<_>>(),
     ))?;
     Ok(ObservationVersions {
         format_version: FORMAT_VERSION,

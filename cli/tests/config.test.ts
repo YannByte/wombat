@@ -2,6 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { parseConfigArgs } from '../src/config-cli.js';
+test('extension review resolves local timezone and preserves explicit scope and ordering', () => {
+  const r = parseConfigArgs(['--review','--kind','skill']).request;
+  assert.equal(r.review, true); assert.equal(r.sort, 'review');
+  assert.equal(r.scope?.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  assert.equal(parseConfigArgs(['--review','--timezone','UTC','--sort','context_tokens']).request.scope?.timezone, 'UTC');
+  assert.equal(parseConfigArgs(['--review','--sort','least_activity']).request.sort, 'least_activity');
+  assert.throws(() => parseConfigArgs(['--review=true']));
+  assert.throws(() => parseConfigArgs(['--review','--review']));
+});
 test('configuration arguments preserve scope and reject ambiguous flags', () => {
   const result = parseConfigArgs(['--root','/one','--root=/two','--project-root','/project','--kind','skill','--json']);
   assert.deepEqual(result.request.roots, [path.resolve('/one'), path.resolve('/two')]);

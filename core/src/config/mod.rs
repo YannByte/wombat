@@ -4,6 +4,7 @@ mod hook_targets;
 pub(crate) mod hooks;
 mod identity;
 mod observations;
+pub(crate) mod review;
 pub(crate) use observations::{ConfigCollection, ObservationVersions};
 pub(crate) mod measure;
 mod references;
@@ -94,6 +95,7 @@ use scope::{applicable, in_time, matches_row, normalize_at, usage};
 pub(crate) fn capabilities() -> Response {
     Response {
         extension_activity: None,
+        extension_review: None,
         hook_registry: HookRegistry::default(),
         output_version: 1,
         action: Action::Capabilities,

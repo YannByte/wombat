@@ -3,6 +3,16 @@
   "title": "Response",
   "type": "object",
   "properties": {
+    "extensionReview": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ExtensionReview"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "extensionActivity": {
       "anyOf": [
         {
@@ -113,6 +123,58 @@
     "hookRegistry"
   ],
   "definitions": {
+    "ExtensionReview": {
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "enabledItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "disabledItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unconfirmedItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "estimatedItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unmeasuredItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "confirmedVisibleTokens": {
+          "description": "Native listings do not expose model selection, aliases or prompt budget truncation.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "methodVersion",
+        "enabledItems",
+        "disabledItems",
+        "unconfirmedItems",
+        "estimatedItems",
+        "unmeasuredItems"
+      ]
+    },
     "ExtensionActivityStatistics": {
       "type": "object",
       "properties": {
@@ -1151,6 +1213,16 @@
         "bodyEstimateStatus": {
           "type": "string"
         },
+        "contextFootprint": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContextFootprint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "usageCount": {
           "type": [
             "integer",
@@ -1433,6 +1505,80 @@
       },
       "required": [
         "code"
+      ]
+    },
+    "ContextFootprint": {
+      "description": "A reference catalog row, never proof of model-visible context or historical loading.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContentEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "renderer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nativeVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillContext"
+          }
+        },
+        "visibility": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "contexts",
+        "visibility"
+      ]
+    },
+    "SkillContext": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "name",
+        "enabled",
+        "scope"
       ]
     },
     "Evidence": {

@@ -390,6 +390,16 @@
         "bodyEstimateStatus": {
           "type": "string"
         },
+        "contextFootprint": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContextFootprint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "usageCount": {
           "type": [
             "integer",
@@ -681,6 +691,80 @@
       },
       "required": [
         "code"
+      ]
+    },
+    "ContextFootprint": {
+      "description": "A reference catalog row, never proof of model-visible context or historical loading.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContentEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "renderer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nativeVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillContext"
+          }
+        },
+        "visibility": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "contexts",
+        "visibility"
+      ]
+    },
+    "SkillContext": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "name",
+        "enabled",
+        "scope"
       ]
     },
     "UseBasis": {

@@ -1,5 +1,6 @@
 import type { CodexOptions } from "./codex/process.js";
 import type { captureHooks } from "./codex/hooks.js";
+import type { captureSkills } from "./codex/skill-review.js";
 import { spawn } from "node:child_process";
 import { createConnection } from "node:net";
 import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -38,6 +39,7 @@ type ProductRequest =
   | { optimize: OptimizeRequest };
 type NativeRequest = ProductRequest & {
   nativeHooks?: Awaited<ReturnType<typeof captureHooks>>;
+  nativeSkills?: Awaited<ReturnType<typeof captureSkills>>;
 };
 function exchange(
   socket: string,
@@ -264,7 +266,9 @@ export async function queryLive(
     product.action !== "capabilities" &&
     product.action !== "activity" &&
     (!product.readView || product.action === "recheck");
-  if (fresh) {
+  const skillReview = "config" in request && request.config.review &&
+    (request.config.kind === "skill" || request.config.kinds?.every(kind => kind === "skill"));
+  if (fresh && !skillReview) {
     const { captureHooks } = await import("./codex/hooks.js");
     observed = {
       ...request,
@@ -274,6 +278,12 @@ export async function queryLive(
         config,
       ),
     };
+  }
+  if (fresh && "config" in request && request.config.review &&
+    (!request.config.kind || request.config.kind === "skill") &&
+    (!request.config.kinds || request.config.kinds.includes("skill"))) {
+    const { captureSkills } = await import("./codex/skill-review.js");
+    observed = { ...observed, nativeSkills: await captureSkills(request.config, options, config) };
   }
   if ("query" in request && request.query.action === "refresh")
     options.onProgress?.("同步本机日志并保存用量");

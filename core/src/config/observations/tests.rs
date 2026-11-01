@@ -51,6 +51,7 @@ fn item() -> Item {
         skill_metadata: None,
         body_token_estimate: None,
         body_estimate_status: "unknown".into(),
+        context_footprint: None,
         usage_count: None,
         use_basis: None,
         last_record_at: None,

@@ -73,6 +73,8 @@ currentItems 不计明确缺失的路径，清单仍公开缺失行；显式读�
 
 派生 config-v2 原子 JSON 只存安全元数据，每范围最多20,000项，旧缓存读取16 MiB。不存配置正文、环境值、命令参数或工具输出；不联网扫描，不执行 MCP。它可重建，与不可重建的用户处理记录分开。
 
+`Request.review` 通过宿主私有通道按需增加原生 Skill 观察。Rust 生成 `contextFootprint` 和分页前的 `extensionReview` 汇总。版本化参考渲染器使用现有参考分词器计量名称、原生完整描述及文件绝对定位；尚未观察别名、提示预算截断或动态选择。`visibility` 保持未确认，`confirmedVisibleTokens` 保持 null。停用、仅磁盘发现和不可用对象保持区分。原生清单中位于文件读取授权范围外的条目仅保留元数据，不读取正文（`nativeMetadataOnly`）。原生状态与元数据绑定读取视图和宿主版本，不从磁盘缓存复用。MCP 和 Hook 缺少可靠载荷时不计量上下文。部分使用次数是下界，与完整次数分开呈现；使用归并与账本计算保持不变。
+
 ## 优化与偏好契约
 
 Rust 的 `optimize_dto.rs` 生成[请求](../schemas/optimize-request-v1.schema.json)与[响应 v5](../schemas/optimize-response-v5.schema.json)。支持 list/detail/checks/capabilities、显式 keep/not_applicable 和 recheck，以及固定轮次 activity。目录仅列十项已实现的静态规则；`partial` 来自实际范围或检查证据缺口，即使没有命中也保留缺口。

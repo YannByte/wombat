@@ -13,6 +13,7 @@ export function parseConfigArgs(argv: string[]): { request: ConfigRequest; json:
   for (let i = 0; i < argv.length; i++) {
     const [name, inline] = argv[i].split(/=(.*)/s);
     if (name === '--help' || name === '-h') { help = true; continue; }
+    if (name === '--review') { if (inline !== undefined || request.review) fail(argv[i]); request.review = true; continue; }
     if (name === '--all-time') { if(inline!==undefined || request.scope!.allTime) fail(argv[i]); request.scope!.allTime=true; continue; }
     if (name === '--json') { if (inline !== undefined || json) fail(argv[i]); json = true; continue; }
     if (!['--root','--project-root','--project','--since','--until','--timezone','--agent','--source','--thread','--kind','--observation','--search','--sort','--item','--action','--offset','--limit','--read-view','--snapshot'].includes(name)) fail(argv[i]);
@@ -33,7 +34,7 @@ export function parseConfigArgs(argv: string[]): { request: ConfigRequest; json:
       case '--thread': scope.threadId = value; break;
       case '--kind': if (!['rule','skill','mcp','hook'].includes(value)) fail(value); request.kind = value as ConfigRequest['kind']; break;
       case '--observation': if (!['used','loaded_only','unknown'].includes(value)) fail(value); request.observation = value as ConfigRequest['observation']; break;
-      case '--sort': if (!['tokens','activity','size','name','content_tokens','characters','recent'].includes(value)) fail(value); request.sort = value as ConfigRequest['sort']; break;
+      case '--sort': if (!['tokens','activity','size','name','content_tokens','characters','recent','review','context_tokens','least_activity'].includes(value)) fail(value); request.sort = value as ConfigRequest['sort']; break;
       case '--action': if (!['list','detail','evidence','related_scopes','capabilities'].includes(value)) fail(value); request.action = value as ConfigRequest['action']; break;
       case '--item': request.itemId = value; break;
       case '--search': request.search = value; break;
@@ -49,6 +50,10 @@ export function parseConfigArgs(argv: string[]): { request: ConfigRequest; json:
   if(request.scope!.allTime && (request.scope!.since || request.scope!.until)) fail('--all-time');
   if (roots.length) request.roots = roots;
   request.projectRoots = projects.length ? projects : [process.cwd()];
+  if (request.review) {
+    request.sort ??= 'review';
+    request.scope!.timezone ??= Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
   return { request, json, help };
 }
 
@@ -64,10 +69,23 @@ export async function runConfigCli(argv: string[]): Promise<number> {
     if (json) process.stdout.write(JSON.stringify(result) + '\n');
     else {
       process.stdout.write(t('config.scopeNote') + '\n');
-      if(result.extensionActivity){const a=result.extensionActivity;process.stdout.write(t('config.activity.counts',{used:a.observedUse,quiet:a.noObservedUse,unknown:a.unavailable})+'\n');for(const item of a.items)if(item.noObservedUseDays!=null)process.stdout.write(`${terminalText(result.items.find(i=>i.id===item.itemId)?.name??item.itemId)} · ${t('config.activity.days',{days:item.noObservedUseDays})}\n`);process.stdout.write(t('config.activity.note')+'\n');}
+      if (result.extensionReview) {
+        process.stdout.write(t('config.review.window', { since: result.scope.since ?? '—', until: result.scope.until ?? '—', timezone: result.scope.timezone ?? '—' }) + '\n');
+        process.stdout.write(t('config.review.summary', { enabled: result.extensionReview.enabledItems, disabled: result.extensionReview.disabledItems, unknown: result.extensionReview.unconfirmedItems, measured: result.extensionReview.estimatedItems, unmeasured: result.extensionReview.unmeasuredItems }) + '\n');
+        process.stdout.write(t('config.review.note') + '\n');
+      }
+      if(result.extensionActivity && !result.extensionReview){const a=result.extensionActivity;process.stdout.write(t('config.activity.counts',{used:a.observedUse,quiet:a.noObservedUse,unknown:a.unavailable})+'\n');for(const item of a.items)if(item.noObservedUseDays!=null)process.stdout.write(`${terminalText(result.items.find(i=>i.id===item.itemId)?.name??item.itemId)} · ${t('config.activity.days',{days:item.noObservedUseDays})}\n`);process.stdout.write(t('config.activity.note')+'\n');}
       for (const item of result.items) {
         process.stdout.write(`${item.kind}\t${terminalText(item.name)}\t${t(`config.${item.observation}`)}\t${terminalText(item.path)}\n`);
-        if (item.kind !== 'hook') {
+        if (item.contextFootprint) {
+          const f = item.contextFootprint;
+          const state = f.contexts.some(c => c.enabled) ? t('config.hookEnabled') : f.contexts.length ? t('config.hookDisabled') : t('config.review.unconfirmed');
+          const count = useBasisCount(item.usageCount, item.useBasis);
+          const frequency = count == null ? '—' : item.useBasis?.status === 'partial' ? t('config.review.partialCount', {count}) : count;
+          process.stdout.write('  ' + t('config.review.row', { state, tokens: f.estimate?.tokens ?? t('config.review.unmeasured'), count: frequency, last: item.lastRecordAt ?? '—' }) + '\n');
+          for (const c of f.contexts) process.stdout.write(`  ${terminalText(c.project)} · ${terminalText(c.name)} · ${terminalText(c.scope)} · ${t(c.enabled ? 'config.hookEnabled' : 'config.hookDisabled')}\n`);
+        }
+        if (item.kind !== 'hook' && (!result.extensionReview || request.action === 'detail')) {
           for (const line of configUseBasisLines(item)) process.stdout.write(`  ${line}\n`);
         }
       }

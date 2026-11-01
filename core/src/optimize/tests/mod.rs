@@ -50,6 +50,7 @@ fn view() -> View {
             estimate: None,
             body_token_estimate: None,
             body_estimate_status: "unknown".into(),
+            context_footprint: None,
             skill_metadata: Some(SkillMetadata {
                 status: "invalid".into(),
                 description_characters: Some(501),

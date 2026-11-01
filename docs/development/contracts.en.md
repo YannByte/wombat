@@ -73,7 +73,10 @@ currentItems excludes explicitly missing paths while inventory still exposes mis
 
 Derived config-v2 atomic JSON stores safe metadata only, at most20,000 items per scope and16 MiB for old-cache reads. Configuration bodies, environment values, command arguments and tool outputs are not retained; scanning neither accesses the network nor executes MCP. Rebuildable metadata is separate from irreplaceable user review records.
 
+`Request.review` adds on-demand native Skill observations through the private host channel. Rust generates `contextFootprint` and the pre-pagination `extensionReview` summary. The versioned reference renderer encodes name, full native description and absolute file locator with the existing reference tokenizer; aliases, prompt-budget truncation and dynamic selection are not observed. `visibility` remains unconfirmed and `confirmedVisibleTokens` remains null. Disabled, disk-only and unavailable entries stay distinct. Native-listed entries outside authorized filesystem roots retain metadata without reading their bodies (`nativeMetadataOnly`). Native state and metadata are pinned to the read view and host revision, not reused from disk cache. MCP and Hook context remains unmeasured without reliable payloads. Partial use counts are lower bounds, displayed separately from complete counts; usage reducers and accounting do not change.
+
 ## Optimize and preference contracts
+
 
 Rust `optimize_dto.rs` generates [requests](../schemas/optimize-request-v1.schema.json) and [response v5](../schemas/optimize-response-v5.schema.json). Supported actions are list/detail/checks/capabilities, explicit keep/not_applicable and recheck, plus fixed-turn activity. The catalog lists ten implemented static rules. `partial` reflects actual scope or check evidence gaps, including gaps with no positive finding.
 

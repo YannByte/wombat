@@ -220,6 +220,7 @@ export interface Item {
   skillMetadata?: SkillMetadata | null;
   bodyTokenEstimate?: ContentEstimate | null;
   bodyEstimateStatus: string;
+  contextFootprint?: ContextFootprint | null;
   usageCount?: number | null;
   useBasis?: UseBasis | null;
   lastRecordAt?: string | null;
@@ -272,6 +273,24 @@ export interface SkillDiagnostic {
   column?: number | null;
   current?: string | null;
   expected?: string | null;
+}
+/**
+ * A reference catalog row, never proof of model-visible context or historical loading.
+ */
+export interface ContextFootprint {
+  status: string;
+  estimate?: ContentEstimate | null;
+  renderer?: string | null;
+  nativeVersion?: string | null;
+  checkedAt?: string | null;
+  contexts: SkillContext[];
+  visibility: string;
+}
+export interface SkillContext {
+  project: string;
+  name: string;
+  enabled: boolean;
+  scope: string;
 }
 export interface UseBasis {
   methodVersion: number;

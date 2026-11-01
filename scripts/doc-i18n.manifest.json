@@ -216,6 +216,11 @@
       "record": "docs/decisions/proposed/product/2026-10-03-optimization-lifecycle.i18n.json"
     },
     {
+      "zh": "docs/decisions/implemented/product/2026-11-01-extension-review.md",
+      "en": "docs/decisions/implemented/product/2026-11-01-extension-review.en.md",
+      "record": "docs/decisions/implemented/product/2026-11-01-extension-review.i18n.json"
+    },
+    {
       "zh": "docs/decisions/rejected/product/2026-10-02-progressive-initialization.md",
       "en": "docs/decisions/rejected/product/2026-10-02-progressive-initialization.en.md",
       "record": "docs/decisions/rejected/product/2026-10-02-progressive-initialization.i18n.json"

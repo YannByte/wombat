@@ -398,6 +398,8 @@ fn run(resident: bool) -> Result<()> {
                             config: crate::config_dto::Request,
                             #[serde(default, rename = "nativeHooks")]
                             native_hooks: Option<crate::config::hooks::Capture>,
+                            #[serde(default, rename = "nativeSkills")]
+                            native_skills: Option<crate::config::review::Capture>,
                         }
                         let mut value: Value = serde_json::from_str(&input)
                             .map_err(|_| operation_error("INVALID_ARGUMENT", "查询参数无效"))?;
@@ -558,7 +560,7 @@ fn run(resident: bool) -> Result<()> {
                                             )
                                         })?
                                         .clone();
-                                    config_query(cfg.clone(), None, &state, &jobs, &configs)?;
+                                    config_query(cfg.clone(), None, None, &state, &jobs, &configs)?;
                                     let baseline = configs.lock().unwrap().get(&key)?;
                                     cfg.read_view = None;
                                     Some(baseline)
@@ -568,6 +570,7 @@ fn run(resident: bool) -> Result<()> {
                             let response = config_query(
                                 cfg,
                                 r.native_hooks.as_ref(),
+                                None,
                                 &state,
                                 &jobs,
                                 &configs,
@@ -587,6 +590,7 @@ fn run(resident: bool) -> Result<()> {
                             return Ok(encode_success(&config_query(
                                 request.config,
                                 request.native_hooks.as_ref(),
+                                request.native_skills.as_ref(),
                                 &state,
                                 &jobs,
                                 &configs,

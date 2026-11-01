@@ -23,6 +23,7 @@ export type HookTrust = "managed" | "untrusted" | "trusted" | "modified";
 export type HookHandler = "command" | "mcpTool" | "prompt" | "agent";
 
 export interface Response {
+  extensionReview?: ExtensionReview | null;
   extensionActivity?: ExtensionActivityStatistics | null;
   outputVersion: number;
   action: Action;
@@ -45,6 +46,18 @@ export interface Response {
   page: Page;
   coverage: Coverage;
   hookRegistry: HookRegistry;
+}
+export interface ExtensionReview {
+  methodVersion: number;
+  enabledItems: number;
+  disabledItems: number;
+  unconfirmedItems: number;
+  estimatedItems: number;
+  unmeasuredItems: number;
+  /**
+   * Native listings do not expose model selection, aliases or prompt budget truncation.
+   */
+  confirmedVisibleTokens?: number | null;
 }
 export interface ExtensionActivityStatistics {
   methodVersion: number;
@@ -276,6 +289,7 @@ export interface Item {
   skillMetadata?: SkillMetadata | null;
   bodyTokenEstimate?: ContentEstimate | null;
   bodyEstimateStatus: string;
+  contextFootprint?: ContextFootprint | null;
   usageCount?: number | null;
   useBasis?: UseBasis | null;
   lastRecordAt?: string | null;
@@ -328,6 +342,24 @@ export interface SkillDiagnostic {
   column?: number | null;
   current?: string | null;
   expected?: string | null;
+}
+/**
+ * A reference catalog row, never proof of model-visible context or historical loading.
+ */
+export interface ContextFootprint {
+  status: string;
+  estimate?: ContentEstimate | null;
+  renderer?: string | null;
+  nativeVersion?: string | null;
+  checkedAt?: string | null;
+  contexts: SkillContext[];
+  visibility: string;
+}
+export interface SkillContext {
+  project: string;
+  name: string;
+  enabled: boolean;
+  scope: string;
 }
 export interface Evidence {
   id: string;

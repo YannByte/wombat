@@ -75,9 +75,12 @@ JSON
 ```sh
 wombat check list --project-root /absolute/project --json
 wombat check inventory --project-root /absolute/project --json
+wombat check inventory --review --kind skill --project-root /absolute/project --project /absolute/project --json
 wombat check checks --item ITEM_ID --read-view READ_VIEW --json
 wombat check recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /absolute/project --json
 ```
+
+使用 `--review` 同时查看原生 Skill 启用状态、目录条目参考 Token 和使用记录。默认最近 30 个本地日（含今天）；`--timezone` 覆盖本地时区，`--until` 不含当天。支持 `review`、`context_tokens` 或 `least_activity` 排序；分页和取证复用 `--read-view`。复查当前原生状态时发起不带旧视图的新体检。目录估算不含按需正文，不证明模型实际可见或节省量。MCP／Hook 缺少可靠载荷时仍显示未测得。体检不会停用或删除扩展。
 
 `--root` 选择来源日志；`--project-root` 选择配置。清单支持类型、观测、搜索、排序和分页；默认 50 条，最多 200 条。详情、证据和关联范围保留 `--item` 与 `--read-view`。复查保留原始来源／项目根目录、范围、规则、读取视图和基线 ID。只有 `miss` 且 `comparison.status=comparable` 才能证明原检查通过。缺失或过期证据不能证明修复。
 

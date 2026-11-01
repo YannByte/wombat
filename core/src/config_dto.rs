@@ -53,10 +53,16 @@ pub enum Sort {
     ContentTokens,
     Characters,
     Recent,
+    Review,
+    ContextTokens,
+    LeastActivity,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Request {
+    /// Observe native Skill metadata and order context footprint alongside use frequency.
+    #[serde(default)]
+    pub review: bool,
     #[serde(default)]
     pub action: Action,
     pub roots: Option<Vec<String>>,
@@ -137,6 +143,8 @@ pub struct Item {
     pub skill_metadata: Option<SkillMetadata>,
     pub body_token_estimate: Option<ContentEstimate>,
     pub body_estimate_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_footprint: Option<ContextFootprint>,
     pub usage_count: Option<u64>,
     pub use_basis: Option<UseBasis>,
     pub last_record_at: Option<String>,
@@ -194,6 +202,40 @@ pub struct ContentEstimate {
     pub applicability: String,
     #[serde(default)]
     pub tokenizer_version: Option<String>,
+}
+
+/// A reference catalog row, never proof of model-visible context or historical loading.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextFootprint {
+    pub status: String,
+    pub estimate: Option<ContentEstimate>,
+    pub renderer: Option<String>,
+    pub native_version: Option<String>,
+    pub checked_at: Option<String>,
+    pub contexts: Vec<SkillContext>,
+    pub visibility: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillContext {
+    pub project: String,
+    pub name: String,
+    pub enabled: bool,
+    pub scope: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtensionReview {
+    #[schemars(range(min = 1, max = 1))]
+    pub method_version: u32,
+    pub enabled_items: usize,
+    pub disabled_items: usize,
+    pub unconfirmed_items: usize,
+    pub estimated_items: usize,
+    pub unmeasured_items: usize,
+    /// Native listings do not expose model selection, aliases or prompt budget truncation.
+    pub confirmed_visible_tokens: Option<u64>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -274,6 +316,8 @@ pub struct RelatedScope {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Response {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extension_review: Option<ExtensionReview>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_activity: Option<ExtensionActivityStatistics>,
     pub output_version: u32,

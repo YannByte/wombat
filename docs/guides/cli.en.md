@@ -75,9 +75,12 @@ Whole-turn timing uses method `timing` with full thread/turn identities. Evidenc
 ```sh
 wombat check list --project-root /absolute/project --json
 wombat check inventory --project-root /absolute/project --json
+wombat check inventory --review --kind skill --project-root /absolute/project --project /absolute/project --json
 wombat check checks --item ITEM_ID --read-view READ_VIEW --json
 wombat check recheck --read-view ORIGINAL_READ_VIEW --baseline BASELINE_ID --project-root /absolute/project --json
 ```
+
+Use `--review` to join native Skill enablement, reference catalog-row Tokens and recorded use. It defaults to 30 local calendar days including today; `--timezone` overrides the local zone and `--until` is exclusive. Sort with `review`, `context_tokens` or `least_activity`; reuse `--read-view` for paging and evidence. A fresh review without that view rechecks current native state. Catalog estimates exclude on-demand bodies and do not prove model visibility or savings. Missing MCP/Hook payloads remain unmeasured. Review does not disable or delete extensions.
 
 `--root` selects source logs; `--project-root` selects configuration. Inventory supports kind, observation, search, sort and paging; pages default to 50, maximum 200. Detail, evidence and related scopes keep `--item` and `--read-view`. Pin the original source/project roots, scope, rules, read view and baseline ID for recheck. Only `miss` with `comparison.status=comparable` establishes that the original check passed. Missing or expired evidence cannot prove repair.
 

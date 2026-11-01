@@ -4,8 +4,11 @@ use crate::usage_observations::{self, Projection, TimeBasis};
 mod history;
 mod response;
 
-pub(crate) fn execute(r: Request, id: String, view: &View) -> Result<Response> {
+pub(crate) fn execute(mut r: Request, id: String, view: &View) -> Result<Response> {
     validate(&r)?;
+    if r.review && matches!(r.sort, Sort::Tokens) {
+        r.sort = Sort::Review;
+    }
     let (scope, tz) = normalize_at(&r.scope, &view.checked)?;
     let mut result = query_response(&r, id, &scope, view);
     if scope
@@ -79,6 +82,11 @@ fn project_inventory(view: &View, scope: &Scope) -> Vec<Item> {
         .collect::<Vec<_>>();
     // Cached inventory metadata cannot carry a prior query's historical use state.
     for item in &mut items {
+        if let Some(footprint) = &mut item.context_footprint {
+            footprint
+                .contexts
+                .retain(|c| scope.project.as_ref().is_none_or(|p| p == &c.project));
+        }
         item.usage_count = None;
         item.use_basis = Some(usage_observations::basis(
             None,
