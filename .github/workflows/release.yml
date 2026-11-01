@@ -33,7 +33,7 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          node -e 'const p=require("./package.json");if(process.env.GITHUB_REF_NAME!==`v${p.version}`)throw new Error(`tag ${process.env.GITHUB_REF_NAME} does not match package ${p.version}`)'
+          node -e 'const p=require("./package.json");if(process.env.GITHUB_REF_NAME!=="v"+p.version)throw new Error("tag "+process.env.GITHUB_REF_NAME+" does not match package "+p.version)'
           default_branch=$DEFAULT_BRANCH
           git fetch --no-tags origin "+refs/heads/$default_branch:refs/remotes/origin/$default_branch"
           git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/origin/$default_branch" || {

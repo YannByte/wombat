@@ -99,14 +99,14 @@ try {
   };
   delete installEnv.WOMBAT_CORE_BIN; delete installEnv.NODE_OPTIONS; delete installEnv.NODE_PATH;
   delete installEnv.WOMBAT_INSTALL_ROOT; delete installEnv.WOMBAT_ENDPOINT_FILE;
-  stage('archive identity and extraction');
+  stage('archive identity and metadata');
   const releaseDirectory = path.dirname(setFile);
   const unpackedAt = performance.now();
-  const unpack = spawnSync(...toolCommand('tar', ['-xzf', asset.archive, '-C', scratch]), {cwd: releaseDirectory, encoding: 'utf8', timeout: 120_000});
+  // The real installer validates and extracts the payload below. Read only metadata here.
+  const unpack = spawnSync(...toolCommand('tar', ['-xOzf', asset.archive, 'wombat/release.json']), {cwd: releaseDirectory, encoding: 'utf8', timeout: 120_000, maxBuffer: 64*1024});
   assert.ifError(unpack.error); assert.equal(unpack.status, 0, unpack.stderr);
-  const installMs = Math.round(performance.now() - unpackedAt);
-  const unpacked = path.join(scratch, 'wombat');
-  const release = JSON.parse(readFileSync(path.join(unpacked, 'release.json'), 'utf8'));
+  const metadataReadMs = Math.round(performance.now() - unpackedAt);
+  const release = JSON.parse(unpack.stdout);
   assert.deepEqual({version: release.version, source: release.source, sourceSha256: release.sourceSha256, target: release.target, runtime: release.runtime},
     {version: set.version, source: set.source, sourceSha256: set.sourceSha256, target, runtime: {name: 'node', version: releaseNodeVersion}});
   stage('candidate first installation');
@@ -204,7 +204,7 @@ try {
 
   console.log(JSON.stringify({version: set.version, source: set.source, target, runtime: run(runtime, ['--version']).trim(),
     archive: asset.archive, archiveBytes: asset.bytes, installedBytes: inventory(installed).reduce((total, file) => total + file.size, 0),
-    extractMs: installMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, cliOnly: true}));
+    metadataReadMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, cliOnly: true}));
 } finally {
   await stopService();
   rmSync(scratch, {recursive: true, force: true, maxRetries: 20, retryDelay: 500});
