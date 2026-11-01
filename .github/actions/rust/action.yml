@@ -1,0 +1,23 @@
+name: Native Rust cache
+description: Cache native dependencies and reuse workspace artifacts only for exact compiler and source matches.
+inputs:
+  key:
+    description: Native target and build profile
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      id: cache
+      with:
+        workspaces: core -> target
+        shared-key: ${{ inputs.key }}
+        key: ${{ hashFiles('core/src/**', 'core/prices/**', 'core/tests/**', 'core/build.rs') }}
+        cache-bin: false
+        cache-workspace-crates: true
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - name: Reuse exact-source Cargo fingerprints after checkout
+      shell: bash
+      env:
+        CI_RUST_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: bash "${{ github.action_path }}/restore-times.sh"

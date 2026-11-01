@@ -64,7 +64,8 @@
     "installers:check": "node scripts/generate-installers.ts --check",
     "plugin:install": "node scripts/install-plugin-bootstrap.ts",
     "ci:plan": "node scripts/ci-plan.ts",
-    "ci:timings": "node scripts/ci-timings.ts"
+    "ci:timings": "node scripts/ci-timings.ts",
+    "licenses:prepare": "node scripts/build-core.mjs --fetch"
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6",

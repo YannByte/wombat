@@ -53,10 +53,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/node
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
-        with:
-          tool: actionlint@1.7.12
-          fallback: none
+      - name: Download verified actionlint executable
+        env:
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --location --max-time 60 --output "$archive" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Check workflow syntax and expressions
         run: actionlint -color
       - name: Repository checks and Linux source assumptions
@@ -108,14 +113,9 @@ jobs:
           persist-credentials: false
       - name: Prepare Rust lint tool
         run: rustup component add clippy
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: ./.github/actions/rust
         with:
-          workspaces: core -> target
-          shared-key: test-${{ matrix.target }}
-          cache-bin: false
-          cache-workspace-crates: true
-          key: ${{ hashFiles('core/src/**') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          key: test-${{ matrix.target }}
       - name: Check all native targets with warnings denied
         run: cargo clippy --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings
       - name: Compile Rust tests
@@ -146,18 +146,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/node
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: ./.github/actions/rust
         with:
-          workspaces: core -> target
-          shared-key: release-${{ matrix.target }}
-          cache-bin: false
-          cache-workspace-crates: true
-          key: ${{ hashFiles('core/src/**') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          key: release-${{ matrix.target }}
       - name: Isolate sources and product data
         run: |
           echo "CODEX_HOME=$RUNNER_TEMP/wombat-source" >> "$GITHUB_ENV"
           echo "WOMBAT_DATA_HOME=$RUNNER_TEMP/wombat-data" >> "$GITHUB_ENV"
+      - name: Prepare locked Rust license sources after cache restore
+        run: corepack pnpm licenses:prepare
       - name: Inventory native dependencies on this target
         if: matrix.target != 'darwin-arm64'
         run: corepack pnpm licenses:generate
@@ -377,14 +374,11 @@ jobs:
           echo "CODEX_HOME=$RUNNER_TEMP/wombat-source" >> "$GITHUB_ENV"
           echo "WOMBAT_DATA_HOME=$RUNNER_TEMP/wombat-data" >> "$GITHUB_ENV"
           rustup component add rustfmt clippy
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: ./.github/actions/rust
         with:
-          workspaces: core -> target
-          shared-key: release-win32-x64
-          cache-bin: false
-          cache-workspace-crates: true
-          key: ${{ hashFiles('core/src/**') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          key: release-win32-x64
+      - name: Prepare locked Rust license sources after cache restore
+        run: corepack pnpm licenses:prepare
       - name: Inventory native dependencies on this target
         run: corepack pnpm licenses:generate
       - name: Focused Windows installation and upgrade acceptance
