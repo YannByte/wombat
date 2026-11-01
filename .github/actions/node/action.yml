@@ -1,0 +1,19 @@
+name: Locked Node dependencies
+description: Set up the pinned Node and package manager; cache only the pnpm store.
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      with:
+        run_install: false
+        cache: false
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '26.4.0'
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+    - name: Install pinned Corepack and locked workspace dependencies
+      shell: bash
+      run: |
+        npm install --global corepack@0.33.0 --force
+        corepack pnpm install --frozen-lockfile --prefer-offline

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "node --import tsx cli/src/index.ts",
-    "build": "node scripts/build-core.mjs && pnpm --filter @wombat/client build && pnpm --filter @wombat/cli build && node scripts/build-cli.mjs && node scripts/build-skill.ts && node scripts/record-build.ts",
+    "build": "node scripts/build.ts",
     "build:core": "node scripts/build-core.mjs",
     "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.json && node scripts/check-module-boundaries.mjs",
     "test": "pnpm run test:prebuild && pnpm run test:core && pnpm run test:unit && pnpm run test:integration && pnpm run test:e2e",
@@ -19,8 +19,8 @@
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
     "test:e2e": "node --import tsx --test tests/e2e/*.test.ts",
     "verify:e2e": "node --import tsx scripts/verify-e2e.ts",
-    "contracts:generate": "node scripts/build-core.mjs --check && node scripts/generate-usage-contracts.mjs",
-    "contracts:check": "node scripts/build-core.mjs --check && node scripts/generate-usage-contracts.mjs --check",
+    "contracts:generate": "node scripts/contracts.ts",
+    "contracts:check": "node scripts/contracts.ts --check",
     "skills:check": "node scripts/check-skills.mjs",
     "notes:check": "node scripts/check-decisions.mjs",
     "docs:budget": "node scripts/check-doc-budgets.mjs",
@@ -62,7 +62,9 @@
     "verify:skill-conversation": "node --import tsx scripts/verify-skill-conversation.ts",
     "installers:generate": "node scripts/generate-installers.ts",
     "installers:check": "node scripts/generate-installers.ts --check",
-    "plugin:install": "node scripts/install-plugin-bootstrap.ts"
+    "plugin:install": "node scripts/install-plugin-bootstrap.ts",
+    "ci:plan": "node scripts/ci-plan.ts",
+    "ci:timings": "node scripts/ci-timings.ts"
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6",

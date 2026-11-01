@@ -1,3 +1,10 @@
+import {readFileSync,readdirSync} from 'node:fs';
+import path from 'node:path';
+
+export function actionSources(root:string):Record<string,string> {
+  const directory=path.join(root,'.github');
+  return Object.fromEntries(readdirSync(directory,{recursive:true,encoding:'utf8'}).filter(f=>/\.ya?ml$/.test(f)).map(f=>[`.github/${f}`,readFileSync(path.join(directory,f),'utf8')]));
+}
 export interface CiRun {
   conclusion: string;
   event: string;

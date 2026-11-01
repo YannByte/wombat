@@ -19,7 +19,7 @@
 
 ## 验证
 
-`corepack pnpm repo:check` 不依赖 dist，CI 在构建前运行。脚本遵循 [scripts/AGENTS.md](../../scripts/AGENTS.md)，范围见 [wombat-verify](../../.agents/skills/wombat-verify/SKILL.md)。审阅及行为测试验证语义，静态检查不能全覆盖。
+`corepack pnpm repo:check` 不依赖 dist，CI 将其与平台构建独立运行。脚本遵循 [scripts/AGENTS.md](../../scripts/AGENTS.md)，范围见 [wombat-verify](../../.agents/skills/wombat-verify/SKILL.md)。审阅及行为测试验证语义，静态检查不能全覆盖。
 
 ```sh
 corepack pnpm build
@@ -36,9 +36,11 @@ corepack pnpm test
 
 依赖变化运行 `corepack pnpm licenses:generate` 和 `corepack pnpm licenses:check`。按[发行 Skill](../../.agents/skills/wombat-release/SKILL.md)验证目标平台及干净安装。只报告实际验证，构建不替代产品或平台验收。
 
+CI 执行、缓存与时间分析见 [CI](ci.md)。
+
 ### 失败排查
 
-- `test:repo`、`test:prebuild` 不依赖构建产物；CI 的 Linux/macOS/Windows 通过才开始五平台构建。本地发行在 Rust 编译前检查源码，不替代产品或安装验收。
+- `test:repo`、`test:prebuild` 不依赖构建产物；CI 在 Linux/macOS/Windows 各运行一次，与五平台原生构建并行。本地发行在 Rust 编译前检查源码，不替代产品或安装验收。
 - 时间计算保留来源精度；以实例身份判断进程归属，PID/端口可能复用。探测与外层截止时间竞速时用稳定失败代码；未确认不代表清理成功。
 - 区分启动、数据就绪及验收。首次读取可返回扫描预览；最终统计须读取已完成数据并绑定同一版本，不以任意等待证明就绪。
 - 停止重试，保留阶段、日志、源码版本及环境，追查根因。陌生行为先查上游文档；重跑、调参或延长超时不能代替分析。

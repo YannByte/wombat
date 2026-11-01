@@ -339,6 +339,11 @@
       "zh": "docs/decisions/implemented/architecture/2026-10-31-codex-cleanup-guards.md",
       "en": "docs/decisions/implemented/architecture/2026-10-31-codex-cleanup-guards.en.md",
       "record": "docs/decisions/implemented/architecture/2026-10-31-codex-cleanup-guards.i18n.json"
+    },
+    {
+      "zh": "docs/development/ci.md",
+      "en": "docs/development/ci.en.md",
+      "record": "docs/development/ci.i18n.json"
     }
   ],
   "legacyUnpaired": [],

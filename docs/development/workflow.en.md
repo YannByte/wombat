@@ -19,7 +19,7 @@ Module responsibilities belong in [architecture](architecture.en.md), product fi
 
 ## Verification
 
-Run `corepack pnpm repo:check` for source rules without dist; CI runs it before platform builds. Follow [scripts/AGENTS.md](../../scripts/AGENTS.md) for check scripts and [wombat-verify](../../.agents/skills/wombat-verify/SKILL.md) for scope selection. Code review and relevant behavior tests verify the semantic conventions above; static checks do not claim complete coverage.
+Run `corepack pnpm repo:check` for source rules without dist; CI runs it independently of platform builds. Follow [scripts/AGENTS.md](../../scripts/AGENTS.md) for check scripts and [wombat-verify](../../.agents/skills/wombat-verify/SKILL.md) for scope selection. Code review and relevant behavior tests verify the semantic conventions above; static checks do not claim complete coverage.
 
 ```sh
 corepack pnpm build
@@ -36,9 +36,11 @@ Verify CLI, real core and installed assets separately. Check cancellation, failu
 
 For dependency changes run `corepack pnpm licenses:generate` and `corepack pnpm licenses:check`. Verify target platforms and clean installation under the [release Skill](../../.agents/skills/wombat-release/SKILL.md). Report actual verification only; builds do not establish product or platform acceptance.
 
+CI execution, caching and timing analysis are described in [CI](ci.en.md).
+
 ### Failure investigation
 
-- Run `corepack pnpm test:repo` and `corepack pnpm test:prebuild` for source-only script tests and platform assumptions. CI requires these checks on Linux, macOS, and Windows before the five platform builds. The local release gate runs source checks before Rust compilation. These checks do not replace product, browser, or installation acceptance.
+- Run `corepack pnpm test:repo` and `corepack pnpm test:prebuild` for source-only script tests and platform assumptions. CI runs these checks once on Linux, macOS, and Windows, alongside the five native builds. The local release gate runs source checks before Rust compilation. These checks do not replace product, browser, or installation acceptance.
 - Preserve source timestamp precision in test arithmetic. Test process ownership with an instance identity; PIDs and ports can be reused. Use a stable failure code when either a probe or its enclosing deadline can expire first. An unconfirmed probe must not establish successful cleanup.
 - Treat process startup, data readiness, and acceptance as separate states. A first read can return a syncing preview. Tests that require final counts must request a completed read and bind subsequent queries to its version. Do not use arbitrary sleeps to establish readiness.
 - Stop retries and preserve the failing stage, logs, source revision, and environment. Trace the root cause. Check upstream documentation for unfamiliar behavior; reruns, parameter changes, and longer timeouts cannot replace analysis.

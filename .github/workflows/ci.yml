@@ -8,17 +8,328 @@ on:
       target:
         description: Verification scope
         type: choice
-        options:
-          - all
-          - win32-x64
-          - published-release
+        options: [all, win32-x64, published-release]
         default: all
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A shared non-cancelling main group can still replace pending runs. Each main run is independent.
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  WOMBAT_AUTO_PRICES: '0'
+  # Retain line information while avoiding full debug-symbol caches; debug assertions stay enabled.
+  CARGO_PROFILE_DEV_DEBUG: '1'
+  CARGO_PROFILE_TEST_DEBUG: '1'
 jobs:
+  changes:
+    name: Select CI scope
+    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      heavy: ${{ steps.scope.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.4.0'
+      - name: Filter documentation paths without omitting the required result
+        id: scope
+        run: node scripts/ci-plan.ts
+
+  repository:
+    name: Repository rules before build
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/node
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+        with:
+          tool: actionlint@1.7.12
+          fallback: none
+      - name: Check workflow syntax and expressions
+        run: actionlint -color
+      - name: Repository checks and Linux source assumptions
+        run: |
+          corepack pnpm repo:check
+          corepack pnpm test:prebuild
+
+  prebuild:
+    name: Source-only checks on ${{ matrix.runner }}
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node
+      - name: Check source tools and platform assumptions without build artifacts
+        run: |
+          corepack pnpm test:repo
+          corepack pnpm test:prebuild
+
+  rust-tests:
+    name: Core tests ${{ matrix.target }}
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, target: darwin-arm64}
+          - {runner: macos-15-intel, target: darwin-x64}
+          - {runner: ubuntu-24.04, target: linux-x64}
+          - {runner: ubuntu-24.04-arm, target: linux-arm64}
+          - {runner: windows-2025, target: win32-x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare Rust lint tool
+        run: rustup component add clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core -> target
+          shared-key: test-${{ matrix.target }}
+          cache-bin: false
+          cache-workspace-crates: true
+          key: ${{ hashFiles('core/src/**') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Check all native targets with warnings denied
+        run: cargo clippy --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings
+      - name: Compile Rust tests
+        run: cargo test --locked --manifest-path core/Cargo.toml --no-run
+      - name: Run Rust tests and doc tests
+        run: cargo test --locked --manifest-path core/Cargo.toml
+
+  verify:
+    name: Verify ${{ matrix.target }}
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, target: darwin-arm64}
+          - {runner: macos-15-intel, target: darwin-x64}
+          - {runner: ubuntu-24.04, target: linux-x64}
+          - {runner: ubuntu-24.04-arm, target: linux-arm64}
+          - {runner: windows-2025, target: win32-x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core -> target
+          shared-key: release-${{ matrix.target }}
+          cache-bin: false
+          cache-workspace-crates: true
+          key: ${{ hashFiles('core/src/**') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Isolate sources and product data
+        run: |
+          echo "CODEX_HOME=$RUNNER_TEMP/wombat-source" >> "$GITHUB_ENV"
+          echo "WOMBAT_DATA_HOME=$RUNNER_TEMP/wombat-data" >> "$GITHUB_ENV"
+      - name: Inventory native dependencies on this target
+        if: matrix.target != 'darwin-arm64'
+        run: corepack pnpm licenses:generate
+      - name: Build release core and CLI once
+        run: corepack pnpm build
+      - name: Verify shared-service startup
+        run: corepack pnpm release:probe
+      - name: Check types and generated contracts
+        if: matrix.target == 'linux-x64'
+        run: |
+          corepack pnpm typecheck
+          corepack pnpm contracts:check
+      - name: Platform unit tests
+        run: corepack pnpm test:unit
+      - name: Platform integration tests
+        run: corepack pnpm test:integration
+      - name: Platform end-to-end tests
+        run: corepack pnpm test:e2e
+      - name: Check native dependency licenses
+        run: corepack pnpm licenses:check
+      - name: Export core, bundled runtime and notices
+        run: corepack pnpm native:export
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-${{ matrix.target }}
+          path: dist/native-artifacts/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 1
+      - name: Retain the tested Linux build for archive assembly
+        if: matrix.target == 'linux-x64'
+        run: tar -czf tested-build.tar.gz dist/build.json dist/modules-build.json dist/wombat* dist/skill dist/licenses client/dist cli/dist licenses docs/dependency-licenses.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: matrix.target == 'linux-x64'
+        with:
+          name: tested-build
+          path: tested-build.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  github-candidate:
+    name: Assemble GitHub Release candidate
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: native-*
+          path: native-artifacts
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tested-build
+          path: tested-build
+      - name: Assemble the five archives from the tested build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -xzf tested-build/tested-build.tar.gz
+          corepack pnpm github:pack -- --native-dir native-artifacts --reuse-build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-candidate
+          path: dist/github/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  install-candidate:
+    name: Install archive on ${{ matrix.target }}
+    needs: github-candidate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, target: darwin-arm64}
+          - {runner: macos-15-intel, target: darwin-x64}
+          - {runner: ubuntu-24.04, target: linux-x64}
+          - {runner: ubuntu-24.04-arm, target: linux-arm64}
+          - {runner: windows-2025, target: win32-x64}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: github-candidate
+          path: candidate
+      - name: Prepare upgrade acceptance module
+        run: corepack pnpm --filter @wombat/client build
+      - name: Exercise the exact self-contained archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/verify-github-release.ts --set candidate/release-set.json
+
+  dependency-audit:
+    name: Dependency advisories
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
+        with:
+          tool: cargo-audit@0.22.2
+          fallback: none
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core -> target
+          shared-key: audit-registry
+          cache-targets: false
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Audit locked JavaScript and Rust dependencies
+        run: |
+          corepack pnpm audit --audit-level moderate
+          if cargo tree --locked --manifest-path core/Cargo.toml --target all | grep -Eq '(^|[[:space:]])rkyv v'; then
+            echo 'rkyv became reachable; remove the advisory exception and upgrade it before merging.' >&2
+            exit 1
+          fi
+          cargo audit --file core/Cargo.lock --ignore RUSTSEC-2026-0235
+
+  formatting:
+    name: Rust formatting
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare formatting tool
+        run: rustup component add rustfmt
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path core/Cargo.toml -- --check
+
+  result:
+    name: CI
+    if: ${{ always() && github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
+    needs: [changes, repository, prebuild, rust-tests, verify, dependency-audit, formatting, github-candidate, install-candidate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.4.0'
+      - name: Require every selected check
+        env:
+          CI_HEAVY: ${{ needs.changes.outputs.heavy }}
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/ci-plan.ts gate
+
   verify-published:
     name: Verify public installation and update
     if: ${{ github.event.repository.private == false && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'published-release' }}
@@ -44,97 +355,6 @@ jobs:
           npm install --global corepack@0.33.0 --force
           corepack pnpm release:publish -- --verify-published
 
-  repository:
-    name: Repository rules before build
-    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - run: |
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          corepack pnpm repo:check
-
-  prebuild:
-    name: Source-only checks on ${{ matrix.runner }}
-    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-24.04, macos-15, windows-2025]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - name: Check platform assumptions without built artifacts
-        run: |
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          corepack pnpm test:repo
-          corepack pnpm test:prebuild
-
-  verify:
-    name: Verify ${{ matrix.target }}
-    needs: [repository, prebuild, dependency-audit]
-    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { runner: macos-15, target: darwin-arm64 }
-          - { runner: macos-15-intel, target: darwin-x64 }
-          - { runner: ubuntu-24.04, target: linux-x64 }
-          - { runner: ubuntu-24.04-arm, target: linux-arm64 }
-          - { runner: windows-2025, target: win32-x64 }
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    env:
-      WOMBAT_AUTO_PRICES: '0'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - name: Install locked tools and dependencies
-        run: |
-          echo "CODEX_HOME=$RUNNER_TEMP/wombat-source" >> "$GITHUB_ENV"
-          echo "WOMBAT_DATA_HOME=$RUNNER_TEMP/wombat-data" >> "$GITHUB_ENV"
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          rustup show
-          rustup component add rustfmt clippy
-          cargo fetch --locked --manifest-path core/Cargo.toml
-      - name: Inventory native dependencies on this target
-        if: matrix.target != 'darwin-arm64'
-        run: corepack pnpm licenses:generate
-      - name: Release gate
-        run: corepack pnpm release:check
-      - name: Export core, bundled runtime and notices
-        run: corepack pnpm native:export
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: native-${{ matrix.target }}
-          path: dist/native-artifacts/
-          if-no-files-found: error
-          retention-days: 1
 
   verify-windows:
     name: Windows installation candidate
@@ -151,121 +371,23 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - name: Install locked tools and dependencies
+      - uses: ./.github/actions/node
+      - name: Prepare Rust tools and isolated source directories
         run: |
           echo "CODEX_HOME=$RUNNER_TEMP/wombat-source" >> "$GITHUB_ENV"
           echo "WOMBAT_DATA_HOME=$RUNNER_TEMP/wombat-data" >> "$GITHUB_ENV"
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          rustup show
           rustup component add rustfmt clippy
-          cargo fetch --locked --manifest-path core/Cargo.toml
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core -> target
+          shared-key: release-win32-x64
+          cache-bin: false
+          cache-workspace-crates: true
+          key: ${{ hashFiles('core/src/**') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Inventory native dependencies on this target
         run: corepack pnpm licenses:generate
       - name: Focused Windows installation and upgrade acceptance
         env:
           GH_TOKEN: ${{ github.token }}
         run: corepack pnpm release:verify-install
-
-  github-candidate:
-    name: Assemble GitHub Release candidate
-    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
-    needs: verify
-    runs-on: macos-15
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: native-*
-          path: native-artifacts
-          merge-multiple: true
-      - name: Assemble the five self-contained archives
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          corepack pnpm build
-          corepack pnpm github:pack -- --native-dir native-artifacts --reuse-build
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: github-candidate
-          path: dist/github/
-          if-no-files-found: error
-          retention-days: 1
-
-  install-candidate:
-    name: Install archive on ${{ matrix.target }}
-    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
-    needs: github-candidate
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { runner: macos-15, target: darwin-arm64 }
-          - { runner: macos-15-intel, target: darwin-x64 }
-          - { runner: ubuntu-24.04, target: linux-x64 }
-          - { runner: ubuntu-24.04-arm, target: linux-arm64 }
-          - { runner: windows-2025, target: win32-x64 }
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: github-candidate
-          path: candidate
-      - name: Prepare upgrade acceptance dependencies
-        run: |
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          corepack pnpm --filter @wombat/client build
-      - name: Exercise the exact self-contained archive
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/verify-github-release.ts --set candidate/release-set.json
-
-  dependency-audit:
-    name: Dependency advisories
-    if: ${{ github.event.repository.private == false && (github.event_name != 'workflow_dispatch' || inputs.target == 'all') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '26.4.0'
-      - run: |
-          npm install --global corepack@0.33.0 --force
-          corepack pnpm install --frozen-lockfile
-          corepack pnpm audit --audit-level moderate
-          cargo install --locked cargo-audit --version 0.22.2
-          if cargo tree --locked --manifest-path core/Cargo.toml --target all | grep -Eq '(^|[[:space:]])rkyv v'; then
-            echo 'rkyv became reachable; remove the advisory exception and upgrade it before merging.' >&2
-            exit 1
-          fi
-          # rust_decimal lists rkyv as an optional dependency, but Wombat does not
-          # enable that feature. The guard above turns this exception into a failure
-          # if the vulnerable crate ever enters the build graph.
-          cargo audit --file core/Cargo.lock --ignore RUSTSEC-2026-0235

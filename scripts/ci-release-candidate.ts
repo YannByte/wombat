@@ -6,7 +6,8 @@ import { parseArgs } from 'node:util';
 import {nativeTargets} from './native-platforms.ts';
 
 export const requiredCandidateJobs = ['Repository rules before build', 'Dependency advisories',
-  'Assemble GitHub Release candidate', ...nativeTargets.flatMap(target => [`Verify ${target}`, `Install archive on ${target}`])];
+  'CI', 'Rust formatting', 'Source-only checks on macos-15', 'Source-only checks on windows-2025',
+  'Assemble GitHub Release candidate', ...nativeTargets.flatMap(target => [`Core tests ${target}`, `Verify ${target}`, `Install archive on ${target}`])];
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

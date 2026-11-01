@@ -1,8 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { parseArgs } from './release-preflight.ts';
-import { actionPinErrors, repositorySlug, rootReadmeReleaseErrors, successfulCiRun } from './release-policy.ts';
+import { actionPinErrors, actionSources, repositorySlug, rootReadmeReleaseErrors, successfulCiRun } from './release-policy.ts';
+
+test('composite actions obey the same pinned-source policy as workflows',()=>{
+  const root=mkdtempSync(path.join(os.tmpdir(),'wombat-action-pins-'));
+  try{
+    const directory=path.join(root,'.github/actions/node');mkdirSync(directory,{recursive:true});
+    const file=path.join(directory,'action.yml');writeFileSync(file,`steps:\n  - uses: actions/setup-node@${'a'.repeat(40)}\n`);
+    assert.deepEqual(actionPinErrors(actionSources(root)),[]);
+    writeFileSync(file,'steps:\n  - uses: actions/setup-node@v7\n');
+    assert.match(actionPinErrors(actionSources(root)).join('\n'),/full commit SHA/);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
 
 test('parses an explicit release identity and rejects ambiguous arguments', () => {
   assert.deepEqual(parseArgs(['--version', '0.1.0-dev.3', '--json']), {
