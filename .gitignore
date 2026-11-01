@@ -30,3 +30,4 @@ core/target/
 client/dist/
 tui/dist/
 cli/dist/
+core/.ci-rust-outputs/

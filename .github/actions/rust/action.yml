@@ -11,8 +11,9 @@ runs:
       id: cache
       with:
         workspaces: core -> target
+        cache-directories: core/.ci-rust-outputs
         shared-key: ${{ inputs.key }}
-        key: ${{ hashFiles('core/src/**', 'core/prices/**', 'core/tests/**', 'core/build.rs') }}
+        key: ${{ inputs.key == 'release-win32-x64' && 'outputs-v1-' || '' }}${{ hashFiles('core/src/**', 'core/prices/**', 'core/tests/**', 'core/build.rs') }}
         cache-bin: false
         cache-workspace-crates: true
         save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -20,4 +21,6 @@ runs:
       shell: bash
       env:
         CI_RUST_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
-      run: bash "${{ github.action_path }}/restore-times.sh"
+      run: |
+        bash "${{ github.action_path }}/restore-times.sh"
+        bash "${{ github.action_path }}/windows-output.sh" restore

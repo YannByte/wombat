@@ -12,6 +12,7 @@ interface Run {id:number;name:string;created_at:string;updated_at:string;conclus
 type Phase='preparation'|'verification'|'unknown';
 const seconds=(from:string|null,to:string|null)=>{const a=Date.parse(from??''),b=Date.parse(to??'');return Number.isFinite(a)&&Number.isFinite(b)&&b>=a?(b-a)/1000:null;};
 export function stepPhase(name:string):Phase {
+  if(/^Run \.\/\.github\/actions\/(?:node|rust)$/.test(name))return 'preparation';
   if(/^(?:Post |Set up job|Complete job|Run actions\/|Run pnpm\/|Run Swatinem\/|Run taiki-e\/)|Prepare|Install locked|Isolate|Inventory native|Export |Retain |Build release|Compile Rust|Assemble.*archives|Setup/i.test(name))return 'preparation';
   if(/^Run npm|^Release gate$|Check platform assumptions without built artifacts/.test(name))return 'unknown';
   if(/test|check|verif|audit|format|lint|Require every|Exercise/i.test(name))return 'verification';
@@ -25,7 +26,8 @@ export function phaseMarkers(log:string):{at:number;phase:Phase}[] {
     const stage=text.match(/^=== (.+) ===$/);
     if(stage)phase=stage[1]==='Build'?'preparation':stage[1]==='Generated contracts'?'preparation':'verification';
     const script=text.match(/^> wombat@[\w.+-]+ ([\w:-]+) /)?.[1];
-    if(script){if(script==='build'||script==='test:core'||script==='contracts:check')phase='preparation';else if(/^(?:test(?::|$)|repo:check|typecheck|licenses:check)/.test(script))phase='verification';else if(script==='github:pack')phase='unknown';}
+    if(script){if(script==='build'||script==='test:core'||script==='contracts:check'||script==='github:pack')phase='preparation';else if(/^(?:test(?::|$)|repo:check|typecheck|licenses:check)/.test(script))phase='verification';}
+    if(/^Release archive verification: /.test(text))phase='verification';
     if(/^\s*Installing cargo-audit v/.test(text))phase='preparation';
     if(/^\s*Finished `(test|dev|release)` profile/.test(text))phase='verification';
     if(/^running \d+ tests?/.test(text))phase='verification';

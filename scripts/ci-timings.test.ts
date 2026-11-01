@@ -10,5 +10,11 @@ test('separates dependency waiting, runner queue, preparation and validation',()
   assert.equal(jobTiming(run,job).unclassifiedSeconds,40);
   assert.equal(jobTiming(run,{...job,started_at:null,completed_at:null}).executionSeconds,null);
   assert.equal(stepPhase('Compile Rust tests'),'preparation');
+  assert.equal(stepPhase('Run ./.github/actions/node'),'preparation');
+  assert.equal(stepPhase('Run ./.github/actions/rust'),'preparation');
   assert.equal(stepPhase('Run Rust tests and doc tests'),'verification');
+  const archive={...job,steps:[{name:'Run ./.github/actions/node',started_at:time(15),completed_at:time(20),conclusion:'success'},
+    {name:'Assemble the five archives from the tested build',started_at:time(20),completed_at:time(60),conclusion:'success'}]};
+  const packed=jobTiming(run,archive,`${time(20)} > wombat@0.5.0 github:pack /checkout\n${time(40)} Release archive verification: candidate first installation`);
+  assert.deepEqual([packed.preparationSeconds,packed.verificationSeconds,packed.unclassifiedSeconds],[25,20,0]);
 });

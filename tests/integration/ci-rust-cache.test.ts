@@ -15,21 +15,31 @@ test('exact-source cache normalization avoids checkout-driven recompilation whil
   };
   try{
     mkdirSync(path.join(dir,'core/src'),{recursive:true});
-    writeFileSync(path.join(dir,'core/Cargo.toml'),'[package]\nname="ci-cache-probe"\nversion="0.1.0"\nedition="2021"\n');
+    writeFileSync(path.join(dir,'core/Cargo.toml'),'[package]\nname="wombat-core"\nversion="0.1.0"\nedition="2021"\n');
     const source=path.join(dir,'core/src/main.rs'),body='fn main() { println!("cache probe"); }\n';writeFileSync(source,body);
     copyFileSync(new URL('../../rust-toolchain.toml',import.meta.url),path.join(dir,'rust-toolchain.toml'));
     const helper=path.join(dir,'restore-times.sh');copyFileSync(new URL('../../.github/actions/rust/restore-times.sh',import.meta.url),helper);
     run('git',['init','--quiet']);run(cargo,['generate-lockfile','--offline','--manifest-path','core/Cargo.toml']);run('git',['add','core/src/main.rs','core/Cargo.toml','core/Cargo.lock']);
     const build=()=>run(cargo,['build','--locked','--offline','--verbose','--manifest-path','core/Cargo.toml']);
-    assert.match(build().stderr,/Compiling ci-cache-probe/);
+    assert.match(build().stderr,/Compiling wombat-core/);
     const newer=new Date(Date.now()+10000);utimesSync(source,newer,newer);
     run('bash',[helper],{CI_RUST_CACHE_HIT:'false'});assert.ok(statSync(source).mtimeMs>Date.now());
-    assert.match(build().stderr,/Compiling ci-cache-probe/,'A dependency-only cache must not suppress source validation');
+    assert.match(build().stderr,/Compiling wombat-core/,'A dependency-only cache must not suppress source validation');
     run('bash',[helper],{CI_RUST_CACHE_HIT:'true'});assert.ok(statSync(source).mtimeMs<1000);assert.equal(readFileSync(source,'utf8'),body);
-    const reused=build();assert.doesNotMatch(reused.stderr,/Compiling ci-cache-probe/);assert.match(reused.stderr,/Fresh ci-cache-probe/);
-    const binary=path.join(dir,'core/target/debug',process.platform==='win32'?'ci-cache-probe.exe':'ci-cache-probe');
+    const reused=build();assert.doesNotMatch(reused.stderr,/Compiling wombat-core/);assert.match(reused.stderr,/Fresh wombat-core/);
+    const binary=path.join(dir,'core/target/debug',process.platform==='win32'?'wombat-core.exe':'wombat-core');
     assert.equal(run(binary,[]).stdout.trim(),'cache probe');
+    if(process.platform==='win32'){
+      const outputHelper=path.join(dir,'windows-output.sh');copyFileSync(new URL('../../.github/actions/rust/windows-output.sh',import.meta.url),outputHelper);
+      const release=()=>run(cargo,['build','--release','--locked','--offline','--verbose','--manifest-path','core/Cargo.toml']);
+      assert.match(release().stderr,/Compiling wombat-core/);
+      const output=path.join(dir,'core/target/release/deps/wombat_core.exe');assert.ok(existsSync(output));
+      run('bash',[outputHelper,'save'],{RUNNER_OS:'Windows'});rmSync(output);
+      assert.match(release().stderr,/Compiling wombat-core/,'A pruned native output forces recompilation');
+      rmSync(output);run('bash',[outputHelper,'restore'],{RUNNER_OS:'Windows',CI_RUST_CACHE_HIT:'true'});
+      assert.match(release().stderr,/Fresh wombat-core/,'The retained native output permits real Cargo reuse');
+    }
     writeFileSync(source,'fn main() { println!("changed source"); }\n');
-    run('bash',[helper],{CI_RUST_CACHE_HIT:'false'});assert.match(build().stderr,/Compiling ci-cache-probe/);assert.equal(run(binary,[]).stdout.trim(),'changed source');
+    run('bash',[helper],{CI_RUST_CACHE_HIT:'false'});assert.match(build().stderr,/Compiling wombat-core/);assert.equal(run(binary,[]).stdout.trim(),'changed source');
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
