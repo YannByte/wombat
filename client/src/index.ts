@@ -28,3 +28,12 @@ export {schemas as agentResultSchemas} from './generated/schema-agent-results.js
 export type {ErrorOutput as AgentErrorOutput} from './generated/agent-error.js';
 
 export type { ArtifactsRequest, ArtifactsResult, ArtifactItem, ArtifactsTransport } from './client.js';
+
+export type {ProjectRequest,ProjectResult,ProjectTransport} from './client.js';
+
+export type {Help as CliHelp} from './generated/cli-help.js';
+
+export type {HistoryRead} from './generated/cli-history-read.js';
+
+export {validate as validateCliHelp} from './generated/validate-cli-help.js';
+export {validate as validateHistoryRead} from './generated/validate-cli-history-read.js';

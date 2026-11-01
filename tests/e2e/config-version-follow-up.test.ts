@@ -36,9 +36,9 @@ test('extension activity reports full filtered counts before pagination and sepa
     const page = await nativeApi.config!(request);
     assert.equal(page.items.length, 1); assert.equal(page.extensionActivity!.items.length, 1);
     assert.deepEqual([page.extensionActivity!.observedUse, page.extensionActivity!.noObservedUse, page.extensionActivity!.unavailable], [1, 2, 0]);
-    const mismatched = JSON.parse(f.cli(['call'], JSON.stringify({ method: 'config', params: request }), 1));
+    const mismatched = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'config', params: request }), 1));
     assert.equal(mismatched.error.code, 'INVALID_ARGUMENT', 'A pinned read view requires the same explicit source and project roots');
-    const cli = JSON.parse(f.cli(['call'], JSON.stringify({ method: 'config', params: { ...request, roots: [f.root], projectRoots: [f.project] } }), 2));
+    const cli = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'config', params: { ...request, roots: [f.root], projectRoots: [f.project] } }), 2));
     assert.equal(cli.coverage.status, 'partial', 'Configured native integration remains unknown in this isolated fixture');
     assert.deepEqual(cli.extensionActivity, page.extensionActivity);
     const allTime = await nativeApi.config!({ action: 'list', readView: full.readView, scope: { project: f.project, allTime: true }, kinds: ['skill'] });

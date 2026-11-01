@@ -3,6 +3,24 @@
   "title": "Request",
   "oneOf": [
     {
+      "description": "Assemble current project checks, configuration, bounded work history and read-only artifact candidates without editing project files.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "project"
+        },
+        "params": {
+          "$ref": "#/definitions/Request"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
       "description": "Inspect or control local background indexing and current-user automatic startup.",
       "type": "object",
       "properties": {
@@ -11,7 +29,7 @@
           "const": "service"
         },
         "params": {
-          "$ref": "#/definitions/Request"
+          "$ref": "#/definitions/Request2"
         }
       },
       "required": [
@@ -29,7 +47,7 @@
           "const": "artifacts"
         },
         "params": {
-          "$ref": "#/definitions/Request2"
+          "$ref": "#/definitions/Request3"
         }
       },
       "required": [
@@ -47,7 +65,7 @@
           "const": "conversation"
         },
         "params": {
-          "$ref": "#/definitions/Request3"
+          "$ref": "#/definitions/Request4"
         }
       },
       "required": [
@@ -65,7 +83,7 @@
           "const": "usage"
         },
         "params": {
-          "$ref": "#/definitions/Request4"
+          "$ref": "#/definitions/Request5"
         }
       },
       "required": [
@@ -83,7 +101,7 @@
           "const": "snapshot"
         },
         "params": {
-          "$ref": "#/definitions/Request5"
+          "$ref": "#/definitions/Request6"
         }
       },
       "required": [
@@ -101,7 +119,7 @@
           "const": "config"
         },
         "params": {
-          "$ref": "#/definitions/Request6"
+          "$ref": "#/definitions/Request7"
         }
       },
       "required": [
@@ -119,7 +137,7 @@
           "const": "optimize"
         },
         "params": {
-          "$ref": "#/definitions/Request7"
+          "$ref": "#/definitions/Request8"
         }
       },
       "required": [
@@ -137,7 +155,7 @@
           "const": "timing"
         },
         "params": {
-          "$ref": "#/definitions/Request8"
+          "$ref": "#/definitions/Request9"
         }
       },
       "required": [
@@ -155,7 +173,7 @@
           "const": "setup"
         },
         "params": {
-          "$ref": "#/definitions/Request9"
+          "$ref": "#/definitions/Request10"
         }
       },
       "required": [
@@ -173,7 +191,7 @@
           "const": "account"
         },
         "params": {
-          "$ref": "#/definitions/Request10"
+          "$ref": "#/definitions/Request11"
         }
       },
       "required": [
@@ -191,7 +209,7 @@
           "const": "directories"
         },
         "params": {
-          "$ref": "#/definitions/Request11"
+          "$ref": "#/definitions/Request12"
         }
       },
       "required": [
@@ -209,7 +227,7 @@
           "const": "preferences"
         },
         "params": {
-          "$ref": "#/definitions/Request12"
+          "$ref": "#/definitions/Request13"
         }
       },
       "required": [
@@ -227,7 +245,7 @@
           "const": "prices"
         },
         "params": {
-          "$ref": "#/definitions/Request13"
+          "$ref": "#/definitions/Request14"
         }
       },
       "required": [
@@ -245,7 +263,7 @@
           "const": "collection"
         },
         "params": {
-          "$ref": "#/definitions/Request14"
+          "$ref": "#/definitions/Request15"
         }
       },
       "required": [
@@ -263,7 +281,7 @@
           "const": "monitor"
         },
         "params": {
-          "$ref": "#/definitions/Request15"
+          "$ref": "#/definitions/Request16"
         }
       },
       "required": [
@@ -275,6 +293,75 @@
   ],
   "definitions": {
     "Request": {
+      "type": "object",
+      "properties": {
+        "projectRoot": {
+          "type": "string"
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "since": {
+          "type": "string"
+        },
+        "until": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "sourceInstanceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ruleOverrides": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RuleOverrides"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "projectRoot",
+        "since",
+        "until",
+        "timezone"
+      ]
+    },
+    "RuleOverrides": {
+      "type": "object",
+      "properties": {
+        "agentsBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "descriptionCharacters": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "Request2": {
       "type": "object",
       "properties": {
         "action": {
@@ -298,7 +385,7 @@
         "disable"
       ]
     },
-    "Request2": {
+    "Request3": {
       "oneOf": [
         {
           "type": "object",
@@ -398,7 +485,7 @@
         }
       ]
     },
-    "Request3": {
+    "Request4": {
       "type": "object",
       "properties": {
         "action": {
@@ -435,6 +522,15 @@
           ]
         },
         "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "offset": {
+          "description": "Skip matching conversations in Records; other actions use bound cursors.",
           "type": [
             "integer",
             "null"
@@ -501,13 +597,22 @@
       ]
     },
     "Action2": {
-      "type": "string",
-      "enum": [
-        "activity",
-        "locate",
-        "read",
-        "search",
-        "changes"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "activity",
+            "locate",
+            "read",
+            "search",
+            "changes"
+          ]
+        },
+        {
+          "description": "One source-backed activity per conversation, including work without measurements.",
+          "type": "string",
+          "const": "records"
+        }
       ]
     },
     "Selection": {
@@ -693,11 +798,11 @@
         "eventOffset"
       ]
     },
-    "Request4": {
+    "Request5": {
       "type": "object",
       "properties": {
         "query": {
-          "$ref": "#/definitions/Request5"
+          "$ref": "#/definitions/Request6"
         },
         "mode": {
           "default": "auto",
@@ -735,7 +840,7 @@
           "description": "Additional queries share the selected immutable revision. No synchronization options.",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Request5"
+            "$ref": "#/definitions/Request6"
           },
           "maxItems": 8,
           "default": []
@@ -746,7 +851,7 @@
         "query"
       ]
     },
-    "Request5": {
+    "Request6": {
       "type": "object",
       "properties": {
         "comparison": {
@@ -1114,7 +1219,7 @@
         "cached"
       ]
     },
-    "Request6": {
+    "Request7": {
       "type": "object",
       "properties": {
         "review": {
@@ -1346,7 +1451,7 @@
         "least_activity"
       ]
     },
-    "Request7": {
+    "Request8": {
       "type": "object",
       "properties": {
         "action": {
@@ -1504,28 +1609,6 @@
         "trim"
       ]
     },
-    "RuleOverrides": {
-      "type": "object",
-      "properties": {
-        "agentsBytes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "descriptionCharacters": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "additionalProperties": false
-    },
     "ActivitySelection": {
       "description": "Fixed turn analysis, separate from configuration identities and durable handling decisions.",
       "type": "object",
@@ -1553,7 +1636,7 @@
         "turnId"
       ]
     },
-    "Request8": {
+    "Request9": {
       "oneOf": [
         {
           "type": "object",
@@ -1772,7 +1855,7 @@
         "use_records"
       ]
     },
-    "Request9": {
+    "Request10": {
       "type": "object",
       "properties": {
         "project": {
@@ -1797,7 +1880,7 @@
       },
       "additionalProperties": false
     },
-    "Request10": {
+    "Request11": {
       "type": "object",
       "properties": {
         "action": {
@@ -1819,7 +1902,7 @@
         "history"
       ]
     },
-    "Request11": {
+    "Request12": {
       "type": "object",
       "properties": {
         "action": {
@@ -1870,7 +1953,7 @@
         "project"
       ]
     },
-    "Request12": {
+    "Request13": {
       "type": "object",
       "properties": {
         "action": {
@@ -1906,7 +1989,7 @@
         "en"
       ]
     },
-    "Request13": {
+    "Request14": {
       "type": "object",
       "properties": {
         "action": {
@@ -1926,7 +2009,7 @@
         "auto_update"
       ]
     },
-    "Request14": {
+    "Request15": {
       "type": "object",
       "properties": {
         "action": {
@@ -2004,7 +2087,7 @@
         "hooks"
       ]
     },
-    "Request15": {
+    "Request16": {
       "oneOf": [
         {
           "type": "object",

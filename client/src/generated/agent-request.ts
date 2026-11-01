@@ -2,67 +2,71 @@
 
 export type Request =
   | {
-      method: "service";
+      method: "project";
       params: Request1;
     }
   | {
-      method: "artifacts";
+      method: "service";
       params: Request2;
     }
   | {
-      method: "conversation";
+      method: "artifacts";
       params: Request3;
     }
   | {
-      method: "usage";
+      method: "conversation";
       params: Request4;
     }
   | {
-      method: "snapshot";
+      method: "usage";
       params: Request5;
     }
   | {
-      method: "config";
+      method: "snapshot";
       params: Request6;
     }
   | {
-      method: "optimize";
+      method: "config";
       params: Request7;
     }
   | {
-      method: "timing";
+      method: "optimize";
       params: Request8;
     }
   | {
-      method: "setup";
+      method: "timing";
       params: Request9;
     }
   | {
-      method: "account";
+      method: "setup";
       params: Request10;
     }
   | {
-      method: "directories";
+      method: "account";
       params: Request11;
     }
   | {
-      method: "preferences";
+      method: "directories";
       params: Request12;
     }
   | {
-      method: "prices";
+      method: "preferences";
       params: Request13;
     }
   | {
-      method: "collection";
+      method: "prices";
       params: Request14;
     }
   | {
-      method: "monitor";
+      method: "collection";
       params: Request15;
+    }
+  | {
+      method: "monitor";
+      params: Request16;
     };
 export type Action = "status" | "start" | "pause" | "resume" | "stop" | "enable" | "disable";
-export type Request2 =
+export type Request3 =
   | {
       projectRoot: string;
       paths?: string[];
@@ -86,7 +90,7 @@ export type Request2 =
       selection?: string[];
       action: "recheck";
     };
-export type Action2 = "activity" | "locate" | "read" | "search" | "changes";
+export type Action2 = ("activity" | "locate" | "read" | "search" | "changes") | "records";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -151,7 +155,7 @@ export type Action5 =
   "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type DecisionReason = "necessary" | "object_changed" | "incorrect_evidence";
 export type Category = "repair" | "trim";
-export type Request8 =
+export type Request9 =
   | {
       threadId: string;
       turnId: string;
@@ -190,7 +194,7 @@ export type Language = "zh" | "en";
 export type Action9 = "status" | "update" | "auto_update";
 export type Action10 = "status" | "events" | "configure" | "pause" | "resume";
 export type Mode3 = "logs" | "hooks";
-export type Request15 =
+export type Request16 =
   | {
       action: "list";
     }
@@ -214,14 +218,31 @@ export type Request15 =
 export type Period = "day" | "week" | "month";
 
 export interface Request1 {
+  projectRoot: string;
+  roots?: string[];
+  since: string;
+  until: string;
+  timezone: string;
+  sourceInstanceId?: string | null;
+  ruleOverrides?: RuleOverrides | null;
+}
+export interface RuleOverrides {
+  agentsBytes?: number | null;
+  descriptionCharacters?: number | null;
+}
+export interface Request2 {
   action: Action;
 }
-export interface Request3 {
+export interface Request4 {
   action: Action2;
   snapshotId: string;
   roots?: string[];
   selection?: Selection;
   limit?: number | null;
+  /**
+   * Skip matching conversations in Records; other actions use bound cursors.
+   */
+  offset?: number | null;
   cursor?: string | null;
   query?: string | null;
   baselineSnapshotId?: string | null;
@@ -260,8 +281,8 @@ export interface Evidence {
    */
   eventOffset: number;
 }
-export interface Request4 {
-  query: Request5;
+export interface Request5 {
+  query: Request6;
   mode?: Mode & string;
   verify?: boolean;
   /**
@@ -283,16 +304,16 @@ export interface Request4 {
    */
   also?:
     | []
-    | [Request5]
-    | [Request5, Request5]
-    | [Request5, Request5, Request5]
-    | [Request5, Request5, Request5, Request5]
-    | [Request5, Request5, Request5, Request5, Request5]
-    | [Request5, Request5, Request5, Request5, Request5, Request5]
-    | [Request5, Request5, Request5, Request5, Request5, Request5, Request5]
-    | [Request5, Request5, Request5, Request5, Request5, Request5, Request5, Request5];
+    | [Request6]
+    | [Request6, Request6]
+    | [Request6, Request6, Request6]
+    | [Request6, Request6, Request6, Request6]
+    | [Request6, Request6, Request6, Request6, Request6]
+    | [Request6, Request6, Request6, Request6, Request6, Request6]
+    | [Request6, Request6, Request6, Request6, Request6, Request6, Request6]
+    | [Request6, Request6, Request6, Request6, Request6, Request6, Request6, Request6];
 }
-export interface Request5 {
+export interface Request6 {
   comparison?: ComparisonRequest | null;
   action: Action3;
   snapshotId?: string | null;
@@ -335,7 +356,7 @@ export interface Scope {
    */
   turnId?: string | null;
 }
-export interface Request6 {
+export interface Request7 {
   /**
    * Observe native Skill metadata and order context footprint alongside use frequency.
    */
@@ -369,7 +390,7 @@ export interface Scope2 {
   sourceInstanceId?: string | null;
   threadId?: string | null;
 }
-export interface Request7 {
+export interface Request8 {
   action?: Action5 & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
@@ -387,10 +408,6 @@ export interface Request7 {
   ruleOverrides?: RuleOverrides | null;
   activity?: ActivitySelection | null;
 }
-export interface RuleOverrides {
-  agentsBytes?: number | null;
-  descriptionCharacters?: number | null;
-}
 /**
  * Fixed turn analysis, separate from configuration identities and durable handling decisions.
  */
@@ -406,28 +423,28 @@ export interface Scope3 {
 export interface Cursor {
   token: string;
 }
-export interface Request9 {
+export interface Request10 {
   project?: string | null;
   roots?: string[] | null;
   includeHooks?: boolean;
 }
-export interface Request10 {
+export interface Request11 {
   action?: Action6 & string;
 }
-export interface Request11 {
+export interface Request12 {
   action?: Action7 & string;
   purpose?: Purpose | null;
   path?: string | null;
   grantId?: string | null;
 }
-export interface Request12 {
+export interface Request13 {
   action: Action8;
   language?: Language | null;
 }
-export interface Request13 {
+export interface Request14 {
   action: Action9;
 }
-export interface Request14 {
+export interface Request15 {
   action?: Action10 & string;
   mode?: Mode3 | null;
   roots?: string[] | null;

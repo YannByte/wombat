@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import {spawnProductCli} from './cli-invocation.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'wombat-release-probe-'));
@@ -53,11 +54,10 @@ try {
   await delay(100);
   assert.equal(service.exitCode, null, diagnostics || 'shared service exited before the probe');
   assert.equal(service.signalCode, null, diagnostics || 'shared service exited before the probe');
-  const result = spawnSync(process.execPath, [path.join(root, 'dist', 'wombat.js'), "check", 'capabilities', '--json'], {
+  const result = spawnProductCli(path.join(root, 'dist', 'wombat.js'), {method:'optimize',params:{action:'capabilities'}}, {
     cwd: temporary,
     env,
     encoding: 'utf8',
-    input: '',
     timeout: 15_000,
     maxBuffer: 8 * 1024 * 1024,
   });

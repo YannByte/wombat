@@ -1,3 +1,4 @@
+import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { realpathSync } from 'node:fs';
@@ -78,10 +79,10 @@ test('extension review joins native metadata and pinned use without changing the
     assert.ok(unavailable.coverage.issues.some(i => i.code === 'CODEX_REQUEST_REJECTED'));
     assert.equal(unavailable.extensionReview?.enabledItems, 0);
     await mode([skill]);
-    const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'check', 'inventory', '--review', '--kind', 'skill', '--root', root, '--project-root', project, '--project', project, '--since', scope.since, '--until', scope.until, '--timezone', 'UTC', '--snapshot', usage.result.snapshotRef.snapshotId, '--json'], { env: { ...process.env, WOMBAT_CODEX_BIN: native.binary }, encoding: 'utf8', timeout: 15000 });
+    const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{review:true,kind:'skill',roots:[root],projectRoots:[project],scope, snapshotId:usage.result.snapshotRef.snapshotId}}, { env: { ...process.env, WOMBAT_CODEX_BIN: native.binary }, encoding: 'utf8', timeout: 15000 });
     assert.ok([0, 2].includes(cli.status!), cli.stderr + cli.stdout);
     assert.equal(JSON.parse(cli.stdout).extensionReview.enabledItems, 1);
-    const api = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'call'], { env: process.env, input: JSON.stringify({ method: 'config', params: { review: true, readView: before.readView, roots: [root], projectRoots: [project], kind: 'skill', scope } }), encoding: 'utf8', timeout: 15000 });
+    const api = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'system', 'call'], { env: process.env, input: JSON.stringify({ method: 'config', params: { review: true, readView: before.readView, roots: [root], projectRoots: [project], kind: 'skill', scope } }), encoding: 'utf8', timeout: 15000 });
     assert.ok([0, 2].includes(api.status!), api.stderr + api.stdout);
     assert.equal(JSON.parse(api.stdout).items[0].contextFootprint.estimate.tokens, estimate);
     const outside = path.join(dir, 'outside/SKILL.md');

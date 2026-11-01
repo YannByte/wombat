@@ -44,6 +44,7 @@ pub mod optimize_dto;
 pub mod preferences;
 pub mod pricing;
 pub mod pricing_sync;
+pub mod project_dto;
 mod query_cache;
 pub mod service_dto;
 pub mod session_events;
@@ -272,6 +273,26 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<preferences::Response>(),
+        )?),
+        "schema_cli_history_read" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<agent_dto::HistoryRead>(),
+        )?),
+        "schema_cli_help" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<agent_dto::Help>(),
+        )?),
+        "schema_project_request" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<project_dto::Request>(),
+        )?),
+        "schema_project_response" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<project_dto::Response>(),
         )?),
         "schema_optimize_request" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()

@@ -68,6 +68,12 @@
         "$ref": "#/definitions/RuntimeCheck"
       },
       "default": []
+    },
+    "installationChecks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/InstallationCheck"
+      }
     }
   },
   "required": [
@@ -312,6 +318,40 @@
         "modified",
         "unavailable",
         "unmanaged"
+      ]
+    },
+    "InstallationCheck": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/InstallationStatus"
+        },
+        "message": {
+          "type": "string"
+        },
+        "repair": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "message"
+      ]
+    },
+    "InstallationStatus": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "warning",
+        "fail"
       ]
     }
   }

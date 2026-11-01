@@ -1,3 +1,4 @@
+import {writeHelp} from './help.js';
 import path from 'node:path';
 import {CoreError,type UsageClient} from '@wombat/client';
 import {createNodeClient} from '@wombat/client/node';
@@ -53,6 +54,7 @@ export async function runMonitorChecks(
     while (!signal.aborted) {
       try {
         const result = await checkMonitor(client, options.roots, options.ids, signal);
+        if (!result.plans.some(p=>p.enabled && (!options.ids || options.ids.includes(p.id)))) {print(result);return 2;}
         if (!options.watch || result.notifications.length) print(result);
         if (!options.watch) return result.notifications.some((n) => n.partial) ? 2 : 0;
       } catch (error) {
@@ -76,6 +78,7 @@ export async function runMonitorChecks(
 
 
 export async function runMonitorWatch(argv:string[]):Promise<number>{
+  if(argv.includes('--help')||argv.includes('-h')){writeHelp('alerts',argv);return 0;}
   const roots:string[]=[],ids:string[]=[];let interval=60,once=false;const seen=new Set<string>();
   for(let i=0;i<argv.length;i++){
     const [flag,inline]=argv[i].split(/=(.*)/s);if(seen.has(flag)&&!['--root','--id'].includes(flag))throw new CoreError('INVALID_ARGUMENT',t('monitor.invalid'));seen.add(flag);
@@ -84,6 +87,6 @@ export async function runMonitorWatch(argv:string[]):Promise<number>{
     const value=inline??argv[++i];if(!value)throw new CoreError('INVALID_ARGUMENT',t('monitor.invalid'));if(flag==='--root')roots.push(path.resolve(value));else if(flag==='--id')ids.push(value);else{interval=Number(value);if(!/^\d+$/.test(value)||interval<5||interval>3600)throw new CoreError('INVALID_ARGUMENT',t('monitor.invalid'));}
   }
   const controller=new AbortController(),stop=()=>controller.abort();process.once('SIGINT',stop);process.once('SIGTERM',stop);
-  try{return await runMonitorChecks(createNodeClient(),{roots,ids:ids.length?ids:undefined,interval,watch:!once},controller.signal,r=>process.stdout.write(JSON.stringify(r)+'\n'),e=>process.stderr.write(JSON.stringify({error:{code:e.code,message:t('monitor.checkFailed')}})+'\n'));}
+  try{return await runMonitorChecks(createNodeClient(),{roots,ids:ids.length?ids:undefined,interval,watch:!once},controller.signal,r=>process.stdout.write(argv.includes('--json')?JSON.stringify(r)+'\n':!r.plans.some(p=>p.enabled&&(!ids.length||ids.includes(p.id)))?t('cli.alerts.noPlans')+'\n':t('cli.alerts.result',{count:r.notifications.length})+'\n'+r.notifications.map(n=>`${n.planId} · ${n.kind} · ${n.checkedAt}`).join('\n')+'\n'),e=>process.stderr.write(JSON.stringify({error:{code:e.code,message:t('monitor.checkFailed')}})+'\n'));}
   finally{process.off('SIGINT',stop);process.off('SIGTERM',stop);}
 }

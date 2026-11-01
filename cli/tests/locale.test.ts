@@ -31,5 +31,5 @@ test('monthly CLI buckets use natural names and unknown API cost remains a compl
 });
 test('human help uses Tasks consistently and explains the undated restriction',()=>{
  const saved=locale.getLocale();
- try{locale.setLocale('en');assert.match(usageHelp(),/Task history/);assert.doesNotMatch(usageHelp(),/conversation/i);assert.match(usageHelp(),/--all-time \| --undated/);locale.setLocale('zh');assert.match(usageHelp(),/任务历史/);assert.doesNotMatch(usageHelp(),/对话/);assert.match(usageHelp(),/--all-time \| --undated/);}finally{locale.setLocale(saved);}
+ try{locale.setLocale('en');assert.match(usageHelp(),/wombat history/);assert.match(usageHelp(),/--all-time \| --undated/);locale.setLocale('zh');assert.match(usageHelp(),/wombat history/);assert.match(usageHelp(),/--all-time \| --undated/);}finally{locale.setLocale(saved);}
 });

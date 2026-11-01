@@ -45,14 +45,14 @@ test('statistics keep zero, missing totals, ties, unassigned facts and empty win
     assert.equal(growth.attributedTokenDelta, null, 'Incomplete populations cannot claim an exact decomposition');
     await assert.rejects(nativeApi.live!({ query: { ...query, threadId: 'absent' }, mode: 'cached' }), { code: 'NOT_FOUND' });
     await assert.rejects(nativeApi.live!({ query: { ...query, scope: { allTime: true, threadId: tie.id }, threadId: tie.id }, mode: 'cached' }), { code: 'INVALID_ARGUMENT' });
-    const invalid = JSON.parse(f.cli(['call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: { ...query, presentation: 'details' } } }), 1));
+    const invalid = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: { ...query, presentation: 'details' } } }), 1));
     assert.equal(invalid.error.code, 'INVALID_ARGUMENT');
     await f.append('tie-a', [measurement('tie-a', 'added', 50, at)]);
     const fresh = (await nativeApi.live!({ query: { ...query, snapshotId: undefined }, mode: 'fresh' })).result;
     assert.equal(fresh.statistics!.population.completeTaskTokens, 250);
     const pinned = (await nativeApi.live!({ query, mode: 'cached' })).result;
     assert.deepEqual(pinned.statistics, stats, 'A later scan cannot rewrite an existing snapshot');
-    const cli = JSON.parse(f.cli(["usage", "stats", '--snapshot', snapshotId, '--all-time', '--presentation', 'models', '--limit', '1', '--json']));
+    const cli = JSON.parse(f.cli(["usage", "stats", '--snapshot', snapshotId, '--all-time', '--by', 'model', '--limit', '1', '--json']));
     assert.deepEqual(cli.statistics, stats, 'CLI retains missing measurement fields in a successfully read source');
   });
 });

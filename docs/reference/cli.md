@@ -4,13 +4,13 @@
 
 `@wombat/cli` 解析参数，输出文本或 JSON，并装配本地查询。命令和参数以[CLI 使用说明](../guides/cli.md)为准。
 
-Agent 通过 `api` 发现本机方法与 Schema，通过 `call` 从标准输入提交单个有界 JSON 请求。请求包装从 Rust 生成，派发复用公开类型化客户端，并与普通命令共享退出码判断。语法、预算和恢复方式见 CLI 指南。
+Agent 通过 `system api` 发现本机方法与 Schema，通过 `system call` 从标准输入提交单个有界 JSON 请求。请求包装从 Rust 生成，派发复用公开类型化客户端，并与普通命令共享退出码判断。语法、预算和恢复方式见 CLI 指南。
 
 ## 公开入口
 
 - 包根入口提供参数解析与 `runUsageCli`；`./format` 提供结果文本格式化。
-- 五个顶层入口为 `usage`、`check`、`system`、`api` 和 `call`。明细能力通过 `call` 保留生成的方法；旧命令别名直接拒绝。
-- 无子命令时输出用量文本，与 `usage` 一致。
+- 五个顶层入口为 `history`、`usage`、`check`、`clean` 和 `system`。明细能力通过 `system api` 与 `system call` 使用生成的方法。移除的命令和参数直接拒绝，不提供兼容别名。
+- 无子命令时只展示任务帮助，不执行查询。`--help --json` 按生成契约提供任务、示例和下一步帮助；已知命令直接执行，字段不熟悉时只读取所选方法的 Schema。
 
 
 - 展示语言使用 `@wombat/client/locale`，详见[产品语言与文案](../i18n/product.md)。
@@ -40,7 +40,7 @@ CLI 只负责参数、输出、进度与退出码，不计算费用或改变快�
 
 ## 整轮耗时
 
-通过 `call` 使用 `timing` 方法。汇总需要完整任务和轮次 ID。证据导航固定相同快照、目标和集合，使用不透明游标，每页 1..200 行。集合为 `turn_events`、`use_objects` 和 `use_records`，只有 `use_records` 接受对象筛选。能力查询不扫描来源。本地与 `share-v1` 投影保留各自隐私边界。
+通过 `system call` 使用 `timing` 方法。汇总需要完整任务和轮次 ID。证据导航固定相同快照、目标和集合，使用不透明游标，每页 1..200 行。集合为 `turn_events`、`use_objects` 和 `use_records`，只有 `use_records` 接受对象筛选。能力查询不扫描来源。本地与 `share-v1` 投影保留各自隐私边界。
 
 退出码按核心质量判定：完整汇总返回 0，即使可选指标未知；部分、运行中或受截断的汇总返回 2。成功的证据和能力查询返回 0，但不证明轮次完整。错误返回 1，取消返回 130。耗时读取绕过自动价格、配置、Hook 接收和账户观测。未知归属、耗时和仓库基线不能替换为零。计算及共享规则由[核心参考](core.md)维护。
 
@@ -57,7 +57,7 @@ Wombat 会拒绝未知快照或索引格式，不会迁移或删除原数据。�
 
 ## 本机宿主操作
 
-`system doctor` 检查安装。`system doctor --plugin` 检查原生 Skill 发现；`--hooks` 请求可选注册证据。`system update` 更新运行时。生成的 `call` 方法负责服务、账户、价格、采集、目录授权和预算。`system watch` 负责主动 fresh 预算检查及取消，临时失败输出到 stderr，下一轮重新加载计划。`system hook codex` 保留有界建议性接收、静默 stdout 和接收失败返回 0。语法及运行边界由 [CLI 指南](../guides/cli.md)维护。
+`system doctor` 检查安装、原生 Skill 发现及资源兼容性；`--hooks` 请求可选注册证据。`system update` 更新运行时。生成的 `system call` 方法负责服务、账户、价格、采集、目录授权和预算。`usage alerts` 负责主动 fresh 预算检查及取消，临时失败输出到 stderr，下一轮重新加载计划。`system hook codex` 保留有界建议性接收、静默 stdout 和接收失败返回 0。语法及运行边界由 [CLI 指南](../guides/cli.md)维护。
 
 ## 发布更新
 

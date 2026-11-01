@@ -28,6 +28,8 @@ pub struct Selection {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
+    /// One source-backed activity per conversation, including work without measurements.
+    Records,
     Activity,
     Locate,
     Read,
@@ -65,6 +67,8 @@ pub struct Request {
     #[serde(default)]
     pub selection: Selection,
     pub limit: Option<usize>,
+    /// Skip matching conversations in Records; other actions use bound cursors.
+    pub offset: Option<usize>,
     pub cursor: Option<String>,
     pub query: Option<String>,
     pub baseline_snapshot_id: Option<String>,
@@ -77,6 +81,11 @@ pub struct Request {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Activity {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<RecordSummary>,
+    /// Read-target cursor at a source search match; bound to snapshot, selection and evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_cursor: Option<String>,
     pub evidence: Evidence,
     pub timestamp: Option<String>,
     pub collected_at: String,
@@ -93,6 +102,13 @@ pub struct Activity {
     pub has_text_locator: bool,
     pub content_partial: bool,
     pub change: Option<Change>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecordSummary {
+    pub upstream_id: String,
+    pub started_at: Option<String>,
+    pub last_activity_at: Option<String>,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -113,6 +129,7 @@ pub struct ContentLocation {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Fragment {
     pub evidence: Evidence,
+    pub message: Activity,
     pub text: String,
     pub next_cursor: Option<String>,
     pub locations: Vec<ContentLocation>,

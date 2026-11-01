@@ -80,13 +80,12 @@ test('installed runtime queries synthetic usage, fixed drill-down and configurat
     assert.equal(turns.items[0].usage.tokens.total, 220);
     const steps = invoke(queryInvocation({"action":"steps","threadId":threads.items[0].id,"turnId":turns.items[0].id,"snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(steps.items.filter((item: { kind: string }) => item.kind === 'measurement').length, 1);
-    const configArgs = ['--root', source, '--project-root', project];
-    const inventory = invoke(["check", 'inventory', ...configArgs]);
+    const inventory = invoke({method:'config',params:{action:'list',roots:[source],projectRoots:[project]}});
     assert.ok(
       inventory.items.some((item: { path: string }) => canonicalPath(item.path) === canonicalSkill),
       `installed inventory did not include ${skill}: ${JSON.stringify(inventory.items.map((item: { path: string }) => item.path))}`,
     );
-    const suggestions = invoke(["check", 'list', ...configArgs, '--read-view', inventory.readView]);
+    const suggestions = invoke({method:'optimize',params:{action:'list',roots:[source],projectRoots:[project],readView:inventory.readView}});
     assert.ok(suggestions.suggestions.some((item: { item: { path: string }; findings: { rule: string }[] }) => canonicalPath(item.item.path) === canonicalSkill && item.findings.some(finding => finding.rule === 'descriptionSize')));
     await stopService(service); service = undefined;
     assert.ok(invoke(['--help']).commands.includes('check'));

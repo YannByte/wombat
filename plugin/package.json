@@ -13,7 +13,9 @@
     "agent-api-v1",
     "usage-statistics-v1",
     "config-content-hashes-v1",
-    "config-checks-v1"
+    "config-checks-v1",
+    "task-cli-v1",
+    "project-report-v1"
   ],
   "skills": [
     "wombat"

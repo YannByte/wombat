@@ -8,6 +8,7 @@ import { describeAgentApi } from '../src/agent-description.js';
 import { local, capabilityResult } from './timing-fixtures.js';
 
 const requests = [
+  {method:'project',params:{projectRoot:'/synthetic',since:'2026-10-01',until:'2026-11-01',timezone:'UTC'}},
   { method: "artifacts", params: { action: "inspect", projectRoot: "/synthetic" } },
   {
     method: 'usage',
@@ -85,8 +86,8 @@ test('local discovery exposes only reachable method schemas and current product 
 test('API discovery and argument failures never construct a runtime client', async () => {
   for (const [args, expected] of [
     [[], 0],
-    [['--method', 'timing', '--output-schema'], 0],
-    [['--method', 'unknown'], 1],
+    [['timing', '--output-schema'], 0],
+    [['unknown'], 1],
     [['--output-schema'], 1],
     [['--json=1'], 1],
     [['--lang', 'unsupported'], 1],

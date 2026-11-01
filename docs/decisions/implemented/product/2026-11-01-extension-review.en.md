@@ -14,7 +14,7 @@ Follow Claude Code's [`/skill-doctor`](https://code.claude.com/docs/en/skills#fi
 
 ### Product decision
 
-The primary view combines context footprint and use frequency. Functional overlap, format and reference checks explain selected entries when needed. Retain one main Skill, three references and five CLI entries. Run on demand without a Web host, separate Skill, overall score or resident collector. Existing cost capabilities remain unchanged and are not a primary review metric or selling point.
+The primary view combines context footprint and use frequency. Functional overlap, format and reference checks explain selected entries when needed. Retain one main Skill, five references and five CLI entries. Run on demand without a Web host, separate Skill, overall score or resident collector. Existing cost capabilities remain unchanged and are not a primary review metric or selling point.
 
 This decision owns the review tradeoffs, supplementing [G05 of the optimization proposal](../../proposed/product/2026-10-03-optimization-lifecycle.en.md). G05 still governs proven long-term inactivity. Responsibilities from [read-only checks and one plugin](../architecture/2026-10-31-on-demand-checks.en.md) remain: Wombat supplies facts, evidence and rechecks; Codex interprets and performs authorized changes. The [CLI guide](../../../guides/cli.en.md) and [public contracts](../../../development/contracts.en.md) own current entries and measurement limits.
 
@@ -53,7 +53,7 @@ Deduplicate start/result and replay through operation identity while retaining i
 
 Rust reuses configuration objects, use bases and the reference tokenizer, adding discovery-metadata quantities, measurement status and ordering/totals only for actual consumers. Generate TS and Schema from Rust DTOs. Node reuses native connections and `skills/list`, distinguishing selected project instances by name, path, origin and enablement. File existence cannot replace host enablement.
 
-Reuse `check inventory` lists, details, evidence and related scopes. Keep static checks in `check` and `check recheck`, exposing the same capabilities through `api` and `call`. Implementation public contracts own concrete fields and arguments. Within the three references, `diagnose` organizes review, `verify` organizes authorized adjustment, recovery and recheck, and `query` supplies history only when needed.
+Use `check skills` for the task view, with generated `config` detail, evidence and related-scope operations. Keep static checks in `check` and `check verify`, exposing the same capabilities through `system api` and `system call`. Implementation public contracts own concrete fields and arguments. Within the five references, `environment` organizes extension review, `diagnose` selects project evidence, `cleanup` handles artifact choices, `verify` organizes authorized adjustment, recovery and recheck, and `query` supplies history only when needed.
 
 When requested, Codex uses verified host configuration capabilities or trusted project tools to change only selected entries and retain minimal recovery material. Prefer disabling or narrower scope over deleting files or plugin caches. Disclose actual global impact when project controls are unsupported. Reuse existing authorization; confirm again only when impact changes. Recovery restores selected values without overwriting later unrelated edits. Add no automatic handling history.
 

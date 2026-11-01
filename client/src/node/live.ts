@@ -266,9 +266,9 @@ export async function queryLive(
     product.action !== "capabilities" &&
     product.action !== "activity" &&
     (!product.readView || product.action === "recheck");
-  const skillReview = "config" in request && request.config.review &&
-    (request.config.kind === "skill" || request.config.kinds?.every(kind => kind === "skill"));
-  if (fresh && !skillReview) {
+  const needsHooks = !('config' in request) || request.config.kind === 'hook' ||
+    (!request.config.kind && (!request.config.kinds || request.config.kinds.includes('hook')));
+  if (fresh && needsHooks) {
     const { captureHooks } = await import("./codex/hooks.js");
     observed = {
       ...request,

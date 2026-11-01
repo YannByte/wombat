@@ -29,7 +29,7 @@ test('local native access denial remains explicit in CLI/native and recovers wit
                 assert.equal(result.identity, null);
                 assert.ok(!JSON.stringify(result).includes('SYNTHETIC_PRIVATE_NATIVE_PATH'));
             }
-            const setup = JSON.parse(f.cli(["system", "doctor", "--plugin", '--project', f.project, '--json'], '', 2));
+            const setup = JSON.parse(f.cli(["system", "doctor", '--project', f.project, '--json'], '', 2));
             assert.equal(setup.discovery.status, 'unavailable');
             assert.equal(setup.discovery.errorCode, 'LOCAL_ACCESS_DENIED');
             await writeFile(native.mode, JSON.stringify({ kind: 'available' }));

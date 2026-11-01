@@ -133,6 +133,10 @@ async function call(
     throw new CoreError("CORE_UNAVAILABLE", "Method unavailable");
   };
   switch (request.method) {
+    case "project": {
+      const r=await(client.project?.(request.params,options)??unavailable());
+      return {result:r,exitCode:r.partial?2:0};
+    }
     case "artifacts": {
       const r=await(client.artifacts?.(request.params,options)??unavailable());
       return {result:r,exitCode:r.partial?2:0};
@@ -235,6 +239,7 @@ export async function runAgentCli(
   try {
     argv = configureLanguage(argv);
     let method: string | undefined;
+    if(command==='api' && argv[0] && !argv[0].startsWith('-')) method=argv.shift();
     const seen = new Set<string>();
     for (let i = 0; i < argv.length; i++) {
       const [flag, inline] = argv[i].split(/=(.*)/s);
@@ -251,9 +256,7 @@ export async function runAgentCli(
         if (inline !== undefined) throw invalid();
         continue;
       }
-      if (command !== "api" || flag !== "--method") throw invalid();
-      method = inline ?? argv[++i];
-      if (!method || method.startsWith("-")) throw invalid();
+      throw invalid();
     }
     if (seen.has("--output-schema") && !method) throw invalid();
     if (signal.aborted) throw new CoreError("CANCELLED", "Cancelled");

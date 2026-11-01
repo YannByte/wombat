@@ -14,7 +14,7 @@ test('help discovers every supported command without duplicates or removed hosts
   try {
     assert.equal(await runUsageCli(['--lang', 'en', '--help', '--json']), 0);
     const result = JSON.parse(chunks.join(''));
-    const expected = ['usage','check','system','api','call'];
+    const expected = ['history','usage','check','clean','system'];
     assert.deepEqual([...result.commands].sort(), expected.sort());
     assert.match(result.help, /^Wombat\n\nUsage/);
     for (const command of expected) assert.match(result.help, new RegExp('wombat '+command+'\\b'));

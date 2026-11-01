@@ -10,7 +10,7 @@ test('local discovery needs no initialization and removed browser commands canno
   const data = path.join(dir,'data');
   const env = {...process.env, WOMBAT_DATA_HOME:data, CODEX_HOME:path.join(dir,'absent-source'), WOMBAT_AUTO_PRICES:'0', WOMBAT_CORE_BIN:path.join(dir,'absent-core')};
   try {
-    for (const args of [['--help','--json'], ['--version','--json'], ['api','--json'], ['api','--method','conversation','--json']]) {
+    for (const args of [['--help','--json'], ['--version','--json'], ['system','api','--json'], ['system','api','conversation','--json']]) {
       const result=spawnSync(process.execPath,[path.resolve('dist/wombat.js'),...args],{env,encoding:'utf8',timeout:10000,maxBuffer:2*1024*1024});
       assert.ifError(result.error);
       assert.equal(result.status,0,result.stderr+result.stdout);

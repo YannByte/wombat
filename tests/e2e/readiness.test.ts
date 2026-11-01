@@ -13,7 +13,7 @@ test('initial recent preparation, batch reads and history expansion agree across
   await utimes(path.join(f.root,'sessions/cold.jsonl'),new Date('2020-01-01'),new Date('2020-01-01'));
   const scope={since:day,until:new Date(Date.parse(day)+86400000).toISOString().slice(0,10),timezone:'UTC'};
   const params={query:{action:'usage',scope,compact:true},mode:'fresh',waitMs:20000,also:[{action:'threads',scope,compact:true},{action:'statistics',scope,compact:true}]};
-  const recent=JSON.parse(f.cli(['call','--json'],JSON.stringify({method:'usage',params}),2));
+  const recent=JSON.parse(f.cli(['system','call','--json'],JSON.stringify({method:'usage',params}),2));
   assert.equal(recent.result.summary.tokens.total,110);assert.equal(recent.freshness.initialScan,false);
   assert(recent.result.quality.sources.some((s:any)=>s.issues.some((i:any)=>i.code==='historyDeferred')));
   for(const value of recent.additional){assert.equal(value.summary.tokens.total,110);assert.equal(value.snapshotRef.snapshotId,recent.freshness.revision);}

@@ -102,13 +102,22 @@
   ],
   "definitions": {
     "Action": {
-      "type": "string",
-      "enum": [
-        "activity",
-        "locate",
-        "read",
-        "search",
-        "changes"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "activity",
+            "locate",
+            "read",
+            "search",
+            "changes"
+          ]
+        },
+        {
+          "description": "One source-backed activity per conversation, including work without measurements.",
+          "type": "string",
+          "const": "records"
+        }
       ]
     },
     "Selection": {
@@ -224,6 +233,23 @@
     "Activity": {
       "type": "object",
       "properties": {
+        "record": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RecordSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readCursor": {
+          "description": "Read-target cursor at a source search match; bound to snapshot, selection and evidence.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "evidence": {
           "$ref": "#/definitions/Evidence"
         },
@@ -331,6 +357,30 @@
         "contentPartial"
       ]
     },
+    "RecordSummary": {
+      "type": "object",
+      "properties": {
+        "upstreamId": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastActivityAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "upstreamId"
+      ]
+    },
     "Evidence": {
       "type": "object",
       "properties": {
@@ -380,6 +430,9 @@
         "evidence": {
           "$ref": "#/definitions/Evidence"
         },
+        "message": {
+          "$ref": "#/definitions/Activity"
+        },
         "text": {
           "type": "string"
         },
@@ -408,6 +461,7 @@
       "additionalProperties": false,
       "required": [
         "evidence",
+        "message",
         "text",
         "locations",
         "context",

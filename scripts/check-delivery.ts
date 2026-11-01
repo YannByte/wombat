@@ -25,13 +25,13 @@ export function deliveryErrors(root: string): string[] {
     ts.forEachChild(node, visit);
   }
   visit(source);
-  if (JSON.stringify(commands) !== '["usage","check","system","api","call"]') errors.push('cli/src/command-routing.ts: expose exactly usage, check, system, api and call');
+  if (JSON.stringify(commands) !== '["history","usage","check","clean","system"]') errors.push('cli/src/command-routing.ts: expose exactly history, usage, check, clean and system');
   const references = path.join(root, 'plugin/skills/wombat/references');
   const files = existsSync(references) ? readdirSync(references).filter(f => f.endsWith('.md')).sort() : [];
-  if (JSON.stringify(files) !== '["diagnose.md","query.md","verify.md"]') errors.push('plugin/skills/wombat/references: retain exactly diagnose.md, query.md and verify.md');
+  if (JSON.stringify(files) !== '["cleanup.md","diagnose.md","environment.md","query.md","verify.md"]') errors.push('plugin/skills/wombat/references: retain exactly cleanup.md, diagnose.md, environment.md, query.md and verify.md');
   const main = path.join(root, 'plugin/skills/wombat/SKILL.md');
   const links = existsSync(main) ? [...readFileSync(main, 'utf8').matchAll(/\]\(references\/([^/)]+\.md)\)/g)].map(m => m[1]).sort() : [];
-  if (JSON.stringify(links) !== JSON.stringify(files) || links.length !== 3) errors.push('plugin/skills/wombat/SKILL.md: link directly to each of the three task references once');
+  if (JSON.stringify(links) !== JSON.stringify(files) || links.length !== 5) errors.push('plugin/skills/wombat/SKILL.md: link directly to each of the five task references once');
   return errors;
 }
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

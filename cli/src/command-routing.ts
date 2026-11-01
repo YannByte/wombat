@@ -2,13 +2,9 @@ type CommandRoute = readonly [run: (args: string[]) => Promise<number>, errorVer
 
 /** Five human entries; structured methods remain owned by the generated Rust schema. */
 export const commandRoutes = new Map<string, CommandRoute>([
-  ['check', [async args => (await import('./config-cli.js')).runConfigCli(args), 1]],
+  ['history', [async args => (await import('./history-cli.js')).runHistoryCli(args), 1]],
+  ['check', [async args => (await import('./project-cli.js')).runProjectCli(args), 1]],
+  ['clean', [async args => (await import('./artifacts-cli.js')).runArtifactsCli(args), 1]],
   ['system', [async args => (await import('./system-cli.js')).runSystemCli(args), 1]],
 ]);
-export const commandNames = ['usage', 'check', 'system', 'api', 'call'];
-
-export function firstCommandIndex(argv: readonly string[]): number {
-  let index = 0;
-  while (argv[index] === '--lang' || argv[index]?.startsWith('--lang=')) index += argv[index] === '--lang' ? 2 : 1;
-  return index;
-}
+export const commandNames = ['history', 'usage', 'check', 'clean', 'system'];

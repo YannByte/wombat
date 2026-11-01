@@ -1,3 +1,4 @@
+import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -60,7 +61,7 @@ test('MCP attempts, resources, fork replay and append/restart share exact CLI an
         const evidence = await nativeTransport.config!({ action: 'evidence', itemId: item.id, readView: first.readView, scope: { allTime: true } });
         assert.deepEqual(evidence.evidence.map(e => e.eventType).sort(), ['resource_read', 'tool_call']);
         assert.ok(!JSON.stringify(evidence).includes('SECRET'));
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'inventory', '--action', 'evidence', '--root', root, '--project-root', project, '--item', item.id, '--read-view', first.readView!, '--all-time', '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'evidence',roots:[root],projectRoots:[project],itemId:item.id,readView:first.readView,scope:{allTime:true}}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         assert.deepEqual(JSON.parse(cli.stdout).evidence, evidence.evidence);
         // A child arrives later with copied completed events and a genuinely new retry.

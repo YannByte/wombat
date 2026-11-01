@@ -1,3 +1,4 @@
+import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -62,7 +63,7 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.equal(related.items[0].relatedTurns, 1);
         assert.equal(related.items[0].usage?.tokens.total, 330, 'repeated reads do not multiply the associated ledger');
         assert.equal(related.evidence[0].turnId, related.evidence[1].turnId);
-        const cliRelated = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'inventory', '--root', root, '--project-root', project, '--action', 'evidence', '--item', item.id, '--read-view', first.readView!, '--all-time', '--timezone', 'UTC', '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cliRelated = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'evidence',roots:[root],projectRoots:[project],itemId:item.id,readView:first.readView,scope:{allTime:true,timezone:'UTC'}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cliRelated.status, 2, cliRelated.stderr + cliRelated.stdout);
         assert.deepEqual(JSON.parse(cliRelated.stdout).evidence, related.evidence);
         const exact = await nativeApi.live!({ query: { action: 'turns', snapshotId: related.usageRevision, threadId: related.evidence[0].threadId, locateTurnId: related.evidence[0].turnId, scope: { allTime: true } }, mode: 'cached' });
@@ -74,7 +75,7 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.equal((await nativeApi.optimize!({ action: 'list', readView: first.readView })).pending, 1, 'record dates do not change the current checks');
         const overridden = await nativeApi.optimize!({ action: 'list', readView: first.readView, ruleOverrides: { descriptionCharacters: 600 } });
         assert.deepEqual(overridden.suggestions[0].findings.map(f => f.rule), ['bodyTokens']);
-        const cliSame = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'list', '--root', root, '--project-root', project, '--read-view', first.readView!, '--description-characters', '600', '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cliSame = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project],readView:first.readView,ruleOverrides:{descriptionCharacters:600}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cliSame.status, 2, cliSame.stderr + cliSame.stdout);
         assert.deepEqual(JSON.parse(cliSame.stdout).suggestions, overridden.suggestions);
         const latest = await nativeApi.optimize!({ action: 'list', readView: first.readView });
@@ -146,7 +147,7 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.equal(metadataReview.suggestions.length, 1);
         assert.equal(metadataReview.suggestions[0].category, 'repair');
         assert.deepEqual(metadataReview.suggestions[0].findings.map(f => f.rule), ['skillFormat']);
-        const metadataCli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'list', '--root', root, '--project-root', project, '--read-view', invalidMetadata.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const metadataCli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project],readView:invalidMetadata.readView}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(metadataCli.status, 2, metadataCli.stderr + metadataCli.stdout);
         assert.deepEqual(JSON.parse(metadataCli.stdout).suggestions, metadataReview.suggestions, 'CLI and native consume the same immutable metadata assessment');
         await writeFile(skill, '---\nname: example\ndescription: Synthetic\ncompatibility: local\nmetadata:\n  label: "123"\nunknown-host-field:\n  enabled: true\n---\nUse evidence.\n');

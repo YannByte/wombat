@@ -2,12 +2,12 @@
   "version": 2,
   "sections": {
     "/cli-command-entry": {
-      "zh": "f6c542568607f20c9be18a1f58b215f9b2f1da6f1bcb385db62630d5b8fc8a39",
-      "en": "a38e9572b9df88f9925316d6e1c80c4a9b3763e8beb0b53cde1f4c64e617a6c7"
+      "zh": "1e9c7d8491524267e390e5bf6787cc7a8f991620f5b70564443830ea7786db00",
+      "en": "2a5066c51e8c5da789d0388af349ff33565d58e7f44fff6248e17f1ceee0d37f"
     },
     "/cli-command-entry/public-entries": {
-      "zh": "4029354921075089deef4a43a3a4ab7f3df98fcbf6472035b67364154e85017f",
-      "en": "3a39450cbc5e7a28bf22764b9c7956fa38dfcf635c35c8be0344f8858fb6bf71"
+      "zh": "64dd6c3dd4d8292f7f3b41480c05532e5e6f5fe1f35ec681cc07c5cc8ed44b0b",
+      "en": "414af637f91e6d3f85bc93308cbfc952e72539bbf3aa452ab39047eea3054af2"
     },
     "/cli-command-entry/agent-interface-principles": {
       "zh": "040c2b07cf9af5012254452d9ce7634eb26dd06781a80423c87778a9be236ce7",
@@ -18,16 +18,16 @@
       "en": "9c37e143d06cedf0a6d658ce2a5e0f6548d634212e3e4fca1d7c1ccf19de0fdc"
     },
     "/cli-command-entry/whole-turn-timing": {
-      "zh": "7055243ff08bb9473f157d85d4008deac2675991c63c7b36f4208827e3cb5f23",
-      "en": "02814e4c739c86e3d11d55e97c9455aa711af1a3b6a13871af478af22bbfc48f"
+      "zh": "b56da7bf3e0bebc8128dc67844da55e357e762dc4305c3ba3d0f3d49ecf5bb75",
+      "en": "b627e8487b38868ae7d6dc565b370d9455c9369a2815370d0996fcba44535c17"
     },
     "/cli-command-entry/unsupported-formats-and-recovery": {
       "zh": "92ffdac1685e74934adc0078776031cae1af25271a6b7e492c74c23b48cd2a09",
       "en": "15df29442a30c2ea3f5d512429f501d877a603041c8fd1894d9f5a4234c89b69"
     },
     "/cli-command-entry/local-host-operations": {
-      "zh": "2e5102844c2ac7fccc76d2999cbf887416b6992ad0282e76ae6f46a1d8ef701a",
-      "en": "ab10cb373007a47e81e5a08d9b5f4b80b36b62af0199704e72b341705281f53f"
+      "zh": "1366c28a1f49966e8ba0812d2084bff26718ee71e24861024b9ef035fd8f4dc2",
+      "en": "02140edd7d7d6e1668684c90691a07b363bbbaabe71acf9c94fdc4419597c1f8"
     },
     "/cli-command-entry/release-updates": {
       "zh": "c58a2d90bcf91a6db795aa2a76b17e5fa81b70169a1d0f601b6954c491186e4f",

@@ -1,7 +1,7 @@
 {
   "interface": {
     "display_name": "Wombat",
-    "short_description": "Explore work history, usage and project improvements",
-    "default_prompt": "Use $wombat to answer my task with local evidence and, when a change is needed, recommend a concrete action and a way to verify it."
+    "short_description": "Diagnose projects and verify concrete improvements",
+    "default_prompt": "Use $wombat to help with my project or work-history question, give evidence-backed actions when useful, and verify selected improvements after authorization."
   }
 }

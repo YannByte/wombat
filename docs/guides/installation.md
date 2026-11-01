@@ -2,7 +2,7 @@
 
 中文 | [English](installation.en.md)
 
-Wombat `v0.5.0` 支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。安装内容已包含运行所需组件，无需开发工具或 API Key。
+Wombat `v0.6.0` 支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。安装内容已包含运行所需组件，无需开发工具或 API Key。
 
 ## 安装运行时与插件
 
@@ -20,10 +20,10 @@ curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/instal
 
 先安装兼容的本机 Codex。安装器安装 Wombat，通过 Codex 注册单条本地 marketplace、安装唯一插件，再检查当前项目的发现状态与运行时兼容性。在新项目对话中调用 `$wombat:wombat`。默认不探测可选 Hooks，不改变采集模式或信任。之后可直接使用 `wombat`。
 
-插件阶段失败时，已安装的 Wombat 和数据会保留。错误提示会给出失败阶段、错误码、恢复操作和私有诊断摘要的路径。发现检查遇到权限不足、连接断开或超时时，先处理提示中的问题，再只运行 `wombat system doctor --plugin --project PATH --json`，无需重装。Skill 被禁用或存在冲突时，先检查 Codex 中该项目的插件设置，再执行同一只读检查。只有插件安装失败或已确认版本、内容不匹配时，才使用安装器的 `--plugin-only`（macOS/Linux）或 `-PluginOnly`（PowerShell）；保留自定义安装目录选项。此模式复用当前运行时，不重复下载，也不修改 PATH；不要附加版本或下载源选项。向 [Issues](https://github.com/YannByte/wombat/issues) 附加诊断摘要前，请先检查其内容：摘要包含本机项目和 Skill 路径，但不包含原始命令输出或 Hook 配置。
+插件阶段失败时，已安装的 Wombat 和数据会保留。错误提示会给出失败阶段、错误码、恢复操作和私有诊断摘要的路径。发现检查遇到权限不足、连接断开或超时时，先处理提示中的问题，再只运行 `wombat system doctor --project PATH --json`，无需重装。Skill 被禁用或存在冲突时，先检查 Codex 中该项目的插件设置，再执行同一只读检查。只有插件安装失败或已确认版本、内容不匹配时，才使用安装器的 `--plugin-only`（macOS/Linux）或 `-PluginOnly`（PowerShell）；保留自定义安装目录选项。此模式复用当前运行时，不重复下载，也不修改 PATH；不要附加版本或下载源选项。向 [Issues](https://github.com/YannByte/wombat/issues) 附加诊断摘要前，请先检查其内容：摘要包含本机项目和 Skill 路径，但不包含原始命令输出或 Hook 配置。
 
 
-默认安装不启动索引，也不注册自动启动。查询才触发准备，并复用已提交结果。如需保留可选常驻查询服务，macOS/Linux 加 `--service`，Windows 加 `-Service`；没有查询时仍不索引。`--plugin-only` / `-PluginOnly` 不改变服务。已有自动启动注册保留，直到执行 通过 `wombat call` 调用 `service` 方法的 `disable` 动作 移除；更新后的服务同样只在查询时索引。安装成功不代表数据已经就绪。查看进度、暂停、恢复和移除方式见[查询服务控制](cli.md)。
+默认安装不启动索引，也不注册自动启动。查询才触发准备，并复用已提交结果。如需保留可选常驻查询服务，macOS/Linux 加 `--service`，Windows 加 `-Service`；没有查询时仍不索引。`--plugin-only` / `-PluginOnly` 不改变服务。已有自动启动注册保留，直到执行 通过 `wombat system call` 调用 `service` 方法的 `disable` 动作 移除；更新后的服务同样只在查询时索引。安装成功不代表数据已经就绪。查看进度、暂停、恢复和移除方式见[查询服务控制](cli.md)。
 
 ## 更新
 

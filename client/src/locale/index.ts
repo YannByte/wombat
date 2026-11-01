@@ -239,3 +239,8 @@ export function inputChangeText(change: import('../generated/timing-local-respon
   if(s.detailsOmitted)details.push(t('inputChange.detailsOmitted'));
   return {headline,details,note:t('inputChange.note')};
 }
+
+export function messageOriginText(origin:import('../generated/conversation-response.js').MessageOrigin|null|undefined):string {
+  const keys={assistant_visible:"history.origin.assistant_visible",user_input:"history.origin.user_input",user_unclassified:"history.origin.user_unclassified",injected_context:"history.origin.injected_context",reasoning:"history.origin.reasoning",inter_agent:"history.origin.inter_agent",inherited:"history.origin.inherited",compaction:"history.origin.compaction",unknown:"history.origin.unknown"} as const;
+  return t(keys[origin??'unknown']);
+}

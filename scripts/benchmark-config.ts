@@ -1,3 +1,4 @@
+import {spawnProductCli} from './cli-invocation.js';
 /** Synthetic configuration collection + CLI benchmark, including core peak RSS. */
 import assert from 'node:assert/strict';
 import {spawn,spawnSync} from 'node:child_process';
@@ -21,7 +22,7 @@ let timer='';service.stderr!.on('data',c=>{timer=(timer+c.toString()).slice(-500
 const closed=new Promise<void>(resolve=>service.once('close',()=>resolve()));
 let pid=service.pid!;
 for(let n=0;n<20;n++){const child=Number(spawnSync('pgrep',['-P',String(service.pid)],{encoding:'utf8'}).stdout.trim().split(/\s+/)[0]);if(child){pid=child;break;}await delay(20);}
-const sample=()=>{const start=performance.now();const p=spawnSync(process.execPath,['dist/wombat.js','optimize','inventory','--root',source,'--project-root',project,'--all-time','--json'],{env,encoding:'utf8',timeout:30_000,maxBuffer:16*1024*1024});assert.equal(p.status,2,p.stderr+p.stdout);return {ms:Math.round((performance.now()-start)*100)/100,data:JSON.parse(p.stdout)};};
+const sample=()=>{const start=performance.now();const p=spawnProductCli('dist/wombat.js',{method:'config',params:{action:'list',roots:[source],projectRoots:[project],scope:{allTime:true}}},{env,encoding:'utf8',timeout:30_000,maxBuffer:16*1024*1024});assert.equal(p.status,2,p.stderr+p.stdout);return {ms:Math.round((performance.now()-start)*100)/100,data:JSON.parse(p.stdout)};};
 try{
  const cold=sample();const a=cold.data.items.find((i:any)=>i.path===largeFile);assert.equal(a.contentTokens,131072,'Official tiktoken 0.13.0 synthetic ordinary vector');assert.equal(cold.data.items.find((i:any)=>i.path===path.join(project,'AGENTS.md')).contentTokens,2);
  for(const item of cold.data.items.filter((i:any)=>i.kind==='skill')){assert.equal(item.bodyTokenEstimate?.tokens,3,'Independent official hello world newline body vector');assert.equal(item.bodyTokenEstimate?.payload,'skillBody');assert.equal(item.bodyTokenEstimate?.contentHash,createHash('sha256').update('hello world\n').digest('hex'));}

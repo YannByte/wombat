@@ -1,29 +1,22 @@
-# Diagnose a project obstacle
+# Diagnose the project
 
-Start from the user's question, selected work and a concrete consequence. For a known failure, inspect its original evidence and prior attempts. For an open project review, proactively trace the most consequential execution, validation or recovery path. Read the actual owner and caller; a green report or a named check does not prove that the right behavior was exercised.
+| User task | Start with | Next decision |
+|---|---|---|
+| Diagnose this project | `check --project PATH --json` | Use separate checks, configuration, recent-work and artifact sections to select consequential paths |
+| Investigate recorded repeated work | `check --task RECORD --turn TURN --json` | Inspect the original failure, selected turns and current owner/caller |
+| Investigate a known current defect | Native project reads | Trace the reachable trigger and existing protections; query history only if it could change the judgment |
+| Inspect unfamiliar detailed evidence | `system api METHOD --json`, then `system call` | Select only the needed generated operation; preserve scope and identity |
 
-Use native project reads for current code and files; a known code defect does not require a history query. Use `check` for deterministic configuration findings and `check inventory` for measured configuration or associated use. Use generated investigation or timing calls when historical activity could change the conclusion; select a task and turn before reading historical detail. Do not run every analysis for completeness.
+A diagnosis-only request remains read-only for project files and enablement. Wombat may prepare its derived data on demand. Installation, builds, services or tests with writes/external effects belong in the proposed operations unless existing authorization already covers them. Missing history limits historical judgments without blocking current-code inspection.
 
-For a candidate, identify its reachable trigger and consequence. Inspect the existing guard, alternate caller or test that could disprove it. A deterministic defect does not need a recorded incident. Missing logs alone do not establish a defect. Distinguish expected negative tests, required validation and failed prerequisites from accidental repetition or failed work.
+For open diagnosis, proactively trace important execution, validation or recovery paths from actual project entries and recent problems. Inspect the real owner, callers and tests, including evidence that could disprove a finding. Do not stop at configuration size reminders or assume a named check tested the right behavior. A deterministic current defect needs no recorded incident.
 
-Propose the smallest correction to the existing owner. State the file or operation, evidence, behavior to preserve and original case to rerun. For example, when delivery bypasses an existing validator, connect it at the delivery gate and verify that valid input passes and relevant invalid input blocks delivery. Prefer the existing mechanism before proposing a new policy, Skill or service.
+`check --task` inspects a complete selected turn and rejects date filters. For date-bounded evidence, retain dates in generated `conversation` selection instead.
 
-For an uncertain cause, name the bounded investigation and observation that would decide it. If existing authorization covers that investigation, perform it before recommending a change; otherwise state what evidence is missing. Distinguish confirmed defects from hypotheses. Return only suggestions with a concrete consequence and useful next action; file length or missing use alone does not establish a problem.
+Treat failures, repeated reads/requests, input growth and waits as leads. Exclude expected negative tests, required validation and reasonable retries. Keep current configuration separate from historical loading. Component views can differ; no single complete project snapshot or whole-code audit is implied.
 
-Before an authorized edit, retain the original condition, target version and check. Codex performs the edit and relevant tests. Wombat supplies evidence; ordinary diagnosis does not persist a handling lifecycle or authorize writes.
+Combine signals from one mechanism in one explanation with their source positions retained. Prioritize consequence, evidence and feasible action without a score or finding quota. For each worthwhile action, state trigger/consequence, confidence, exact file/operation, smallest correction, behavior to preserve and original case to repeat. Prefer an existing validator, gate or recovery mechanism before adding another policy, Skill or service.
 
-## Review Skills and MCP
+Separate confirmed defects, bounded investigations and user choices. Complete a permitted bounded investigation when it can decide the cause. Do not turn a hypothesis, low use or an evidence gap into a repair claim. If no supported improvement emerges, state inspected scope and important limits.
 
-For unused extensions or context burden, start with `check inventory --review --kind skill --project-root PATH --project PATH --limit 10 --json`. This fixes a read view before further evidence reads. Reuse the user's dates and timezone; the default review covers 30 local calendar days including today. Use `--sort context_tokens` or `--sort least_activity` for either dimension. Page the retained view only when more entries could change the choice.
-
-Show selected entries together: native name, origin/path, project and enabled scope, catalog Token estimate, use count, last use and recommendation. `contextFootprint.estimate` measures a reference discovery row, not the on-demand body or actual model-visible prompt. Native enabled state does not establish visibility; unmeasured or unavailable values remain unknown. MCP and Hook payloads are not measured from configuration size or tool counts. Use `--kind mcp` or `--kind hook` only when those are in scope.
-
-Prioritize large, rarely used entries for review; retain frequent or rare critical capabilities when useful. Zero records are a review lead, not proof of uselessness. A partial count is a lower bound, including zero; do not rank it as confirmed inactivity. Explain the specific task need, affected scope and smallest useful choice: keep, enable on demand, narrow scope or disable. Inspect selected content, related tasks or static findings only if they could change that choice. Do not read every Skill or run every checker before answering. Do not create a waste score, claim exact savings or change installed extensions without authorization. Use [Verify](verify.md) for authorized changes.
-
-## Cleanup candidates
-
-For project cleanup, start with `check cleanup --project-root PATH --json`. Add repeated `--path PATH` for selected current-task temporary paths and `--keep PATH` for user assets or pending consumers. Add `--product-temporary` only when Wombat temporary generations are in scope. This check needs no conversation index; do not widen it to all home or system caches.
-
-Use each item's reasons, owner, regeneration evidence, observed bytes and current-use result. A candidate needs an ownership and pending-consumer check; an open-file miss alone does not establish inactivity. Keep sources, conversations, Memory, plans, Skills, reports, shared and unknown material. Use history to locate a likely producer only when that could change the decision; it does not prove creation or accepted delivery. Name the exact path, regeneration basis, consumers and next check. Use [Verify](verify.md) to perform authorized cleanup.
-
-For Codex cleanup, use `check cleanup --codex --json`, narrowing with `--path PATH` and exclusions with `--keep PATH`. It covers desktop caches, update and marketplace stages, old daemon releases, incomplete runtimes and aged direct crash reports in macOS layouts. Use returned retention reasons and current/pending versions; preserve persistent state and complete runtimes. A running or unknown process, installation lock, changed pointer or incomplete item evidence can block cleanup. Follow the guarded apply workflow rather than asking the user to delete a blocked path manually.
+Present a reviewable selection using report-local numbers. Include affected objects, exclusions, dependencies, validation and recovery; disclose global effects or permanent deletion. Wait for selection for diagnosis-only requests. Existing explicit edit authorization remains valid. “Execute all” covers the displayed executable plan, not hypotheses, undisclosed effects or later findings. Use [Execute and verify](verify.md) after selection; [AI environment](environment.md) and [Cleanup](cleanup.md) supply their specific evidence rules only when relevant.

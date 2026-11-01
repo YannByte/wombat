@@ -1,21 +1,129 @@
 {
   "version": 2,
   "sections": {
-    "/use-the-codex-plugin": {
-      "zh": "2feaf182283afa134b21d1908e671e72fe936ee8eb08006db0a16c971f7c8bc7",
-      "en": "a88eddcb6d48f67f5bd240fa4d29fa477c732a0138fe0032702af5c216c4f62a"
+    "/use-wombat": {
+      "zh": "7526799e522382bf2ba6f8b43a9971ab0012d795091f9d640347a293f275e72e",
+      "en": "2152837aee96e5945e6a1fe5e7783671612f9c12459d3438dc519b6f4a7a175d"
     },
-    "/use-the-codex-plugin/select-evidence-by-task": {
-      "zh": "194299b5793236d3759020cb6896105c075da9dc9b68eec63f0701cb3d668bfc",
-      "en": "2776f1e16755bee95ba007cd289b1085c5af592919da8460d7f7d728b1d275f1"
+    "/use-wombat/start-with-one-sentence": {
+      "zh": "0959c2e821720771ee05de96fa2834076611fa5e3c944c410f53220bdde1903e",
+      "en": "ff20a68468bbda03fddc6d5f71f9eea34aec865c4d9186b4477a9c8ca94992a1"
     },
-    "/use-the-codex-plugin/update-and-remove": {
-      "zh": "17eb2344edcd73cc5dd68c84412ec5ce65d113f40dcc9771fc5b5c31c550fe8b",
-      "en": "3a27b5064419da141bf882f7eef82d87d47f41156d43b18a34d4d33ae7cc28cd"
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements": {
+      "zh": "813fa63e06b52307fe2d2e6a33290fe88bed7faeb7e4c0182ef813078059ced1",
+      "en": "fed7346d0088e0e508230c893f1fc4b0513f1f96482defd5a3495402516e3942"
     },
-    "/use-the-codex-plugin/optional-observations-and-limits": {
-      "zh": "c09a556b4f47338cfad8f53c73a302d182de192d812ad94c5ba741abe42827de",
-      "en": "03df2b2048ebee44d45f7ef69dbb3ad654bea3df2097fbab13192b1aab35ae9b"
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements/start-a-diagnosis": {
+      "zh": "0fb4e3404b70bca42b069e85e6902c2905abeae7cd36aa0aa615846001e8436f",
+      "en": "9191d80995f50a387288d8af15b2444f61616395cc3ccd8f90b7ed28c2027ecf"
+    },
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements/during-diagnosis": {
+      "zh": "0bddfa73aa505b2fce76c3eb6365a4b986290d24623d576b5e64276a8586a538",
+      "en": "217dd600e1cc9ef3cee3bd71141677e361cd540b582a2784861b043355aa8ba3"
+    },
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements/use-the-report-to-decide": {
+      "zh": "f3d68510728256bcbce192d11c335cdab78f93a14356182283a6ca034cb8e9d0",
+      "en": "a90a57cb0d0bba4df2ea565f2e11d6c8c3aa9fabd21fc6834122ff8da51d86ae"
+    },
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements/select-actions-or-investigate-further": {
+      "zh": "3ca7f41c5575ee5f90c5da50a84c2bbc90ccd9d352394d02f565cba921a810ce",
+      "en": "0f712ed7309ff9e3c56cb6b75c57d1e1135665126a195777b20d88a066a0eff6"
+    },
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements/see-the-outcome": {
+      "zh": "4671bbad835c34585630f0a59102a16edb8d933088c4747a6feaf9350e87b4fa",
+      "en": "58d18121ee127acf19e35cf3c8bcf91e74526f73b346b7502d5e720b768ddac2"
+    },
+    "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements/interruptions-and-gaps": {
+      "zh": "e2cd3a225f50f0c80a7da931078a07b423a31a11d012ecde05cde578528b2e02",
+      "en": "c240150f4c2f60de763ab737b23d0264a4720438dae4464508e092d2069e135e"
+    },
+    "/use-wombat/what-conversations-look-like": {
+      "zh": "ba3d545dd8a859455b945aa5d2b5e0944c37a4e47a5b8c5b8ec5372f1319c18c",
+      "en": "409a4df9d63972285f30b8cffd85c00b8a7e7937a1f74b73919b048496f5aab2"
+    },
+    "/use-wombat/what-conversations-look-like/recover-a-decision-and-continue": {
+      "zh": "89c97ee0f5c12408ba3a35c38749a98dd120e78b57a4c9785bd0eb500649a9dd",
+      "en": "118a6d141bf74445a95db9a3c6f42eecc0311a10e657c3a8504620ee44ecd76c"
+    },
+    "/use-wombat/what-conversations-look-like/understand-a-change-before-deciding-to-act": {
+      "zh": "1344a14997485cd438ca0e052a8ead36775b66f8868a2cdbd42c19649c5b6f8b",
+      "en": "6d1b9cb69012c5d200d60fcc0c3ec3d98828c80d6b929dfea2fbcb78ad3c9b6a"
+    },
+    "/use-wombat/what-conversations-look-like/turn-an-engineering-finding-into-a-verifiable-change": {
+      "zh": "5847ba7bb4601efde9b163660aac1d7a05fdd7d153ab1ca56eb8bbaca1337487",
+      "en": "b5bff75cd57cc6d2423e939774f26c1bfa5e071f98b9dae05f99ada654267723"
+    },
+    "/use-wombat/what-conversations-look-like/make-evidence-based-choices-about-ai-setup": {
+      "zh": "8af5d600f6f2465cde903a6dea94e79b3cf8b09e497f8f858bf56b07840f6128",
+      "en": "3bca14a3cbc1b18b8581a66907d3159b69ded25011e440693e40930dfb0d59ff"
+    },
+    "/use-wombat/what-conversations-look-like/check-that-retained-work-still-works-after-cleanup": {
+      "zh": "79f1b38493a93592741659cb1ba2579db835c2fbb1fa72342002a9aa9d88cd9a",
+      "en": "67295d1a6d148cbee17752b1718591cd8cdf07a977a5b3e27c163bdf44425485"
+    },
+    "/use-wombat/how-wombat-works-with-you": {
+      "zh": "dc6463fb0ba00bc0835d75596fd3bc434a8d3bc8aa5b3ef28c26a810a4625554",
+      "en": "b4f36c36a44a863964cb200c850d8208f12fb26f559992556da99bb8deea4ba7"
+    },
+    "/use-wombat/how-wombat-works-with-you/understand-the-goal-and-scope": {
+      "zh": "8dab00f5e2ae26f37f7193a145fd5dddedd69e65896887c6209e49e9b968d65f",
+      "en": "e7c77281ce1720f5fb540731275bddb64bc1a95b87078cde4155fd7a34ec84af"
+    },
+    "/use-wombat/how-wombat-works-with-you/answer-first-then-give-evidence": {
+      "zh": "ed2177116887c4ef4405c0e80baca9ac40013b817a6404696aca4d8b775983b1",
+      "en": "73b9024ba2a380873e8c2bcdb650f64ebbebd3e74f02a8b85eaa5cbde8bc2552"
+    },
+    "/use-wombat/how-wombat-works-with-you/give-actionable-advice": {
+      "zh": "14aeb5fac660f9ca4d2f5c7bdf8a55c00ef59b5c026a0328df5250e945e2fa25",
+      "en": "40ed8d3ba991b6fbe998d0c625fb16cb23771a50dd4748fe791c11dc775693b5"
+    },
+    "/use-wombat/how-wombat-works-with-you/continue-under-existing-authorization": {
+      "zh": "374c654af0d65564f6da808908a5d1e853e28a566fd905a5151e12d191a9ef6e",
+      "en": "57f17df862a87d23196039ee89324bf6bc2c0ab548bbe72c867d4e5dd74fd21f"
+    },
+    "/use-wombat/how-wombat-works-with-you/recheck-the-original-problem": {
+      "zh": "2acff3ccd7f7ced425d76ac3c739cbeaec5eebe1767870915ccb26ea8dfd9bba",
+      "en": "a144ae86b2f2a794cd36870f38ecdf5feeb5344e9724d73e3df9eb25e238c857"
+    },
+    "/use-wombat/recover-decisions-and-resume-work": {
+      "zh": "87bb0b74d31c3520aa6537e3555f8b441ad0174c9a1291e39240614398e6cc1a",
+      "en": "863d3edd35645aa3dde0728221eb9bdecbf28578426b3899cd441d24454e49c2"
+    },
+    "/use-wombat/understand-usage-and-changes": {
+      "zh": "60dbdc49f4e4cd89adf8970e25170c124ad50abab6ba18f78f5f16c0468796bb",
+      "en": "4c126dbd0e26c581de6c7f775ade9cf3d79b441c83d7950618a4a8623f1a8145"
+    },
+    "/use-wombat/review-and-improve-engineering-work": {
+      "zh": "be68dd0a9dc66f421266b8340b4ba2685feb2fc5f24ca11136addd4c9bcb2e2d",
+      "en": "dd9797de81630a777d14997a5bf6a9395d3e528aaef92219275e886a990657d3"
+    },
+    "/use-wombat/organize-ai-setup-and-temporary-artifacts": {
+      "zh": "0aba05fc58f09b223e71a8e85448c164865a2d6aa81fb8ab6e2100e0d5f22e1a",
+      "en": "b512d2ab7aa964ec70a7dd40c9dacf5fdf179c824c5499ef135e363108f363a9"
+    },
+    "/use-wombat/organize-ai-setup-and-temporary-artifacts/decide-which-skills-or-mcp-to-retain": {
+      "zh": "40fb998de451f0014d263c571a37fdb92f2839455a5e2fbbf6e78f1d5b90d4a2",
+      "en": "3f3016071aaede1a5384e2f1d50fe51489ce08d3a52188919bb9fa852888564f"
+    },
+    "/use-wombat/organize-ai-setup-and-temporary-artifacts/clean-temporary-and-build-files": {
+      "zh": "e518b0b4c6dd52b7405d63a1d7e0045565cd725f58ba79e60df58b9f8886c995",
+      "en": "1b0e72cc4d82b9fa9d6e852ab2caa012f4d5f7e48bf2a499eca81a3668cbec66"
+    },
+    "/use-wombat/prepare-reports-or-knowledge": {
+      "zh": "348bd66a9a4423e6d910f747eebe2e7b05d5de17670a96e690af5af494571288",
+      "en": "36cef34fea4d55ea63ac148f5cd60252363ad2d8f174cc9ab70dbe73898bd1b3"
+    },
+    "/use-wombat/continue-when-something-is-missing": {
+      "zh": "082a1a52530583e09acfcc3fc2514928435d60732e0855a58f27754a1ab83cae",
+      "en": "22fe08976f4dee1ce04b86514efabfa4554b5748d490732bba418e10bb0c5300"
+    },
+    "/use-wombat/update-and-remove": {
+      "zh": "d732135ec3152acf69e34c424cf64f182a3bff67cecc19d164eccd22c49cdf2d",
+      "en": "a7313c09a93255b33aec47ada15363cc511b9db0525402b7736431f737268114"
+    },
+    "/use-wombat/results-and-boundaries": {
+      "zh": "655b3b8aa33166a6152dc987019c3ffd81bccc6e2743f81224631d4e70a37936",
+      "en": "c183d54b5fe489d4f77b0511d80da38275045b3477ec24b0202f16f33b6a297f"
     }
   }
 }

@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Request",
+  "type": "object",
+  "properties": {
+    "projectRoot": {
+      "type": "string"
+    },
+    "roots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "since": {
+      "type": "string"
+    },
+    "until": {
+      "type": "string"
+    },
+    "timezone": {
+      "type": "string"
+    },
+    "sourceInstanceId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ruleOverrides": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RuleOverrides"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "projectRoot",
+    "since",
+    "until",
+    "timezone"
+  ],
+  "definitions": {
+    "RuleOverrides": {
+      "type": "object",
+      "properties": {
+        "agentsBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "descriptionCharacters": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

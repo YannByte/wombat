@@ -8,7 +8,7 @@ import type {ArtifactsResult,AgentRequest} from '@wombat/client';
 
 test('assembled cleanup is read-only, retains original selection, protects assets and rechecks authorized removal', {timeout:45000}, async()=>{
  await withLocalProduct(async f=>{
-  const invoke=(input:string[]|AgentRequest)=>{const a=Array.isArray(input)?input:['call'];const r=spawnSync(process.execPath,[f.entry,...a],{env:process.env,input:Array.isArray(input)?'':JSON.stringify(input),encoding:'utf8',timeout:15000});assert.ifError(r.error);assert.ok(r.status===0||r.status===2,r.stderr+r.stdout);const value=JSON.parse(r.stdout) as ArtifactsResult;assert.equal(r.status,value.partial?2:0);return value;};
+  const invoke=(input:string[]|AgentRequest)=>{const a=Array.isArray(input)?input:['system','call'];const r=spawnSync(process.execPath,[f.entry,...a],{env:process.env,input:Array.isArray(input)?'':JSON.stringify(input),encoding:'utf8',timeout:15000});assert.ifError(r.error);assert.ok(r.status===0||r.status===2,r.stderr+r.stdout);const value=JSON.parse(r.stdout) as ArtifactsResult;assert.equal(r.status,value.partial?2:0);return value;};
   assert.equal(spawnSync('git',['init',f.project],{encoding:'utf8',timeout:5000}).status,0);
   await writeFile(path.join(f.project,'.gitignore'),'target/\n');
   await writeFile(path.join(f.project,'Cargo.toml'),"[package]\nname='synthetic'\nversion='0.1.0'\n");
@@ -32,7 +32,7 @@ test('assembled cleanup is read-only, retains original selection, protects asset
   await writeFile(path.join(output,'MEMORY.md'),'user asset');
   const protectedResult=await f.client.artifacts!(q);assert.equal(protectedResult.items[0].assessment,'protected');
   await rm(path.join(output,'MEMORY.md'));
-  const selected=invoke(['check','cleanup','--project-root',f.project,'--path','target','--json']);
+  const selected=invoke(['clean','--project',f.project,'--path','target','--json']);
   assert.equal(selected.items[0].path,output);
   // The host removes only this test-owned fixture, never through a product mutation API.
   await rm(output,{recursive:true});

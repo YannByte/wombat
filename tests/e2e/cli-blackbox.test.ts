@@ -78,7 +78,7 @@ test('real CLI starts its shared service through a capability probe without scan
   };
   delete env.WOMBAT_CORE_BIN;
   try {
-    const result = spawnProductCli(entry, ['check', 'capabilities', '--json'], {
+    const result = spawnProductCli(entry, {method:'optimize',params:{action:'capabilities'}}, {
       cwd: root, env, encoding: 'utf8', input: '', timeout: 15_000, maxBuffer: 8 * 1024 * 1024,
     });
     assert.ifError(result.error);
@@ -248,9 +248,9 @@ test('language changes presentation while real core data and source titles stay 
     assert.match(plain.stdout, /Wombat · Usage/);
     assert.match(plain.stdout, /Not priced/);
     const help = f.run(['--help', '--lang=en'], false);
-    assert.match(help.stdout, /Usage/); assert.match(help.stdout, /wombat call/);
+    assert.match(help.stdout, /Usage/); assert.match(help.stdout, /wombat system/);
     const invalid = f.run(['usage', '--lang=en', '--unknown']);
     assert.equal(invalid.value.error.code, 'INVALID_ARGUMENT');
-    assert.match(invalid.value.error.message, /Unknown option/);
+    assert.match(invalid.value.error.message, /Invalid .*option/);
   } finally { await f.cleanup(); }
 });

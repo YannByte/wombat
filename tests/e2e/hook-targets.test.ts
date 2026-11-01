@@ -1,3 +1,4 @@
+import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
 import { test } from 'node:test';
@@ -51,7 +52,7 @@ test('Hook script findings, project scope, independent rechecks share version-bo
         const checksB = await nativeTransport.optimize!({ action: 'checks', readView: first.readView, itemId: original.item.id, project: b });
         assert.equal(checksB.checks[0].outcome, 'miss');
         assert.equal((await nativeTransport.optimize!({ action: 'list', readView: first.readView, project: b })).pending, 0);
-        const cli = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), "check", 'list', '--root', root, '--project-root', a, '--project-root', b, '--read-view', first.readView!, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[a,b],readView:first.readView}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr);
         assert.deepEqual(JSON.parse(cli.stdout).suggestions, first.suggestions);
         await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision });

@@ -59,7 +59,7 @@ try {
   assert.equal(release.sourceSha256, report.sourceSha256);
   const version = JSON.parse(await run('bundled-no-system-runtime', ['/usr/bin/env', 'PATH=', launcher, '--version', '--json']));
   assert.equal(version.version, release.version);
-  const setup = JSON.parse(await run('native-discovery', [launcher, 'system','doctor','--plugin', '--project', cwd, '--json']));
+  const setup = JSON.parse(await run('native-discovery', [launcher, 'system','doctor', '--project', cwd, '--json']));
   assert.equal(setup.discovery.status, 'available'); assert.equal(setup.discovery.instances[0].name, 'wombat:wombat');
   assert.equal(setup.runtimeChecks[0].status, 'compatible');
   pass('fresh-install-plugin', {release, invocation:'wombat:wombat', noSystemNodeOrRust:true});
