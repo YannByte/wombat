@@ -168,7 +168,7 @@ test(
       t.diagnostic(
         "Restart and replacement passed; checking caller source isolation",
       );
-      const schema = JSON.parse(f.cli(["api", "--method", "service"]));
+      const schema = JSON.parse(f.cli(["system","api", "service"]));
       assert(schema.methods.includes("service"));
       const cli = JSON.parse(f.cli({"method":"service","params":{"action":"status"}}));
       assert(cli.running && cli.resident);

@@ -10,12 +10,12 @@ test('verification requests preserve filters and select the owning live or saved
   assert.deepEqual(saved,{method:'snapshot',params:query});
   const live=queryInvocation({...query,snapshotId:'live:scope:view'},{mode:'cached'});
   assert.deepEqual(live,{method:'usage',params:{query:{...query,snapshotId:'live:scope:view'},mode:'cached'}});
-  assert.deepEqual(cliInvocation(live),{args:['call'],input:JSON.stringify(live)});
+  assert.deepEqual(cliInvocation(live),{args:['system','call'],input:JSON.stringify(live)});
   const human=['usage','stats','--json'];assert.deepEqual(cliInvocation(human),{args:human});
 });
 
 test('verification transport loads in native Node without a TypeScript loader or build',()=>{
   const moduleUrl=new URL('./cli-invocation.ts',import.meta.url).href;
   const run=spawnSync(process.execPath,['--input-type=module','-e',`const {cliInvocation}=await import(${JSON.stringify(moduleUrl)});process.stdout.write(cliInvocation({method:'service',params:{action:'status'}}).args[0]);`],{encoding:'utf8',timeout:5000,maxBuffer:4096});
-  assert.ifError(run.error);assert.equal(run.status,0,run.stderr);assert.equal(run.stdout,'call');
+  assert.ifError(run.error);assert.equal(run.status,0,run.stderr);assert.equal(run.stdout,'system');
 });

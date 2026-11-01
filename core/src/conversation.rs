@@ -25,6 +25,7 @@ const MAX_EVENTS: usize = 2000;
 // This is cooperative: a frame or source read can exceed the time slice.
 const SCAN_MILLIS: u128 = 20;
 const MAX_CURSOR: usize = 32768;
+mod records;
 mod source;
 #[cfg(test)]
 mod tests;
@@ -67,6 +68,9 @@ fn binding(request: &Request) -> Result<String> {
     ))?))
 }
 pub(crate) fn validate(request: &Request) -> Result<()> {
+    if request.offset.is_some() && request.action != Action::Records {
+        return Err(error("INVALID_ARGUMENT"));
+    }
     if request.anchor.is_some()
         && (request.action != Action::Locate || request.cursor.is_some() || request.limit.is_some())
         || request.radius.is_some() && request.anchor.is_none()
@@ -131,7 +135,8 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
     {
         return Err(error("INVALID_ARGUMENT"));
     }
-    if (request.action == Action::Search) != request.query.is_some()
+    if request.action == Action::Search && request.query.is_none()
+        || request.query.is_some() && !matches!(request.action, Action::Search | Action::Records)
         || request
             .query
             .as_ref()
@@ -139,6 +144,7 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
         || request.action == Action::Search
             && request.selection.threads.is_empty()
             && request.selection.projects.is_empty()
+            && (request.selection.since.is_none() || request.selection.until.is_none())
     {
         return Err(error("INVALID_ARGUMENT"));
     }
@@ -364,6 +370,8 @@ fn activity(
         _ => ("other", None, None, None, None, None),
     };
     Activity {
+        record: None,
+        read_cursor: None,
         evidence: Evidence {
             event_id: event.id().into(),
             source_instance_id: event.position().source_instance_id.to_string(),
@@ -515,6 +523,7 @@ fn fragment(
     }
     Ok(Fragment {
         evidence: target.evidence.clone(),
+        message: activity(&event, target.evidence.event_offset, projects, None),
         text,
         next_cursor,
         locations,
@@ -591,6 +600,9 @@ fn query_with_scan_budget(
         freshness: None,
         window: None,
     };
+    if request.action == Action::Records {
+        return records::query(snapshot, request, cancelled, response, scan_millis);
+    }
     if let Some(anchor) = &request.anchor {
         let anchor_event = event(snapshot, anchor, cancelled)?;
         let mut owner = request.selection.clone();
@@ -819,10 +831,23 @@ fn query_with_scan_budget(
                                 &mut state.chunk,
                                 cancelled,
                             ) {
-                                Ok(true) => {
-                                    response.items.push(activity(e, offset, &projects, change))
+                                Ok(Some((chunk, byte))) => {
+                                    let mut item = activity(e, offset, &projects, change);
+                                    let key = crate::hash(serde_json::to_vec(&(
+                                        &request.snapshot_id,
+                                        &request.selection,
+                                        &item.evidence,
+                                    ))?);
+                                    item.read_cursor =
+                                        Some(serde_json::to_string(&FragmentCursor {
+                                            binding: key,
+                                            chunk,
+                                            offset: byte,
+                                            separator: false,
+                                        })?);
+                                    response.items.push(item);
                                 }
-                                Ok(false) => {}
+                                Ok(None) => {}
                                 Err(err)
                                     if err
                                         .downcast_ref::<crate::dto::OperationError>()

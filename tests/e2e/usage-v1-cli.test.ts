@@ -38,9 +38,9 @@ test('fixed-snapshot CLI has one JSON object and partial exit 2', async () => {
     assert.equal(partial.code, 2);
     assert.equal(JSON.parse(partial.stdout).quality.status, 'partial');
     assert.equal(partial.stderr, '');
-    const plain = await run(['--snapshot', 'synthetic'], { WOMBAT_CORE_BIN: core.binary });
+    const plain = await run(['usage', '--snapshot', 'synthetic'], { WOMBAT_CORE_BIN: core.binary });
     assert.equal(plain.code, 0);
-    const terminal = await run(['--snapshot', 'synthetic'], { WOMBAT_CORE_BIN: core.binary }, true);
+    const terminal = await run(['usage', '--snapshot', 'synthetic'], { WOMBAT_CORE_BIN: core.binary }, true);
     assert.equal(terminal.code, 0, terminal.stderr);
     assert.equal(terminal.stdout, plain.stdout);
     assert.equal(terminal.stderr, '');
@@ -92,7 +92,7 @@ test('v1 version works without a core or local package paths at runtime', async 
 test('built CLI SIGINT returns CANCELLED and reaps an uncooperative core', { skip: process.platform === 'win32' }, async () => {
   const core = await mockCore("require('node:fs').writeFileSync(process.env.TEST_PID_FILE,String(process.pid));process.on('SIGTERM',()=>{});process.stdin.resume();setInterval(()=>{},1000);");
   let corePid: number | undefined;
-  const child = spawn(process.execPath, ['dist/wombat.js', 'call'], {
+  const child = spawn(process.execPath, ['dist/wombat.js', 'system', 'call'], {
     env: { ...process.env, WOMBAT_CORE_BIN: core.binary,TEST_PID_FILE:path.join(core.dir,'pid') }, stdio: ['pipe', 'pipe', 'pipe']
   });
   child.stdin.end(JSON.stringify({method:'snapshot',params:{action:'refresh'}}));

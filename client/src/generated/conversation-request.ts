@@ -1,6 +1,6 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = "activity" | "locate" | "read" | "search" | "changes";
+export type Action = ("activity" | "locate" | "read" | "search" | "changes") | "records";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -23,6 +23,10 @@ export interface Request {
   roots?: string[];
   selection?: Selection;
   limit?: number | null;
+  /**
+   * Skip matching conversations in Records; other actions use bound cursors.
+   */
+  offset?: number | null;
   cursor?: string | null;
   query?: string | null;
   baselineSnapshotId?: string | null;

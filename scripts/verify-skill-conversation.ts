@@ -133,21 +133,20 @@ try {
                     if (scenario !== 'account' && scenario !== 'config-review')
                         assert.equal(readFileSync(native.calls, 'utf8'), '', 'Unrelated native account/configuration capture');
                     if (scenario === 'config-review') {
-                        const configArgs = ['--root', source, '--project-root', project, '--project', project];
-                        const suggestions = query<OptimizeResult>(["check", ...configArgs]), suggestion = suggestions.suggestions.find(s => s.item.path === sample);
+                        const suggestions = query<OptimizeResult>({method:'optimize',params:{action:'list',roots:[source],projectRoots:[project],project}}), suggestion = suggestions.suggestions.find(s => s.item.path === sample);
                         assert.ok(suggestion);
                         const session = nativeSessionId(response.events), answerFile = path.join(temp, 'config-recheck.answer.json');
                         const instruction = lang === 'zh' ? '现在只授权精简刚才选定合成 Skill 的 description，其余内容与文件不变。改成 Synthetic review helper for this fixture.，然后按原建议复查，说明结果和限制。' : 'You may now change only the selected synthetic Skill description to Synthetic review helper for this fixture. Preserve all other content and files. Recheck the original suggestion and explain the result and limits.';
                         const next = await run('recheck', ['exec', 'resume', session, '--config', 'mcp_servers={}', '--skip-git-repo-check', '--json', '--output-schema', focusedSchema, '--output-last-message', answerFile, instruction + ` Target ${sample}; original suggestion ${suggestion.id}, readView ${suggestions.readView}, baseline ${suggestion.baselineId}. Use the same runtime prefix ${prefix}, roots, project and original decision scope. Do not create or change keep/not-applicable decisions, scan raw logs or write other files. Answer in ${lang === 'zh' ? 'Chinese' : 'English'}.`], answerFile);
                         assertConfiguration(expected);
                         assert.equal(readFileSync(sourceFile, 'utf8'), sourceBody);
-                        const recheck = query<OptimizeResult>(["check",'recheck','--read-view',suggestions.readView!,'--baseline',suggestion.baselineId!,...configArgs]);
+                        const recheck = query<OptimizeResult>({method:'optimize',params:{action:'recheck',readView:suggestions.readView,baselineId:suggestion.baselineId,roots:[source],projectRoots:[project],project}});
                         assert.ok(recheck.checks.some(c=>c.rule==='descriptionSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
                         assert.equal(recheck.decisionRevision,suggestions.decisionRevision);
                         assert.equal(query<UsageResult>(['usage', '--snapshot', snapshot, '--all-time']).summary.tokens.total, 1100000);
                         result.followup = { answer: next.answer, metrics: next.metrics, originalSuggestionVerified: true, descriptionOnly: true };
                     }
-                    const decisions = query<OptimizeResult>(["check", 'list', '--root', source, '--project-root', project, '--project', project]);
+                    const decisions = query<OptimizeResult>({method:'optimize',params:{action:'list',roots:[source],projectRoots:[project],project}});
                     assert.ok(decisions.suggestions.every(s => s.decision === null));
                     const plansRun = spawnProductCli(cli, {method:'monitor',params:{action:'list'}}, { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' });
                     assert.equal(plansRun.status, 0);

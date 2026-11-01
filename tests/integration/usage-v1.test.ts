@@ -113,7 +113,7 @@ test('distribution uses whole-range scales and shares before pagination; cost or
     assert.equal(turns.summary.tokens.total, 4_600);
     assert(turns.items.some((item: any) => item.matchedUsage.measurementCount === 0));
     assert(Math.abs(turns.items.reduce((sum: number, item: any) => sum + item.costShare, 0) - 1) < 1e-12);
-    const cli = f.invokeCli(['usage', '--snapshot', snapshotId, '--since', allDates.since, '--until', allDates.until, '--presentation', 'distribution', '--sort', 'cost', '--limit', '1', '--json']);
+    const cli = f.invokeCli({method:'snapshot',params:{...request,action:'usage',presentation:'distribution',sort:'cost'}});
     assert.equal(cli.status, first.quality.status === 'partial' ? 2 : 0);
     assert.deepEqual(cli.value.distribution, first.distribution);
     assert.equal(cli.value.items.length, 1);
@@ -310,7 +310,7 @@ test('无 TTY CLI 与 Rust 查询一致，JSON stdout 只有最终结果', async
     const flags = ['usage', '--snapshot', snapshotId, '--since', '2026-09-28', '--until', '2026-09-30', '--timezone', 'UTC', '--json'];
     const cliResult = f.invokeCli(flags);
     assert.equal(cliResult.status, 0, cliResult.stderr);
-    const native = f.query({ action: 'usage', snapshotId, scope: allDates });
+    const native = f.query({ action: 'usage', snapshotId, scope: allDates, limit:20 });
     assert.deepEqual(cliResult.value, native);
     const bad = f.invokeCli(['turns', '--json']);
     assert.equal(bad.status, 1); assert.equal(bad.value.error.code, 'INVALID_ARGUMENT');
@@ -385,7 +385,7 @@ test('此对话全部用量保留无日期计量；未知日期分项能精确�
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
 
-test('CLI automatic daily, weekly and monthly ranges include older data while explicit dates stay fixed', async () => {
+test('CLI calendar scope is independent of grouping and explicit all-time retains older data', async () => {
   const f = await fixture();
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -399,7 +399,7 @@ test('CLI automatic daily, weekly and monthly ranges include older data while ex
     }
     await writeFile(path.join(f.source, 'sessions', 'report-ranges.jsonl'), jsonl(rows));
     const snapshot = f.refresh().snapshotRef.snapshotId;
-    for (const [group, expected] of [['day', 330], ['week', 770], ['month', 770]] as const) {
+    for (const [group, expected] of [['day', 110], ['week', 110], ['month', 110]] as const) {
       const args = ['usage', '--snapshot', snapshot, '--group', group, '--model', model, '--timezone', 'UTC', '--json'];
       const result = f.invokeCli(args);
       assert.equal(result.status, 0);
@@ -407,6 +407,7 @@ test('CLI automatic daily, weekly and monthly ranges include older data while ex
       assert.equal(result.value.availableRange.since, day(400), 'collection retains data outside the default view');
       const subtotal = result.value.items.filter((item: any) => item.isSubtotal).reduce((sum: number, item: any) => sum + item.usage.tokens.total, 0);
       assert.equal(subtotal, expected);
+      assert.equal(f.invokeCli([...args, "--all-time"]).value.summary.tokens.total,1650);
       const explicit = f.invokeCli([...args, '--since', day(10), '--until', today]);
       assert.equal(explicit.status, 0);
       assert.equal(explicit.value.summary.tokens.total, 220);
@@ -453,7 +454,7 @@ test('Web dimensions conserve totals, all-input includes cache, IDs locate pages
     const turns=query({action:'turns',scope,threadId:located.items[0].id,sort:'time'});
     const events=query({action:'steps',scope,threadId:located.items[0].id,turnId:turns.items[0].id,sort:'time'});
     assert(events.items.filter((i:any)=>i.kind==='measurement').every((i:any)=>i.matchesScope===false));
-    const cli=f.invokeCli(['usage','--snapshot',snapshotId,'--since',allDates.since,'--until',allDates.until,'--presentation','projects','--project-unknown','--agent','codex','--json']);
+    const cli=f.invokeCli(['usage','--snapshot',snapshotId,'--since',allDates.since,'--until',allDates.until,'--by','project','--project-unknown','--agent','codex','--json']);
     assert.equal(cli.status,0,cli.stdout);assert.equal(cli.value.summary.tokens.total,2100);
     assert.equal(f.raw({action:'usage',snapshotId,scope:{project:f.workspace,projectUnknown:true}}).ok,false);
   } finally { await rm(f.root,{recursive:true,force:true,maxRetries:20,retryDelay:100}); }

@@ -47,6 +47,7 @@ test("evidence composition preserves both responses, original filters and separa
       collectedAt: "2026-01-02T00:00:00Z",
       kind: "message",
       hasTextLocator: i > 0,
+      ...(i === 1 ? {readCursor: "matched-content"} : {}),
       contentPartial: false,
     });
   const text = {
@@ -55,6 +56,7 @@ test("evidence composition preserves both responses, original filters and separa
     fragments: [
       {
         evidence: locations.items[1].evidence,
+        message: locations.items[1],
         text: "needle",
         nextCursor: "next-content",
         locations: [],
@@ -90,7 +92,7 @@ test("evidence composition preserves both responses, original filters and separa
     maxScanBytes: undefined,
     targets: locations.items
       .slice(1, 3)
-      .map((i) => ({ evidence: i.evidence, maxBytes: 64 })),
+      .map((i) => ({ evidence: i.evidence, ...(i.readCursor ? {cursor:i.readCursor} : {}), maxBytes: 64 })),
   });
   assert.equal(JSON.stringify(request), before);
 });

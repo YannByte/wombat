@@ -8,7 +8,7 @@ import type {QueryOptions} from '../client.js';
 import type {Discovery} from '../generated/skill-discovery.js';
 import type {RuntimeCheck} from '../generated/setup-response.js';
 
-export const skillCapabilities=['usage-json-v3','usage-json-v5','usage-compact-v1','inspection-json-v5','config-json-v1','account-json-v1','collection-json-v1','setup-json-v1','agent-api-v1','usage-statistics-v1','monitor-v1','config-content-hashes-v1','config-checks-v1'];
+export const skillCapabilities=['task-cli-v1','project-report-v1','usage-json-v3','usage-json-v5','usage-compact-v1','inspection-json-v5','config-json-v1','account-json-v1','collection-json-v1','setup-json-v1','agent-api-v1','usage-statistics-v1','monitor-v1','config-content-hashes-v1','config-checks-v1'];
 interface File {path:string;size:number;sha256:string;executable:boolean}
 async function readResource(file:string,limit:number):Promise<Buffer>{
   const handle=await open(file,constants.O_RDONLY|(constants.O_NOFOLLOW??0));

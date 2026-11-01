@@ -57,6 +57,92 @@ fn locate(snapshot: &Snapshot) -> Evidence {
 }
 
 #[test]
+fn records_include_unmetered_work_without_reading_source_bodies() {
+    let (_root, snapshot, _path) = fixture("PRIVATE_SYNTHETIC_UNMETERED");
+    let mut r = request(&snapshot, Action::Records);
+    r.selection.since = Some("2026-10-14".into());
+    r.selection.until = Some("2026-10-15".into());
+    r.selection.timezone = Some("UTC".into());
+    let output = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap();
+    assert_eq!(output.items.len(), 1);
+    assert!(output.scan_complete);
+    assert_eq!(output.source_bytes_read, 0);
+    assert_eq!(
+        output.items[0].record.as_ref().unwrap().upstream_id,
+        "thread"
+    );
+    assert!(
+        !serde_json::to_string(&output)
+            .unwrap()
+            .contains("PRIVATE_SYNTHETIC")
+    );
+    r.offset = Some(1);
+    assert!(
+        query(&snapshot, None, &r, &AtomicBool::new(false))
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    r.offset = None;
+    r.query = Some("missing".into());
+    assert!(
+        query(&snapshot, None, &r, &AtomicBool::new(false))
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    r.query = None;
+    r.selection.since = Some("2026-10-15".into());
+    r.selection.until = Some("2026-10-16".into());
+    let later = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap();
+    assert!(later.scan_complete && later.items.is_empty());
+}
+
+#[test]
+fn search_cursor_reads_the_match_in_a_long_message_without_the_prefix() {
+    let text = "x".repeat(80000) + "关键证据：验证失败后必须保留交付文件。";
+    let (_root, snapshot, _path) = fixture(&text);
+    let mut search = request(&snapshot, Action::Search);
+    search.selection.projects = vec!["/synthetic/project".into()];
+    search.query = Some("关键证据".into());
+    let found = query(&snapshot, None, &search, &AtomicBool::new(false)).unwrap();
+    assert_eq!(found.items.len(), 1);
+    let mut read = read_request(&snapshot, found.items[0].evidence.clone(), 512);
+    read.selection = search.selection;
+    read.targets[0].cursor = found.items[0].read_cursor.clone();
+    let excerpt = query(&snapshot, None, &read, &AtomicBool::new(false)).unwrap();
+    assert!(excerpt.fragments[0].text.starts_with("关键证据"));
+    assert!(excerpt.source_bytes_read < 40000);
+}
+
+#[test]
+fn record_cursors_bind_selection_and_never_repeat_conversations() {
+    let (root, _, path) = fixture("PRIVATE_SYNTHETIC_FIRST");
+    fs::write(
+        &path,
+        rows("PRIVATE_SYNTHETIC_FIRST")
+            + &rows("PRIVATE_SYNTHETIC_SECOND").replace("\"thread\"", "\"second\""),
+    )
+    .unwrap();
+    let snapshot = collect(root.path(), "records-view");
+    let mut r = request(&snapshot, Action::Records);
+    r.limit = Some(1);
+    let first = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap();
+    assert_eq!(first.items.len(), 1);
+    assert!(!first.scan_complete);
+    r.cursor = first.next_cursor;
+    let next = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap();
+    assert_eq!(next.items.len(), 1);
+    assert_ne!(
+        first.items[0].evidence.thread_id,
+        next.items[0].evidence.thread_id
+    );
+    assert!(next.scan_complete);
+    r.selection.projects = vec!["/different".into()];
+    assert!(query(&snapshot, None, &r, &AtomicBool::new(false)).is_err());
+}
+
+#[test]
 fn expired_scan_slice_still_advances_through_messages_and_control_events() {
     let (_root, snapshot, _path) = fixture("PRIVATE_SYNTHETIC_PROGRESS");
     let cancelled = AtomicBool::new(false);

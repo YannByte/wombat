@@ -1,40 +1,12 @@
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { parseConfigArgs } from '../src/config-cli.js';
-test('extension review resolves local timezone and preserves explicit scope and ordering', () => {
-  const r = parseConfigArgs(['--review','--kind','skill']).request;
-  assert.equal(r.review, true); assert.equal(r.sort, 'review');
-  assert.equal(r.scope?.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
-  assert.equal(parseConfigArgs(['--review','--timezone','UTC','--sort','context_tokens']).request.scope?.timezone, 'UTC');
-  assert.equal(parseConfigArgs(['--review','--sort','least_activity']).request.sort, 'least_activity');
-  assert.throws(() => parseConfigArgs(['--review=true']));
-  assert.throws(() => parseConfigArgs(['--review','--review']));
-});
-test('configuration arguments preserve scope and reject ambiguous flags', () => {
-  const result = parseConfigArgs(['--root','/one','--root=/two','--project-root','/project','--kind','skill','--json']);
-  assert.deepEqual(result.request.roots, [path.resolve('/one'), path.resolve('/two')]);
-  assert.deepEqual(result.request.projectRoots, [path.resolve('/project')]);
-  assert.equal(result.request.kind, 'skill'); assert.equal(result.json, true);
-  for (const args of [['--json=true'], ['--limit','0'], ['--limit','201'], ['--offset','1.5'], ['--kind','unknown'], ['--sort','name','--sort','size'], ['--write'], ['--project-root']]) assert.throws(() => parseConfigArgs(args));
-});
-
-test('all dates and measured-content sorts have unambiguous CLI contracts', () => {
-  assert.equal(parseConfigArgs(['--all-time','--sort','content_tokens']).request.scope?.allTime,true);
-  assert.throws(()=>parseConfigArgs(['--all-time','--since','2026-10-01']));
-});
-test('object review arguments retain versions and expose only narrow actions', async () => {
-  const {parseOptimizeArgs}=await import('../src/optimize-cli.js');
-  const r=parseOptimizeArgs(['keep','--reason','necessary','--suggestion','one','--read-view','config:one','--decision-revision','2','--json']);
-  assert.equal(r.request.action,'keep');assert.equal(r.request.suggestionId,'one');assert.equal(r.request.decisionRevision,'2');
-  assert.throws(()=>parseOptimizeArgs(['history']));
-  for(const args of [['keep'],['execute'],['list','--shell','anything'],['list','--limit','201'],['list','--json=true']])assert.throws(()=>parseOptimizeArgs(args));
-});
-
-test('product reminder overrides cannot change specification thresholds',async()=>{
- const {parseOptimizeArgs}=await import('../src/optimize-cli.js');
- assert.deepEqual(parseOptimizeArgs(['list','--agents-bytes','20000','--description-characters','1024']).request.ruleOverrides,{agentsBytes:20000,descriptionCharacters:1024});
- for(const args of [['--agents-bytes','0'],['--description-characters','1025'],['--description-characters','-1'],['--body-tokens','10000']])assert.throws(()=>parseOptimizeArgs(args));
+import {parseVerificationArgs} from '../src/optimize-cli.js';
+test('verification uses only the new public spelling and preserves original conditions',()=>{
+ const r=parseVerificationArgs(['verify','--project','/project','--read-view','v','--baseline','b','--root','/one','--root','/two','--agents-bytes','20000','--description-characters','1024']);
+ assert.equal(r.request.action,'recheck');assert.equal(r.request.readView,'v');assert.equal(r.request.baselineId,'b');assert.deepEqual(r.request.roots,[path.resolve('/one'),path.resolve('/two')]);assert.deepEqual(r.request.projectRoots,[path.resolve('/project')]);
+ assert.deepEqual(r.request.ruleOverrides,{agentsBytes:20000,descriptionCharacters:1024});
+ for(const args of [['recheck'],['list'],['keep'],['verify'],['verify','--read-view','v'],['verify','--read-view','v','--baseline','b','--project-root','p'],['verify','--read-view','v','--baseline','b','--description-characters','1025']])assert.throws(()=>parseVerificationArgs(args));
 });
 
 test('config text uses the core basis to distinguish known zero, missing history and identity gaps', async () => {

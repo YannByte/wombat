@@ -1,6 +1,6 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = "activity" | "locate" | "read" | "search" | "changes";
+export type Action = ("activity" | "locate" | "read" | "search" | "changes") | "records";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -56,6 +56,11 @@ export interface Selection {
   recordKinds?: MessageRecordKind[];
 }
 export interface Activity {
+  record?: RecordSummary | null;
+  /**
+   * Read-target cursor at a source search match; bound to snapshot, selection and evidence.
+   */
+  readCursor?: string | null;
   evidence: Evidence;
   timestamp?: string | null;
   collectedAt: string;
@@ -73,6 +78,11 @@ export interface Activity {
   contentPartial: boolean;
   change?: Change | null;
 }
+export interface RecordSummary {
+  upstreamId: string;
+  startedAt?: string | null;
+  lastActivityAt?: string | null;
+}
 export interface Evidence {
   eventId: string;
   sourceInstanceId: string;
@@ -85,6 +95,7 @@ export interface Evidence {
 }
 export interface Fragment {
   evidence: Evidence;
+  message: Activity;
   text: string;
   nextCursor?: string | null;
   locations: ContentLocation[];

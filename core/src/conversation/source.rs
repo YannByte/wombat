@@ -173,7 +173,7 @@ pub(super) fn search(
     needle: &str,
     next: &mut usize,
     cancelled: &AtomicBool,
-) -> Result<bool> {
+) -> Result<Option<(usize, usize)>> {
     if *next > content.chunks.len() {
         return Err(error("INVALID_ARGUMENT"));
     }
@@ -188,6 +188,7 @@ pub(super) fn search(
         raw += content.chunks[start].bytes as usize;
     }
     let mut tail = String::new();
+    let mut positions: VecDeque<(usize, usize, usize)> = VecDeque::new();
     let mut part = None;
     let started = Instant::now();
     for (index, chunk) in content.chunks.iter().enumerate().skip(start) {
@@ -197,17 +198,36 @@ pub(super) fn search(
         }
         if part.is_some_and(|p| p != chunk.part) {
             tail.clear();
+            positions.clear();
         }
         let (value, _) = reader.chunk(event, chunk, cancelled)?;
         tail.push_str(&value);
+        positions.push_back((index, 0, value.len()));
         part = Some(chunk.part);
         if index >= *next {
             *next = index + 1;
-            if tail.contains(needle) {
-                return Ok(true);
+            if let Some(mut matched) = tail.find(needle) {
+                for (chunk, offset, length) in &positions {
+                    if matched < *length {
+                        return Ok(Some((*chunk, offset + matched)));
+                    }
+                    matched -= length;
+                }
+                return Err(error("CONTENT_UNAVAILABLE"));
             }
         }
-        tail = suffix(&tail, needle.len().saturating_sub(1)).to_owned();
+        let retained = suffix(&tail, needle.len().saturating_sub(1));
+        let mut drop = tail.len() - retained.len();
+        while let Some((_, offset, length)) = positions.front_mut() {
+            if drop < *length {
+                *offset += drop;
+                *length -= drop;
+                break;
+            }
+            drop -= *length;
+            positions.pop_front();
+        }
+        tail = retained.to_owned();
     }
-    Ok(false)
+    Ok(None)
 }

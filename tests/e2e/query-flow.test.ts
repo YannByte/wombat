@@ -47,7 +47,7 @@ test(
         measurement("excluded", "third", 9000, at),
       ]);
       const invoke = (request: AgentRequest) => {
-        const run = spawnSync(process.execPath, [f.entry, "call"], {
+        const run = spawnSync(process.execPath, [f.entry, "system", "call"], {
           input: JSON.stringify(request),
           encoding: "utf8",
           timeout: 10000,

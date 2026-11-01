@@ -21,10 +21,10 @@ test('built CLI and native share period drivers, family totals and durable refre
  try{
   service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
   const first=run(['usage','--fresh','--all-time']);
-  const args=["usage", "compare",'--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--dimension','project','--limit','1'];
+  const args=["usage", "compare",'--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--by','project','--limit','1'];
   const compared=run(args);assert.equal(compared.snapshotRef.snapshotId,first.snapshotRef.snapshotId);assert.equal(compared.comparison.delta.tokens,40);assert.equal(compared.page.total,3);assert.equal(compared.comparison.drivers[0].delta.tokens+compared.comparison.remaining.tokens,40);
   const threads=run({"method":"usage","params":{"query":{"action":"threads","scope":{"allTime":true}},"mode":"auto"}});const id=(name:string)=>threads.items.find((t:{upstreamId:string})=>t.upstreamId===name).id;
-  const family=run(["usage", "compare",'--thread',id('parent'),'--other-thread',id('other'),'--family','--all-time']);assert.equal(family.comparison.left.own.tokens.total,240);assert.equal(family.comparison.left.descendants.tokens.total,60);assert.equal(family.comparison.left.selected.tokens.total,300);assert.equal(family.comparison.left.memberCount,2);
+  const family=run(["usage", "compare",'--task',id('parent'),'--against',id('other'),'--family','--all-time']);assert.equal(family.comparison.left.own.tokens.total,240);assert.equal(family.comparison.left.descendants.tokens.total,60);assert.equal(family.comparison.left.selected.tokens.total,300);assert.equal(family.comparison.left.memberCount,2);
   const inspect=run({"method":"usage","params":{"query":{"action":"investigate","scope":{"allTime":true}},"mode":"cached"}});assert.equal(inspect.inspection.candidateCount,0);assert.equal(inspect.snapshotRef.snapshotId,first.snapshotRef.snapshotId);
   const trajectory=run({"method":"usage","params":{"query":{"action":"trajectory","scope":{"allTime":true,"threadId":id('parent')}},"mode":"cached"}});assert.equal(trajectory.inspection.trajectory.length,2);assert.equal(trajectory.inspection.trajectory[1].uncachedDelta,null);assert.equal(trajectory.inspection.trajectory[1].compactionComparison.inputDifference,40);assert.ok(trajectory.inspection.limitations.includes('context_occupancy_unavailable'));
   const contexts=run({"method":"usage","params":{"query":{"action":"context","scope":{"allTime":true,"threadId":id('parent')}},"mode":"cached"}});assert.equal(contexts.inspection.context.injectedRecords,1);assert.equal(contexts.inspection.context.records[0].contentVersion,null);
@@ -38,7 +38,7 @@ test('built CLI and native share period drivers, family totals and durable refre
   let restored=run(['usage','--cached','--all-time']);const restoredBy=Date.now()+5000;
   while(restored.snapshotRef.snapshotId!==refreshed.snapshotRef.snapshotId&&Date.now()<restoredBy){await delay(30);restored=run(['usage','--cached','--all-time']);}
   assert.equal(restored.snapshotRef.snapshotId,refreshed.snapshotRef.snapshotId);assert.deepEqual(restored.freshness.publicationChange,refreshed.freshness.publicationChange);
-  const call=(query:import('@wombat/client').UsageRequest)=>run(['call'],JSON.stringify({method:'usage',params:{query:{roots:[root],...query},mode:'cached'}}));
+  const call=(query:import('@wombat/client').UsageRequest)=>run(['system','call'],JSON.stringify({method:'usage',params:{query:{roots:[root],...query},mode:'cached'}}));
   await call({action:'usage',scope:{allTime:true}});
   const value=(await call({action:'compare',snapshotId:restored.snapshotRef.snapshotId,scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'},comparison:{kind:'periods',baselineSince:'2026-09-01',baselineUntil:'2026-09-08',dimension:'project'},limit:1})).result;
   assert.equal(value.comparison.delta.tokens,50);assert.deepEqual(value.freshness.publicationChange,restored.freshness.publicationChange);

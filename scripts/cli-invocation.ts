@@ -10,7 +10,7 @@ export function queryInvocation(query: UsageRequest, options: Omit<LiveRequest, 
     : { method: 'usage', params: { query, ...options } };
 }
 export function cliInvocation(input: CliInput): { args: string[]; input?: string } {
-  return Array.isArray(input) ? { args: input } : { args: ['call'], input: JSON.stringify(input) };
+  return Array.isArray(input) ? { args: input } : { args: ['system','call'], input: JSON.stringify(input) };
 }
 /** Domain assertions compare the same usage result; raw Agent-envelope tests invoke call directly. */
 export function spawnProductCli(entry: string, input: CliInput, options: SpawnSyncOptionsWithStringEncoding, nodeArgs: string[] = [], runtime = process.execPath): SpawnSyncReturns<string> {

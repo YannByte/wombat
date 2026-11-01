@@ -30,7 +30,7 @@ GPT-5.3-Codex、GPT-5.4、GPT-5.4 Mini 和 GPT-5.5 的核对页面没有给出�
 
 ## 联网更新价表
 
-`wombat call` 的 `prices` 方法、`status` 动作离线返回当前价表；`prices` 方法的 `update` 动作显式联网更新。成功后调用 `snapshot` 方法的 `refresh` 动作让新快照使用新价表；更新价表不会修改旧快照。
+`wombat system call` 的 `prices` 方法、`status` 动作离线返回当前价表；`prices` 方法的 `update` 动作显式联网更新。成功后调用 `snapshot` 方法的 `refresh` 动作让新快照使用新价表；更新价表不会修改旧快照。
 
 来源固定为[OpenAI 官方价格 Markdown](https://developers.openai.com/api/docs/pricing.md)。这是文档下载接口，不是 OpenAI 承诺稳定的专用价格 API；`/v1/models` 不提供单价。仅解析标准文本模型表和专用表中的 Codex 行，不导入 Batch、Flex、Fast、Ultrafast、多模态、工具和带未来生效时间的其他专用模型。当前解析器要求美元/百万 Token、明确272K长上下文分界及已支持模型完整性；格式、单位、阈值或必需模型变化会报 `PRICE_SOURCE_CHANGED`，等待适配后重试。缺失单价保持 null，新模型只精确匹配名称，日期别名仅沿用内置已核对映射。
 

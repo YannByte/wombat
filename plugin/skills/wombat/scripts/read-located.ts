@@ -33,7 +33,7 @@ export async function readLocated(
   const targets = locations.items
     .filter((item) => item.hasTextLocator)
     .slice(0, maxTargets)
-    .map((item) => ({ evidence: item.evidence, maxBytes }));
+    .map((item) => ({ evidence: item.evidence, ...(item.readCursor ? {cursor:item.readCursor} : {}), maxBytes }));
   if (!targets.length) return [locations, null];
   const text = await call({
     method: "conversation",

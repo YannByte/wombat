@@ -16,3 +16,10 @@ test('conversation cancellation rejects a valid late transport response',async()
  const controller=new AbortController(),result=client.conversation!(request,{signal:controller.signal});
  await ready;controller.abort();finish(response);await assert.rejects(result,{code:'CANCELLED'});
 });
+test('read metadata stays bound to the exact selected message',async()=>{
+ const evidence={eventId:'message',sourceInstanceId:'source',threadId:'task',eventOffset:0};
+ const target:ConversationRequest={action:'read',snapshotId:'fixed',selection:request.selection,targets:[{evidence}]};
+ const value:ConversationResult={...response,action:'read',fragments:[{evidence,message:{evidence:{...evidence,eventId:'other'},project:'/synthetic',kind:'message',hasTextLocator:true,contentPartial:false,collectedAt:'2026-10-01T00:00:00Z'},text:'Synthetic text',locations:[],context:[],partial:false}]};
+ const client=createUsageClient({query:async()=>({}),conversation:async()=>value});
+ await assert.rejects(client.conversation!(target),{code:'PROTOCOL_ERROR'});
+});

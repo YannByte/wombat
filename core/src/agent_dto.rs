@@ -11,6 +11,8 @@ use std::collections::BTreeMap;
     deny_unknown_fields
 )]
 pub enum Request {
+    /// Assemble current project checks, configuration, bounded work history and read-only artifact candidates without editing project files.
+    Project(crate::project_dto::Request),
     /// Inspect or control local background indexing and current-user automatic startup.
     Service(crate::service_dto::Request),
     /// Inspect artifacts, recheck original selections or explicitly remove selected Codex candidates; no session indexing.
@@ -80,4 +82,33 @@ pub struct Error {
 pub struct ErrorOutput {
     pub output_version: u32,
     pub error: Error,
+}
+
+/// Task-oriented local command discovery. No runtime or source preparation.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Help {
+    #[schemars(range(min = 1, max = 1))]
+    pub output_version: u32,
+    pub command: String,
+    pub commands: Vec<String>,
+    pub help: String,
+    pub examples: Vec<HelpExample>,
+    pub next: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HelpExample {
+    pub task: String,
+    pub command: String,
+}
+
+/// A bounded original-text read and an independent continuation for message locations.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HistoryRead {
+    #[schemars(range(min = 1, max = 1))]
+    pub output_version: u32,
+    pub result: crate::conversation_dto::Response,
+    pub next_locations: Option<crate::conversation_dto::Request>,
 }

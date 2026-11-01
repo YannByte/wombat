@@ -48,7 +48,7 @@ test('message reads skip control facts and hide only declared interface context 
     await check(nativeApi);
     // The control-only fixture has missing operation outcomes; preserve its
     // partial-source status through the CLI while returning usable messages.
-    const cli = await complete(async request => JSON.parse(f.cli(['call'], JSON.stringify({ method: 'conversation', params: request }), 2)), base);
+    const cli = await complete(async request => JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'conversation', params: request }), 2)), base);
     assert.equal(cli.partial, true);
     assert.equal(cli.items.length, 3);
     await f.stop(); await f.start();
@@ -72,8 +72,8 @@ test('real conversation chain covers no-usage activity, CLI, continuation and so
     assert(!JSON.stringify(located).includes('PRIVATE_SYNTHETIC_BODY'));
     const target = located.items[0].evidence;
     const activity = await f.client.conversation!({ ...base, action: 'activity' }); assert(activity.items.some(i => i.kind === 'message'));
-    const methods = JSON.parse(f.cli(['api'])); assert(methods.methods.includes('conversation'));
-    const cliLocated: ConversationResult = JSON.parse(f.cli(['call'], JSON.stringify({ method: 'conversation', params: base }))); assert.equal(cliLocated.items[0].evidence.eventId, target.eventId);
+    const methods = JSON.parse(f.cli(['system','api'])); assert(methods.methods.includes('conversation'));
+    const cliLocated: ConversationResult = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'conversation', params: base }))); assert.equal(cliLocated.items[0].evidence.eventId, target.eventId);
     const read: ConversationRequest = { ...base, action: 'read', targets: [{ evidence: target, maxBytes: 256 * 1024 }] };
     let result = await f.client.conversation!(read), rebuilt = result.fragments[0].text, bytes = result.sourceBytesRead;
     while (result.fragments[0].nextCursor) {

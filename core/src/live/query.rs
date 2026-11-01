@@ -257,6 +257,8 @@ pub(super) fn conversation_query(
         .transpose()?;
     let mut result =
         crate::conversation::query(&snapshot, baseline.as_deref(), &request, cancelled)?;
+    result.partial |=
+        freshness.initial_scan || !matches!(freshness.status.as_str(), "current" | "fixed");
     result.freshness = Some(freshness);
     if serde_json::to_vec(&result)?.len() > 1024 * 1024 {
         return Err(operation_error(

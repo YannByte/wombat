@@ -1,3 +1,8 @@
+import type {Request as ProjectRequest} from './generated/project-request.js';
+import type {Response as ProjectResult} from './generated/project-response.js';
+export type {Request as ProjectRequest} from './generated/project-request.js';
+export type {Response as ProjectResult} from './generated/project-response.js';
+export type ProjectTransport = (request: ProjectRequest, options: QueryOptions) => Promise<unknown>;
 import type { Request as ArtifactsRequest } from './generated/artifacts-request.js';
 import type { Response as ArtifactsResult } from './generated/artifacts-response.js';
 export type { Request as ArtifactsRequest } from './generated/artifacts-request.js';
@@ -112,6 +117,7 @@ export type PricingTransport = (request: PricingRequest, options: QueryOptions) 
 export type LiveTransport = (request: LiveRequest, options: QueryOptions) => Promise<unknown>;
 
 export interface UsageClient {
+  project?(request:ProjectRequest,options?:QueryOptions):Promise<ProjectResult>;
   artifacts?(request:ArtifactsRequest,options?:QueryOptions):Promise<ArtifactsResult>;
   service?(request:ServiceRequest,options?:QueryOptions):Promise<ServiceResult>;
   conversation?(request: ConversationRequest, options?: QueryOptions): Promise<ConversationResult>;
@@ -130,6 +136,7 @@ export interface UsageClient {
 }
 
 export interface ClientTransports extends HostTransports {
+  project?: ProjectTransport;
   artifacts?: ArtifactsTransport;
   service?:ServiceTransport;
   conversation?: ConversationTransport;
@@ -162,6 +169,17 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
   } = transports;
   const hosts = transports;
   return {
+    ...(transports.project ? {async project(request:ProjectRequest,options:QueryOptions={}):Promise<ProjectResult>{
+      const [{validate:input},{validate:output}]=await Promise.all([import('./generated/validate-project-request.js'),import('./generated/validate-project-response.js')]);
+      throwIfCancelled(options);
+      if(!input(request))throw new CoreError('INVALID_ARGUMENT','Invalid project request');
+      const result=await transports.project!(request,options);
+      throwIfCancelled(options);
+      if(!output(result)||result.outputVersion!==1||result.scope.projectRoot!==request.projectRoot||result.scope.since!==request.since||result.scope.until!==request.until||result.scope.timezone!==request.timezone||(result.scope.sourceInstanceId??null)!==(request.sourceInstanceId??null)||JSON.stringify(result.scope.roots??[])!==JSON.stringify(request.roots??[])||(result.scope.ruleOverrides?.agentsBytes??null)!==(request.ruleOverrides?.agentsBytes??null)||(result.scope.ruleOverrides?.descriptionCharacters??null)!==(request.ruleOverrides?.descriptionCharacters??null))throw new CoreError('PROTOCOL_ERROR','Invalid project response');
+      const sections=[result.configuration,result.checks,result.history,result.records,result.artifacts];
+      if(result.partial!==sections.some(s=>s.state!=='complete')||sections.some(s=>s.state==='unavailable'?s.result!==null||!s.error:s.result===null||s.error!==null))throw new CoreError('PROTOCOL_ERROR','Inconsistent project sections');
+      return result;
+    }}:{}),
     ...(transports.artifacts ? {async artifacts(request:ArtifactsRequest,options:QueryOptions={}):Promise<ArtifactsResult>{
       const [{validate:input},{validate:output}]=await Promise.all([import('./generated/validate-artifacts-request.js'),import('./generated/validate-artifacts-response.js')]);
       throwIfCancelled(options);
@@ -1172,7 +1190,7 @@ function matchesConversationSelection(request: ConversationRequest, result: Conv
   if (request.anchor && result.window && (!sameConversationEvidence(request.anchor,result.window.anchor) || result.window.radius !== (request.radius ?? 20))) return false;
   const s=request.selection ?? {}, has=(values: readonly string[] | undefined, value: string | null | undefined) => !values?.length || (value != null && values.includes(value));
   if (!result.items.every(i=>has(s.sources,i.evidence.sourceInstanceId) && has(s.projects,i.project) && has(s.threads,i.evidence.threadId) && has(s.turns,i.evidence.turnId) && has(s.origins,i.origin) && has(s.phases,i.phase) && has(s.recordKinds,i.recordKind))) return false;
-  if (request.action === 'read' && (result.fragments.length !== request.targets?.length || !result.fragments.every((f,i)=>sameConversationEvidence(f.evidence,request.targets![i].evidence)))) return false;
+  if (request.action === 'read' && (result.fragments.length !== request.targets?.length || !result.fragments.every((f,i)=>sameConversationEvidence(f.evidence,request.targets![i].evidence)&&sameConversationEvidence(f.message.evidence,f.evidence)))) return false;
   return !result.fragments.some(f=>f.partial) || result.partial;
 }
 function sameConversationEvidence(a: NonNullable<ConversationRequest['targets']>[number]['evidence'], b: NonNullable<ConversationRequest['targets']>[number]['evidence']): boolean {

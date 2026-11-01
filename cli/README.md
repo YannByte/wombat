@@ -7,7 +7,7 @@ English | [中文](README.zh-CN.md)
 ## Public entries
 
 - The package exports argument parsing and `runUsageCli`. `./format` exports text formatting.
-- `api` lists local methods and schemas. `call` reads one bounded JSON request from stdin.
+- `history`, `usage`, `check`, `clean` and `system` organize user tasks. `system api` discovers generated contracts; `system call` reads one bounded JSON request from stdin.
 
 ## Limits
 

@@ -24,7 +24,7 @@ flowchart LR
 | `client/` | Rust-generated DTOs, schema validation, `UsageClient`, stable errors, cancellation, and progress; the generic entry imports neither Node nor terminal libraries |
 | `client/src/node/` | Restricted core communication, subprocesses, live connections, official price downloads, timeouts, and output limits; exported as `@wombat/client/node` |
 | `client/src/locale/` | Shared typed Chinese/English dictionaries, language selection, and presentation formatting; source content and protocol values stay untranslated |
-| `cli/` | Arguments, JSON/text, exit codes and local query lifecycle; the default command prints usage text |
+| `cli/` | Arguments, JSON/text, exit codes and local query lifecycle; the default command shows task help without querying sources |
 | `plugin/` | User plugins |
 
 Dependencies point from `cli → client/node → core`. The main Skill reuses public CLI queries and Codex native project tools. No browser transport or UI package is shipped.

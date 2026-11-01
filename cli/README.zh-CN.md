@@ -7,7 +7,7 @@
 ## 公开入口
 
 - 包导出参数解析和 `runUsageCli`；`./format` 导出文本格式化功能。
-- `api` 列出本机方法和 Schema；`call` 从 stdin 读取一个有大小限制的 JSON 请求。
+- `history`、`usage`、`check`、`clean` 和 `system` 按用户任务组织。`system api` 查看生成契约；`system call` 从 stdin 读取一个有大小限制的 JSON 请求。
 
 ## 限制
 

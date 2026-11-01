@@ -29,8 +29,8 @@ test('plugin Hook identity, project coverage, retained declarations and rechecks
     const hooks = { data: [{ cwd: a, hooks: [metadata], warnings: [], errors: [] }, { cwd: b, hooks: [{ ...metadata, enabled: false, trustStatus: 'untrusted' }], warnings: [], errors: [] }, { cwd: c, hooks: [], warnings: [], errors: [] }] };
     const setMode = (extra: object = {}) => writeFile(native.mode, JSON.stringify({ hooks, ...extra }));
     await setMode();
-    const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
+    const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES, WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN };
+    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN: native.binary });
     const binary = path.resolve('dist/wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
     await once(service, 'spawn');
     const client = createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false });
@@ -50,11 +50,13 @@ test('plugin Hook identity, project coverage, retained declarations and rechecks
         assert.equal(first.hookRegistry.contexts[0].registrations[0].pluginId, 'sample.tools@test');
         assert.equal(first.hookRegistry.contexts[0].registrations[0].nativeKey, metadata.key);
         assert.equal(first.hookRegistry.contexts[1].registrations[0].enabled, false);
-        const args = [path.resolve('dist/wombat.js'), "check", 'inventory', '--root', root, ...[a, b, c].flatMap(p => ['--project-root', p]), '--kind', 'hook', '--read-view', first.readView!];
-        const cli = spawnSync(process.execPath, [...args, '--json'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const args = [path.resolve('dist/wombat.js'), 'system', 'call'];
+        const cli = spawnSync(process.execPath, args, { env: process.env, input:JSON.stringify({method:'config',params:{action:'list',roots:[root],projectRoots:[a,b,c],kind:'hook',readView:first.readView}}), encoding: 'utf8', timeout: 15000 });
         assert.ok(cli.status === 0 || cli.status === 2, cli.stderr);
         assert.deepEqual(JSON.parse(cli.stdout).hookRegistry, first.hookRegistry);
-        const cliText = spawnSync(process.execPath, [...args, '--lang', 'en'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        await setMode({hooks:{data:[hooks.data[0]]}});
+        const cliText = spawnSync(process.execPath, [path.resolve('dist/wombat.js'),'check','hooks','--project',a,'--root',root,'--lang','en'], { env: process.env, encoding: 'utf8', timeout: 15000 });
+        await setMode();
         assert.ok(cliText.status === 0 || cliText.status === 2, cliText.stderr);
         assert.match(cliText.stdout, /Plugin: sample.tools@test/);
         assert.equal((await nativeTransport.config!({ kind: 'hook', readView: first.readView, scope: { project: c } })).items.length, 0);

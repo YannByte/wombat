@@ -26,6 +26,24 @@ pub struct Response {
     pub runtime_version: Option<String>,
     #[serde(default)]
     pub runtime_checks: Vec<RuntimeCheck>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installation_checks: Vec<InstallationCheck>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallationStatus {
+    Pass,
+    Warning,
+    Fail,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InstallationCheck {
+    pub id: String,
+    pub status: InstallationStatus,
+    pub message: String,
+    pub repair: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]

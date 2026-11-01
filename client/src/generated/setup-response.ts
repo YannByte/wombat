@@ -5,6 +5,7 @@ export type HookRegistryStatus = "unavailable" | "partial" | "observed";
 export type HookTrust = "managed" | "untrusted" | "trusted" | "modified";
 export type HookHandler = "command" | "mcpTool" | "prompt" | "agent";
 export type RuntimeStatus = "compatible" | "incompatible" | "modified" | "unavailable" | "unmanaged";
+export type InstallationStatus = "pass" | "warning" | "fail";
 
 export interface Response {
   outputVersion: number;
@@ -21,6 +22,7 @@ export interface Response {
    */
   runtimeVersion?: string | null;
   runtimeChecks?: RuntimeCheck[];
+  installationChecks?: InstallationCheck[];
 }
 export interface Discovery {
   status: DiscoveryStatus;
@@ -65,4 +67,10 @@ export interface RuntimeCheck {
   requiredCapabilities: string[];
   missingCapabilities: string[];
   errorCode?: string | null;
+}
+export interface InstallationCheck {
+  id: string;
+  status: InstallationStatus;
+  message: string;
+  repair?: string | null;
 }

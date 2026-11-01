@@ -48,17 +48,18 @@ test('task statistics and budgets share exact facts across Agent CLI and native 
         const typical = (await client.live!({ query: { ...request, threadId: selected.id }, mode: 'cached' })).result.statistics!.selectedTask!;
         assert.equal(typical.aboveP90, true);
         assert.equal(typical.percentileRank, 5 / 6);
-        const agent = run(['call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: request } }));
+        const agent = run(['system','call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: request } }));
         assert.deepEqual(agent.result.statistics, stats);
-        const human = run(["usage", "stats", '--snapshot', snapshotId, '--project', project, '--since', today, '--until', tomorrow, '--baseline-since', yesterday, '--baseline-until', today, '--presentation', 'models', '--limit', '1', '--json']);
-        assert.deepEqual(human.statistics, stats);
+        const human = run(["usage", "stats", '--snapshot', snapshotId, '--project', project, '--since', today, '--until', tomorrow, '--by', 'model', '--limit', '1', '--json']);
+        const populationOnly=(await client.live!({query:{...request,comparison:undefined},mode:'cached'})).result.statistics;
+        assert.deepEqual(human.statistics, populationOnly);
         run({method:'monitor',params:{action:'upsert',plan:{id:'daily',enabled:true,period:'day',tokenLimit:Number('400'),review:true,scope:{project:project,timezone:'UTC'}}}});
-        const first = run(['system','watch','--once','--id=daily','--root',source,'--json']);
+        const first = run(['usage','alerts','--once','--id=daily','--root',source,'--json']);
         assert.equal(first.notifications.length, 2);
         assert.ok(first.notifications.some((n: {
             kind: string;
         }) => n.kind === 'budget_exceeded'));
-        assert.equal(run(['system','watch','--once','--id','daily','--root',source,'--json']).notifications.length, 0);
+        assert.equal(run(['usage','alerts','--once','--id','daily','--root',source,'--json']).notifications.length, 0);
         const foreignView = (await client.live!({ query: { action: 'usage', roots: [foreign], scope: { allTime: true } }, mode: 'fresh' })).result;
         await client.monitor!({ action: 'upsert', plan: { id: 'foreign', enabled: true, period: 'day', review: false, tokenLimit: 500, scope: { project, sourceInstanceId: foreignView.quality.sources[0].source.id, timezone: 'UTC' } } });
         await client.monitor!({ action: 'check', snapshotId: foreignView.snapshotRef.snapshotId, ids: ['foreign'] });
@@ -98,9 +99,9 @@ test('task statistics and budgets share exact facts across Agent CLI and native 
         const fourth = await wider.monitor!({ action: 'check', snapshotId: pinned.result.snapshotRef.snapshotId, ids: ['fourth'] });
         assert.equal(fourth.notifications.length, 1);
         assert.deepEqual(fourth.notifications[0].sourceInstanceIds, [omitted]);
-        const api = run(['api', '--json']);
+        const api = run(['system','api', '--json']);
         assert.ok(api.methods.includes('monitor'));
-        assert.equal(run(['call'], JSON.stringify({ method: 'monitor', params: { action: 'list' } })).action, 'list');
+        assert.equal(run(['system','call'], JSON.stringify({ method: 'monitor', params: { action: 'list' } })).action, 'list');
     }
     finally {
         if (service.exitCode === null && service.signalCode === null) {

@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Help",
+  "description": "Task-oriented local command discovery. No runtime or source preparation.",
+  "type": "object",
+  "properties": {
+    "outputVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "command": {
+      "type": "string"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "help": {
+      "type": "string"
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/HelpExample"
+      }
+    },
+    "next": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "outputVersion",
+    "command",
+    "commands",
+    "help",
+    "examples",
+    "next"
+  ],
+  "definitions": {
+    "HelpExample": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "task",
+        "command"
+      ]
+    }
+  }
+}

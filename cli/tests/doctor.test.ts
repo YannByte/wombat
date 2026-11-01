@@ -31,6 +31,8 @@ test('doctor reports repairable source, PATH, core and Codex warnings or failure
   const result = collectDoctor({entryFile: path.join(root, 'dist', 'wombat.js'), env: {PATH: '', CODEX_HOME: path.join(root, 'missing')},
     resolveCore: () => { throw new Error('missing core'); }});
   assert.equal(result.status, 'fail'); assert.ok(result.checks.every(check => check.message && (check.status === 'pass' || check.repair)));
-  assert.deepEqual(parseDoctorArgs(['--json']), {json: true, help: false});
-  assert.throws(() => parseDoctorArgs(['--scan']), /doctor/);
+  assert.equal(parseDoctorArgs(['--json']).json,true);
+  assert.equal(parseDoctorArgs(['--project','/synthetic']).request.project,path.resolve('/synthetic'));
+  assert.throws(()=>parseDoctorArgs(['--plugin']));
+  assert.throws(() => parseDoctorArgs(['--scan']));
 });

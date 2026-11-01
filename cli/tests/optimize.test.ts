@@ -57,12 +57,6 @@ test('activity text leads with measured findings and next steps while retaining 
 }));
 
 test('activity CLI requires a fixed turn and renders inspection signals in both languages',async()=>{
- const {parseOptimizeArgs}=await import('../src/optimize-cli.js');
- const {activityResult}=await import('../../tests/fixtures/activity.js');
- const parsed=parseOptimizeArgs(['activity','--snapshot','live:synthetic:fixed','--thread','task','--turn','turn','--json']);
- assert.equal(parsed.request.action,'activity');assert.equal(parsed.request.projectRoots,undefined);
- assert.deepEqual(parsed.request.activity,{snapshotId:'live:synthetic:fixed',threadId:'task',turnId:'turn'});
- for(const args of [['activity'],['activity','--snapshot','fixed','--thread','task'],['activity','--snapshot','fixed','--thread','task','--turn','turn','--read-view','config:other'],['list','--turn','turn']])assert.throws(()=>parseOptimizeArgs(args));
  const previous=locale.getLocale();
  try{for(const language of ['en','zh'] as const){locale.setLocale(language);const text=formatOptimizeText(activityResult());assert.match(text,language==='en'?/Calls after failure: 1 observed/:/失败后再次调用: 已观察到 1 次/);assert.match(text,/40%/);assert.match(text,language==='en'?/at least 5 operations/:/至少 5 次结果可判定/);assert.match(text,language==='en'?/current sample is small/:/当前样本较少/);assert.match(text,language==='en'?/same path does not establish identical content/:/同路径不证明内容/);assert.doesNotMatch(text,/activity\.|undefined|NaN|未知/);}}finally{locale.setLocale(previous);}
 });
@@ -73,4 +67,4 @@ test('check text preserves outcomes, comparison gaps, exact zero and source-text
  fixture.checks=[{...check('miss','incomparable'),comparison:{status:'incomparable',reason:'ruleParametersOrMethodChanged'}}];assert.ok(formatOptimizeText(fixture).includes(t('optimize.assessment.comparison.incomparable')));
 }));
 test('formatting changes language while preserving facts and the opaque recheck baseline',()=>{const fixture=result(),before=JSON.stringify(fixture),saved=locale.getLocale();try{locale.setLocale('en');const en=formatOptimizeText(fixture);locale.setLocale('zh');const zh=formatOptimizeText(fixture);assert.notEqual(en,zh);assert.match(en,/synthetic-baseline/);assert.match(zh,/synthetic-baseline/);assert.equal(JSON.stringify(fixture),before);}finally{locale.setLocale(saved);}});
-test('rechecks require original view and baseline; removed lifecycle actions reject',async()=>{const {parseOptimizeArgs}=await import('../src/optimize-cli.js');for(const a of [['recheck'],['recheck','--read-view','view'],['history'],['redisplay'],['handoff']])assert.throws(()=>parseOptimizeArgs(a));const r=parseOptimizeArgs(['recheck','--read-view','view','--baseline','baseline']);assert.equal(r.request.baselineId,'baseline');});
+test('rechecks require original view and baseline; removed lifecycle actions reject',async()=>{const {parseVerificationArgs}=await import('../src/optimize-cli.js');for(const a of [['verify'],['verify','--read-view','view'],['history'],['redisplay'],['handoff']])assert.throws(()=>parseVerificationArgs(a));const r=parseVerificationArgs(['verify','--read-view','view','--baseline','baseline']);assert.equal(r.request.baselineId,'baseline');});

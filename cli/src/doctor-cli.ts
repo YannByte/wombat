@@ -1,3 +1,10 @@
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {parseOptions,withCancellation} from './human-input.js';
+import {writeHelp} from './help.js';
+import {setupExitCode} from './exit-codes.js';
+import {createNodeClient} from '@wombat/client/node';
+import type {SetupRequest,SetupResult} from '@wombat/client';
 import {spawnSync} from 'node:child_process';
 import {accessSync, constants, existsSync, readFileSync, statSync} from 'node:fs';
 import os from 'node:os';
@@ -37,14 +44,11 @@ function resultStatus(checks: DoctorCheck[]): DoctorStatus {
   return checks.some(check => check.status === 'fail') ? 'fail' : checks.some(check => check.status === 'warning') ? 'warning' : 'pass';
 }
 
-export function parseDoctorArgs(argv: string[]): {json: boolean; help: boolean} {
-  let json = false, help = false;
-  for (const arg of argv) {
-    if (arg === '--json' && !json) json = true;
-    else if ((arg === '--help' || arg === '-h') && !help) help = true;
-    else throw new CoreError('INVALID_ARGUMENT', t('cli.doctor.invalid', {value: arg}));
-  }
-  return {json, help};
+export function parseDoctorArgs(argv: string[]) {
+  const p=parseOptions(argv,['--project','--root'],['--hooks'],['--root']);
+  if(p.positionals.length)throw new CoreError('INVALID_ARGUMENT',t('cli.doctor.invalid',{value:p.positionals[0]}));
+  const request:SetupRequest={project:path.resolve(p.get('--project')??process.cwd()),includeHooks:p.flags.has('--hooks'),...(p.all('--root').length?{roots:p.all('--root').map(r=>path.resolve(r))}:{})};
+  return {request,json:p.json,help:p.help};
 }
 
 export function collectDoctor(options: {entryFile?: string; env?: NodeJS.ProcessEnv; resolveCore?: () => string; runCore?: (file: string) => {status: number | null; stdout: string; stderr: string}} = {}): DoctorResult {
@@ -93,14 +97,26 @@ export function collectDoctor(options: {entryFile?: string; env?: NodeJS.Process
   return {outputVersion: 1, action: 'doctor', status: resultStatus(checks), version: packageMetadata.version, checks, scannedSources: false, networkUsed: false};
 }
 
-export function runDoctorCli(argv: string[]): number {
-  const invocation = parseDoctorArgs(argv);
-  if (invocation.help) { process.stdout.write(t('cli.doctor.help')); return 0; }
-  const result = collectDoctor();
-  if (invocation.json) process.stdout.write(JSON.stringify(result) + '\n');
-  else {
-    for (const check of result.checks) process.stdout.write(`${t(`cli.doctor.${check.status}`)}\t${check.id}\t${check.message}${check.repair ? `\n  ${check.repair}` : ''}\n`);
-    process.stdout.write(t('cli.doctor.boundary') + '\n');
-  }
-  return result.status === 'fail' ? 1 : result.status === 'warning' ? 2 : 0;
+export async function runDoctorCli(argv:string[]):Promise<number>{
+  const {request,json,help}=parseDoctorArgs(argv);
+  if(help){writeHelp('system',['doctor',...argv]);return 0;}
+  return withCancellation(async signal=>{
+    let probe:{status:number|null;stdout:string;stderr:string}|undefined, failure:unknown;
+    try{
+      const file=resolveCoreBinary(),script=/\.[cm]js$/.test(file);
+      const result=await promisify(execFile)(script?process.execPath:file,script?[file,'--version']:['--version'],{encoding:'utf8',timeout:15000,maxBuffer:65536,windowsHide:true,signal});
+      probe={status:0,stdout:result.stdout,stderr:result.stderr};
+    }catch(error){failure=error;}
+    if(signal.aborted)throw new CoreError('CANCELLED',t('common.cancelled'));
+    const local=collectDoctor({runCore:()=>{if(failure)throw failure;return probe!;}});
+    const result:SetupResult={...await createNodeClient({automaticPrices:false}).setup!(request,{signal}),installationChecks:local.checks};
+    if(json)process.stdout.write(JSON.stringify(result)+'\n');
+    else{
+      for(const check of local.checks)process.stdout.write(`${t(`cli.doctor.${check.status}`)}\t${check.id}\t${check.message}${check.repair?'\n  '+check.repair:''}\n`);
+      process.stdout.write(t('setup.summary',{version:result.nativeVersion??'—',skill:t(`skill.${result.discovery.status==='selection_changed'?'unavailable':result.discovery.status}`)})+'\n');
+      for(const check of result.runtimeChecks??[])process.stdout.write(t('setup.runtimeCheck',{version:check.pluginVersion??'—',status:t(`setup.runtime.${check.status}`)})+'\n');
+      for(const code of result.errorCodes)process.stdout.write(t('setup.errorLine',{code})+'\n');
+    }
+    return local.status==='pass'?setupExitCode(result):2;
+  });
 }

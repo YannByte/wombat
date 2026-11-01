@@ -44,6 +44,15 @@
       "minimum": 0,
       "maximum": 9007199254740991
     },
+    "offset": {
+      "description": "Skip matching conversations in Records; other actions use bound cursors.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
     "cursor": {
       "type": [
         "string",
@@ -103,13 +112,22 @@
   ],
   "definitions": {
     "Action": {
-      "type": "string",
-      "enum": [
-        "activity",
-        "locate",
-        "read",
-        "search",
-        "changes"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "activity",
+            "locate",
+            "read",
+            "search",
+            "changes"
+          ]
+        },
+        {
+          "description": "One source-backed activity per conversation, including work without measurements.",
+          "type": "string",
+          "const": "records"
+        }
       ]
     },
     "Selection": {

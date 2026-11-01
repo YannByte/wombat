@@ -24,7 +24,7 @@ flowchart LR
 | `client/` | Rust 生成 DTO、Schema 校验、`UsageClient`、稳定错误、取消与进度；通用入口不导入 Node 或终端库 |
 | `client/src/node/` | 受限内核通信、子进程、实时连接、官方价格下载、超时及输出上限；公开为 `@wombat/client/node` |
 | `client/src/locale/` | 共享类型化中英字典、语言选择与纯展示格式化；原始内容和协议值不翻译 |
-| `cli/` | 参数、JSON/文本、退出码与本地查询生命周期；默认命令输出用量文本 |
+| `cli/` | 参数、JSON/文本、退出码与本地查询生命周期；默认命令显示任务帮助，不查询来源 |
 | `plugin/` | 用户插件 |
 
 依赖方向为 `cli → client/node → core`。主 Skill 复用公开 CLI 查询和 Codex 原生项目工具。不交付浏览器传输或 UI 包。
