@@ -1,11 +1,24 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {cpSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {verifyReleaseAssets} from './check-release-assets.ts';
 import {nativeTargets} from './native-platforms.ts';
+
+test('release helpers load in a clean checkout without development dependencies', t => {
+  const directory=mkdtempSync(path.join(os.tmpdir(),'wombat-release-no-install-'));
+  t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  cpSync(new URL('.',import.meta.url),path.join(directory,'scripts'),{recursive:true});
+  writeFileSync(path.join(directory,'package.json'),JSON.stringify({type:'module',version:'1.0.0'}));
+  const result=spawnSync(process.execPath,['--input-type=module','--eval',
+    "await import('./scripts/check-release-assets.ts'); await import('./scripts/generate-release-notes.ts'); await import('./scripts/ci-release-candidate.ts');"],
+  {cwd:directory,encoding:'utf8',timeout:10000,maxBuffer:1024*1024});
+  assert.ifError(result.error);
+  assert.equal(result.status,0,result.stderr+result.stdout);
+});
 
 test('reused candidates retain exact identity and archive hashes without rebuilding', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'wombat-reused-assets-'));
