@@ -8,19 +8,31 @@ runs:
   using: composite
   steps:
     - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-      id: cache
+      id: dependencies
       with:
         workspaces: core -> target
-        cache-directories: core/.ci-rust-outputs
+        prefix-key: rust-dependencies-v1
         shared-key: ${{ inputs.key }}
-        key: ${{ inputs.key == 'release-win32-x64' && 'outputs-v1-' || '' }}${{ hashFiles('core/src/**', 'core/prices/**', 'core/tests/**', 'core/build.rs') }}
         cache-bin: false
-        cache-workspace-crates: true
+        cache-workspace-crates: false
         save-if: ${{ github.ref == 'refs/heads/main' }}
+    - name: Identify the native compiler environment
+      id: environment
+      shell: bash
+      run: bash "${{ github.action_path }}/fingerprint.sh"
+    # Save runs before rust-cache's post cleanup; restore runs after its dependency cleanup.
+    - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      id: workspace
+      with:
+        path: |
+          core/target/**/.fingerprint/wombat-core-*
+          core/target/**/deps/libwombat_core*
+          core/target/**/deps/wombat_core*
+          core/target/debug/wombat-core*
+          core/target/release/wombat-core*
+        key: rust-workspace-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.key }}-${{ steps.environment.outputs.key }}-${{ hashFiles('core/src/**', 'core/prices/**', 'core/tests/**', 'core/build.rs', 'core/Cargo.toml', 'core/Cargo.lock', 'rust-toolchain.toml', 'scripts/build-core.mjs', '.cargo/config*', 'core/.cargo/config*', '.github/actions/rust/**', '.github/workflows/ci.yml') }}
     - name: Reuse exact-source Cargo fingerprints after checkout
       shell: bash
       env:
-        CI_RUST_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
-      run: |
-        bash "${{ github.action_path }}/restore-times.sh"
-        bash "${{ github.action_path }}/windows-output.sh" restore
+        CI_RUST_CACHE_HIT: ${{ steps.workspace.outputs.cache-hit }}
+      run: bash "${{ github.action_path }}/restore-times.sh"

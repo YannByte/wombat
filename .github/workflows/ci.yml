@@ -163,9 +163,6 @@ jobs:
           # Explain stale Cargo artifacts instead of mistaking a cache hit for reuse.
           CARGO_LOG: cargo::core::compiler::fingerprint=info
         run: corepack pnpm build
-      - name: Retain the native Windows Cargo output
-        if: matrix.target == 'win32-x64'
-        run: bash .github/actions/rust/windows-output.sh save
       - name: Verify shared-service startup
         run: corepack pnpm release:probe
       - name: Check types and generated contracts
@@ -394,5 +391,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: corepack pnpm release:verify-install
-      - name: Retain the native Windows Cargo output
-        run: bash .github/actions/rust/windows-output.sh save

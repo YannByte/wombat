@@ -1,5 +1,6 @@
 import {readFileSync,readdirSync} from 'node:fs';
 import path from 'node:path';
+import {rustCachePolicyErrors} from './ci-rust-policy.ts';
 
 export function actionSources(root:string):Record<string,string> {
   const directory=path.join(root,'.github');
@@ -74,7 +75,7 @@ export function rootReadmeReleaseErrors(
 }
 
 export function actionPinErrors(workflows: Record<string, string>): string[] {
-  const errors: string[] = [];
+  const errors: string[] = rustCachePolicyErrors(workflows);
   for (const [file, content] of Object.entries(workflows)) {
     for (const [index, line] of content.split('\n').entries()) {
       const match = line.match(/^\s*(?:-\s*)?uses:\s*([^\s#]+)/);

@@ -69,20 +69,22 @@
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6",
+    "@types/js-yaml": "4.0.9",
     "@types/node": "26.0.0",
+    "@types/ws": "8.18.2",
     "@wombat/cli": "workspace:*",
     "@wombat/client": "workspace:*",
     "ajv": "8.18.0",
     "cross-spawn": "7.0.6",
     "esbuild": "^0.25.0",
+    "js-yaml": "4.3.2",
     "json-schema-to-typescript": "15.0.4",
     "mdast-util-from-markdown": "2.0.2",
     "mdast-util-gfm": "3.1.0",
     "micromark-extension-gfm": "3.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
-    "ws": "8.22.0",
-    "@types/ws": "8.18.2"
+    "ws": "8.22.0"
   },
   "pnpm": {
     "overrides": {
