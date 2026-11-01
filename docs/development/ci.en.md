@@ -11,3 +11,5 @@ The Node setup action caches only the pnpm store by lockfile. Rust jobs use sepa
 The build entry checks source identity, revision, compiler environment and hashes of bundled and module outputs before reuse. Missing or changed inputs/outputs force a build. A second unchanged build does no compilation or bundling. Contract checks reuse a verified release core; without a valid build they compile the debug schema producer. To inspect the latest 50 workflow runs, use `corepack pnpm ci:timings -- --output-dir /tmp/wombat-ci --label before --logs`. Reports separate runner queue, preparation and validation, retain dependency waiting separately, and identify historical combined steps whose boundaries cannot be recovered. Use `--run ID --label after` for a measured comparison and `--reuse` to avoid downloading unchanged evidence again.
 
 Timing medians exclude failed and cancelled runs.
+
+Unknown historical phase boundaries remain unclassified.
