@@ -223,6 +223,12 @@ pub(super) fn quality_status(snapshot: &Snapshot, count: usize) -> Quality {
             .iter()
             .any(|s| matches!(s.status.as_str(), "partial" | "failed" | "cancelled"));
     Quality {
+        issue_scope: QualityIssueScope::Index,
+        query_impact: if partial {
+            QualityQueryImpact::Unknown
+        } else {
+            QualityQueryImpact::None
+        },
         status: if partial {
             "partial"
         } else if count == 0 {

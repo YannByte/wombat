@@ -8,11 +8,6 @@ import type { Response as ArtifactsResult } from './generated/artifacts-response
 export type { Request as ArtifactsRequest } from './generated/artifacts-request.js';
 export type { Response as ArtifactsResult, Item as ArtifactItem } from './generated/artifacts-response.js';
 export type ArtifactsTransport = (request: ArtifactsRequest, options: QueryOptions) => Promise<unknown>;
-import type { Request as ServiceRequest } from './generated/service-request.js';
-import type { Response as ServiceResult } from './generated/service-response.js';
-export type { Request as ServiceRequest } from './generated/service-request.js';
-export type { Response as ServiceResult } from './generated/service-response.js';
-export type ServiceTransport = (request:ServiceRequest,options:QueryOptions)=>Promise<unknown>;
 import type { Request as ConversationRequest } from './generated/conversation-request.js';
 import type { Response as ConversationResult } from './generated/conversation-response.js';
 export type { Request as ConversationRequest } from './generated/conversation-request.js';
@@ -119,7 +114,6 @@ export type LiveTransport = (request: LiveRequest, options: QueryOptions) => Pro
 export interface UsageClient {
   project?(request:ProjectRequest,options?:QueryOptions):Promise<ProjectResult>;
   artifacts?(request:ArtifactsRequest,options?:QueryOptions):Promise<ArtifactsResult>;
-  service?(request:ServiceRequest,options?:QueryOptions):Promise<ServiceResult>;
   conversation?(request: ConversationRequest, options?: QueryOptions): Promise<ConversationResult>;
   monitor?(request: MonitorRequest, options?: QueryOptions): Promise<MonitorResult>;
   setup?(request: SetupRequest, options?: QueryOptions): Promise<SetupResult>;
@@ -138,7 +132,6 @@ export interface UsageClient {
 export interface ClientTransports extends HostTransports {
   project?: ProjectTransport;
   artifacts?: ArtifactsTransport;
-  service?:ServiceTransport;
   conversation?: ConversationTransport;
   monitor?: MonitorTransport;
   setup?: SetupTransport;
@@ -175,7 +168,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
       if(!input(request))throw new CoreError('INVALID_ARGUMENT','Invalid project request');
       const result=await transports.project!(request,options);
       throwIfCancelled(options);
-      if(!output(result)||result.outputVersion!==1||result.scope.projectRoot!==request.projectRoot||result.scope.since!==request.since||result.scope.until!==request.until||result.scope.timezone!==request.timezone||(result.scope.sourceInstanceId??null)!==(request.sourceInstanceId??null)||JSON.stringify(result.scope.roots??[])!==JSON.stringify(request.roots??[])||(result.scope.ruleOverrides?.agentsBytes??null)!==(request.ruleOverrides?.agentsBytes??null)||(result.scope.ruleOverrides?.descriptionCharacters??null)!==(request.ruleOverrides?.descriptionCharacters??null))throw new CoreError('PROTOCOL_ERROR','Invalid project response');
+      if(!output(result)||result.outputVersion!==2||result.scope.projectRoot!==request.projectRoot||result.scope.since!==request.since||result.scope.until!==request.until||result.scope.timezone!==request.timezone||(result.scope.sourceInstanceId??null)!==(request.sourceInstanceId??null)||JSON.stringify(result.scope.roots??[])!==JSON.stringify(request.roots??[])||(result.scope.ruleOverrides?.agentsBytes??null)!==(request.ruleOverrides?.agentsBytes??null)||(result.scope.ruleOverrides?.descriptionCharacters??null)!==(request.ruleOverrides?.descriptionCharacters??null))throw new CoreError('PROTOCOL_ERROR','Invalid project response');
       const sections=[result.configuration,result.checks,result.history,result.records,result.artifacts];
       if(result.partial!==sections.some(s=>s.state!=='complete')||sections.some(s=>s.state==='unavailable'?s.result!==null||!s.error:s.result===null||s.error!==null))throw new CoreError('PROTOCOL_ERROR','Inconsistent project sections');
       return result;
@@ -186,16 +179,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
       if(!input(request))throw new CoreError('INVALID_ARGUMENT','Invalid artifacts request');
       const result=await transports.artifacts!(request,options);
       throwIfCancelled(options);
-      if(!output(result)||result.outputVersion!==2||result.policyVersion!==2||result.action!==request.action||request.action!=='inspect'&&(result.readView!==request.readView||result.baselineId!==request.baselineId))throw new CoreError('PROTOCOL_ERROR','Invalid artifacts response');
-      return result;
-    }}:{}),
-    ...(transports.service ? {async service(request:ServiceRequest,options:QueryOptions={}):Promise<ServiceResult>{
-      const [{validate:input},{validate:output}]=await Promise.all([import('./generated/validate-service-request.js'),import('./generated/validate-service-response.js')]);
-      throwIfCancelled(options);
-      if(!input(request))throw new CoreError('INVALID_ARGUMENT','Invalid service request');
-      const result=await transports.service!(request,options);
-      throwIfCancelled(options);
-      if(!output(result)||result.outputVersion!==1||result.action!==request.action)throw new CoreError('PROTOCOL_ERROR','Invalid service response');
+      if(!output(result)||result.outputVersion!==3||result.policyVersion!==2||result.action!==request.action||request.action!=='inspect'&&(result.baselineId!==request.baseline.baselineId))throw new CoreError('PROTOCOL_ERROR','Invalid artifacts response');
       return result;
     }}:{}),
     ...(transports.monitor
@@ -217,7 +201,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
               result.outputVersion !== 1 ||
               result.action !== request.action ||
               (request.action === 'check'
-                ? result.snapshotId !== request.snapshotId
+                ? !result.snapshotId
                 : result.snapshotId != null)
             )
               throw new CoreError('PROTOCOL_ERROR', 'Invalid monitor response');
@@ -278,7 +262,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
         if (!input(request)) throw new CoreError('INVALID_ARGUMENT', 'Invalid conversation request');
         const result = await transports.conversation!(request, options);
         throwIfCancelled(options);
-        if (!output(result) || !matchesConversationSelection(request, result) || result.outputVersion !== 1 || result.action !== request.action || result.snapshotId !== request.snapshotId || result.baselineSnapshotId !== (request.baselineSnapshotId ?? null) || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
+        if (!output(result) || !matchesConversationSelection(request, result) || result.outputVersion !== 2 || result.action !== request.action || !result.snapshotId || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
         return result;
       },
     } : {}),
@@ -407,7 +391,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
             throwIfCancelled(options);
             if (
               !validateOptimizeResult(result) ||
-              result.outputVersion !== 5 ||
+              result.outputVersion !== 6 ||
               result.action !== (request.action ?? 'list') ||
               !matchesActivity(request, result)
             )
@@ -431,7 +415,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
             throwIfCancelled(options);
             if (
               !validateConfigResult(result) ||
-              result.outputVersion !== 1 ||
+              result.outputVersion !== 2 ||
               result.action !== (request.action ?? 'list')
             )
               throw new CoreError('PROTOCOL_ERROR', '配置数据格式不正确');
@@ -502,7 +486,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
         !validateResponse(result) ||
         result.outputVersion !== 5 ||
         result.action !== request.action ||
-        !matchesComparison(request, result) ||
+        !result.snapshotRef.snapshotId || !matchesComparison(request, result) ||
         !matchesInspection(request, result) ||
         !matchesStatistics(request, result)
       ) {
@@ -516,7 +500,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
 function matchesTiming(request: TimingRequest, result: TimingResult): boolean {
   const profile = request.privacyProfile ?? 'local';
   if (
-    result.outputVersion !== 6 ||
+    result.outputVersion !== 7 ||
     result.action !== request.action ||
     result.profile !== profile ||
     result.methodVersion !== 'safe_event_turn_v7'
@@ -537,12 +521,12 @@ function matchesTiming(request: TimingRequest, result: TimingResult): boolean {
       (result.profile === 'local' && !matchesRepeatNavigation(result)))
   )
     return false;
-  if (request.action === 'capabilities') return !('scope' in result) && !('readView' in result);
+  if (request.action === 'capabilities') return !('scope' in result) && !('basis' in result);
   if (request.action === 'summary' && profile === 'share-v1') {
     // Sharing deliberately omits local locating identities; core selection owns
     // target binding. The separate schema validates the identifier-free branch.
     return (
-      'relativeAnchors' in result && !('readView' in result) && result.privacy.profile === profile
+      'relativeAnchors' in result && !('basis' in result) && result.privacy.profile === profile
     );
   }
   if (
@@ -559,7 +543,7 @@ function matchesTiming(request: TimingRequest, result: TimingResult): boolean {
   if (request.action === 'evidence')
     return (
       'rows' in result &&
-      result.snapshotId === request.snapshotId &&
+      result.snapshotId.length > 0 &&
       result.collection === (request.collection ?? 'turn_events') &&
       (result.collection !== 'use_records' ||
         ((result.objectRef ?? null) === (request.objectRef ?? null) &&
@@ -567,9 +551,11 @@ function matchesTiming(request: TimingRequest, result: TimingResult): boolean {
             result.rows.every((row) => row.objectRef === request.objectRef))))
     );
   return (
-    'readView' in result &&
+    'basis' in result &&
     result.privacy.profile === profile &&
-    (request.snapshotId == null || result.readView.snapshotId === request.snapshotId)
+    result.basis.snapshotId.length > 0 &&
+    result.evidence.snapshotId === result.basis.snapshotId &&
+    result.evidence.collections.every(c => c.snapshotId === result.basis.snapshotId)
   );
 }
 
@@ -735,7 +721,6 @@ function validActivityRequest(request: OptimizeRequest): boolean {
   return (
     request.activity != null &&
     [
-      request.readView,
       request.baselineId,
       request.projectRoots,
       request.project,
@@ -868,16 +853,15 @@ function matchesActivity(request: OptimizeRequest, result: OptimizeResult): bool
     !activity ||
     !selected ||
     activity.formatVersion !== 3 ||
+    !activity.basis.snapshotId ||
+    result.usageRevision !== activity.basis.snapshotId ||
     activity.analysisMethod !== 'safe_event_turn_v7' ||
     activity.scope.agentKind !== 'codex' ||
     !activity.scope.wholeTurn ||
-    activity.readView.snapshotId !== selected.snapshotId ||
     activity.scope.threadId !== selected.threadId ||
     activity.scope.turnId !== selected.turnId ||
     (request.sourceInstanceId != null &&
       activity.scope.sourceInstanceId !== request.sourceInstanceId) ||
-    result.usageRevision !== selected.snapshotId ||
-    result.readView != null ||
     result.suggestions.length ||
     result.checks.length
   )
@@ -1017,8 +1001,6 @@ function matchesComparison(request: Request, result: Response): boolean {
   const input = request.comparison,
     output = result.comparison;
   if (!input || !output || input.kind !== output.kind) return false;
-  if (request.snapshotId != null && result.snapshotRef.snapshotId !== request.snapshotId)
-    return false;
   if (input.kind === 'periods' && output.kind === 'periods')
     return (
       output.dimension === input.dimension &&
@@ -1049,8 +1031,6 @@ function matchesInspection(request: Request, result: Response): boolean {
   if (['investigate', 'review'].includes(request.action) !== (output.opportunities != null))
     return false;
   if (['investigate', 'review'].includes(request.action) !== (output.activity != null))
-    return false;
-  if (request.snapshotId != null && result.snapshotRef.snapshotId !== request.snapshotId)
     return false;
   const thread = request.threadId ?? request.scope?.threadId;
   if (thread != null && result.scope.threadId !== thread) return false;
@@ -1159,8 +1139,6 @@ function matchesStatistics(request: Request, result: Response): boolean {
     s.quantileMethod !== 'type_7' ||
     s.dimension !== (request.presentation ?? null)
   )
-    return false;
-  if (request.snapshotId != null && request.snapshotId !== result.snapshotRef.snapshotId)
     return false;
   if (
     (request.threadId != null) !== (s.selectedTask != null) ||

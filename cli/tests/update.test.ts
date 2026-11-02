@@ -132,7 +132,7 @@ test('managed installation verifies and atomically selects a downloaded release'
     const updated = await updateInstalled({ baseUrl, entryFile: entry });
     const nextId = `0.3.0-${source.slice(0, 12)}-${sourceSha256.slice(0, 12)}`;
     assert.equal(updated.updated, true);
-    assert.equal(updated.serviceRestart, 'unconfirmed');
+    assert.equal('serviceRestart' in updated, false);
     assert.equal(
       JSON.parse(readFileSync(path.join(install, 'service-registration.json'), 'utf8')).version,
       99,

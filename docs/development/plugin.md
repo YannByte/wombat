@@ -18,4 +18,4 @@ codex plugin add wombat@wombat-local
 
 `corepack pnpm verify:skill-native -- --output-dir /tmp/wombat-native --codex-bin /absolute/path/to/codex` 使用全新配置，验证单插件安装、发现、运行时兼容及保留数据的移除。默认 setup 不探测 Hooks；显式 `--hooks` 才检查可选注册。插件安装不代表已建立索引或事件覆盖。
 
-构建后可用 `corepack pnpm verify:skill-conversation -- --output-dir /tmp/wombat-conversations --agent-bin /absolute/path/to/codex --language both` 做需授权的模型对话测试。`--scenario` 选择 usage、pricing、timing、statistics、monitor、account、daily-review、task-retro 或 config-review；`all` 运行全部。每例使用全新数据与安装目录；只有该例后续对话延续状态。配置例只授权修改选定 description，并按原 readView/baselineId 复查。报告保存用量与事实，建议质量仍需人工审阅。没有运行该检查时，不能声称已验证模型建议效果。
+构建后可用 `corepack pnpm verify:skill-conversation -- --output-dir /tmp/wombat-conversations --agent-bin /absolute/path/to/codex --language both` 做需授权的模型对话测试。`--scenario` 选择 usage、pricing、timing、statistics、monitor、account、daily-review、task-retro 或 config-review；`all` 运行全部。每例使用全新数据与安装目录；只有该例后续对话延续状态。配置例只授权修改选定 description，并按原始发现和基线 ID 复查。报告保存用量与事实，建议质量仍需人工审阅。没有运行该检查时，不能声称已验证模型建议效果。

@@ -56,17 +56,15 @@ fn request(root: &Path) -> Request {
         codex: false,
     }
 }
-fn inspect(root: &Path, store: &Mutex<Store>, host: &Host) -> Response {
-    execute_with(request(root), store, &|| false, host).unwrap()
+fn inspect(root: &Path, host: &Host) -> Response {
+    execute_with(request(root), &|| false, host).unwrap()
 }
-fn recheck(before: &Response, store: &Mutex<Store>, host: &Host) -> Response {
+fn recheck(before: &Response, host: &Host) -> Response {
     execute_with(
         Request::Recheck {
-            read_view: before.read_view.clone(),
-            baseline_id: before.baseline_id.clone(),
+            baseline: Box::new(before.clone()),
             selection: vec![],
         },
-        store,
         &|| false,
         host,
     )
@@ -75,16 +73,16 @@ fn recheck(before: &Response, store: &Mutex<Store>, host: &Host) -> Response {
 #[test]
 fn scan_is_read_only_and_known_cache_is_not_permission_to_remove() {
     let (_temp, root) = fixture();
-    let store = Mutex::new(Store::default());
+
     let before = fs::read(root.join("target/object.o")).unwrap();
-    let response = inspect(&root, &store, &Host::default());
+    let response = inspect(&root, &Host::default());
     assert_eq!(response.items.len(), 1);
     assert_eq!(response.items[0].assessment, Assessment::Candidate);
     assert_eq!(response.items[0].regeneration, Regeneration::CargoCache);
     assert!(!response.partial);
     assert_eq!(fs::read(root.join("target/object.o")).unwrap(), before);
     assert_eq!(
-        recheck(&response, &store, &Host::default()).items[0].recheck,
+        recheck(&response, &Host::default()).items[0].recheck,
         Some(RecheckState::Unchanged)
     );
 }
@@ -97,7 +95,7 @@ fn tracked_ignored_personal_files_nested_repositories_and_pending_consumers_are_
     ] {
         let (_temp, root) = fixture();
         fs::write(root.join("target").join(name), b"synthetic").unwrap();
-        let result = inspect(&root, &Mutex::default(), &Host::default());
+        let result = inspect(&root, &Host::default());
         assert_ne!(result.items[0].assessment, Assessment::Candidate);
         assert!(result.items[0].reasons.contains(&reason));
     }
@@ -107,7 +105,7 @@ fn tracked_ignored_personal_files_nested_repositories_and_pending_consumers_are_
         ..Default::default()
     };
     assert_eq!(
-        inspect(&root, &Mutex::default(), &h).items[0].assessment,
+        inspect(&root, &h).items[0].assessment,
         Assessment::Protected
     );
     let req = Request::Inspect {
@@ -117,7 +115,7 @@ fn tracked_ignored_personal_files_nested_repositories_and_pending_consumers_are_
         product_temporary: false,
         codex: false,
     };
-    let r = execute_with(req, &Mutex::default(), &|| false, &Host::default()).unwrap();
+    let r = execute_with(req, &|| false, &Host::default()).unwrap();
     assert_eq!(r.items[0].reasons, vec![Reason::UserKept]);
 }
 #[test]
@@ -131,42 +129,37 @@ fn missing_use_observations_never_establish_idle_or_disposable() {
             use_state: state,
             ..Default::default()
         };
-        assert_eq!(
-            inspect(&root, &Mutex::default(), &h).items[0].assessment,
-            assessment
-        );
+        assert_eq!(inspect(&root, &h).items[0].assessment, assessment);
     }
 }
 #[test]
 fn baseline_binds_original_selection_and_detects_changes_deletion_and_replacement() {
     let (_temp, root) = fixture();
-    let store = Mutex::default();
+
     let h = Host::default();
-    let before = inspect(&root, &store, &h);
+    let before = inspect(&root, &h);
     fs::write(root.join("target/object.o"), b"changed").unwrap();
     assert_eq!(
-        recheck(&before, &store, &h).items[0].recheck,
+        recheck(&before, &h).items[0].recheck,
         Some(RecheckState::Changed)
     );
     fs::remove_dir_all(root.join("target")).unwrap();
     assert_eq!(
-        recheck(&before, &store, &h).items[0].recheck,
+        recheck(&before, &h).items[0].recheck,
         Some(RecheckState::Gone)
     );
     fs::create_dir(root.join("target")).unwrap();
     fs::write(root.join("target/new.o"), b"new").unwrap();
     assert_eq!(
-        recheck(&before, &store, &h).items[0].recheck,
+        recheck(&before, &h).items[0].recheck,
         Some(RecheckState::Changed)
     );
     assert!(
         execute_with(
             Request::Recheck {
-                read_view: before.read_view.clone(),
-                baseline_id: before.baseline_id.clone(),
+                baseline: Box::new(before.clone()),
                 selection: vec!["unselected".into()]
             },
-            &store,
             &|| false,
             &h
         )
@@ -175,11 +168,12 @@ fn baseline_binds_original_selection_and_detects_changes_deletion_and_replacemen
     assert!(
         execute_with(
             Request::Recheck {
-                read_view: before.read_view.clone(),
-                baseline_id: "changed".into(),
+                baseline: Box::new(Response {
+                    baseline_id: "changed".into(),
+                    ..before.clone()
+                }),
                 selection: vec![]
             },
-            &store,
             &|| false,
             &h
         )
@@ -189,15 +183,15 @@ fn baseline_binds_original_selection_and_detects_changes_deletion_and_replacemen
 #[test]
 fn changed_regeneration_inputs_and_late_usage_invalidate_the_preview() {
     let (_temp, root) = fixture();
-    let store = Mutex::default();
-    let before = inspect(&root, &store, &Host::default());
+
+    let before = inspect(&root, &Host::default());
     fs::write(
         root.join("Cargo.toml"),
         "[package]\nname='different'\nversion='0.2.0'\n",
     )
     .unwrap();
     assert_eq!(
-        recheck(&before, &store, &Host::default()).items[0].recheck,
+        recheck(&before, &Host::default()).items[0].recheck,
         Some(RecheckState::Changed)
     );
     let busy = Host {
@@ -205,31 +199,21 @@ fn changed_regeneration_inputs_and_late_usage_invalidate_the_preview() {
         ..Default::default()
     };
     assert_eq!(
-        recheck(&before, &store, &busy).items[0].assessment,
+        recheck(&before, &busy).items[0].assessment,
         Assessment::Protected
     );
 }
 #[test]
-fn expired_cancelled_and_incomplete_observations_do_not_become_success() {
+fn stateless_cancelled_and_incomplete_observations_do_not_become_success() {
     let (_temp, root) = fixture();
-    let store = Mutex::default();
-    let before = inspect(&root, &store, &Host::default());
-    store.lock().unwrap().views[0].1 = Instant::now() - Duration::from_secs(TTL + 1);
-    assert!(
-        execute_with(
-            Request::Recheck {
-                read_view: before.read_view,
-                baseline_id: before.baseline_id,
-                selection: vec![]
-            },
-            &store,
-            &|| false,
-            &Host::default()
-        )
-        .is_err()
+
+    let before = inspect(&root, &Host::default());
+    // The full original plan survives independently of any process or timer.
+    assert_eq!(
+        recheck(&before, &Host::default()).items[0].recheck,
+        Some(RecheckState::Unchanged)
     );
-    assert!(execute_with(request(&root), &store, &|| true, &Host::default()).is_err());
-    assert!(store.lock().unwrap().views.is_empty());
+    assert!(execute_with(request(&root), &|| true, &Host::default()).is_err());
     let flag = AtomicBool::new(false);
     let cancelled = || flag.load(Ordering::Relaxed);
     let mut b = scan::Budget::new(&cancelled);
@@ -263,7 +247,7 @@ fn links_cannot_escape_scope_and_hard_links_are_counted_once() {
     let outside = tempfile::tempdir().unwrap();
     fs::write(outside.path().join("private"), b"must survive").unwrap();
     symlink(outside.path(), root.join("dist")).unwrap();
-    let r = inspect(&root, &Mutex::default(), &Host::default());
+    let r = inspect(&root, &Host::default());
     assert!(
         r.items
             .iter()
@@ -274,7 +258,7 @@ fn links_cannot_escape_scope_and_hard_links_are_counted_once() {
         b"must survive"
     );
     fs::hard_link(root.join("target/object.o"), root.join("target/alias.o")).unwrap();
-    let r = inspect(&root, &Mutex::default(), &Host::default());
+    let r = inspect(&root, &Host::default());
     let item = r.items.iter().find(|i| i.path.ends_with("target")).unwrap();
     assert_eq!(item.observation.as_ref().unwrap().files, 2);
 }
@@ -283,7 +267,7 @@ fn selected_temporary_paths_need_review_without_recheck_expansion() {
     let (_temp, root) = fixture();
     fs::create_dir(root.join("temporary")).unwrap();
     fs::write(root.join("temporary/item.bin"), b"local").unwrap();
-    let store = Mutex::default();
+
     let r = execute_with(
         Request::Inspect {
             project_root: root.to_str().unwrap().into(),
@@ -292,7 +276,6 @@ fn selected_temporary_paths_need_review_without_recheck_expansion() {
             product_temporary: false,
             codex: false,
         },
-        &store,
         &|| false,
         &Host::default(),
     )
@@ -300,7 +283,7 @@ fn selected_temporary_paths_need_review_without_recheck_expansion() {
     assert_eq!(r.items[0].assessment, Assessment::Review);
     assert!(r.items[0].reasons.contains(&Reason::TaskOwnershipRequired));
     fs::create_dir(root.join("new-output")).unwrap();
-    assert_eq!(recheck(&r, &store, &Host::default()).items.len(), 1);
+    assert_eq!(recheck(&r, &Host::default()).items.len(), 1);
 }
 
 #[test]
@@ -314,8 +297,8 @@ fn compiler_overrides_and_changed_owner_do_not_pass_original_conditions() {
     )
     .unwrap();
     fs::write(root.join("package.json"), r#"{"scripts":{"build":"tsc"}}"#).unwrap();
-    let store = Mutex::default();
-    let before = inspect(&root, &store, &Host::default());
+
+    let before = inspect(&root, &Host::default());
     let dist = before
         .items
         .iter()
@@ -327,7 +310,7 @@ fn compiler_overrides_and_changed_owner_do_not_pass_original_conditions() {
         r#"{"scripts":{"build":"tsc --outDir other"}}"#,
     )
     .unwrap();
-    let after = recheck(&before, &store, &Host::default());
+    let after = recheck(&before, &Host::default());
     let dist = after
         .items
         .iter()
@@ -339,7 +322,7 @@ fn compiler_overrides_and_changed_owner_do_not_pass_original_conditions() {
     fs::rename(&root, &moved).unwrap();
     fs::create_dir(&root).unwrap();
     assert!(
-        recheck(&before, &store, &Host::default())
+        recheck(&before, &Host::default())
             .items
             .iter()
             .all(|i| i.recheck == Some(RecheckState::Unavailable))
@@ -365,11 +348,35 @@ fn explicitly_selected_external_links_are_not_traversed() {
             product_temporary: false,
             codex: false,
         },
-        &Mutex::default(),
         &|| false,
         &Host::default(),
     )
     .unwrap();
     assert_eq!(r.items[0].assessment, Assessment::Protected);
     assert!(r.items[0].observation.is_none());
+}
+
+#[test]
+fn selected_ids_bind_the_original_scope_and_evidence_even_if_plan_digest_is_recomputed() {
+    let (_dir, root) = fixture();
+    let original = inspect(&root, &Host::default());
+    for mutate in [0, 1, 2] {
+        let mut forged = original.clone();
+        match mutate {
+            0 => forged.scope.keep_paths.push("/different-scope".into()),
+            1 => forged.items[0].path.push_str("-foreign"),
+            _ => forged.items[0].assessment = Assessment::Protected,
+        }
+        forged.baseline_id = baseline_id(&forged).unwrap();
+        let result = execute_with(
+            Request::Recheck {
+                baseline: Box::new(forged),
+                selection: vec![original.items[0].id.clone()],
+            },
+            &|| false,
+            &Host::default(),
+        );
+        assert!(result.is_err());
+    }
+    assert!(root.join("target/object.o").exists());
 }

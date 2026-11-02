@@ -23,8 +23,8 @@ test('index initialization faults return actual errors, retain unsupported recor
     unsupported.close();
     const previous = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
-    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
+
     const client = createNodeClient({ binaryPath: binary, automaticPrices: false });
     const nativeEntry = projectTestClient(client, [root], [project]);
     try {
@@ -45,7 +45,7 @@ test('index initialization faults return actual errors, retain unsupported recor
         assert.equal(checks.checks.find(c => c.rule === 'fileSize')?.outcome, 'hit');
         assert.ok(!checks.checks.some(c => c.rule === 'runtimeDuplicateInjection'));
         await writeFile(instructions, 'Short synthetic instructions.');
-        const recheck = await nativeApi.optimize!({ project, action: 'recheck', readView: pending.readView, baselineId: suggestion.baselineId });
+        const recheck = await nativeApi.optimize!({ project, action: 'recheck', baseline:suggestion, baselineId: suggestion.baselineId });
         assert.ok(recheck.checks.some(c=>c.rule==='fileSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
         assert.equal(recheck.decisionRevision,'0');
         const retained = new DatabaseSync(database);
@@ -53,7 +53,7 @@ test('index initialization faults return actual errors, retain unsupported recor
         assert.equal(retained.prepare('PRAGMA user_version').get()!.user_version, 99);
         retained.close();
         // Explicit repair uses the real CLI and publishes only the derived generation.
-        const rebuilt = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'usage', '--root', root, '--rebuild', '--wait-ms', '20000', '--json'], { env: { ...process.env, WOMBAT_CORE_BIN: binary }, encoding: 'utf8', timeout: 25000 });
+        const rebuilt = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'usage', '--root', root, '--rebuild', '--json'], { env: { ...process.env, WOMBAT_CORE_BIN: binary }, encoding: 'utf8', timeout: 25000 });
         assert.ifError(rebuilt.error);
         assert.ok([0, 2].includes(rebuilt.status!), rebuilt.stdout + rebuilt.stderr);
         const restored = JSON.parse(rebuilt.stdout);
@@ -70,8 +70,8 @@ test('index initialization faults return actual errors, retain unsupported recor
         assert.equal((await nativeApi.optimize!({ project })).decisionRevision,'0');
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(previous)) {
             if (v === undefined)
                 delete process.env[k];

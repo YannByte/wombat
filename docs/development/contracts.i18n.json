@@ -2,24 +2,24 @@
   "version": 2,
   "sections": {
     "/public-contracts": {
-      "zh": "f187bf8eb55e378239de38b05d9f14a53bad3f3794d1255bdab897395c7abfdf",
-      "en": "ceb91150bbe0ff26f1ebaebc9cdbf2e3ca1c3b02217df6dc691ff97fa6a003ad"
+      "zh": "77874f497a8068c78c7e3cb530f62049bf9e655471e62791c9f09405e38f4e71",
+      "en": "e51a8d138962aa6a00e56ff13022170a8518fc42b1cab9c6fd99f7c4e0f1ed17"
     },
     "/public-contracts/client-entries": {
-      "zh": "43df27589e6cac42deff22d885581433bb66077922612dcb496abf56f4557b4f",
-      "en": "d0ef4dba22e780929a3e8a6026abfd1c58f2912a649e69fc0752dc52ea43e6ae"
+      "zh": "a9102d3c05053c6921b48f2a7da9316487be061240bba615ff34375c30455bc3",
+      "en": "bf9b79435f23b369f4a7856abf13b8047ea58636dc192c2ee9ef17bbeac8fe16"
     },
-    "/public-contracts/whole-turn-timing-contract-v6": {
-      "zh": "77b027d25778832ccf15e0d16d671b255b1724d80f11b276796da7f75048175b",
-      "en": "915bf5b2f18acd8eac9354ef9e35c5e64ff6b0a2d2d7cf402875f2feaf42a971"
+    "/public-contracts/whole-turn-timing-contract-v7": {
+      "zh": "f3603d237859cec41bcd4eca349d0621b8ccbdb01ef5fb19c3567c462798ef0b",
+      "en": "1b8fc70dcc57f160ee322db47a8e8b527d5e71045c25f69ac49d6f346a6e13ae"
     },
-    "/public-contracts/read-only-configuration-contract-v1": {
-      "zh": "5f24a523a03f8679049a7cf0972746e27dea2dbe3c2f8f931548538366750ea9",
-      "en": "a39123bb4d8028c33cc27b99df580b83d154ea5700c9f03751711031c0a32e18"
+    "/public-contracts/read-only-configuration-contract-v2": {
+      "zh": "f70194500b72ff5af7324edb9e4af81cf59905b4044181dea1ce9f1b011d59e1",
+      "en": "d6fa00b8255bd7e5aad738caf319936b30de710d77940d64d7afdad8d7ba69b8"
     },
     "/public-contracts/optimize-and-preference-contracts": {
-      "zh": "869e7834de86697568962cf98a3875a180013dbc736ddfc7abc99e129336eb75",
-      "en": "9d7aa36b822f592b868131ac9b99eee56c5fbf33903cba49f8e1f871e13d6012"
+      "zh": "4045957b8646a1d96bcc491f22473b91982ba61ae6640995619e70e6fc2ba564",
+      "en": "e0b12c9d582b6a4f6d5e35cf6fa1e3bed3e9aaaaa158ed1f5fcdc8079b64d222"
     },
     "/public-contracts/account-contract-v1": {
       "zh": "68849c40edb27eb0c45924a5674068ca3b51ada6faefed605f6c0f047431df9c",

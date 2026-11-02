@@ -4,7 +4,9 @@
 
 Status: implemented
 
-常驻索引生命周期部分替代空闲退出选择，见[常驻索引提案](../../proposed/architecture/2026-10-15-resident-indexing.md)；来源隔离和不可变读取语义仍然适用。
+下文中的服务与保留视图生命周期已由[前台查询决策](2026-11-02-foreground-queries.md)替代；独立来源、计量及有界证据方面的理由继续作为历史背景保留。
+
+常驻索引生命周期部分替代空闲退出选择，见[常驻索引提案](../../rejected/architecture/2026-10-15-resident-indexing.md)；来源隔离和不可变读取语义仍然适用。
 
 ## 问题
 

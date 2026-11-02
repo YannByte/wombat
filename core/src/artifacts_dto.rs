@@ -1,4 +1,6 @@
 //! Artifact observations and explicitly selected Codex cleanup. Candidates are not authorization.
+pub const REQUEST_VERSION: u32 = 3;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,14 +24,12 @@ pub enum Request {
         codex: bool,
     },
     Apply {
-        read_view: String,
-        baseline_id: String,
+        baseline: Box<Response>,
         #[schemars(length(max = 100))]
         selection: Vec<String>,
     },
     Recheck {
-        read_view: String,
-        baseline_id: String,
+        baseline: Box<Response>,
         #[serde(default)]
         selection: Vec<String>,
     },
@@ -194,15 +194,14 @@ pub struct Summary {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Response {
-    #[schemars(range(min = 2, max = 2))]
+    #[schemars(range(min = 3, max = 3))]
     pub output_version: u32,
     #[schemars(range(min = 2, max = 2))]
     pub policy_version: u32,
     pub action: String,
-    pub read_view: String,
+    pub project_identity: String,
     pub baseline_id: String,
     pub checked_at: String,
-    pub expires_at: String,
     pub scope: Scope,
     pub items: Vec<Item>,
     pub summary: Summary,

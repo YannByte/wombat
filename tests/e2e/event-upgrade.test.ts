@@ -65,21 +65,7 @@ function fixture(project: string, skill: string): unknown[] {
         row('event_msg', { type: 'task_complete', turn_id: nativeTurn, duration_ms: 1200, time_to_first_token_ms: 0, last_agent_message: body }, 1000),
     ];
 }
-async function stop(child: ChildProcess | undefined): Promise<void> {
-    if (!child || child.exitCode !== null || child.signalCode !== null)
-        return;
-    const closed = once(child, 'close');
-    child.kill('SIGTERM');
-    let kill: ReturnType<typeof setTimeout> | undefined, deadline: ReturnType<typeof setTimeout> | undefined;
-    try {
-        kill = setTimeout(() => child.kill('SIGKILL'), 2000);
-        await Promise.race([closed, new Promise<never>((_, reject) => { deadline = setTimeout(() => reject(new Error('Synthetic core did not stop')), 4000); })]);
-    }
-    finally {
-        clearTimeout(kill);
-        clearTimeout(deadline);
-    }
-}
+
 async function environment() {
     const dir = realpathSync.native(await mkdtemp(path.join(tmpdir(), 'wombat-event-upgrade-')));
     const root = path.join(dir, 'source'), project = path.join(dir, 'project'), data = path.join(dir, 'data');
@@ -88,13 +74,13 @@ async function environment() {
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
     const keys = ['WOMBAT_DATA_HOME', 'CODEX_HOME', 'WOMBAT_AUTO_PRICES', 'WOMBAT_CODEX_BIN', 'WOMBAT_CORE_BIN'] as const;
     const saved = keys.map(key => [key, process.env[key]] as const);
-    let child: ChildProcess | undefined, nativeEntry: UsageClient | undefined;
+    let nativeEntry: UsageClient | undefined;
     let hidden = false;
     const close = async () => {
         try { }
         finally {
             try {
-                await stop(child);
+
             }
             finally {
                 try {
@@ -121,18 +107,12 @@ async function environment() {
         await writeFile(path.join(root, 'session_index.jsonl'), jsonl([{ id: nativeThread, thread_name: title, updated_at: new Date(epoch).toISOString() }]));
         await writeFile(file, jsonl(fixture(project, skill)));
         Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN: path.join(dir, 'absent-native-codex'), WOMBAT_CORE_BIN: binary });
-        const start = async () => {
-            child = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-            await once(child, 'spawn');
-        };
-        await start();
         const node = createNodeClient({ binaryPath: binary, automaticPrices: false, timeoutMs: 15000 });
         nativeEntry = projectTestClient(node, [root], [project]);
 
 
         const nativeTransport = nativeEntry;
-        return { dir, root, project, data, skill, file, node, nativeTransport, close, stopService: () => stop(child), startService: start,
-            restart: async () => { await stop(child); await start(); },
+        return { dir, root, project, data, skill, file, node, nativeTransport, close,
             hideSource: async () => { await rename(path.join(root, 'sessions'), path.join(root, 'sessions-hidden')); hidden = true; },
             restoreSource: async () => { await rename(path.join(root, 'sessions-hidden'), path.join(root, 'sessions')); hidden = false; },
         };
@@ -174,7 +154,7 @@ async function pages(client: UsageClient, request: EvidenceRequest): Promise<Evi
         if (page.action !== 'evidence')
             throw new Error('Expected evidence page');
         assert.equal(page.collection, request.collection);
-        assert.equal(page.snapshotId, request.snapshotId);
+        assert.ok(page.snapshotId);
         assert.equal(page.scope.threadId, request.threadId);
         assert.equal(page.scope.turnId, request.turnId);
         assert.ok(page.rows.length <= (request.limit ?? 50));
@@ -266,26 +246,26 @@ test('fixed native events have independent token/time/work/use truth through Nod
         assert.equal(first.result.summary.tokens.cacheRead, 20);
         assert.equal(first.result.summary.tokens.input, 80);
         assert.equal(first.result.summary.tokens.output, 10);
-        const threads = await env.nativeTransport.live!({ query: { action: 'threads', snapshotId, scope: { allTime: true } }, mode: 'cached' });
+        const threads = await env.nativeTransport.live!({ query: { action: 'threads', scope: { allTime: true } }, mode: 'cached' });
         const thread = threads.result.items.find(item => item.kind === 'thread');
         assert.ok(thread);
         assert.equal(thread.title, title);
-        const turns = await env.nativeTransport.live!({ query: { action: 'turns', snapshotId, threadId: thread.id, scope: { allTime: true } }, mode: 'cached' });
+        const turns = await env.nativeTransport.live!({ query: { action: 'turns', threadId: thread.id, scope: { allTime: true } }, mode: 'cached' });
         const turn = turns.result.items.find(item => item.kind === 'turn');
         assert.ok(turn);
-        const request = { action: 'summary', snapshotId, threadId: thread.id, turnId: turn.id, mode: 'cached', privacyProfile: 'local' } as const;
+        const request = { action: 'summary', threadId: thread.id, turnId: turn.id, mode: 'cached', privacyProfile: 'local' } as const;
         const initial = local(await timing(env.nativeTransport, request));
         counts(initial);
-        assert.equal(initial.readView.snapshotId, snapshotId);
+        assert.equal(initial.basis.snapshotId, snapshotId);
         assert.equal(initial.scope.wholeTurn, true);
         const node = local(await timing(env.node, { ...request, roots: [env.root] }));
         counts(node);
         assert.deepEqual(node.time, initial.time);
         assert.deepEqual(node.work, initial.work);
         assert.deepEqual(node.uses, initial.uses);
-        const args: CliInput = {"method":"timing","params":{"action":"summary","privacyProfile":"local","mode":"cached","snapshotId":snapshotId,"threadId":thread.id,"turnId":turn.id}};
+        const args: CliInput = {"method":"timing","params":{"action":"summary","privacyProfile":"local","mode":"cached","threadId":thread.id,"turnId":turn.id}};
         assert.deepEqual(cli(args), initial, 'all entries use the same fixed evidence, not separately selected latest views');
-        const evidence = { action: 'evidence', snapshotId, threadId: thread.id, turnId: turn.id, limit: 2 } as const;
+        const evidence = { action: 'evidence', threadId: thread.id, turnId: turn.id, limit: 2 } as const;
         const events = await pages(env.nativeTransport, { ...evidence, collection: 'turn_events' });
         const eventRows = events.flatMap(page => { assert.equal(page.collection, 'turn_events'); if (page.collection !== 'turn_events')
             throw new Error('Wrong event collection'); return page.rows; });
@@ -331,11 +311,11 @@ test('fixed native events have independent token/time/work/use truth through Nod
         assert.equal(skillRows.length, 3);
         assert.ok(skillRows.every(item => item.objectRef === skill.objectRef));
         assert.equal(skillRows.filter(item => item.outcome === 'failed').length, 1);
-        const cliPage = cli({"method":"timing","params":{"action":"evidence","snapshotId":snapshotId,"threadId":thread.id,"turnId":turn.id,"collection":"use_records","objectRef":skill.objectRef,"limit":2}});
+        const cliPage = cli({"method":"timing","params":{"action":"evidence","threadId":thread.id,"turnId":turn.id,"collection":"use_records","objectRef":skill.objectRef,"limit":2}});
         assert.deepEqual(cliPage, filtered[0]);
         const shared = share(await timing(env.nativeTransport, { ...request, privacyProfile: 'share-v1' }));
         whitelist(shared, [body, title, server, tool, env.dir, env.skill, nativeThread, nativeTurn, 'synthetic-native-command', 'synthetic-native-patch', 'synthetic-native-mcp', 'synthetic-native-read-one', 'synthetic-native-message']);
-        const cliShared = cli({"method":"timing","params":{"action":"summary","privacyProfile":"share-v1","mode":"cached","snapshotId":snapshotId,"threadId":thread.id,"turnId":turn.id}});
+        const cliShared = cli({"method":"timing","params":{"action":"summary","privacyProfile":"share-v1","mode":"cached","threadId":thread.id,"turnId":turn.id}});
         assert.ok(cliShared && typeof cliShared === 'object' && 'scope' in cliShared);
         const cliScope = cliShared.scope;
         assert.ok(cliScope && typeof cliScope === 'object' && 'taskAlias' in cliScope && typeof cliScope.taskAlias === 'string');
@@ -355,26 +335,26 @@ test('fixed native events have independent token/time/work/use truth through Nod
         const current = await env.nativeTransport.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'fresh' });
         assert.notEqual(current.result.snapshotRef.snapshotId, snapshotId);
         assert.equal(current.result.summary.tokens.total, 220);
-        const freshRequest = { ...request, snapshotId: current.result.snapshotRef.snapshotId };
+        const freshRequest = {...request};
         const fresh = local(await timing(env.nativeTransport, freshRequest));
         counts(fresh, true);
-        assert.equal(fresh.readView.snapshotId, current.result.snapshotRef.snapshotId);
+        assert.equal(fresh.basis.snapshotId, current.result.snapshotRef.snapshotId);
         assert.deepEqual(fresh.scope, initial.scope);
         const frozen = local(await timing(env.nativeTransport, request));
-        counts(frozen);
-        assert.deepEqual(frozen.time, initial.time);
-        assert.deepEqual(frozen.work, initial.work);
-        assert.deepEqual(frozen.uses, initial.uses);
-        assert.deepEqual(await pages(env.nativeTransport, { ...evidence, collection: 'use_records' }), records);
-        const frozenUsage = await env.nativeTransport.live!({ query: { action: 'usage', snapshotId, scope: { allTime: true } }, mode: 'cached' });
-        assert.equal(frozenUsage.result.summary.tokens.total, 110);
+        counts(frozen,true);
+        assert.deepEqual(frozen.time, fresh.time);
+        assert.deepEqual(frozen.work, fresh.work);
+        assert.deepEqual(frozen.uses, fresh.uses);
+        assert.equal((await pages(env.nativeTransport, { ...evidence, collection: 'use_records' })).reduce((n,p)=>n+p.rows.length,0),5);
+        const frozenUsage = await env.nativeTransport.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'cached' });
+        assert.equal(frozenUsage.result.summary.tokens.total, 220);
         // Moving only this synthetic sessions directory makes rescanning observable.
         await env.hideSource();
         const offline = local(await timing(env.nativeTransport, request));
-        counts(offline);
-        assert.deepEqual(offline.uses, initial.uses);
-        const offlineUsage = await env.nativeTransport.live!({ query: { action: 'usage', snapshotId, scope: { allTime: true } }, mode: 'cached' });
-        assert.equal(offlineUsage.result.summary.tokens.total, 110);
+        counts(offline,true);
+        assert.deepEqual(offline.uses, fresh.uses);
+        const offlineUsage = await env.nativeTransport.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'cached' });
+        assert.equal(offlineUsage.result.summary.tokens.total, 220);
         assert.deepEqual(cli(args), offline);
         await env.restoreSource();
     }
@@ -392,16 +372,13 @@ test('service restart and derived-index rebuild preserve explicit decisions with
         assert.ok(suggestion);
         assert.deepEqual(suggestion.findings.map(finding => finding.rule), ['descriptionSize', 'bodyTokens']);
         assert.ok(suggestion.baselineId);
-        const kept = await env.nativeTransport.optimize!({ action:'keep',suggestionId:suggestion.id,decisionReason:'necessary',readView:initial.readView,decisionRevision:initial.decisionRevision });
+        const kept = await env.nativeTransport.optimize!({ action:'keep',suggestionId:suggestion.id,decisionReason:'necessary',decisionRevision:initial.decisionRevision });
         assert.equal(kept.pending,initial.pending-1);
         const userFile=path.join(env.data,'user-v1/reviews.sqlite3');
         const saved=await readFile(userFile), revision=kept.decisionRevision;
-        await env.restart();
         assert.equal((await env.nativeTransport.optimize!({})).pending,kept.pending);
         assert.deepEqual(await readFile(userFile),saved,'inspection after restart cannot write user decisions');
-        await env.stopService();
         for(const index of ['live-v2','config-v2']) await rm(path.join(env.data,index),{recursive:true,force:true});
-        await env.startService();
         const rebuilt=await env.nativeTransport.optimize!({});
         assert.equal(rebuilt.pending,kept.pending);
         assert.equal(rebuilt.decisionRevision,revision);

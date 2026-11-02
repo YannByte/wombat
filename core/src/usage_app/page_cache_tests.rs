@@ -129,22 +129,28 @@ fn a_cached_window_answers_new_page_sizes_without_reading_expired_facts() {
     let size_change = execute_snapshot(request("threads", None, 0, 21), &snapshot).unwrap();
     assert_eq!(size_change.items.len(), 21);
     assert_eq!(size_change.page.next_offset, Some(21));
+    // Summary reductions retain their indexed facts after details are deferred.
     for r in [
         request("threads", None, 50, 7),
         request("threads", None, 40, 20),
     ] {
-        let error = execute_snapshot(r, &snapshot).unwrap_err();
+        let expected = execute_uncached(r.clone(), &snapshot).unwrap();
+        let mut expected = expected;
+        compact::apply(&mut expected);
+        let actual = execute_snapshot(r, &snapshot).unwrap();
         assert_eq!(
-            error
-                .downcast_ref::<crate::dto::OperationError>()
-                .unwrap()
-                .code,
-            "VIEW_EXPIRED"
+            serde_json::to_value(actual).unwrap(),
+            serde_json::to_value(expected).unwrap()
         );
     }
     let mut invalid = request("threads", None, 0, 0);
     assert!(execute_snapshot(invalid.clone(), &snapshot).is_err());
     invalid.limit = Some(7);
     invalid.scope.model = Some("different".into());
-    assert!(execute_snapshot(invalid, &snapshot).is_err());
+    assert!(
+        execute_snapshot(invalid, &snapshot)
+            .unwrap()
+            .items
+            .is_empty()
+    );
 }

@@ -1,0 +1,225 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Request",
+  "type": "object",
+  "properties": {
+    "review": {
+      "description": "Observe native Skill metadata and order context footprint alongside use frequency.",
+      "type": "boolean",
+      "default": false
+    },
+    "action": {
+      "default": "list",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Action"
+        }
+      ]
+    },
+    "roots": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "projectRoots": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "cachedUsage": {
+      "description": "Check current configuration against committed usage without scheduling collection.",
+      "type": "boolean",
+      "default": false
+    },
+    "scope": {
+      "default": {
+        "allTime": null,
+        "since": null,
+        "until": null,
+        "timezone": null,
+        "project": null,
+        "agentKind": null,
+        "sourceInstanceId": null,
+        "threadId": null
+      },
+      "allOf": [
+        {
+          "$ref": "#/definitions/Scope"
+        }
+      ]
+    },
+    "kind": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Kind"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kinds": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/Kind"
+      }
+    },
+    "observation": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Observation"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "search": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sort": {
+      "default": "tokens",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Sort"
+        }
+      ]
+    },
+    "itemId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "offset": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "limit": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Action": {
+      "type": "string",
+      "enum": [
+        "list",
+        "detail",
+        "evidence",
+        "related_scopes",
+        "capabilities"
+      ]
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "allTime": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agentKind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceInstanceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "rule",
+        "skill",
+        "mcp",
+        "hook"
+      ]
+    },
+    "Observation": {
+      "type": "string",
+      "enum": [
+        "used",
+        "loaded_only",
+        "unknown"
+      ]
+    },
+    "Sort": {
+      "type": "string",
+      "enum": [
+        "tokens",
+        "activity",
+        "size",
+        "name",
+        "content_tokens",
+        "characters",
+        "recent",
+        "review",
+        "context_tokens",
+        "least_activity"
+      ]
+    }
+  },
+  "$comment": "Wombat request protocol 2"
+}

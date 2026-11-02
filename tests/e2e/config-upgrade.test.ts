@@ -1,3 +1,4 @@
+import {comparable} from '../helpers/comparable.js';
 import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
@@ -27,17 +28,17 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
     await writeFile(path.join(root, 'sessions/log.jsonl'), rows.map(r => JSON.stringify(r)).join('\n') + '\n');
     const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
-    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
+
     const client = createNodeClient({ binaryPath: binary }), nativeEntry = projectTestClient(client, [root], [project]);
     const nativeApi = nativeEntry;
     try {
         // Pin completed fixture facts before testing configuration and historical totals.
-        const all = await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true, timezone: 'UTC' } }, mode: 'fresh', waitMs: 20000 });
+        const all = await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true, timezone: 'UTC' } }, mode: 'fresh'  });
         assert.notEqual(all.result.freshness?.initialScan,true);
         assert.equal(all.result.summary.tokens.total, 330);
         assert.ok(all.result.items.some(i => i.kind === 'usage' && i.date == null), 'all dates explicitly includes undated usage');
-        const day = await nativeApi.live!({ query: { action: 'usage', scope: { since: '2026-09-29', until: '2026-09-30', timezone: 'UTC' }, snapshotId: all.result.snapshotRef.snapshotId }, mode: 'cached' });
+        const day = await nativeApi.live!({ query: { action: 'usage', scope: { since: '2026-09-29', until: '2026-09-30', timezone: 'UTC' }  }, mode: 'cached' });
         assert.equal(day.result.summary.tokens.total, 110);
         const config = await nativeApi.config!({ action: 'list', scope: { allTime: true, timezone: 'UTC' } }), item = config.items.find(i => i.kind === 'skill')!;
         assert.equal(item.bytes, Buffer.byteLength(large));
@@ -60,31 +61,31 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.equal(first.suggestions[0].category, 'trim');
         assert.equal(first.ruleParameters.version, 'static-config-v7');
         assert.deepEqual(first.suggestions[0].findings.map(f => f.rule), ['descriptionSize', 'bodyTokens']);
-        const related = await nativeApi.config!({ action: 'evidence', readView: first.readView, itemId: item.id, scope: { allTime: true, timezone: 'UTC' } });
+        const related = await nativeApi.config!({ action: 'evidence', itemId: item.id, scope: { allTime: true, timezone: 'UTC' } });
         assert.equal(related.items[0].counts.fileReads, 2);
         assert.equal(related.items[0].relatedTurns, 1);
         assert.equal(related.items[0].usage?.tokens.total, 330, 'repeated reads do not multiply the associated ledger');
         assert.equal(related.evidence[0].turnId, related.evidence[1].turnId);
-        const cliRelated = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'evidence',roots:[root],projectRoots:[project],itemId:item.id,readView:first.readView,scope:{allTime:true,timezone:'UTC'}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cliRelated = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'evidence',roots:[root],projectRoots:[project],itemId:item.id,scope:{allTime:true,timezone:'UTC'}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cliRelated.status, 2, cliRelated.stderr + cliRelated.stdout);
         assert.deepEqual(JSON.parse(cliRelated.stdout).evidence, related.evidence);
-        const exact = await nativeApi.live!({ query: { action: 'turns', snapshotId: related.usageRevision, threadId: related.evidence[0].threadId, locateTurnId: related.evidence[0].turnId, scope: { allTime: true } }, mode: 'cached' });
+        const exact = await nativeApi.live!({ query: { action: 'turns', threadId: related.evidence[0].threadId, locateTurnId: related.evidence[0].turnId, scope: { allTime: true } }, mode: 'cached' });
         assert.equal(exact.result.items.find(i => i.kind === 'turn')?.id, related.evidence[0].turnId);
         assert.equal(exact.result.summary.tokens.total, 330);
-        const noRelated = await nativeApi.config!({ action: 'evidence', readView: first.readView, itemId: item.id, scope: { since: '2026-10-01', until: '2026-10-02', timezone: 'UTC' } });
+        const noRelated = await nativeApi.config!({ action: 'evidence', itemId: item.id, scope: { since: '2026-10-01', until: '2026-10-02', timezone: 'UTC' } });
         assert.equal(noRelated.evidence.length, 0);
         assert.equal(noRelated.items[0].usage, null);
-        assert.equal((await nativeApi.optimize!({ action: 'list', readView: first.readView })).pending, 1, 'record dates do not change the current checks');
-        const overridden = await nativeApi.optimize!({ action: 'list', readView: first.readView, ruleOverrides: { descriptionCharacters: 600 } });
+        assert.equal((await nativeApi.optimize!({ action: 'list'  })).pending, 1, 'record dates do not change the current checks');
+        const overridden = await nativeApi.optimize!({ action: 'list', ruleOverrides: { descriptionCharacters: 600 } });
         assert.deepEqual(overridden.suggestions[0].findings.map(f => f.rule), ['bodyTokens']);
-        const cliSame = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project],readView:first.readView,ruleOverrides:{descriptionCharacters:600}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cliSame = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project],ruleOverrides:{descriptionCharacters:600}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cliSame.status, 2, cliSame.stderr + cliSame.stdout);
-        assert.deepEqual(JSON.parse(cliSame.stdout).suggestions, overridden.suggestions);
-        const latest = await nativeApi.optimize!({ action: 'list', readView: first.readView });
-        const pinned: OptimizeRequest = { readView: latest.readView, decisionRevision: latest.decisionRevision };
+        assert.deepEqual(comparable(JSON.parse(cliSame.stdout).suggestions), comparable(overridden.suggestions));
+        const latest = await nativeApi.optimize!({ action: 'list'  });
+        const pinned: OptimizeRequest = { decisionRevision: latest.decisionRevision };
         const ignored = await nativeApi.optimize!({ ...pinned, action: 'keep', decisionReason: 'necessary', suggestionId: first.suggestions[0].id });
         assert.equal(ignored.pending, 0);
-        await assert.rejects(nativeApi.optimize!({ ...pinned, action: 'list' }), { code: 'VIEW_EXPIRED' });
+        await assert.rejects(nativeApi.optimize!({ ...pinned, action: 'list' }), { code: 'DECISION_CHANGED' });
         await rm(path.join(data, 'config-v2'), { recursive: true, force: true });
         assert.equal((await nativeApi.optimize!({ action: 'list' })).pending, 0, 'derived inventory rebuild retains user decisions');
         await writeFile(skill, `---\nname: []\ndescription: sample\n---\n${'x '.repeat(4999) + 'x'}`);
@@ -92,7 +93,7 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.equal(changed.pending, 1);
         assert.equal(changed.suggestions[0].category, 'repair');
         assert.notEqual(changed.suggestions[0].id, first.suggestions[0].id);
-        const baseline = {readView: changed.readView, baselineId: changed.suggestions[0].baselineId, suggestionId: changed.suggestions[0].id};
+        const baseline = {baseline:changed.suggestions[0], baselineId: changed.suggestions[0].baselineId, suggestionId: changed.suggestions[0].id};
         const marked = await nativeApi.optimize!({action:'recheck',...baseline});
         assert.ok(marked.checks.some(c=>c.outcome==='hit'));
         await rm(skill);
@@ -106,9 +107,9 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         const checked = await nativeApi.optimize!({action:'recheck',...baseline});
         assert.ok(checked.checks.filter(c=>['skillFormat','bodyTokens'].includes(c.rule)).every(c=>c.outcome==='miss'&&c.comparison.status==='comparable'));
         assert.equal(checked.pending,0);
-        const now = await nativeApi.config!({action:'detail',readView:checked.readView,itemId:item.id,scope:{allTime:true}});
+        const now = await nativeApi.config!({action:'detail',itemId:item.id,scope:{allTime:true}});
         assert.equal(now.items[0].bytes,Buffer.byteLength(fixed));
-        const historic = await nativeApi.live!({ query: { action: 'usage', snapshotId: config.usageRevision, scope: { allTime: true } }, mode: 'cached' });
+        const historic = await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'cached' });
         assert.equal(historic.result.summary.tokens.total, 330);
         const metadataHeavy = `---\nname: example\ndescription: valid\n# ${'x '.repeat(10000)}\n---\nhello world`;
         await writeFile(skill, metadataHeavy);
@@ -116,7 +117,7 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.ok(metadataItem.bytes! > 16384);
         assert.ok(metadataItem.contentTokens! > 5000);
         assert.equal(metadataItem.bodyTokenEstimate?.tokens, 2);
-        assert.equal((await nativeApi.optimize!({ action: 'list', readView: metadataConfig.readView })).pending, 0, 'large metadata/full file does not substitute for body measurement');
+        assert.equal((await nativeApi.optimize!({ action: 'list'  })).pending, 0, 'large metadata/full file does not substitute for body measurement');
         const descriptionTooLong = `---\nname: example\ndescription: ${'😀'.repeat(1025)}\n---\n${'x '.repeat(4999)}x`;
         await writeFile(skill, descriptionTooLong);
         const standard = await nativeApi.optimize!({ action: 'list', ruleOverrides: { descriptionCharacters: 1024 } });
@@ -124,34 +125,34 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         assert.equal(standard.suggestions[0].category, 'repair');
         assert.deepEqual(standard.suggestions[0].findings.map(f => f.rule), ['descriptionStandard', 'bodyTokens']);
         assert.equal(standard.suggestions[0].findings[0].observed, 1025);
-        await nativeApi.optimize!({ action: 'recheck', suggestionId: standard.suggestions[0].id, readView: standard.readView, baselineId: standard.suggestions[0].baselineId, ruleOverrides: { descriptionCharacters: 1024 } });
+        await nativeApi.optimize!({ action: 'recheck', baseline: standard.suggestions[0], suggestionId: standard.suggestions[0].id, baselineId: standard.suggestions[0].baselineId, ruleOverrides: { descriptionCharacters: 1024 } });
         await writeFile(skill, descriptionTooLong.replace('😀'.repeat(1025), '😀'.repeat(730)));
         const remaining = await nativeApi.optimize!({action:'list'});
         assert.equal(remaining.pending,1);
         const remainingTarget=remaining.suggestions[0];
         assert.deepEqual(remainingTarget.findings.map(f=>f.rule),['descriptionSize','bodyTokens']);
         await writeFile(skill,fixed);
-        const final=await nativeApi.optimize!({action:'recheck',readView:remaining.readView,baselineId:remainingTarget.baselineId});
+        const final=await nativeApi.optimize!({action:'recheck',baseline:remainingTarget,baselineId:remainingTarget.baselineId});
         assert.equal(final.pending,0);
         assert.ok(final.checks.filter(c=>['descriptionSize','bodyTokens'].includes(c.rule)).every(c=>c.outcome==='miss'&&c.comparison.status==='comparable'));
         for (const bad of [{ action: 'execute' }, { ruleOverrides: { descriptionCharacters: 1025 } }, { ruleOverrides: { bodyTokens: 10000 } }])
             await assert.rejects(nativeApi.optimize!({ action: 'list', ...bad } as OptimizeRequest), { code: 'INVALID_ARGUMENT' });
-        await assert.rejects(nativeApi.optimize!({ action:'list',readView:'config:foreign' }),{code:'VIEW_EXPIRED'});
+        assert.equal((await nativeApi.optimize!({ action:'list' })).pending,0);
         await assert.rejects(nativeApi.optimize!({ action: 'keep', decisionReason: 'necessary', suggestionId: 'missing' }), { code: 'NOT_FOUND' });
-        const cliAll = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'usage', '--snapshot', all.result.snapshotRef.snapshotId, '--all-time', '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cliAll = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'usage', '--all-time', '--json'], { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cliAll.status, 0, cliAll.stderr + cliAll.stdout);
         assert.equal(JSON.parse(cliAll.stdout).summary.tokens.total, 330);
         await writeFile(skill, '---\nname: Different\ndescription: Synthetic\ncompatibility: true\nmetadata:\n  label: 123\n---\nUse evidence.\n');
         const invalidMetadata = await nativeApi.config!({ action: 'list', scope: { allTime: true } }), invalidSkill = invalidMetadata.items.find(i => i.kind === 'skill')!;
         assert.deepEqual(invalidSkill.skillMetadata?.issues, ['nameInvalid', 'nameDirectoryMismatch', 'compatibilityTypeInvalid', 'metadataTypeInvalid']);
         assert.equal(invalidSkill.bodyTokenEstimate, null, 'invalid metadata cannot supply a known body estimate');
-        const metadataReview = await nativeApi.optimize!({ action: 'list', readView: invalidMetadata.readView });
+        const metadataReview = await nativeApi.optimize!({ action: 'list'  });
         assert.equal(metadataReview.suggestions.length, 1);
         assert.equal(metadataReview.suggestions[0].category, 'repair');
         assert.deepEqual(metadataReview.suggestions[0].findings.map(f => f.rule), ['skillFormat']);
-        const metadataCli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project],readView:invalidMetadata.readView}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const metadataCli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project]}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(metadataCli.status, 2, metadataCli.stderr + metadataCli.stdout);
-        assert.deepEqual(JSON.parse(metadataCli.stdout).suggestions, metadataReview.suggestions, 'CLI and native consume the same immutable metadata assessment');
+        assert.deepEqual(comparable(JSON.parse(metadataCli.stdout).suggestions), comparable(metadataReview.suggestions), 'CLI and native consume the same immutable metadata assessment');
         await writeFile(skill, '---\nname: example\ndescription: Synthetic\ncompatibility: local\nmetadata:\n  label: "123"\nunknown-host-field:\n  enabled: true\n---\nUse evidence.\n');
         assert.equal((await nativeApi.optimize!({ action: 'list' })).pending, 0, 'valid metadata and unknown host fields do not produce a format fault');
         assert.equal((await nativeApi.preferences!({ action: 'get' })).language, null);
@@ -166,11 +167,7 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
         }
     }
     finally {
-        if (service.exitCode === null) {
-            const exited = once(service, 'close');
-            service.kill();
-            await exited;
-        }
+
         for (const [key, value] of Object.entries(saved))
             if (value === undefined)
                 delete process.env[key];

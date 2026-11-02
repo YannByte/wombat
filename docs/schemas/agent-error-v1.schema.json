@@ -40,7 +40,6 @@
       "type": "string",
       "enum": [
         "read_schema",
-        "reacquire_view",
         "narrow_query",
         "retry_same_scope",
         "check_setup",

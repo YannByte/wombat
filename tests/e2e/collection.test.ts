@@ -25,14 +25,14 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
     const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES, WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_CORE_BIN: process.env.WOMBAT_CORE_BIN };
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), entry = path.resolve('dist/wombat.js');
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: source, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN: native.binary, WOMBAT_CORE_BIN: binary });
-    const service = spawn(binary, ['--serve-usage'], { env: process.env, stdio: 'ignore' });
-    await once(service, 'spawn');
+
+
     const client = createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false });
     let nativeEntry: UsageClient | undefined;
     const run = (args: CliInput, input = '') => { const result = spawnProductCli(entry, args, { env: process.env, input, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }); assert.ifError(result.error); assert.ok(!/PRIVATE_INPUT|PRIVATE_OUTPUT|PRIVATE_PROMPT/.test(result.stdout + result.stderr)); return result; };
     try {
         await client.setup!({ project });
-        await assert.rejects(client.live!({ query: { action: 'usage', roots: [source] }, mode: 'cached' }), { code: 'NO_SNAPSHOT' });
+        await assert.rejects(client.live!({ query: { action: 'usage', roots: [source] }, mode: 'cached' }), { code: 'INDEX_UNAVAILABLE' });
         const before = (await client.live!({ query: { action: 'usage', roots: [source], scope: { allTime: true }, limit: 1 }, mode: 'fresh' })).result;
         assert.equal(before.summary.tokens.total, 110);
         assert.equal((await client.collection!({})).state, 'logs_only');
@@ -93,10 +93,7 @@ test('collection CLI, Rust and setup retain privacy, scope and the log ledger', 
         assert.ok(!/PRIVATE_INPUT|PRIVATE_OUTPUT|PRIVATE_PROMPT/.test(bytes.toString()));
     }
     finally {
-        if (service.exitCode === null && service.signalCode === null) {
-            service.kill('SIGTERM');
-            await once(service, 'exit');
-        }
+
         await native.waitForExit();
         for (const [key, value] of Object.entries(old)) {
             if (value === undefined)

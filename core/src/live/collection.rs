@@ -367,6 +367,7 @@ pub(super) fn sync_with_policy(
     changed |= prior.get("failures").unwrap_or(&json!({})) != &serde_json::to_value(&failures)?;
     changed |= prior.get("epochs") != Some(&serde_json::to_value(&epochs)?);
     changed |= prior.get("prices").and_then(Value::as_str) != Some(&prices.catalog_hash);
+    super::resources::trim_parser_caches(&tx, caches)?;
     if !changed {
         tx.commit()?;
         return Ok(None);
@@ -457,9 +458,7 @@ pub(super) fn sync_with_policy(
         events,
         operations,
     )?;
-    if let Some(prior) =
-        prior_view.filter(|prior| !super::preview::is_initial(prior) && !restoring_projects(prior))
-    {
+    if let Some(prior) = prior_view.filter(|prior| !restoring_projects(prior)) {
         snapshot.publication_change = Some(crate::usage_app::publication_change(
             prior,
             &snapshot,

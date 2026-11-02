@@ -17,7 +17,7 @@ fn initial(v: &View, path: &Path) -> Response {
 fn selection(r: &Response) -> Request {
     Request {
         action: Action::Recheck,
-        read_view: r.read_view.clone(),
+        baseline: Some(Box::new(r.suggestions[0].clone())),
         baseline_id: r.suggestions[0].baseline_id.clone(),
         ..Default::default()
     }
@@ -47,7 +47,7 @@ fn inspection_and_comparable_recheck_never_create_a_review_store() {
     assert!(!path.exists());
 }
 #[test]
-fn baseline_rejects_changed_rules_scope_and_expired_views() {
+fn baseline_rejects_changed_rules_scope_and_missing_original() {
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("reviews.sqlite3");
     let before = measured();
@@ -61,7 +61,9 @@ fn baseline_rejects_changed_rules_scope_and_expired_views() {
     let mut changed = selection(&first);
     changed.source_instance_id = Some("different".into());
     assert!(run(changed, "new".into(), &before, Some(&before), &path).is_err());
-    assert!(run(selection(&first), "new".into(), &before, None, &path).is_err());
+    let mut missing = selection(&first);
+    missing.baseline = None;
+    assert!(run(missing, "new".into(), &before, None, &path).is_err());
     assert!(!path.exists());
 }
 #[test]
@@ -297,7 +299,7 @@ fn concurrent_decisions_use_one_revision_and_only_one_write_commits() {
             .downcast_ref::<crate::dto::OperationError>()
             .unwrap()
             .code,
-        "VIEW_EXPIRED"
+        "DECISION_CHANGED"
     );
     let success = outcomes.iter().find_map(|r| r.as_ref().ok()).unwrap();
     assert_eq!(success.decision_revision, "2");

@@ -47,8 +47,8 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
     const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    const service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const client = createNodeClient({ binaryPath: binary });
     const nativeEntry = projectTestClient(client, [root], [project]);
 
@@ -56,27 +56,27 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
     const scope = { since: '2026-09-29', until: '2026-09-30', timezone: 'UTC' };
     try {
         const usage = await nativeApi.live!({ query: { action: 'usage', scope }, mode: 'fresh' });
-        const result = await nativeApi.config!({ action: 'list', snapshotId: usage.result.snapshotRef.snapshotId, scope });
+        const result = await nativeApi.config!({ action: 'list', scope });
         assert.equal(result.items.length, 5);
         assert.equal(result.summary.currentItems, 4, 'missing paths are disclosed without being counted as present configuration');
         assert.equal(result.items.find(i => i.path === path.join(root, 'AGENTS.md'))!.measurementStatus, 'missing');
         const item = result.items.find(i => i.name === 'review')!;
-        const combined = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'system', 'call'], { env: process.env, input: JSON.stringify({ method: 'config', params: { action: 'list', roots: [root], projectRoots: [project], snapshotId: usage.result.snapshotRef.snapshotId, scope, kinds: ['rule', 'skill', 'mcp', 'hook'], limit: 20 } }), encoding: 'utf8', timeout: 10000 });
+        const combined = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'system', 'call'], { env: process.env, input: JSON.stringify({ method: 'config', params: { action: 'list', roots: [root], projectRoots: [project], scope, kinds: ['rule', 'skill', 'mcp', 'hook'], limit: 20 } }), encoding: 'utf8', timeout: 10000 });
         assert.ok([0, 2].includes(combined.status!), combined.stderr + combined.stdout);
         const inventory = JSON.parse(combined.stdout);
         assert.deepEqual(inventory.items.map((i: {
             id: string;
         }) => i.id).sort(), result.items.map(i => i.id).sort(), 'One multi-kind view preserves the complete requested inventory');
-        const webInventory = await nativeApi.config!({ action: 'list', readView: result.readView, kinds: ['rule', 'skill', 'mcp', 'hook'], scope });
+        const webInventory = await nativeApi.config!({ action: 'list', kinds: ['rule', 'skill', 'mcp', 'hook'], scope });
         assert.deepEqual(webInventory.items.map(i => i.id).sort(), inventory.items.map((i: {
             id: string;
         }) => i.id).sort());
-        const nodeRetained = await client.config!({ action: 'list', readView: inventory.readView, roots: [root], projectRoots: [project], kind: 'skill', scope });
-        assert.equal(nodeRetained.readView, inventory.readView);
-        const retained = await nativeApi.config!({ action: 'list', readView: webInventory.readView, kind: 'skill', scope });
-        assert.equal(retained.readView, webInventory.readView);
+        const nodeRetained = await client.config!({ action: 'list', roots: [root], projectRoots: [project], kind: 'skill', scope });
+        assert.equal('readView' in nodeRetained,false);
+        const retained = await nativeApi.config!({ action: 'list', kind: 'skill', scope });
+        assert.equal('readView' in retained,false);
         assert.ok(retained.items.every(i => i.kind === 'skill'));
-        await assert.rejects(nativeApi.config!({ action: 'list', readView: webInventory.readView, snapshotId: usage.result.snapshotRef.snapshotId, scope }), { code: 'INVALID_ARGUMENT' });
+        await assert.rejects(nativeApi.config!({ action: 'list', scope,readView:'removed' } as never), { code: 'INVALID_ARGUMENT' });
         const failedItem = result.items.find(i => i.name === 'failed')!;
         assert.equal(failedItem.counts.failed, 1);
         assert.equal(failedItem.observation, 'used', 'a dispatched read is a use even when its outcome is failed');
@@ -107,16 +107,15 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
         assert.equal(rule.observation, 'loaded_only');
         assert.equal(rule.counts.fileReads, 0, 'instruction loading is evidence of loading, not a dispatched file read');
         assert.equal(rule.usage?.tokens.total, 110);
-        const ruleEvidence = await nativeApi.config!({ action: 'evidence', readView: result.readView, itemId: rule.id, scope });
+        const ruleEvidence = await nativeApi.config!({ action: 'evidence', itemId: rule.id, scope });
         assert.equal(ruleEvidence.evidence.length, 1);
         assert.equal(ruleEvidence.evidence[0].eventType, 'instruction_load');
         assert.equal(ruleEvidence.evidence[0].outcome, 'completed');
         assert.ok(!JSON.stringify(result).includes('SYNTHETIC_RULE_BODY_PRIVATE'));
         assert.equal(result.coverage.absenceObservable, false);
         assert.ok(!JSON.stringify(result).includes('SYNTHETIC_SECRET'));
-        const request: ConfigRequest = { action: 'evidence', readView: result.readView, itemId: item.id, scope, limit: 1 };
-        // A reading page does not poll. Its configuration view must outlive the usage service's normal idle timeout.
-        await new Promise(resolve => setTimeout(resolve, 16100));
+        const request: ConfigRequest = { action: 'evidence', itemId: item.id, scope, limit: 1 };
+        // Each call collects current facts without retaining a process lease.
         const first = await nativeApi.config!(request);
         assert.equal(first.page.total, 3);
         assert.equal(first.page.nextOffset, 1);
@@ -129,24 +128,25 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
             await appendFile(path.join(root, 'sessions/one.jsonl'), JSON.stringify(event('event_msg', { type: 'token_usage_record', thread_id: 't', turn_id: 'u', response_id: `added-${n}`, usage: { input_tokens: 100, cached_input_tokens: 20, cache_write_input_tokens: 0, output_tokens: 10, reasoning_output_tokens: 2, total_tokens: 110 } })) + '\n');
             await nativeApi.live!({ query: { action: 'usage', scope }, mode: 'fresh' });
         }
-        const turns = await nativeApi.live!({ query: { action: 'turns', snapshotId: result.usageRevision, threadId, locateTurnId: turnId }, mode: 'cached' });
+        const turns = await nativeApi.live!({ query: { action: 'turns', threadId, locateTurnId: turnId }, mode: 'cached' });
         assert.equal(turns.result.items[0].kind, 'turn');
         assert.equal(turns.result.items[0].id, turnId);
-        assert.equal(turns.result.summary.tokens.total, 110, 'configuration retains its usage revision after normal view eviction');
-        const cliTurn = spawnProductCli(path.resolve('dist/wombat.js'), queryInvocation({"action":"turns","threadId":threadId,"snapshotId":result.usageRevision!}, {mode:"auto"}), { encoding: 'utf8', env: process.env, timeout: 10000 });
+        assert.equal(turns.result.summary.tokens.total, 1100, 'current configuration uses the latest committed usage');
+        const cliTurn = spawnProductCli(path.resolve('dist/wombat.js'), queryInvocation({"action":"turns","threadId":threadId}, {mode:"auto"}), { encoding: 'utf8', env: process.env, timeout: 10000 });
         assert.equal(cliTurn.status, 0, cliTurn.stderr + cliTurn.stdout);
-        assert.equal(JSON.parse(cliTurn.stdout).summary.tokens.total, 110, 'CLI fixed queries also resolve the retained usage revision without roots');
-        const reverse = await nativeApi.config!({ action: 'list', readView: result.readView, scope: { ...scope, threadId } });
+        assert.equal(JSON.parse(cliTurn.stdout).summary.tokens.total, 1100, 'CLI reads the latest committed usage');
+        const reverse = await nativeApi.config!({ action: 'list', scope: { ...scope, threadId } });
         assert.equal(reverse.items.length, 4);
-        await assert.rejects(nativeApi.config!({action:'list',readView:'config:foreign'}),{code:'VIEW_EXPIRED'});
-        await assert.rejects(nativeApi.config!({action:'list',snapshotId:'live:foreign'}),{code:'INVALID_ARGUMENT'});
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots:[root],projectRoots:[project],readView:result.readView,scope:{...scope,timezone:'UTC'}}}, { encoding: 'utf8', env: process.env, timeout: 10000 });
+        assert.ok((await nativeApi.config!({action:'list'})).items.length > 0);
+        await assert.rejects(nativeApi.config!({action:'list',readView:'removed'} as unknown as ConfigRequest),{code:'INVALID_ARGUMENT'});
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots:[root],projectRoots:[project],scope:{...scope,timezone:'UTC'}}}, { encoding: 'utf8', env: process.env, timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
-        assert.deepEqual(JSON.parse(cli.stdout).summary, result.summary);
+        assert.equal(JSON.parse(cli.stdout).summary.currentItems,result.summary.currentItems);
+        assert.equal(JSON.parse(cli.stdout).summary.usage.tokens.total,1100);
         await writeFile(skill, 'Changed synthetic review instruction');
         const changed = await nativeApi.config!({ action: 'list', scope });
         assert.notEqual(changed.configRevision, result.configRevision);
-        assert.equal((await nativeApi.config!({ ...request, action: 'detail' })).items[0].contentHash, item.contentHash);
+        assert.notEqual((await nativeApi.config!({ ...request, action: 'detail' })).items[0].contentHash, item.contentHash);
         await writeFile(path.join(root, 'config.toml'), '[malformed');
         const failed = await nativeApi.config!({ action: 'list', scope });
         assert.equal(failed.items.find(i => i.kind === 'mcp')!.stale, true);
@@ -160,17 +160,13 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
         await writeFile(unselectedRule,'Unselected synthetic rule.');
         const outside=await nativeApi.config!({action:'list',scope:{...scope,project:unselected}});
         assert.ok(!outside.items.some(item=>item.path===unselectedRule),'A filter must not add a project root');
-        const outsideDate = await nativeApi.config!({ action: 'list', readView: result.readView, scope: { since: '2026-09-30', until: '2026-10-01', timezone: 'UTC' } });
+        const outsideDate = await nativeApi.config!({ action: 'list', scope: { since: '2026-09-30', until: '2026-10-01', timezone: 'UTC' } });
         assert.equal(outsideDate.summary.usage, null);
         for (const filename of await readdir(path.join(data, 'config-v2')))
             assert.ok(!(await readFile(path.join(data, 'config-v2', filename), 'utf8')).includes('SYNTHETIC_SECRET'));
     }
     finally {
-        if (service.exitCode === null) {
-            const exited = once(service, 'close');
-            service.kill();
-            await exited;
-        }
+
         for (const [key, value] of Object.entries(saved))
             if (value === undefined)
                 delete process.env[key];

@@ -3,7 +3,6 @@ param(
   [string]$Prefix = "$HOME\.local",
   [string]$BaseUrl = "",
   [switch]$NoModifyPath,
-  [switch]$Service,
   [switch]$Plugin,
   [switch]$PluginOnly
 )
@@ -13,7 +12,6 @@ $installRoot = Join-Path $Prefix "lib\wombat"
 $binDir = Join-Path $Prefix "bin"
 $launcher = Join-Path $binDir "wombat.cmd"
 if ($PluginOnly) {
-  $Service = $false
   if ($Version -ne "latest" -or $BaseUrl) { throw "-PluginOnly uses the current installed version; omit -Version and -BaseUrl" }
   $pointer = Join-Path $installRoot "current.txt"
   if (-not (Test-Path (Join-Path $installRoot ".managed-by-wombat") -PathType Leaf) -or -not (Test-Path $pointer -PathType Leaf) -or (Get-Item $installRoot).LinkType -or (Get-Item $pointer).LinkType -or (Get-Item $pointer).Length -gt 128) { throw "A managed Wombat installation is required for -PluginOnly" }
@@ -114,11 +112,6 @@ set /p WOMBAT_RELEASE=<"%~dp0..\lib\wombat\current.txt"
 finally {
   if (Test-Path $temp) { Remove-Item -Recurse -Force $temp }
 }
-}
-if ($Service) {
-  Write-Host "Enabling the optional resident query service..."
-  '{"method":"service","params":{"action":"enable"}}' | & $launcher call
-  if ($LASTEXITCODE -ne 0) { throw "Wombat is installed; service startup could not be confirmed. Check the reported error and check the service method with wombat api --method service." }
 }
 if ($Plugin) {
   $pluginBootstrap = @'

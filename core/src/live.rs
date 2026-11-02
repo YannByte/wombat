@@ -1,4 +1,6 @@
-//! On-demand local usage service. One writer commits cursors and derived facts together.
+//! Foreground incremental queries. Each caller owns its core process and read transaction.
+pub const REQUEST_VERSION: u32 = 2;
+
 use crate::{
     adapters::{self, contract::*},
     dto::operation_error,
@@ -9,14 +11,7 @@ use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    collections::{BTreeMap, VecDeque},
-    fs,
-    path::PathBuf,
-    sync::{Arc, Condvar, Mutex, mpsc},
-    time::{Duration, Instant},
-};
-
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Request {
@@ -25,10 +20,6 @@ pub struct Request {
     pub mode: Mode,
     #[serde(default)]
     pub verify: bool,
-    /// One bounded wait owned by this caller; cancelling it leaves shared work running.
-    #[serde(default)]
-    #[schemars(range(min = 1, max = 600000))]
-    pub wait_ms: Option<u64>,
     /// Explicitly rebuild derived storage in a new generation; user records stay separate.
     #[serde(default)]
     pub rebuild: bool,
@@ -88,56 +79,6 @@ pub struct Response {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub additional: Vec<usage_app_dto::Response>,
 }
-struct Entry {
-    paused: bool,
-    changed: bool,
-    restoring: bool,
-    roots: Vec<String>,
-    views: VecDeque<(Instant, Arc<Snapshot>)>,
-    checked: Option<String>,
-    error: Option<String>,
-    error_code: Option<&'static str>,
-    touched: Instant,
-    syncing: bool,
-    last_sync: Instant,
-    requested: u64,
-    completed: u64,
-    pending: Option<SyncWork>,
-    running: Option<SyncWork>,
-}
-impl Entry {
-    fn new(roots: Vec<String>) -> Self {
-        Self {
-            paused: service::paused().unwrap_or(true),
-            changed: false,
-            restoring: false,
-            roots,
-            views: VecDeque::new(),
-            checked: None,
-            error: None,
-            error_code: None,
-            touched: Instant::now(),
-            syncing: false,
-            last_sync: Instant::now(),
-            requested: 0,
-            completed: 0,
-            pending: None,
-            running: None,
-        }
-    }
-}
-type Shared = Arc<(Mutex<BTreeMap<String, Entry>>, Condvar)>;
-struct Job {
-    restore_only: bool,
-    key: String,
-}
-#[derive(Clone, Copy)]
-struct SyncWork {
-    ticket: u64,
-    verify: bool,
-    rebuild: bool,
-    include_history: bool,
-}
 
 fn directory() -> Result<PathBuf> {
     let path = crate::storage::data_home()?.join("live-v2");
@@ -151,74 +92,12 @@ fn directory() -> Result<PathBuf> {
     builder.create(&path)?;
     Ok(path)
 }
-#[cfg(windows)]
-fn socket_path() -> Result<PathBuf> {
-    Ok(PathBuf::from(format!(
-        r"\\.\pipe\wombat-{}-v2",
-        &crate::hash(
-            dunce::canonicalize(directory()?)?
-                .to_string_lossy()
-                .as_bytes()
-        )[..24]
-    )))
-}
-#[cfg(unix)]
-fn socket_path() -> Result<PathBuf> {
-    let root = directory()?;
-    // Unix-domain paths are short even when the product data directory is deeply nested.
-    let parent = std::path::Path::new("/tmp").join(format!(
-        "wombat-{}",
-        &crate::hash(dunce::canonicalize(&root)?.to_string_lossy().as_bytes())[..24]
-    ));
-    let mut builder = fs::DirBuilder::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    match builder.create(&parent) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-        Err(e) => return Err(e.into()),
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        let meta = fs::symlink_metadata(&parent)?;
-        if !meta.is_dir() || meta.mode() & 0o077 != 0 || meta.uid() != fs::metadata(&root)?.uid() {
-            return Err(operation_error("EACCES", "实时用量接口目录权限不正确"));
-        }
-    }
-    Ok(parent.join("usage-v2.sock"))
-}
-pub fn endpoint() -> Result<Value> {
-    let socket = socket_path()?;
-    let registration = crate::hash(
-        dunce::canonicalize(crate::storage::data_home()?)?
-            .to_string_lossy()
-            .as_bytes(),
-    );
-    let discovery = sources(&[]);
-    let roots: Vec<_> = discovery.sources.into_iter().map(|s| s.root).collect();
-    Ok(
-        json!({"protocolVersion":2,"socket":socket,"registrationId":registration,"defaultRoots":roots,"discoveryError":!discovery.issues.is_empty(),"contextKey":crate::hash(serde_json::to_vec(&crate::host_environment::context()?)?)}),
-    )
-}
 mod collection;
 mod generation;
-mod preview;
+mod project;
 mod query;
 mod resources;
-mod scheduling;
-mod selection;
-mod service;
-pub(crate) use service::offline as service_offline;
-mod transport;
 pub(crate) use collection::load_collected_except;
-use collection::{restore_view, source_key, sources, sync};
-#[cfg(test)]
-use query::query;
-use query::{config_query, timing_query};
-use selection::select_view;
-pub use transport::serve;
-pub use transport::serve_resident;
+use collection::{source_key, sync};
+pub(crate) use query::cleanup_rebuild;
+pub use query::dispatch;

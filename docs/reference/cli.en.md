@@ -24,13 +24,13 @@ The interface follows [Google Workspace CLI’s method discovery](https://github
 |---|---|
 | One contract owner | Rust defines product params and output; generation supplies types, validators and schemas. The CLI does not maintain another field catalog. |
 | Discover as needed | Reuse known commands and schemas. Read one input schema for an unfamiliar method or field; list methods only when the available capability is unknown. Output schemas are optional. Discovery performs no scan or model call. |
-| Explicit context | Pass exact roots, projects, dates, timezone and full IDs. Preserve returned snapshots/read views and pagination instead of hidden session defaults. |
+| Explicit context | Pass exact roots, projects, dates, timezone and full IDs. Preserve returned filters and opaque cursors instead of hidden session defaults. |
 | Bounded structured IO | Read one validated JSON request from stdin; emit one owning JSON result. Keep progress on stderr and support cancellation, input/output bounds and method-specific budgets. |
 | Complete capabilities | Dispatch existing typed client methods with all generated params. Skills select workflows; they do not substitute a narrower business API. |
 | Preserve evidence semantics | Complete totals, page rows, omitted detail, partial coverage, unknowns and observed zero remain distinct. Compact output is a core projection. |
-| Recover without guessing | Stable error codes and recovery hints guide the next request. Expired views require reacquisition; changed params require revalidation. A timeout or hint does not authorize repeating a mutation. |
+| Recover without guessing | Stable error codes and recovery hints guide the next request. Invalidated cursors require a new query with the same filters; changed params require revalidation. A timeout or hint does not authorize repeating a mutation. |
 
-Schema validation proves structure only. Product validation still checks supported combinations, authorized targets and version-bound selection. Acceptance must test malformed and unsupported requests, fixed-view paging, partial results, cancellation and installed entries. A successful mock does not establish a real Agent journey.
+Schema validation proves structure only. Product validation still checks supported combinations, authorized targets and version-bound selection. Acceptance must test malformed and unsupported requests, scoped paging, partial results, cancellation and installed entries. A successful mock does not establish a real Agent journey.
 
 ## Limits and verification
 
@@ -40,7 +40,7 @@ The CLI owns arguments, output, progress, and exit codes, not pricing or snapsho
 
 ## Whole-turn timing
 
-Use method `timing` through `system call`. Summary requires full task and turn identities. Evidence navigation pins the same snapshot, target and collection, with opaque cursors and pages of 1..200 rows. Collections are `turn_events`, `use_objects` and `use_records`; only `use_records` accepts an object filter. Capability queries perform no scan. Local and `share-v1` projections retain independent privacy boundaries.
+Use method `timing` through `system call`. Summary requires full task and turn identities. Evidence navigation binds the same target, selection and collection, with opaque cursors and pages of 1..200 rows. Collections are `turn_events`, `use_objects` and `use_records`; only `use_records` accepts an object filter. Capability queries perform no scan. Local and `share-v1` projections retain independent privacy boundaries.
 
 Exit codes follow core quality: complete summaries return 0 even when optional measures are unknown; partial, running or censored summaries return 2. Successful evidence and capability queries return 0 without establishing turn completeness. Errors return 1 and cancellation 130. Timing bypasses automatic prices, configuration, Hook receipt and account observations. Unknown membership, durations and repository baselines are not replaced with zero. The [core reference](core.en.md) owns calculations and sharing.
 
@@ -48,16 +48,16 @@ Exit codes follow core quality: complete summaries return 0 even when optional m
 
 ## Unsupported formats and recovery
 
-Wombat rejects unknown snapshot and index formats without migrating or deleting the original data. An explicit `wombat usage --rebuild --wait-ms 600000 --json` scans the selected source roots into a new current-format database. It switches the active generation only after durable publication succeeds. Failure retains the original index; the original database remains available as a recovery copy. User decisions, identities, grants, account observations and handling records stay in their separate stores. Rebuild does not transform old snapshots and cannot recover source records that are no longer available. A saved-snapshot refresh alone does not repair incompatible live state. A different `WOMBAT_DATA_HOME` creates an isolated store and does not carry existing user records.
+`wombat usage --rebuild --json` rebuilds derived storage from the selected source roots. Publication is atomic; failure preserves the old index and user records remain separate. Unknown formats are rejected without migration or deletion. See the [core reference](core.en.md#foreground-queries-and-internal-storage).
 
-`--wait-ms 1..600000` implies `--fresh` and keeps one caller waiting for its synchronization ticket. Cancellation releases that waiter; shared synchronization continues. Recent requests prioritize files modified within 30 days, previously indexed files, and complete declared fork/copy families. Modification time is a scheduling hint, never usage time. Unrecognized headers force a full scan. `historyDeferred` marks provisional source coverage; recent totals and rankings can change when history loads. Older ranges, all-time requests, `refresh`, verification, explicit `--include-history`, and rebuild include the full available source set. Already indexed history is never narrowed by a later recent request. The Agent `usage` request accepts up to eight `also` queries. They cannot select roots or another snapshot, or refresh. All results share the base query revision; the complete batch has a 2 MiB output budget.
+Foreground collection, cached reads, batching and resource limits are defined in the [core reference](core.en.md#foreground-queries-and-internal-storage). Cancellation stops the caller's core process; no shared scan continues.
 
 
 Timing text shows repeated behavior, timing basis, request observations and localized coverage. JSON retains the generated response. Calculation and sharing rules belong in the [core reference](core.en.md).
 
 ## Local host operations
 
-`system doctor` checks installation, native Skill discovery and resource compatibility; `--hooks` requests optional registration evidence. `system update` updates the runtime. Generated `system call` methods own service, account, prices, collection, directory grants and budgets. `usage alerts` owns active fresh budget checks and cancellation; it reports temporary failures on stderr and reloads plans on the next iteration. `system hook codex` retains bounded advisory receipt, silent stdout and exit 0 on receipt failure. The [CLI guide](../guides/cli.en.md) owns syntax and operating limits.
+`system doctor` checks installation, native Skill discovery and resource compatibility; `--hooks` requests optional registration evidence. `system update` updates the runtime. Generated `system call` methods own account, prices, collection, directory grants and budgets. `usage alerts` owns active fresh budget checks and cancellation; it reports temporary failures on stderr and reloads plans on the next iteration. `system hook codex` retains bounded advisory receipt, silent stdout and exit 0 on receipt failure. The [CLI guide](../guides/cli.en.md) owns syntax and operating limits.
 
 ## Release updates
 

@@ -26,7 +26,7 @@ const response: UsageResult = {
   }),
   items: [],
   page: { offset: 0, limit: 50, total: 0 },
-  quality: { status: 'complete', issues: [], sources: [] },
+  quality: { issueScope: 'index', queryImpact: 'none', status: 'complete', issues: [], sources: [] },
 };
 
 test('live batches reject missing, reordered or differently pinned results',async()=>{
@@ -118,7 +118,6 @@ test('portable comparison binds returned periods, dimensions and snapshot to the
   const scope = { since: '2026-09-23', until: '2026-09-30', timezone: 'UTC' };
   const request: UsageRequest = {
     action: 'compare',
-    snapshotId: 'synthetic',
     scope,
     comparison: {
       kind: 'periods',
@@ -144,7 +143,7 @@ test('portable comparison binds returned periods, dimensions and snapshot to the
   const value: UsageResult = { ...response, action: 'compare', scope, comparison };
   assert.equal(await createUsageClient({ query: async () => value }).query(request), value);
   const invalid = [
-    { ...value, snapshotRef: { ...value.snapshotRef, snapshotId: 'another' } },
+    { ...value, snapshotRef: { ...value.snapshotRef, snapshotId: '' } },
     { ...value, comparison: { ...comparison, dimension: 'model' } },
     { ...value, comparison: { ...comparison, baseline: { ...comparison.baseline, scope } } },
     {

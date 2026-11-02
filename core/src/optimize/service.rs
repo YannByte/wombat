@@ -11,10 +11,10 @@ pub(crate) fn execute(
     r: Request,
     id: String,
     view: &View,
-    baseline: Option<&View>,
+    _baseline: Option<&View>,
 ) -> Result<Response> {
     let path = crate::storage::data_home()?.join("user-v1/reviews.sqlite3");
-    run(r, id, view, baseline, &path)
+    run(r, id, view, None, &path)
 }
 #[cfg(test)]
 pub(super) fn execute_at(r: Request, id: String, view: &View, path: &Path) -> Result<Response> {
@@ -37,7 +37,7 @@ pub(super) fn run(
     r: Request,
     id: String,
     view: &View,
-    baseline: Option<&View>,
+    _baseline: Option<&View>,
     path: &Path,
 ) -> Result<Response> {
     super::activity::validate(&r)?;
@@ -57,17 +57,19 @@ pub(super) fn run(
     }
     let rules = parameters(r.rule_overrides.clone())?;
     let (mut current, coverage_partial) = detect(view, &r, &rules);
-    let baseline_id = |s: &Suggestion, read_view: &str| -> Result<String> {
+    let baseline_id = |s: &Suggestion| -> Result<String> {
         Ok(crate::hash(serde_json::to_vec(&(
-            s.id.as_str(),
-            read_view,
+            &s.id,
+            &s.item,
+            &s.findings,
+            &s.checks,
             &r.project,
             &r.source_instance_id,
             &rules,
         ))?))
     };
     for s in &mut current {
-        s.baseline_id = Some(baseline_id(s, &id)?);
+        s.baseline_id = Some(baseline_id(s)?);
     }
     if matches!(r.action, Action::Keep | Action::NotApplicable) {
         let selected = current
@@ -82,41 +84,57 @@ pub(super) fn run(
             .as_ref()
             .is_some_and(|expected| expected != &revision)
     {
-        return Err(operation_error("VIEW_EXPIRED", "Decision revision changed"));
+        return Err(operation_error(
+            "DECISION_CHANGED",
+            "Decision revision changed",
+        ));
     }
     let mut checks = Vec::new();
     if r.action == Action::Recheck {
-        let before = baseline.ok_or_else(|| {
-            operation_error("VIEW_EXPIRED", "Recheck requires its original read view")
+        let old = r.baseline.as_deref().ok_or_else(|| {
+            operation_error("INVALID_ARGUMENT", "Recheck requires the original finding")
         })?;
-        let key = r.baseline_id.as_ref().ok_or_else(|| {
-            operation_error(
-                "INVALID_ARGUMENT",
-                "Recheck requires the original baseline ID",
-            )
-        })?;
-        let original_view = r.read_view.as_deref().ok_or_else(|| {
-            operation_error(
-                "INVALID_ARGUMENT",
-                "Recheck requires the original read view",
-            )
-        })?;
-        let (previous, _) = detect(before, &r, &rules);
-        let mut selected = Vec::new();
-        for s in &previous {
-            if baseline_id(s, original_view)? == *key
-                && r.suggestion_id.as_ref().is_none_or(|id| &s.id == id)
-            {
-                selected.push(s);
-            }
-        }
-        if selected.is_empty() {
+        if old.review_format_version != 1 {
             return Err(operation_error(
-                "VIEW_EXPIRED",
-                "Original check scope or parameters changed",
+                "UNSUPPORTED_VERSION",
+                "Unsupported original finding format; save a new check report",
             ));
         }
-        for old in selected {
+        let original_scope = &old
+            .checks
+            .first()
+            .ok_or_else(|| {
+                operation_error("EVIDENCE_UNAVAILABLE", "Original check scope is missing")
+            })?
+            .basis
+            .scope;
+        if original_scope
+            .roots
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            != view.roots.iter().collect()
+            || original_scope
+                .project_roots
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                != view.project_roots.iter().collect()
+        {
+            return Err(operation_error(
+                "INVALID_ARGUMENT",
+                "Recheck must retain the original source and project roots",
+            ));
+        }
+        if old.baseline_id.as_ref() != r.baseline_id.as_ref()
+            || old.baseline_id.as_deref() != Some(baseline_id(old)?.as_str())
+            || r.suggestion_id.as_ref().is_some_and(|id| id != &old.id)
+            || old.scope_project != r.project
+        {
+            return Err(operation_error(
+                "INVALID_ARGUMENT",
+                "Original finding scope or rule parameters changed",
+            ));
+        }
+        for old in [old] {
             let actual = view.items.iter().find(|i| {
                 i.id == old.item.id
                     && i.applies(r.source_instance_id.as_deref(), r.project.as_deref())

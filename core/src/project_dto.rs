@@ -1,4 +1,4 @@
-//! Host-assembled project evidence. Component facts retain their own versions and accounting.
+//! Foreground project evidence. Component facts retain their own versions and accounting.
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -37,7 +37,7 @@ pub struct Section<T> {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Response {
-    #[schemars(range(min = 1, max = 1))]
+    #[schemars(range(min = 2, max = 2))]
     pub output_version: u32,
     pub scope: Request,
     pub partial: bool,

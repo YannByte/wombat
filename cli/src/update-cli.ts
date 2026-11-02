@@ -56,7 +56,6 @@ export interface UpdateResult {
   updated: boolean;
   checked: boolean;
   target: string;
-  serviceRestart?: 'confirmed' | 'unconfirmed';
 }
 
 export function updateHelp(): string {
@@ -393,57 +392,6 @@ export async function updateInstalled(
         });
     }
     result.updated = true;
-    const registration = path.join(installed.root, 'service-registration.json');
-    if (existsSync(registration)) {
-      // The runtime switch has completed. Unreadable or unknown service metadata
-      // must retain that result and expose unconfirmed startup without mutation.
-      result.serviceRestart = 'unconfirmed';
-      let service: { version?: unknown; enabled?: unknown } = {};
-      try {
-        const stat = lstatSync(registration);
-        if (stat.isFile() && !stat.isSymbolicLink() && stat.size <= 32768)
-          service = JSON.parse(readFileSync(registration, 'utf8'));
-      } catch {
-        /* Keep the new installation and report the independent service state. */
-      }
-      if (service.version === 1 && service.enabled === false) delete result.serviceRestart;
-      if (service.version === 1 && service.enabled === true) {
-        const nextRuntime = path.join(
-          destination,
-          'runtime',
-          process.platform === 'win32' ? 'node.exe' : 'node',
-        );
-        const restarted = spawnSync(
-          nextRuntime,
-          [path.join(destination, 'lib', 'wombat.js'), 'service', 'enable', '--json'],
-          {
-            env: {
-              ...process.env,
-              WOMBAT_INSTALL_ROOT: installed.root,
-              WOMBAT_ENDPOINT_FILE: path.join(installed.root, 'endpoint.json'),
-            },
-            encoding: 'utf8',
-            timeout: 60_000,
-            maxBuffer: 65536,
-            windowsHide: true,
-            killSignal: 'SIGKILL',
-          },
-        );
-        result.serviceRestart = 'unconfirmed';
-        if (!restarted.error && restarted.status === 0) {
-          try {
-            const status = JSON.parse(restarted.stdout) as {
-              running?: unknown;
-              autoStart?: unknown;
-            };
-            if (status.running === true && status.autoStart === true)
-              result.serviceRestart = 'confirmed';
-          } catch {
-            /* A completed update does not establish service startup. */
-          }
-        }
-      }
-    }
     return result;
   } finally {
     rmSync(scratch, {
@@ -486,7 +434,5 @@ export async function runUpdateCli(argv: string[]): Promise<number> {
         available: result.availableVersion,
       }) + '\n',
     );
-  if (result.serviceRestart === 'unconfirmed' && !invocation.json)
-    process.stderr.write(t('service.updatePending') + '\n');
-  return result.serviceRestart === 'unconfirmed' ? 2 : 0;
+  return 0;
 }

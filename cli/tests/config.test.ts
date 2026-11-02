@@ -2,11 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {parseVerificationArgs} from '../src/optimize-cli.js';
-test('verification uses only the new public spelling and preserves original conditions',()=>{
- const r=parseVerificationArgs(['verify','--project','/project','--read-view','v','--baseline','b','--root','/one','--root','/two','--agents-bytes','20000','--description-characters','1024']);
- assert.equal(r.request.action,'recheck');assert.equal(r.request.readView,'v');assert.equal(r.request.baselineId,'b');assert.deepEqual(r.request.roots,[path.resolve('/one'),path.resolve('/two')]);assert.deepEqual(r.request.projectRoots,[path.resolve('/project')]);
- assert.deepEqual(r.request.ruleOverrides,{agentsBytes:20000,descriptionCharacters:1024});
- for(const args of [['recheck'],['list'],['keep'],['verify'],['verify','--read-view','v'],['verify','--read-view','v','--baseline','b','--project-root','p'],['verify','--read-view','v','--baseline','b','--description-characters','1025']])assert.throws(()=>parseVerificationArgs(args));
+test('verification rejects removed view controls and requires an original report',()=>{
+ for(const args of [['recheck'],['list'],['keep'],['verify'],['verify','--read-view','v'],['verify','--baseline','missing-report.json']])assert.throws(()=>parseVerificationArgs(args));
 });
 
 test('config text uses the core basis to distinguish known zero, missing history and identity gaps', async () => {

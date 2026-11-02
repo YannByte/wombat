@@ -7,7 +7,7 @@
 | Review instructions and references | `check rules --project PATH --json` | Length/repetition is a lead; inspect responsibilities and existing mechanisms |
 | Review Hook targets | `check hooks --project PATH --json` | Configured, natively registered, enabled, trusted and executed are separate facts |
 
-Keep the user's dates and project; use the default 30 local calendar days only when none were specified. Show selected entries together: name, origin/path, project/global scope, native enablement, footprint method, recorded use, last use and advice. Use `--sort context_tokens` or `--sort least_activity` for Skills when that dimension matters; retain view and pagination through generated `config` detail/evidence calls as needed.
+Keep the user's dates and project; use the default 30 local calendar days only when none were specified. Show selected entries together: name, origin/path, project/global scope, native enablement, footprint method, recorded use, last use and advice. Use `--sort context_tokens` or `--sort least_activity` for Skills when that dimension matters; retain original scope and pagination through generated `config` detail/evidence calls as needed.
 
 A partial count is a lower bound, including zero. No record does not establish inactivity or uselessness. Large rarely used entries deserve review, while low-frequency release/recovery abilities can be valuable. Current enablement cannot prove historical loading. Do not derive exact savings from catalog text or configuration size.
 

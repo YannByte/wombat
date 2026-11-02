@@ -92,7 +92,7 @@ impl ColdEvents {
         let revision = crate::live_index::scalar(&reader, &format!("view:{key}"), "id")?;
         if revision.as_ref().and_then(serde_json::Value::as_str) != Some(id) {
             return Err(operation_error(
-                "VIEW_EXPIRED",
+                "INDEX_UNAVAILABLE",
                 "读取版本在证据捕获前已变化",
             ));
         }
@@ -441,39 +441,6 @@ pub(crate) fn load_index(db: &Connection, key: &str) -> Result<Option<EventIndex
     Ok(Some(index))
 }
 impl Snapshot {
-    pub(crate) fn has_cold_lease(&self) -> bool {
-        self.cold_events.is_some()
-    }
-    pub(crate) fn exclusive_cold_lease(&self) -> bool {
-        self.is_summary_view()
-            && self
-                .cold_events
-                .as_ref()
-                .is_some_and(|r| Arc::strong_count(r) == 1)
-            && self
-                .lazy_details
-                .as_ref()
-                .is_some_and(|v| v.lock().is_ok_and(|v| v.is_none()))
-    }
-    pub(crate) fn release_cold_lease(&mut self) -> crate::pricing_sync::Response {
-        let reader = self.cold_events.take().expect("exclusive lease checked");
-        reader.1.clone()
-    }
-    pub(crate) fn reattach_cold_lease(
-        &mut self,
-        db: &Connection,
-        key: &str,
-        prices: crate::pricing_sync::Response,
-    ) -> Result<()> {
-        self.cold_events = Some(ColdEvents::capture(
-            db,
-            key,
-            &self.manifest.snapshot_ref.snapshot_id,
-            &self.manifest.sources,
-            prices,
-        )?);
-        Ok(())
-    }
     pub(crate) fn measurement_changes(
         &self,
         db: &Connection,

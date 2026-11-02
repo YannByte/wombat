@@ -12,25 +12,9 @@ function canonicalPath(file: string): string {
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
-async function stopService(child: ChildProcess): Promise<void> {
-  const stopped = () => child.exitCode !== null || child.signalCode !== null;
-  if (stopped()) return;
-  const exited = new Promise<void>(resolve => {
-    const finished = () => { clearTimeout(timer); resolve(); };
-    const timer = setTimeout(() => { child.off('exit', finished); resolve(); }, 5_000);
-    child.once('exit', finished);
-  });
-  if (process.platform === 'win32' && child.pid) {
-    const result = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { encoding: 'utf8', windowsHide: true });
-    if (result.error) throw result.error;
-  } else child.kill('SIGKILL');
-  await exited;
-  assert.equal(stopped(), true, 'installed runtime service did not stop');
-}
-
 test('installed runtime queries synthetic usage, fixed drill-down and configuration outside the repository', { timeout: 45000 }, async () => {
   const temp = realpathSync.native(mkdtempSync(path.join(os.tmpdir(), 'wombat-skill-flow-')));
-  let service: ChildProcess | undefined;
+
   try {
     const installed = path.join(temp, 'runtime');
     mkdirSync(installed);
@@ -54,15 +38,6 @@ test('installed runtime queries synthetic usage, fixed drill-down and configurat
     }
     const env = { ...process.env, WOMBAT_DATA_HOME: path.join(temp, 'data'), CODEX_HOME: source, WOMBAT_AUTO_PRICES: '0', WOMBAT_CORE_BIN: '' };
     const core = path.join(installed, coreName);
-    service = spawn(core, ['--serve-usage'], { cwd: temp, env, windowsHide: true, stdio: 'ignore' });
-    await new Promise<void>((resolve, reject) => {
-      const ready = () => { service!.off('error', failed); resolve(); };
-      const failed = (error: Error) => { service!.off('spawn', ready); reject(error); };
-      service!.once('spawn', ready);
-      service!.once('error', failed);
-    });
-    await delay(100);
-    assert.equal(service.exitCode, null, 'installed runtime service exited during startup');
     const invoke = (args: CliInput): any => {
       const result = spawnProductCli(path.join(installed, 'wombat.js'), Array.isArray(args) ? [...args, '--json'] : args, {
         cwd: temp, env,
@@ -71,26 +46,24 @@ test('installed runtime queries synthetic usage, fixed drill-down and configurat
       assert.ok(result.status !== null && [0, 2].includes(result.status), result.stderr + result.stdout);
       const value = JSON.parse(result.stdout); assert.ok(!value.error, result.stdout); return value;
     };
-    const fixed = invoke({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto"}});
-    const scope = ['--snapshot', fixed.snapshotRef.snapshotId, '--since', '2026-10-03', '--until', '2026-10-04', '--timezone', 'Asia/Shanghai'];
+    const fixed = invoke({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true}},"mode":"auto"}});
+    const scope = ['--since', '2026-10-03', '--until', '2026-10-04', '--timezone', 'Asia/Shanghai'];
     assert.equal(invoke(['usage', ...scope]).summary.tokens.total, 330);
-    const threads = invoke(queryInvocation({"action":"threads","sort":"tokens","limit":1,"snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
+    const threads = invoke(queryInvocation({"action":"threads","sort":"tokens","limit":1,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(threads.page.total, 2); assert.equal(threads.summary.tokens.total, 330); assert.equal(threads.items[0].matchedUsage.tokens.total, 220);
-    const turns = invoke(queryInvocation({"action":"turns","matchedOnly":true,"threadId":threads.items[0].id,"sort":"tokens","snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
+    const turns = invoke(queryInvocation({"action":"turns","matchedOnly":true,"threadId":threads.items[0].id,"sort":"tokens","scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(turns.items[0].usage.tokens.total, 220);
-    const steps = invoke(queryInvocation({"action":"steps","threadId":threads.items[0].id,"turnId":turns.items[0].id,"snapshotId":fixed.snapshotRef.snapshotId,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
+    const steps = invoke(queryInvocation({"action":"steps","threadId":threads.items[0].id,"turnId":turns.items[0].id,"scope":{"since":"2026-10-03","until":"2026-10-04","timezone":"Asia/Shanghai"}}, {mode:"auto"}));
     assert.equal(steps.items.filter((item: { kind: string }) => item.kind === 'measurement').length, 1);
     const inventory = invoke({method:'config',params:{action:'list',roots:[source],projectRoots:[project]}});
     assert.ok(
       inventory.items.some((item: { path: string }) => canonicalPath(item.path) === canonicalSkill),
       `installed inventory did not include ${skill}: ${JSON.stringify(inventory.items.map((item: { path: string }) => item.path))}`,
     );
-    const suggestions = invoke({method:'optimize',params:{action:'list',roots:[source],projectRoots:[project],readView:inventory.readView}});
+    const suggestions = invoke({method:'optimize',params:{action:'list',roots:[source],projectRoots:[project]}});
     assert.ok(suggestions.suggestions.some((item: { item: { path: string }; findings: { rule: string }[] }) => canonicalPath(item.item.path) === canonicalSkill && item.findings.some(finding => finding.rule === 'descriptionSize')));
-    await stopService(service); service = undefined;
     assert.ok(invoke(['--help']).commands.includes('check'));
   } finally {
-    if (service) await stopService(service);
-    rmSync(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    rmSync(temp,{recursive:true,force:true,maxRetries:10,retryDelay:200});
   }
 });

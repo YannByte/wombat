@@ -39,8 +39,17 @@ test('five task entries join project evidence, preserve totals, read bounded his
       const text=read.result;
       assert.ok(text.fragments.some(f=>f.text.includes('Unique release evidence')));assert.ok(text.sourceBytesRead<100000);assert.ok(text.fragments[0].nextCursor,'Long original content must expose continuation');
       const fragment=text.fragments[0];
-      const continued:HistoryRead=invoke(['history','read',selected.evidence.threadId,'--project',f.project,...dates,'--snapshot',text.snapshotId,'--event',fragment.evidence.eventId,'--event-source',fragment.evidence.sourceInstanceId,'--event-offset',String(fragment.evidence.eventOffset),'--event-turn',fragment.evidence.turnId!,'--cursor',fragment.nextCursor!,'--json']);
+      const continued:HistoryRead=invoke(['history','read',selected.evidence.threadId,'--project',f.project,...dates,'--event',fragment.evidence.eventId,'--event-source',fragment.evidence.sourceInstanceId,'--event-offset',String(fragment.evidence.eventOffset),'--event-turn',fragment.evidence.turnId!,'--cursor',fragment.nextCursor!,'--json']);
       assert.ok(continued.result.fragments.length);assert.ok(continued.result.fragments.every(f=>f.message.evidence.eventId===f.evidence.eventId));
+      const outsideWindow:HistoryRead=invoke(['history','read','unmetered','--project',f.project,'--since','2026-10-30','--until','2026-10-31','--timezone','UTC','--json']);
+      assert.equal(outsideWindow.result.scanComplete,true);
+      assert.equal(outsideWindow.result.fragments.length,0,'Identity resolution must not broaden dated evidence');
+      const calendar:UsageResult=invoke(['usage','--project',f.project,...dates,'--group','day','--json']);
+      assert.equal(calendar.items.length,1);
+      assert.ok(calendar.items.every(i=>i.kind==='usage'&&i.isSubtotal));
+      assert.equal(calendar.summary.tokens.total,1200);
+      assert.equal(calendar.quality.issueScope,'index');
+      assert.equal(calendar.facets,undefined);
       const report:ProjectResult=invoke(['check','--project',f.project,'--root',f.root,...dates,'--json']);
       assert.equal(report.scope.projectRoot,f.project);assert.ok(report.configuration.result);assert.ok(report.checks.result);assert.ok(report.artifacts.result);assert.equal(report.history.result?.result.summary.tokens.total,1200);
       assert.equal(await readFile(path.join(f.project,'AGENTS.md'),'utf8'),rules,'Diagnosis edited the project');
@@ -55,7 +64,8 @@ test('five task entries join project evidence, preserve totals, read bounded his
       const baseline=report.checks.result!.suggestions.find(s=>s.findings.some(f=>f.rule==='localReference'));assert.ok(baseline?.baselineId);
       await writeFile(path.join(f.project,'missing-validation.md'),'Run the project validation before delivery.\n');
       await writeFile(path.join(f.project,'AGENTS.md'),shortRules);
-      const verified:OptimizeResult=invoke(['check','verify','--project',f.project,'--root',f.root,'--read-view',report.checks.result!.readView!,'--baseline',baseline!.baselineId!,'--suggestion',baseline!.id,'--json']);
+      const baselineFile=path.join(f.dir,'check.json');await writeFile(baselineFile,JSON.stringify(report));
+      const verified:OptimizeResult=invoke(['check','verify','--baseline',baselineFile,'--suggestion',baseline!.id,'--json']);
       assert.ok(verified.checks.some(c=>c.rule==='localReference'&&c.outcome==='miss'&&c.comparison.status==='unknown'));
       assert.ok(verified.checks.some(c=>c.rule==='fileSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
       for(const args of [['api'],['call'],['check','inventory'],['check','cleanup'],['system','watch'],['clean','--codex','--apply','--no-input']])assert.equal(invoke([...args,'--json'],1).error.code,'INVALID_ARGUMENT');
@@ -63,4 +73,23 @@ test('five task entries join project evidence, preserve totals, read bounded his
       const emptyPlan=invoke(['usage','alerts','--once','--json'],2);assert.deepEqual(emptyPlan.plans,[]);
     }finally{if(saved===undefined)delete process.env.WOMBAT_CODEX_BIN;else process.env.WOMBAT_CODEX_BIN=saved;}
   });
+});
+
+test('a restarted on-demand service restores the exact committed view without scanning later source appends',{timeout:60000},async()=>{
+ await withLocalProduct(async f=>{
+  const at='2026-10-29T01:00:00Z';
+  await f.write('restore',[row('session_meta',{id:'restore',cwd:f.project},at),measurement('restore','first',1200,at),row('event_msg',{type:'agent_message',message:'Pinned original evidence'},at)]);
+  const first=(await f.client.live!({query:{action:'usage',scope:{allTime:true}},mode:'fresh'})).result;
+
+  await f.append('restore',[measurement('restore','uncollected',800,at)]);
+
+  const fixed=(await f.client.live!({query:{action:'usage',scope:{allTime:true}},mode:'cached'})).result;
+  assert.equal(fixed.snapshotRef.snapshotId,first.snapshotRef.snapshotId);
+  assert.deepEqual(fixed.summary,first.summary,'Restoration must not scan or silently advance the view');
+  const read:HistoryRead=JSON.parse(f.cli(['history','read','restore','--find','Pinned original','--all-time','--json'],'',2));
+  assert.ok(read.result.fragments.some(x=>x.text==='Pinned original evidence'));
+  const next=(await f.client.live!({query:{action:'usage',scope:{allTime:true}},mode:'fresh'})).result;
+  assert.equal(next.summary.tokens.total,2000);
+  assert.notEqual(next.snapshotRef.snapshotId,first.snapshotRef.snapshotId);
+ });
 });

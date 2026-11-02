@@ -155,9 +155,10 @@ pub(crate) use cold_events::{
     load_index as load_cold_event_index, save_index as save_cold_event_index,
 };
 pub use files::{RefreshLock, load, save};
-use files::{bounded_read, corrupt, file_ref, product_home, safe_file, save_with_prices};
+use files::{bounded_read, corrupt, file_ref, safe_file};
 #[cfg(test)]
 use files::{load_at, private_dir, save_at};
+#[cfg(test)]
 pub(crate) use memory::memory;
 pub(crate) use memory::memory_cold_operations;
 

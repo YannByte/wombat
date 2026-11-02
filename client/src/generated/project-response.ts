@@ -251,7 +251,6 @@ export type TokenBasis = "analyzed_totals";
 export type AutomaticStatus = "checking" | "updated" | "unchanged" | "failed";
 export type ProjectLoadState = "pending" | "loading" | "ready";
 export type Action3 =
-  | "refresh"
   | "usage"
   | "threads"
   | "turns"
@@ -351,7 +350,9 @@ export type Item2 =
       tool?: string | null;
       kind: "operation";
     };
-export type Action4 = ("activity" | "locate" | "read" | "search" | "changes") | "records";
+export type QualityIssueScope = "index";
+export type QualityQueryImpact = "none" | "unknown";
+export type Action4 = ("activity" | "locate" | "read" | "search") | "records" | "resolve";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -462,7 +463,6 @@ export interface Response1 {
   outputVersion: number;
   action: Action;
   capabilities: Capabilities;
-  readView?: string | null;
   usageRevision?: string | null;
   configRevision: string;
   checkedAt: string;
@@ -869,7 +869,6 @@ export interface Response2 {
   outputVersion: number;
   action: Action2;
   capabilities: Capabilities2;
-  readView?: string | null;
   configRevision: string;
   usageRevision?: string | null;
   decisionRevision: string;
@@ -1078,7 +1077,7 @@ export interface RuleDefinition {
 }
 export interface ActivityResult {
   formatVersion: number;
-  readView: ReadView;
+  basis: ReadView;
   scope: LocalScope;
   analysisMethod: string;
   freshness: QueryFreshness;
@@ -1737,6 +1736,14 @@ export interface AvailableRange {
   until?: string | null;
 }
 export interface Quality {
+  /**
+   * Issues and source statuses describe the whole snapshot, not this query window.
+   */
+  issueScope: QualityIssueScope;
+  /**
+   * Snapshot warnings without query-bound attribution cannot prove a scoped defect.
+   */
+  queryImpact: QualityQueryImpact;
   status: string;
   issues: Issue2[];
   sources: SourceReport[];
@@ -1798,10 +1805,10 @@ export interface Section4 {
   error?: Failure | null;
 }
 export interface Response5 {
+  record?: ResolvedRecord | null;
   outputVersion: number;
   action: Action4;
   snapshotId: string;
-  baselineSnapshotId?: string | null;
   selection: Selection;
   items: Activity[];
   fragments: Fragment[];
@@ -1819,6 +1826,13 @@ export interface Response5 {
    * When present, completeness applies only to this requested source window.
    */
   window?: ContextWindow | null;
+}
+export interface ResolvedRecord {
+  id: string;
+  upstreamId: string;
+  sourceInstanceId: string;
+  project?: string | null;
+  title?: string | null;
 }
 export interface Selection {
   since?: string | null;
@@ -1899,10 +1913,9 @@ export interface Response6 {
   outputVersion: number;
   policyVersion: number;
   action: string;
-  readView: string;
+  projectIdentity: string;
   baselineId: string;
   checkedAt: string;
-  expiresAt: string;
   scope: Scope3;
   items: Item3[];
   summary: Summary2;

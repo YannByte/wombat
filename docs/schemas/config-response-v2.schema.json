@@ -1,0 +1,1887 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Response",
+  "type": "object",
+  "properties": {
+    "extensionReview": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ExtensionReview"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "extensionActivity": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ExtensionActivityStatistics"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "outputVersion": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 2
+    },
+    "action": {
+      "$ref": "#/definitions/Action"
+    },
+    "capabilities": {
+      "$ref": "#/definitions/Capabilities"
+    },
+    "usageRevision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "configRevision": {
+      "type": "string"
+    },
+    "checkedAt": {
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/definitions/Scope"
+    },
+    "authorizedProjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authorizedSourceRoots": {
+      "description": "Startup read authorization, not proof that logs exist or are readable.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "hostRestartCommand": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "summary": {
+      "$ref": "#/definitions/Summary"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Item"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Evidence"
+      }
+    },
+    "relatedScopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RelatedScope"
+      }
+    },
+    "page": {
+      "$ref": "#/definitions/Page"
+    },
+    "coverage": {
+      "$ref": "#/definitions/Coverage"
+    },
+    "hookRegistry": {
+      "$ref": "#/definitions/HookRegistry"
+    }
+  },
+  "required": [
+    "outputVersion",
+    "action",
+    "capabilities",
+    "configRevision",
+    "checkedAt",
+    "scope",
+    "authorizedProjects",
+    "summary",
+    "items",
+    "evidence",
+    "relatedScopes",
+    "page",
+    "coverage",
+    "hookRegistry"
+  ],
+  "definitions": {
+    "ExtensionReview": {
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "enabledItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "disabledItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unconfirmedItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "estimatedItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unmeasuredItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "confirmedVisibleTokens": {
+          "description": "Native listings do not expose model selection, aliases or prompt budget truncation.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "methodVersion",
+        "enabledItems",
+        "disabledItems",
+        "unconfirmedItems",
+        "estimatedItems",
+        "unmeasuredItems"
+      ]
+    },
+    "ExtensionActivityStatistics": {
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "observedUse": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "noObservedUse": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unavailable": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "scope": {
+          "$ref": "#/definitions/Scope"
+        },
+        "checkedAt": {
+          "type": "string"
+        },
+        "items": {
+          "description": "Same page as inventory items; summary counts are computed before pagination.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionActivity"
+          }
+        }
+      },
+      "required": [
+        "methodVersion",
+        "observedUse",
+        "noObservedUse",
+        "unavailable",
+        "scope",
+        "checkedAt",
+        "items"
+      ]
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "allTime": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agentKind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceInstanceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExtensionActivity": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "observedRecords": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "noObservedUseDays": {
+          "description": "Whole elapsed 24-hour periods without a recorded use in the selected window.\nDoes not establish continuous enablement, loading, or complete observation.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lastRecordAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absenceObservable": {
+          "type": "boolean"
+        },
+        "useBasis": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UseBasis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "absenceObservable"
+      ]
+    },
+    "UseBasis": {
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "status": {
+          "$ref": "#/definitions/UseBasisStatus"
+        },
+        "unit": {
+          "$ref": "#/definitions/UseUnit"
+        },
+        "capturedAt": {
+          "description": "Observer cutoff, distinct from individual event times and source dispatch.",
+          "type": "string"
+        },
+        "snapshotId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "$ref": "#/definitions/UseScope"
+        },
+        "timeBasis": {
+          "$ref": "#/definitions/UseTimeBasis"
+        },
+        "coverage": {
+          "$ref": "#/definitions/UseCoverage"
+        },
+        "sourceCompleteness": {
+          "description": "Completeness of selected source reports, not proof of all native use mechanisms.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/UseSourceCompleteness"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "methodVersion",
+        "status",
+        "unit",
+        "capturedAt",
+        "scope",
+        "timeBasis",
+        "coverage",
+        "sourceCompleteness"
+      ]
+    },
+    "UseBasisStatus": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "observed",
+            "unavailable"
+          ]
+        },
+        {
+          "description": "Canonical observed counts remain usable; gaps prevent a complete count.",
+          "type": "string",
+          "const": "partial"
+        }
+      ]
+    },
+    "UseUnit": {
+      "type": "string",
+      "enum": [
+        "object_use",
+        "rule_read",
+        "rule_load_or_read"
+      ]
+    },
+    "UseScope": {
+      "type": "object",
+      "properties": {
+        "sourceInstanceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threadId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agentKind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "window": {
+          "$ref": "#/definitions/UseWindow"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceIds",
+        "window"
+      ]
+    },
+    "UseWindow": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "all_history"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Inclusive local date since, exclusive local date until, in the recorded timezone.",
+          "type": "object",
+          "properties": {
+            "since": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            },
+            "timezone": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "date_window"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "since",
+            "until",
+            "timezone"
+          ]
+        }
+      ]
+    },
+    "UseTimeBasis": {
+      "type": "string",
+      "enum": [
+        "source_operation_time"
+      ]
+    },
+    "UseCoverage": {
+      "type": "object",
+      "properties": {
+        "dispatchGaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "identityGaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "targetGaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timeGaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "turnGaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "UseSourceCompleteness": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "unknown"
+      ]
+    },
+    "Action": {
+      "type": "string",
+      "enum": [
+        "list",
+        "detail",
+        "evidence",
+        "related_scopes",
+        "capabilities"
+      ]
+    },
+    "Capabilities": {
+      "type": "object",
+      "properties": {
+        "historicalContentHashes": {
+          "type": "boolean"
+        },
+        "kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Kind"
+          }
+        },
+        "evidenceTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenEstimates": {
+          "type": "boolean"
+        },
+        "historicalContent": {
+          "type": "boolean"
+        },
+        "writes": {
+          "type": "boolean"
+        },
+        "projectRegistry": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "historicalContentHashes",
+        "kinds",
+        "evidenceTypes",
+        "tokenEstimates",
+        "historicalContent",
+        "writes",
+        "projectRegistry"
+      ]
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "rule",
+        "skill",
+        "mcp",
+        "hook"
+      ]
+    },
+    "Summary": {
+      "type": "object",
+      "properties": {
+        "currentItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "historicalItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "observedItems": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UsageSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "currentItems",
+        "historicalItems",
+        "observedItems"
+      ]
+    },
+    "UsageSummary": {
+      "type": "object",
+      "properties": {
+        "inputTotal": {
+          "description": "All input, including cache reads and writes. Existing tokens.input stays uncached.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "default": null,
+          "maximum": 9007199254740991
+        },
+        "cacheHitRate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null
+        },
+        "unpricedTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "default": null,
+          "maximum": 9007199254740991
+        },
+        "tokens": {
+          "$ref": "#/definitions/TokenUsage"
+        },
+        "tokenAnalysis": {
+          "$ref": "#/definitions/TokenAnalysis"
+        },
+        "price": {
+          "$ref": "#/definitions/PriceResult"
+        },
+        "measurementCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "tokens",
+        "tokenAnalysis",
+        "price",
+        "measurementCount"
+      ]
+    },
+    "TokenUsage": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cacheRead": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cacheCreate": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "output": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reasoning": {
+          "description": "Subset of output, never an additional billable category.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "rawInput": {
+          "description": "Source input including caches; retained for request-level price conditions.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "TokenAnalysis": {
+      "description": "Token subtotals are scoped to the canonical measurements selected by this query.\nExisting `tokens` fields remain complete totals; partial observations live here.",
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "scope": {
+          "$ref": "#/definitions/TokenAnalysisScope"
+        },
+        "fields": {
+          "$ref": "#/definitions/TokenFields"
+        },
+        "totalAnalysis": {
+          "description": "Independent analysis; immutable historical review items may contain only\nthe native observations captured when the user made the decision.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnalyzedTokenTotal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "methodVersion",
+        "scope",
+        "fields"
+      ]
+    },
+    "TokenAnalysisScope": {
+      "type": "string",
+      "enum": [
+        "selected_canonical_measurements"
+      ]
+    },
+    "TokenFields": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        },
+        "cacheRead": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        },
+        "cacheCreate": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        },
+        "output": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        },
+        "reasoning": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        },
+        "total": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        },
+        "rawInput": {
+          "$ref": "#/definitions/ObservedTokenSubtotal"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "input",
+        "cacheRead",
+        "cacheCreate",
+        "output",
+        "reasoning",
+        "total",
+        "rawInput"
+      ]
+    },
+    "ObservedTokenSubtotal": {
+      "description": "An observed subtotal never implies that unavailable records contributed zero.",
+      "type": "object",
+      "properties": {
+        "observedSubtotal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "coveredRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "missingRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "conflictingRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "invalidRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "indeterminateRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "coveredRecords",
+        "missingRecords",
+        "conflictingRecords",
+        "invalidRecords",
+        "indeterminateRecords"
+      ]
+    },
+    "AnalyzedTokenTotal": {
+      "type": "object",
+      "properties": {
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "subtotal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "coveredRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "recordedRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "calculatedRecords": {
+          "description": "Unavailable native totals use recorded input (including caches) plus output\nonly for an identified response grain. Reasoning is already in output.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unavailableRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "overflowRecords": {
+          "description": "Alternative records excluded by individual or combined safe-integer limits.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "methodVersion",
+        "coveredRecords",
+        "recordedRecords",
+        "calculatedRecords",
+        "unavailableRecords",
+        "overflowRecords"
+      ]
+    },
+    "PriceResult": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "priceRevision": {
+          "type": "string"
+        },
+        "cost": {
+          "description": "Present only when every applicable Token category has a known amount.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "knownCost": {
+          "type": "string"
+        },
+        "status": {
+          "description": "priced, partial, unknown",
+          "type": "string"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PriceComponent"
+          }
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PriceBasis"
+          }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "currency",
+        "policy",
+        "priceRevision",
+        "knownCost",
+        "status",
+        "components",
+        "basis",
+        "issues"
+      ]
+    },
+    "PriceComponent": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cost": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "knownCost": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "ratePerMillion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "category",
+        "knownCost",
+        "status"
+      ]
+    },
+    "PriceBasis": {
+      "type": "object",
+      "properties": {
+        "originalModel": {
+          "type": "string"
+        },
+        "pricingModel": {
+          "type": "string"
+        },
+        "modelProvider": {
+          "type": "string"
+        },
+        "apiProvider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "matchMethod": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "verifiedAt": {
+          "type": "string"
+        },
+        "priceRevision": {
+          "type": "string"
+        },
+        "catalogHash": {
+          "type": "string"
+        },
+        "condition": {
+          "description": "standard, longContext, conditionUnknown",
+          "type": "string"
+        },
+        "requestInputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requestScoped": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "originalModel",
+        "pricingModel",
+        "modelProvider",
+        "matchMethod",
+        "source",
+        "verifiedAt",
+        "priceRevision",
+        "catalogHash",
+        "condition",
+        "requestScoped"
+      ]
+    },
+    "Item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/Kind"
+        },
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nativeKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorizedProjects": {
+          "description": "Authorized inventory memberships, not proof of joint host loading.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sourceContexts": {
+          "description": "Current physical object keeps each source inventory identity and observation.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceContext"
+          }
+        },
+        "configuredState": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "observedAt": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "contentTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "estimateStatus": {
+          "type": "string"
+        },
+        "characters": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "measurementStatus": {
+          "type": "string"
+        },
+        "bytesSource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContentEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skillMetadata": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SkillMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodyTokenEstimate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContentEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodyEstimateStatus": {
+          "type": "string"
+        },
+        "contextFootprint": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContextFootprint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usageCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "useBasis": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UseBasis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastRecordAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation": {
+          "$ref": "#/definitions/Observation"
+        },
+        "counts": {
+          "$ref": "#/definitions/Counts"
+        },
+        "relatedTurns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "relatedTasks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UsageSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "sourceInstanceId",
+        "path",
+        "authorizedProjects",
+        "sourceContexts",
+        "configuredState",
+        "contentHash",
+        "observedAt",
+        "current",
+        "stale",
+        "estimateStatus",
+        "measurementStatus",
+        "bodyEstimateStatus",
+        "observation",
+        "counts",
+        "relatedTurns",
+        "relatedTasks"
+      ]
+    },
+    "SourceContext": {
+      "type": "object",
+      "properties": {
+        "inventoryId": {
+          "type": "string"
+        },
+        "global": {
+          "type": "boolean"
+        },
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "configuredState": {
+          "type": "string"
+        },
+        "counts": {
+          "$ref": "#/definitions/Counts"
+        },
+        "observation": {
+          "$ref": "#/definitions/Observation"
+        },
+        "lastRecordAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "inventoryId",
+        "global",
+        "sourceInstanceId",
+        "contentHash",
+        "configuredState",
+        "counts",
+        "observation"
+      ]
+    },
+    "Counts": {
+      "type": "object",
+      "properties": {
+        "fileReads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "toolCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "resourceReads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "succeeded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outcomeUnknown": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "fileReads",
+        "toolCalls",
+        "resourceReads",
+        "succeeded",
+        "failed",
+        "outcomeUnknown"
+      ]
+    },
+    "Observation": {
+      "type": "string",
+      "enum": [
+        "used",
+        "loaded_only",
+        "unknown"
+      ]
+    },
+    "ContentEstimate": {
+      "type": "object",
+      "properties": {
+        "tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "applicability": {
+          "type": "string"
+        },
+        "tokenizerVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "tokens",
+        "encoding",
+        "method",
+        "payload",
+        "contentHash",
+        "applicability"
+      ]
+    },
+    "SkillMetadata": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "descriptionCharacters": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "description": "Bounded current-file diagnostics for directly reviewable static fields.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillDiagnostic"
+          }
+        }
+      },
+      "required": [
+        "status",
+        "issues",
+        "diagnostics"
+      ]
+    },
+    "SkillDiagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "field": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "current": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "ContextFootprint": {
+      "description": "A reference catalog row, never proof of model-visible context or historical loading.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContentEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "renderer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nativeVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillContext"
+          }
+        },
+        "visibility": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "contexts",
+        "visibility"
+      ]
+    },
+    "SkillContext": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "name",
+        "enabled",
+        "scope"
+      ]
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sourceInstanceId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "itemId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eventType": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "association": {
+          "type": "string"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UsageSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "itemId",
+        "threadId",
+        "eventType",
+        "outcome",
+        "association"
+      ]
+    },
+    "RelatedScope": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UsageSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "evidenceCount"
+      ]
+    },
+    "Page": {
+      "type": "object",
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "nextOffset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "offset",
+        "limit",
+        "total"
+      ]
+    },
+    "Coverage": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "historyStatus": {
+          "type": "string"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Issue"
+          }
+        },
+        "supportedEvidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "absenceObservable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "historyStatus",
+        "issues",
+        "supportedEvidence",
+        "absenceObservable"
+      ]
+    },
+    "Issue": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "HookRegistry": {
+      "description": "A current native registry observation; it never proves that a Hook ran.",
+      "type": "object",
+      "properties": {
+        "nativeVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/definitions/HookRegistryStatus"
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HookContext"
+          }
+        }
+      },
+      "required": [
+        "status",
+        "contexts"
+      ]
+    },
+    "HookRegistryStatus": {
+      "type": "string",
+      "enum": [
+        "unavailable",
+        "partial",
+        "observed"
+      ]
+    },
+    "HookContext": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "registrations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HookRegistration"
+          }
+        }
+      },
+      "required": [
+        "project",
+        "complete",
+        "registrations"
+      ]
+    },
+    "HookRegistration": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "nativeKey": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "registrationHash": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "trust": {
+          "$ref": "#/definitions/HookTrust"
+        },
+        "handler": {
+          "$ref": "#/definitions/HookHandler"
+        },
+        "source": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "nativeKey",
+        "contentHash",
+        "registrationHash",
+        "enabled",
+        "trust",
+        "handler",
+        "source"
+      ]
+    },
+    "HookTrust": {
+      "type": "string",
+      "enum": [
+        "managed",
+        "untrusted",
+        "trusted",
+        "modified"
+      ]
+    },
+    "HookHandler": {
+      "type": "string",
+      "enum": [
+        "command",
+        "mcpTool",
+        "prompt",
+        "agent"
+      ]
+    }
+  }
+}

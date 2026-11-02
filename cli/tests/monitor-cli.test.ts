@@ -32,7 +32,7 @@ test('watch reloads plans after concurrent edits but exposes non-retryable failu
       }
       if (++checks === 1) throw new CoreError('MONITOR_CHANGED', 'Plan changed');
       controller.abort();
-      return { ...settings, action: 'check', snapshotId: 'synthetic' };
+      return { ...settings, action: 'check'  };
     },
     live: async () => ({
       outputVersion: 1,
@@ -59,7 +59,7 @@ test('watch reloads plans after concurrent edits but exposes non-retryable failu
         }),
         items: [],
         page: { offset: 0, limit: 1, total: 0 },
-        quality: { status: 'complete', issues: [], sources: [] },
+        quality: { issueScope: 'index', queryImpact: 'none', status: 'complete', issues: [], sources: [] },
       },
     }),
   };

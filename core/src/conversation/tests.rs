@@ -372,3 +372,95 @@ fn message_kinds_anchor_windows_and_empty_arrays_keep_exact_evidence() {
     assert!(around.window.is_some());
     assert_eq!(around.source_bytes_read, 0);
 }
+
+#[test]
+fn exact_record_identity_does_not_scan_events_or_require_activity_in_the_window() {
+    let (_root, snapshot, path) = fixture("PRIVATE_SYNTHETIC_BODY");
+    let id = snapshot.manifest.threads[0].thread.id.clone();
+    fs::remove_file(path).unwrap();
+    let mut r = request(&snapshot, Action::Resolve);
+    r.query = Some(id.clone());
+    r.selection.since = Some("2026-10-20".into());
+    r.selection.until = Some("2026-10-21".into());
+    let response = query_with_scan_budget(&snapshot, None, &r, &AtomicBool::new(false), 0).unwrap();
+    assert_eq!(response.record.unwrap().id, id);
+    assert_eq!(response.scanned_events, 0);
+    assert_eq!(response.source_bytes_read, 0);
+    r.query = Some("thread".into());
+    assert!(
+        query(&snapshot, None, &r, &AtomicBool::new(false))
+            .unwrap()
+            .record
+            .is_some()
+    );
+    r.selection.projects = vec!["/another/project".into()];
+    assert!(
+        query(&snapshot, None, &r, &AtomicBool::new(false))
+            .unwrap()
+            .record
+            .is_none()
+    );
+    r.selection.projects.clear();
+    r.query = Some("threa".into());
+    assert!(
+        query(&snapshot, None, &r, &AtomicBool::new(false))
+            .unwrap()
+            .record
+            .is_none()
+    );
+    r.query = None;
+    assert!(query(&snapshot, None, &r, &AtomicBool::new(false)).is_err());
+}
+
+#[test]
+fn scoped_scan_cursor_survives_a_new_revision_and_an_unrelated_partition() {
+    let (root, first, path) = fixture("PRIVATE_SYNTHETIC_FIRST");
+    use std::io::Write;
+    writeln!(fs::OpenOptions::new().append(true).open(&path).unwrap(),"{}",json!({"type":"event_msg","timestamp":"2026-10-14T00:00:03Z","payload":{"type":"agent_message","turn_id":"turn","message":"PRIVATE_SYNTHETIC_SECOND"}})).unwrap();
+    drop(first);
+    let first = collect(root.path(), "revision-one");
+    let thread = first.manifest.threads[0].thread.id.clone();
+    let mut selected = request(&first, Action::Locate);
+    selected.selection.threads = vec![thread];
+    selected.limit = Some(1);
+    let page = query(&first, None, &selected, &AtomicBool::new(false)).unwrap();
+    assert_eq!(page.items.len(), 1);
+    assert!(page.next_cursor.is_some());
+    fs::write(
+        root.path().join("sessions/unrelated.jsonl"),
+        rows("PRIVATE_SYNTHETIC_UNRELATED").replace("\"thread\"", "\"unrelated\""),
+    )
+    .unwrap();
+    let second = collect(root.path(), "revision-two");
+    selected.snapshot_id = second.manifest.snapshot_ref.snapshot_id.clone();
+    selected.cursor = page.next_cursor;
+    let resumed = query(&second, None, &selected, &AtomicBool::new(false)).unwrap();
+    assert_eq!(resumed.items.len(), 1);
+    assert_ne!(
+        resumed.items[0].evidence.event_id,
+        page.items[0].evidence.event_id
+    );
+    assert!(resumed.scan_complete);
+}
+
+#[test]
+fn original_text_cursor_is_bound_to_the_event_and_scope_instead_of_a_revision_lease() {
+    let (root, first, _) = fixture("PRIVATE_SYNTHETIC_LONG_MESSAGE");
+    let evidence = locate(&first);
+    let mut selected = request(&first, Action::Read);
+    selected.targets = vec![ReadTarget {
+        evidence,
+        cursor: None,
+        max_bytes: Some(8),
+        before: 0,
+        after: 0,
+    }];
+    let first_page = query(&first, None, &selected, &AtomicBool::new(false)).unwrap();
+    selected.targets[0].cursor = first_page.fragments[0].next_cursor.clone();
+    assert!(selected.targets[0].cursor.is_some());
+    let second = collect(root.path(), "revision-two");
+    selected.snapshot_id = second.manifest.snapshot_ref.snapshot_id.clone();
+    let next = query(&second, None, &selected, &AtomicBool::new(false)).unwrap();
+    assert!(!next.fragments[0].text.is_empty());
+    assert_ne!(next.fragments[0].text, first_page.fragments[0].text);
+}

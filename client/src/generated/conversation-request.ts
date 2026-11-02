@@ -1,6 +1,6 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = ("activity" | "locate" | "read" | "search" | "changes") | "records";
+export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -19,7 +19,6 @@ export type MessageRecordKind = "legacy_snapshot" | "response_snapshot" | "nativ
 
 export interface Request {
   action: Action;
-  snapshotId: string;
   roots?: string[];
   selection?: Selection;
   limit?: number | null;
@@ -29,7 +28,6 @@ export interface Request {
   offset?: number | null;
   cursor?: string | null;
   query?: string | null;
-  baselineSnapshotId?: string | null;
   targets?: ReadTarget[];
   maxScanBytes?: number | null;
   anchor?: Evidence | null;

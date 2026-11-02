@@ -130,12 +130,10 @@ fn view() -> View {
     }
 }
 #[test]
-fn provisional_inventory_keeps_syncing_distinct_from_committed_partial_coverage() {
+fn committed_inventory_preserves_partial_coverage() {
     let root = tempfile::tempdir().unwrap();
-    for (issue, expected) in [
-        (crate::adapters::codex::preview::ISSUE, "syncing"),
-        ("syntheticCoverageGap", "partial"),
-    ] {
+    {
+        let (issue, expected) = ("syntheticCoverageGap", "partial");
         let mut collected = crate::adapters::contract::Collected::default();
         collected.issues.push(crate::adapters::contract::Issue {
             code: issue.into(),
@@ -158,21 +156,16 @@ fn provisional_inventory_keeps_syncing_distinct_from_committed_partial_coverage(
     }
 }
 #[test]
-fn views_expire_explicitly_and_store_is_bounded() {
-    let mut store = Store::default();
-    let (first, _) = store.insert(view());
-    for _ in 0..8 {
-        store.insert(view());
-    }
-    assert_eq!(store.views.len(), 8);
-    assert!(store.get(&first).is_err());
-    let (last, _) = store.insert(view());
-    store.views.back_mut().unwrap().1 = Instant::now() - Duration::from_secs(601);
-    assert!(store.get(&last).is_err());
-    for (_, at, _) in &mut store.views {
-        *at = Instant::now() - Duration::from_secs(601);
-    }
-    assert!(!store.has_views());
+fn configuration_reads_need_no_retained_inventory() {
+    let first = execute(Request::default(), String::new(), &view()).unwrap();
+    let second = execute(Request::default(), String::new(), &view()).unwrap();
+    assert_eq!(first.items.len(), second.items.len());
+    assert!(
+        serde_json::to_value(first)
+            .unwrap()
+            .get("readView")
+            .is_none()
+    );
 }
 #[test]
 fn local_dates_use_exclusive_end_and_preserve_unknowns() {

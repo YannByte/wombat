@@ -2982,7 +2982,6 @@
     "Action": {
       "type": "string",
       "enum": [
-        "refresh",
         "usage",
         "threads",
         "turns",
@@ -3457,6 +3456,22 @@
     "Quality": {
       "type": "object",
       "properties": {
+        "issueScope": {
+          "description": "Issues and source statuses describe the whole snapshot, not this query window.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/QualityIssueScope"
+            }
+          ]
+        },
+        "queryImpact": {
+          "description": "Snapshot warnings without query-bound attribution cannot prove a scoped defect.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/QualityQueryImpact"
+            }
+          ]
+        },
         "status": {
           "type": "string"
         },
@@ -3484,9 +3499,24 @@
         }
       },
       "required": [
+        "issueScope",
+        "queryImpact",
         "status",
         "issues",
         "sources"
+      ]
+    },
+    "QualityIssueScope": {
+      "type": "string",
+      "enum": [
+        "index"
+      ]
+    },
+    "QualityQueryImpact": {
+      "type": "string",
+      "enum": [
+        "none",
+        "unknown"
       ]
     },
     "Issue": {

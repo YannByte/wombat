@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import {DatabaseSync} from 'node:sqlite';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const entry = process.env.WOMBAT_CLI_ENTRY ?? path.join(repository, 'dist/wombat.js');
@@ -19,13 +20,6 @@ const counts = (input: number, read: number, write: number, output: number) => (
 });
 const jsonl = (rows: object[]) => rows.map(value => JSON.stringify(value)).join('\n') + '\n';
 
-async function stopFixture(env:NodeJS.ProcessEnv,cwd:string):Promise<void> {
-  // The private data home binds this control request to the fixture's own runtime.
-  // Release SQLite/file handles before removal instead of waiting for idle expiry.
-  const result=spawnProductCli(entry,{method:'service',params:{action:'stop'}},{cwd,env,encoding:'utf8',timeout:30000,maxBuffer:65536});
-  assert.ifError(result.error);assert.equal(result.status,0,result.stderr+result.stdout);
-  assert.equal(JSON.parse(result.stdout).running,false,'Fixture service shutdown was not confirmed');
-}
 
 async function fixture() {
   // Recorded POSIX identities deliberately differ from the host filesystem grammar.
@@ -74,7 +68,7 @@ async function fixture() {
     return { code: result.status, stdout: result.stdout, stderr: result.stderr, value: json ? JSON.parse(result.stdout) : undefined };
   };
   return { root, source, data, active, run, cleanup: async () => {
-    await stopFixture(env,root);
+
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 });
   } };
 }
@@ -99,9 +93,9 @@ test('real CLI starts its shared service through a capability probe without scan
     const value = JSON.parse(result.stdout);
     assert.equal(value.action, 'capabilities');
     assert.equal(value.resultStatus, 'complete');
-    assert.equal(value.readView, null);
+    assert.equal("readView" in value, false);
   } finally {
-    await stopFixture(env,root);
+
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 });
   }
 });
@@ -121,7 +115,7 @@ test('real CLI refresh, usage, threads, turns and steps conserve independent Tok
       assert.equal(initial.code, 1, initial.stdout);
       assert.equal(initial.value.error.code, 'SYNC_PENDING');
     }
-    const refresh = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source,f.source]},"mode":"auto"}});
+    const refresh = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source,f.source]},"mode":"auto"}});
     assert.equal(refresh.code, 0);
     assert.ok(['current','stale'].includes(refresh.value.freshness.status));
     assert.equal(refresh.value.summary.tokens.total, 491_210);
@@ -158,7 +152,7 @@ test('real CLI refresh, usage, threads, turns and steps conserve independent Tok
 test('real CLI filters, timezones, grouping and pagination retain the full matching totals', async () => {
   const f = await fixture();
   try {
-    f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
+    f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
     for (const filter of [['--model', 'gpt-6-sol'], ['--effort', 'high'], ['--project', '/synthetic/项目甲']]) {
       const result = f.run(['usage', ...dates, ...filter]);
       assert.equal(result.code, 0, result.stdout);
@@ -179,7 +173,7 @@ test('real CLI filters, timezones, grouping and pagination retain the full match
     const first = f.run({"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":1},"mode":"auto"}}).value;
     const ids = [first.items[0].id];
     for (const offset of [1, 2]) {
-      const page = f.run(queryInvocation({action:'threads',sort:'tokens',limit:1,offset,snapshotId:first.snapshotRef.snapshotId},{mode:'cached'})).value;
+      const page = f.run(queryInvocation({action:'threads',sort:'tokens',limit:1,offset},{mode:'cached'})).value;
       assert.deepEqual(page.summary, first.summary);
       ids.push(page.items[0].id);
     }
@@ -214,7 +208,7 @@ test('real CLI rejects invalid requests and reports missing detail without scann
     }
     assert.equal(f.run(['--help']).code, 0);
     assert.equal(f.run(['--version']).code, 0);
-    f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
+    f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
     const missing = f.run({"method":"usage","params":{"query":{"action":"turns","threadId":"missing"},"mode":"auto"}});
     assert.equal(missing.code, 1);
     assert.equal(missing.value.error.code, 'NOT_FOUND');
@@ -224,21 +218,20 @@ test('real CLI rejects invalid requests and reports missing detail without scann
 test('real CLI partial sources, failed refresh and corrupted snapshot have explicit outcomes', async () => {
   const f = await fixture();
   try {
-    const partial = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source,path.join(f.root, 'missing')]},"mode":"auto"}});
+    const partial = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source,path.join(f.root, 'missing')]},"mode":"auto"}});
     assert.equal(partial.code, 2);
     assert.equal(partial.value.quality.status, 'partial');
     assert.equal(partial.value.summary.tokens.total, 491_210);
-    const failed = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[path.join(f.root, 'missing')]},"mode":"auto"}});
+    const failed = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[path.join(f.root, 'missing')]},"mode":"auto"}});
     assert.equal(failed.code, 1);
     assert.equal(failed.value.error.code, 'SOURCE_UNREADABLE');
-    const retained = f.run(queryInvocation({"action":"threads","snapshotId":partial.value.snapshotRef.snapshotId}, {mode:"auto"}));
+    const retained = f.run(queryInvocation({"action":"threads","roots":[f.source,path.join(f.root,"missing")]}, {mode:"cached"}));
     assert.equal(retained.code, 2);
     assert.equal(retained.value.snapshotRef.snapshotId, partial.value.snapshotRef.snapshotId);
-    const ledger = path.join(f.data, 'usage-v4', 'generations', retained.value.snapshotRef.snapshotId, 'committed', 'ledger.json');
-    await writeFile(ledger, '[]');
-    const corrupt = f.run(['usage', ...dates, '--snapshot', retained.value.snapshotRef.snapshotId]);
-    assert.equal(corrupt.code, 1);
-    assert.equal(corrupt.value.error.code, 'SNAPSHOT_CORRUPT');
+    const db=new DatabaseSync(path.join(f.data,'live-v2/index.sqlite'));
+    db.exec('PRAGMA user_version=999');db.close();
+    const corrupt=f.run(['usage',...dates,'--cached']);
+    assert.equal(corrupt.code,1);assert.equal(corrupt.value.error.code,'INDEX_UNSUPPORTED_VERSION');
   } finally { await f.cleanup(); }
 });
 
@@ -246,19 +239,19 @@ test('language changes presentation while real core data and source titles stay 
   const f = await fixture();
   try {
     // The first live query may contain only preview metadata while scanning.
-    const refresh = f.run({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
+    const refresh = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
     assert.equal(refresh.code, 0, refresh.stdout);
     assert.ok(['current','stale'].includes(refresh.value.freshness.status));
     const initial = f.run(['usage', ...dates]);
     assert.equal(initial.code, 0, initial.stdout);
     assert.equal(initial.value.summary.tokens.total, 491_210);
-    const args = ['usage','--snapshot',initial.value.snapshotRef.snapshotId];
+    const args = ['usage',];
     const zh = f.run([...args, '--lang=zh']);
     const en = f.run(['--lang', 'en', ...args]);
     assert.equal(zh.code, en.code);
     for (const field of ['summary', 'items', 'scope', 'page', 'snapshotRef', 'quality']) assert.deepEqual(en.value[field], zh.value[field]);
     assert.equal(en.value.items[0], zh.value.items[0]);
-    const plain = f.run(['usage', ...dates, '--lang=en'], false);
+    const plain = f.run(['usage', ...dates, '--by', 'model', '--lang=en'], false);
     assert.match(plain.stdout, /Wombat · Usage/);
     assert.match(plain.stdout, /Not priced/);
     const help = f.run(['--help', '--lang=en'], false);

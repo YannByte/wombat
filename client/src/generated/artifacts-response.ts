@@ -64,10 +64,9 @@ export interface Response {
   outputVersion: number;
   policyVersion: number;
   action: string;
-  readView: string;
+  projectIdentity: string;
   baselineId: string;
   checkedAt: string;
-  expiresAt: string;
   scope: Scope;
   items: Item[];
   summary: Summary;

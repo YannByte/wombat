@@ -1,11 +1,13 @@
 import { spawn } from 'node:child_process';
+import {randomUUID} from 'node:crypto';
 import { accessSync, constants, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CoreError } from '../errors.js';
+import {isLocalAccessDenied,localAccessError} from './local-access.js';
 import type { QueryOptions } from '../client.js';
 import type { Request } from '../generated/usage-request.js';
-import type { PricingRequest,PreferencesRequest,DirectoriesRequest,TimingRequest,CollectionRequest,ConversationRequest,ServiceRequest } from '../client.js';
+import type { PricingRequest,PreferencesRequest,DirectoriesRequest,TimingRequest,CollectionRequest,ConversationRequest } from '../client.js';
 
 const MAX_RESPONSE = 256_000_000;
 export interface CoreProcessOptions {
@@ -34,15 +36,15 @@ export function decode<T>(output: string): T {
   if (!Object.hasOwn(result, 'value')) throw new CoreError('PROTOCOL_ERROR', 'Rust 内核响应缺少 value');
   return result.value as T;
 }
-export function invokeCore(request: Request, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
-  return invokeOperation('usage_app', request, options, processOptions);
-}
 export function invokePricesCore(request: PricingRequest & { document?: string; attempt_id?: string; error_code?: string }, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
   return invokeOperation('prices', request, options, processOptions);
 }
-export function invokeOperation(op: 'service_offline' | 'conversation' | 'collection' | 'monitor' | 'collection_ingest' | 'timing' | 'usage_app' | 'prices' | 'live_endpoint' | 'preferences' | 'directories' | 'account_history' | 'native_account' | 'native_hook_context', request: ServiceRequest | ConversationRequest | CollectionRequest | TimingRequest | Request | PricingRequest | PreferencesRequest | DirectoriesRequest | Record<string, unknown>, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
+export function invokeOperation(op: 'cleanup_rebuild' | 'local_query' | 'collection' | 'collection_ingest' | 'prices' | 'preferences' | 'directories' | 'account_history' | 'native_account' | 'native_hook_context', request: ConversationRequest | CollectionRequest | TimingRequest | Request | PricingRequest | PreferencesRequest | DirectoriesRequest | Record<string, unknown>, options: QueryOptions, processOptions: CoreProcessOptions, environment:NodeJS.ProcessEnv=process.env): Promise<unknown> {
   if (options.signal?.aborted) return Promise.reject(new CoreError('CANCELLED', '已取消'));
   const binary = binaryPath(processOptions.binaryPath);
+  const requestId=op==='local_query' && 'rebuild' in request && request.rebuild===true?randomUUID():undefined;
+  const childEnvironment={...environment};delete childEnvironment.WOMBAT_REQUEST_ID;
+  if(requestId)childEnvironment.WOMBAT_REQUEST_ID=requestId;
   const maxResponseBytes = processOptions.maxResponseBytes ?? MAX_RESPONSE;
   const timeoutMs = processOptions.timeoutMs ?? 600_000;
   if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0 || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
@@ -51,7 +53,7 @@ export function invokeOperation(op: 'service_offline' | 'conversation' | 'collec
   return new Promise((resolve, reject) => {
     // Explicit developer overrides may be Node fixtures; Windows cannot execute shebang scripts.
     const script = /\.[cm]js$/.test(binary);
-    const child = spawn(script ? process.execPath : binary, script ? [binary] : [], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
+    const child = spawn(script ? process.execPath : binary, script ? [binary] : [], { env:childEnvironment, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     const chunks: Buffer[] = []; let bytes = 0; let errors = ''; let progress = ''; let failure: Error | null = null;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     const stop = () => {
@@ -85,9 +87,17 @@ export function invokeOperation(op: 'service_offline' | 'conversation' | 'collec
       if (progress.length > 8000) progress = progress.slice(-8000);
     });
     child.stdin.on('error', error => { failure ||= error; });
-    child.on('error', error => { cleanup(); reject(error); });
-    child.on('close', code => {
+    child.on('error', error => { cleanup(); reject(isLocalAccessDenied(error)?localAccessError():error); });
+    child.on('close', async code => {
       cleanup();
+      if(requestId && child.pid && (failure || code!==0)){
+        try {
+          const result=await invokeOperation('cleanup_rebuild',{requestId},{},{...processOptions,binaryPath:binary,timeoutMs:5000,maxResponseBytes:65536},childEnvironment) as {removed?:unknown};
+          if(!Number.isSafeInteger(result?.removed)||Number(result.removed)<0)throw new CoreError('PROTOCOL_ERROR','Temporary cleanup was not confirmed');
+        }catch{
+          reject(new CoreError('CLEANUP_FAILED','The request stopped, but temporary index cleanup was not confirmed. Retry a read in the same data directory before removing product data.'));return;
+        }
+      }
       if (failure) { reject(failure); return; }
       if (code !== 0) { reject(new CoreError('CORE_ERROR', `Rust 内核退出码 ${String(code)}：${errors.slice(-1000)}`)); return; }
       try { resolve(decode<unknown>(Buffer.concat(chunks).toString('utf8'))); } catch (error) { reject(error); }

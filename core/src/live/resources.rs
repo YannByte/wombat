@@ -56,7 +56,7 @@ pub(super) fn trim_parser_caches(
         .map(|cache| cache.encoded_bytes)
         .sum::<u64>();
     let mut evicted = false;
-    while bytes > super::service::PARSER_CACHE_BUDGET {
+    while bytes > 32 * 1024 * 1024 {
         let Some(key) = caches
             .iter()
             .max_by_key(|(_, cache)| cache.encoded_bytes)
@@ -68,20 +68,6 @@ pub(super) fn trim_parser_caches(
         evicted = true;
     }
     Ok((bytes, evicted))
-}
-
-pub(super) fn interactive_request() {
-    #[cfg(target_os = "macos")]
-    unsafe {
-        // SAFETY: this changes only the current request thread's QoS.
-        libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_USER_INITIATED, 0);
-    }
-}
-
-pub(super) fn release_unused() {
-    // SAFETY: collection purges only unused mimalloc pages. Retained objects,
-    // including values shared with readers, remain valid.
-    unsafe { libmimalloc_sys::mi_collect(true) }
 }
 
 #[cfg(test)]
@@ -105,52 +91,5 @@ mod tests {
             "INDEX_UNAVAILABLE"
         );
         assert_eq!(super::index_batch(|| Ok(7)).unwrap(), 7);
-    }
-
-    #[test]
-    fn background_hint_is_local_to_the_worker_and_relief_keeps_live_values() {
-        crate::configure_allocator();
-        // Keep the hand-bound option tied to the locked C header.
-        assert_eq!(unsafe { libmimalloc_sys::mi_version() }, 20302);
-        assert_eq!(unsafe { libmimalloc_sys::mi_option_get(27) }, 1);
-        let retained = vec![17_u8; 1024 * 1024];
-        std::thread::spawn(|| {
-            super::background_indexing();
-            #[cfg(target_os = "macos")]
-            unsafe {
-                let (mut class, mut priority) = (libc::qos_class_t::QOS_CLASS_UNSPECIFIED, 0);
-                assert_eq!(
-                    libc::pthread_get_qos_class_np(libc::pthread_self(), &mut class, &mut priority),
-                    0
-                );
-                assert_eq!(class as u32, libc::qos_class_t::QOS_CLASS_BACKGROUND as u32);
-            }
-            #[cfg(target_os = "linux")]
-            unsafe {
-                assert!(
-                    libc::getpriority(
-                        libc::PRIO_PROCESS,
-                        libc::syscall(libc::SYS_gettid) as libc::id_t
-                    ) >= 10
-                );
-            }
-            super::interactive_request();
-            #[cfg(target_os = "macos")]
-            unsafe {
-                let (mut class, mut priority) = (libc::qos_class_t::QOS_CLASS_UNSPECIFIED, 0);
-                assert_eq!(
-                    libc::pthread_get_qos_class_np(libc::pthread_self(), &mut class, &mut priority),
-                    0
-                );
-                assert_eq!(
-                    class as u32,
-                    libc::qos_class_t::QOS_CLASS_USER_INITIATED as u32
-                );
-            }
-            super::release_unused();
-        })
-        .join()
-        .unwrap();
-        assert!(retained.iter().all(|byte| *byte == 17));
     }
 }

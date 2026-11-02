@@ -36,8 +36,8 @@ export function agentErrorOutput(
   const recovery: AgentErrorOutput["error"]["recovery"] =
     code === "INVALID_ARGUMENT"
       ? "read_schema"
-      : ["VIEW_EXPIRED", "SOURCE_CHANGED"].includes(code)
-        ? "reacquire_view"
+      : ["SOURCE_CHANGED", "CURSOR_MISMATCH"].includes(code)
+        ? "retry_same_scope"
         : ["RESOURCE_LIMIT", "OUTPUT_LIMIT", "INPUT_LIMIT"].includes(code)
           ? "narrow_query"
           : code === "SYNC_PENDING"
@@ -141,20 +141,9 @@ async function call(
       const r=await(client.artifacts?.(request.params,options)??unavailable());
       return {result:r,exitCode:r.partial?2:0};
     }
-    case "service":
-      return {
-        result: await (client.service?.(request.params, options) ??
-          unavailable()),
-        exitCode: 0,
-      };
     case "usage": {
       const r = await (client.live?.(request.params, options) ?? unavailable());
       return { result: r, exitCode: resultExitCode(r.result) };
-    }
-    case "snapshot": {
-      const r = await (client.query?.(request.params, options) ??
-        unavailable());
-      return { result: r, exitCode: resultExitCode(r) };
     }
     case "config": {
       const r = await (client.config?.(request.params, options) ??

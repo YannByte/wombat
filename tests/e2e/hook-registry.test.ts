@@ -26,8 +26,8 @@ test('native Hook registry is version-bound, project-specific and private across
     await setMode();
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    const service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const client = createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false });
     const nativeEntry = projectTestClient(client, [root], [a, b]);
     try {
@@ -50,12 +50,13 @@ test('native Hook registry is version-bound, project-specific and private across
         assert.equal(first.configRevision, next.configRevision, 'observation time must not invalidate an unchanged review');
         await setMode({ hooksError: true });
         const calls = await readFile(native.calls, 'utf8');
-        const pinned = await nativeTransport.config!({ kind: 'hook', readView: first.readView });
-        assert.deepEqual(pinned.hookRegistry, first.hookRegistry);
-        assert.equal(await readFile(native.calls, 'utf8'), calls);
+        const pinned = await nativeTransport.config!({ kind: 'hook'  });
+        assert.equal(pinned.hookRegistry.status,'unavailable');
+        assert.ok((await readFile(native.calls, 'utf8')).length > calls.length);
         const unavailable = await nativeTransport.config!({ kind: 'hook' });
         assert.equal(unavailable.hookRegistry.status, 'unavailable');
-        const scoped = await nativeTransport.config!({ kind: 'hook', readView: first.readView, scope: { project: b } });
+        await setMode({ hooksError: false });
+        const scoped = await nativeTransport.config!({ kind: 'hook', scope: { project: b } });
         assert.deepEqual(scoped.hookRegistry.contexts.map(c => c.project), [b]);
         await setMode({ hooksAfter: { data: hooks.data.map(c => ({ ...c, hooks: c.hooks.map(h => ({ ...h, enabled: !h.enabled })) })) } });
         assert.equal((await nativeTransport.config!({ kind: 'hook' })).hookRegistry.status, 'unavailable', 'registry changed during capture');
@@ -92,8 +93,8 @@ test('native Hook registry is version-bound, project-specific and private across
         assert.ok(methods.every(m => ['initialize', 'hooks/list'].includes(m)), 'registry observation must never create or run a task');
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(old)) {
             if (v === undefined)
                 delete process.env[k];

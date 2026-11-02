@@ -1,4 +1,6 @@
 //! Public conversation access contract. Source bodies require explicit read/search.
+pub const REQUEST_VERSION: u32 = 2;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -30,10 +32,13 @@ pub struct Selection {
 pub enum Action {
     /// One source-backed activity per conversation, including work without measurements.
     Records,
+    /// Resolve an exact canonical or upstream identity without scanning activity or text.
+    Resolve,
     Activity,
     Locate,
     Read,
     Search,
+    #[schemars(skip)]
     Changes,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -61,6 +66,8 @@ pub struct ReadTarget {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Request {
     pub action: Action,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub snapshot_id: String,
     #[serde(default)]
     pub roots: Vec<String>,
@@ -71,6 +78,8 @@ pub struct Request {
     pub offset: Option<usize>,
     pub cursor: Option<String>,
     pub query: Option<String>,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub baseline_snapshot_id: Option<String>,
     #[serde(default)]
     pub targets: Vec<ReadTarget>,
@@ -138,11 +147,24 @@ pub struct Fragment {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ResolvedRecord {
+    pub id: String,
+    pub upstream_id: String,
+    pub source_instance_id: String,
+    pub project: Option<String>,
+    pub title: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Response {
-    #[schemars(range(min = 1, max = 1))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<ResolvedRecord>,
+    #[schemars(range(min = 2, max = 2))]
     pub output_version: u32,
     pub action: Action,
     pub snapshot_id: String,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub baseline_snapshot_id: Option<String>,
     pub selection: Selection,
     pub items: Vec<Activity>,

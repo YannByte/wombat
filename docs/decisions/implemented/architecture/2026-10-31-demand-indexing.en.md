@@ -4,9 +4,11 @@
 
 Status: implemented
 
+The service and retained-view lifecycle described below is superseded by the [foreground-query decision](2026-11-02-foreground-queries.en.md). Its independent source, accounting and bounded-evidence rationale remains historical context.
+
 ## Problem
 
-The [resident-indexing proposal](../../proposed/architecture/2026-10-15-resident-indexing.en.md) moves preparation out of the first query but also performs work without a consumer. Startup restoration, source notifications and periodic discovery can allocate memory and update indexes that nobody reads. A visible Web page can perpetuate that work through polling.
+The [resident-indexing proposal](../../rejected/architecture/2026-10-15-resident-indexing.en.md) moves preparation out of the first query but also performs work without a consumer. Startup restoration, source notifications and periodic discovery can allocate memory and update indexes that nobody reads. A visible Web page can perpetuate that work through polling.
 
 ## Decision
 

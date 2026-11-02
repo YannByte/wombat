@@ -154,12 +154,6 @@ pub(crate) fn execute_snapshot(request: Request, snapshot: &Snapshot) -> Result<
         });
     }
     // Duplicate misses on one immutable view share the completed result. Cache
-    if snapshot.expired_detail_lease() {
-        return Err(operation_error(
-            "VIEW_EXPIRED",
-            "Live data lease expired; reacquire the view",
-        ));
-    }
     // hits above remain available while a different request is being reduced.
     let _work = query_work::lock(&snapshot.query_work)?;
     if let Some(key) = &key

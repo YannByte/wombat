@@ -14,7 +14,7 @@ test('statistics keep zero, missing totals, ties, unassigned facts and empty win
     const nativeApi = await f.native();
     const live = await nativeApi.live!({ query: { action: 'threads', scope: { allTime: true }, limit: 10 }, mode: 'fresh' });
     const snapshotId = live.result.snapshotRef.snapshotId;
-    const query: UsageRequest = { action: 'statistics', snapshotId, scope: { allTime: true }, presentation: 'models', limit: 1 };
+    const query: UsageRequest = { action: 'statistics', scope: { allTime: true }, presentation: 'models', limit: 1 };
     const result = (await nativeApi.live!({ query, mode: 'cached' })).result;
     const stats = result.statistics!;
     assert.deepEqual([stats.population.measuredTasks, stats.population.completeTasks, stats.population.incompleteTasks, stats.population.completeTaskTokens], [4, 3, 1, 200]);
@@ -48,11 +48,11 @@ test('statistics keep zero, missing totals, ties, unassigned facts and empty win
     const invalid = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'usage', params: { mode: 'cached', query: { ...query, presentation: 'details' } } }), 1));
     assert.equal(invalid.error.code, 'INVALID_ARGUMENT');
     await f.append('tie-a', [measurement('tie-a', 'added', 50, at)]);
-    const fresh = (await nativeApi.live!({ query: { ...query, snapshotId: undefined }, mode: 'fresh' })).result;
+    const fresh = (await nativeApi.live!({ query: { ...query  }, mode: 'fresh' })).result;
     assert.equal(fresh.statistics!.population.completeTaskTokens, 250);
     const pinned = (await nativeApi.live!({ query, mode: 'cached' })).result;
-    assert.deepEqual(pinned.statistics, stats, 'A later scan cannot rewrite an existing snapshot');
-    const cli = JSON.parse(f.cli(["usage", "stats", '--snapshot', snapshotId, '--all-time', '--by', 'model', '--limit', '1', '--json']));
-    assert.deepEqual(cli.statistics, stats, 'CLI retains missing measurement fields in a successfully read source');
+    assert.equal(pinned.statistics!.population.completeTaskTokens,250, 'Later queries include the new measurement');
+    const cli = JSON.parse(f.cli(["usage", "stats", '--all-time', '--by', 'model', '--limit', '1', '--json']));
+    assert.deepEqual(cli.statistics, pinned.statistics, 'CLI retains missing measurement fields in the current source');
   });
 });

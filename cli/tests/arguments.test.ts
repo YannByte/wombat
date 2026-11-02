@@ -50,8 +50,21 @@ test('invalid dates, conflicting selections and retired spellings fail before qu
   ])assert.throws(()=>parse(args),args.join(' '));
 });
 
-test('live wait, rebuild and fixed view controls retain their execution meanings',()=>{
-  const r=parse(['usage','--wait-ms','600000','--include-history','--json']);assert.equal(r.mode,'fresh');assert.equal(r.waitMs,600000);assert.equal(r.includeHistory,true);
+test('foreground rebuild, history and cache controls retain their meanings',()=>{
+  const r=parse(['usage','--fresh','--include-history','--json']);assert.equal(r.mode,'fresh');assert.equal(r.includeHistory,true);
   assert.equal(parse(['usage','--cached']).mode,'cached');assert.equal(parse(['usage','--rebuild']).rebuild,true);assert.equal(parse(['--version']).version,true);
   for(const timezone of ['UTC','Asia/Shanghai','America/New_York'])assert.equal(parse(['usage','--timezone',timezone]).request.scope?.timezone,timezone);
+});
+
+test('ordinary JSON defaults to compact output and calendar totals; full raw views remain in the generated API',()=>{
+  const request=parse(['usage','last-week','--group','day','--json']).request;
+  assert.equal(request.compact,true);
+  assert.equal(request.presentation,'distribution');
+  assert.equal(parse(['usage','--by','model','--json']).request.presentation,'models');
+  assert.equal(parse(['usage','--limit','7','--offset','7']).request.offset,7);
+});
+
+test('usage rejects removed view selectors',()=>{
+ assert.throws(()=>parse(['usage','--snapshot','live:scope:revision']));
+ assert.deepEqual(parse(['usage','--root','/synthetic']).request.roots,[path.resolve('/synthetic')]);
 });

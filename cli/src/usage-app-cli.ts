@@ -20,11 +20,10 @@ export interface Invocation {
   version: boolean;
   mode: 'auto' | 'fresh' | 'cached';
   watch: boolean;
-  waitMs?: number;
   rebuild?: boolean;
   includeHistory?: boolean;
 }
-const valued=['--wait-ms','--root','--snapshot','--agent','--source','--timezone','--since','--until','--model','--effort','--project','--task','--against','--group','--by','--sort','--limit','--offset','--baseline-since','--baseline-until'];
+const valued=['--root','--agent','--source','--timezone','--since','--until','--model','--effort','--project','--task','--against','--group','--by','--sort','--limit','--offset','--baseline-since','--baseline-until'];
 function invalid(message:string):never {throw new CoreError('INVALID_ARGUMENT',message);}
 export function parseUsageArgs(input:string[],now=new Date()):Invocation {
   const argv=[...input];
@@ -36,7 +35,7 @@ export function parseUsageArgs(input:string[],now=new Date()):Invocation {
   if(p.positionals.length)invalidInput(p.positionals[0]);
   const version=p.flags.has('--version');
   if(version&&argv.some(a=>!['--version','--json'].includes(a)))invalidInput('--version');
-  const request:UsageRequest={action};
+  const request:UsageRequest={action,...(p.json?{compact:true}:{})};
   const flag=(name:string)=>p.flags.has(name), value=(name:string)=>p.get(name);
   if(flag('--compact')){if(!p.json)invalidInput('--compact requires --json');request.compact=true;}
   if(p.help||version)return {request,json:p.json,help:p.help,version,mode:'auto',watch:false};
@@ -62,6 +61,7 @@ export function parseUsageArgs(input:string[],now=new Date()):Invocation {
     if(value('--against')||flag('--family')||explicitBaseline)invalidInput('comparison options');
     if(value('--by')){if(action==='threads'||!['project','model'].includes(value('--by')!))invalidInput('--by');request.presentation=value('--by')==='model'?'models':'projects';}
   }
+  if(action==='usage')request.presentation??='distribution';
   const group=value('--group');if(group){if(action!=='usage'||!['day','week','month'].includes(group))invalidInput('--group');request.group=group as UsageRequest['group'];}
   const sort=value('--sort');if(sort){if(!['usage','threads'].includes(action)||!(action==='threads'?['tokens','cost']:['tokens','cost','time']).includes(sort))invalidInput('--sort');request.sort=sort as UsageRequest['sort'];}
   if(action==='threads')request.sort??='tokens';
@@ -70,11 +70,9 @@ export function parseUsageArgs(input:string[],now=new Date()):Invocation {
   if(!session)request.limit=pageNumber(value('--limit'),action==='threads'?5:20,1,200);
   if(value('--offset'))request.offset=pageNumber(value('--offset'),0);
   if(p.all('--root').length)request.roots=p.all('--root').map(root=>path.resolve(root));
-  if(value('--snapshot'))request.snapshotId=value('--snapshot');
-  const waitMs=value('--wait-ms')?pageNumber(value('--wait-ms'),0,1,600000):undefined;
   const rebuild=flag('--rebuild'),watch=flag('--watch');
-  if(flag('--fresh')&&flag('--cached')||(waitMs||rebuild)&&(flag('--cached')||watch||request.snapshotId)||request.snapshotId&&(flag('--fresh')||request.roots?.length)||watch&&(action!=='usage'||flag('--cached')||request.snapshotId))invalidInput('query mode');
-  return {request,json:p.json,help:false,version:false,mode:waitMs||rebuild||flag('--fresh')?'fresh':flag('--cached')||action==='compare'?'cached':'auto',watch,...(waitMs?{waitMs}:{}),...(rebuild?{rebuild:true}:{}),...(flag('--include-history')?{includeHistory:true}:{})};
+  if(flag('--fresh')&&flag('--cached')||rebuild&&(flag('--cached')||watch)||watch&&(action!=='usage'||flag('--cached')))invalidInput('query mode');
+  return {request,json:p.json,help:false,version:false,mode:rebuild||flag('--fresh')?'fresh':flag('--cached')||action==='compare'?'cached':'auto',watch,...(rebuild?{rebuild:true}:{}),...(flag('--include-history')?{includeHistory:true}:{})};
 }
 export { resultExitCode } from './exit-codes.js';
 export async function runUsageCli(argv = process.argv.slice(2)): Promise<number> {
@@ -109,9 +107,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
       let lastRevision = '';
       for (;;) {
         const queryOptions = {signal:controller.signal};
-        const result = invocation.request.snapshotId && !invocation.request.snapshotId.startsWith('live:')
-          ? await client.query(invocation.request, queryOptions)
-          : (await client.live!({ query: invocation.request, mode: invocation.mode, waitMs:invocation.waitMs, rebuild:invocation.rebuild, includeHistory:invocation.includeHistory }, queryOptions)).result;
+        const result = (await client.live!({ query: invocation.request, mode: invocation.mode, rebuild:invocation.rebuild, includeHistory:invocation.includeHistory }, queryOptions)).result;
         const revision = JSON.stringify([result.snapshotRef.snapshotId, result.scope, result.freshness?.status, result.quality]);
         if (!invocation.watch || revision !== lastRevision) {
           if (!invocation.json && result.freshness && !['current', 'fixed'].includes(result.freshness.status)) process.stderr.write(`Wombat · ${result.freshness.status === 'failed' && result.freshness.error ? result.freshness.error : result.freshness.projectLoads?.length ? t('webui.projectsProgress',{ready:result.freshness.projectLoads.filter(p=>p.state==='ready').length,total:result.freshness.projectLoads.length}) : result.freshness.initialScan ? t('webui.initialTasks') : result.freshness.status === 'syncing' ? t("cli.usage-app-cli.syncing_showing_committed_data") : result.freshness.error ?? t("cli.usage-app-cli.showing_cached_data")}\n`);
@@ -129,7 +125,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
     const code = error instanceof CoreError ? error.code : 'INTERNAL_ERROR';
     const message = (error instanceof Error ? error.message : String(error));
     if (json)
-      process.stdout.write(JSON.stringify({ outputVersion: commandRoutes.get(argv[0])?.[1] ?? 3, error: { code, message } }) + '\n');
+      process.stdout.write(JSON.stringify({ outputVersion: commandRoutes.get(argv[0])?.[1] ?? 3, error: { code, message, ...(error instanceof CoreError && error.details !== undefined ? {details:error.details} : {}) } }) + '\n');
     else
       process.stderr.write(`Wombat · ${message}\n`);
     return code === 'CANCELLED' ? 130 : 1;

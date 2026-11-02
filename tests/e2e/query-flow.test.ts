@@ -84,7 +84,6 @@ test(
       assert.equal(selected.upstreamId, "focus");
       const turns: LiveResult = invoke(queryInvocation({
             action: "turns",
-            snapshotId: batch.result.snapshotRef.snapshotId,
             threadId: selected.id,
             scope: template.params.query.scope,
             matchedOnly: true,
@@ -95,7 +94,6 @@ test(
       assert.equal(turn.kind, "turn");
       const request = {
         action: "locate" as const,
-        snapshotId: batch.result.snapshotRef.snapshotId,
         selection: {
           since: "2026-01-02",
           until: "2026-01-03",

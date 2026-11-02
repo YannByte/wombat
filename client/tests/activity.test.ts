@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createUsageClient,type OptimizeRequest} from '../src/index.js';
 import {activityResult} from '../../tests/fixtures/activity.js';
-const request:OptimizeRequest={action:'activity',activity:{snapshotId:'live:synthetic:fixed',threadId:'task',turnId:'turn'},sourceInstanceId:'synthetic'};
+const request:OptimizeRequest={action:'activity',activity:{threadId:'task',turnId:'turn'},sourceInstanceId:'synthetic'};
 const client=(value:unknown)=>createUsageClient({query:async()=>{throw Error('No usage scan');},optimize:async()=>value});
 test('activity validates fixed scope, methods and positive advice independently of static reviews',async()=>{
  const valid=activityResult();assert.equal(await client(valid).optimize!(request),valid);
  const variants=[{...valid,outputVersion:1},{...valid,activity:null},{...valid,privateFields:'sensitive'},
  {...valid,activity:{...valid.activity,formatVersion:1}},
  {...valid,activity:{...valid.activity,scope:{...valid.activity!.scope,turnId:'foreign'}}},
- {...valid,activity:{...valid.activity,readView:{...valid.activity!.readView,snapshotId:'live:other'}}},
+ {...valid,activity:{...valid.activity,basis:{...valid.activity!.basis,snapshotId:''}}},
  {...valid,activity:{...valid.activity,advice:['inspect_repeated_requests']}},
  {...valid,activity:{...valid.activity,checks:valid.activity!.checks.map((check,index)=>index===0?{...check,observed:{...check.observed,value:0}}:check)}},
  {...valid,activity:{...valid.activity,checks:valid.activity!.checks.map((check,index)=>index===0?{...check,observed:{...check.observed,basis:'native_record'}}:check)}}];

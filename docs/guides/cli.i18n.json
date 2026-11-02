@@ -38,11 +38,11 @@
       "en": "5174ac478f9acdaf96cd3c818d941fd6185bc43b1719e3fbce12309067c6a44f"
     },
     "/complete-wombat-cli-guide/find-work-records-history/search-earlier-discussions": {
-      "zh": "d2ed3a84c3cc23f582a84dc4e248090f63eb5f68b7276247c874f420c17b84d9",
-      "en": "dac6287f764a59735213fa006c6054d5798c6e0ce0a628a3be765d3a0c5249d1"
+      "zh": "ef9c4fa02910227a69003ea6fb0793c30959c33c6b66f2a7d5d0e53c416f5c19",
+      "en": "82e110ce160e556f19ed9b2b9005bc4e9b9933a29b0366eb52626a6e6b00f368"
     },
     "/complete-wombat-cli-guide/find-work-records-history/inspect-a-record": {
-      "zh": "c8ba22002fb32d28292a2353a0106fa9292071a96a7c7481a60e1abde53d21b9",
+      "zh": "2491478461b8ce1c452d5f254069822fbf11db6bcfa1a621bf09afbf30c7a641",
       "en": "2e13d906697b2a477106891808037070a590317da8618be9f816702c01e2c9d6"
     },
     "/complete-wombat-cli-guide/find-work-records-history/resume-work-or-prepare-a-report": {
@@ -54,8 +54,8 @@
       "en": "bf18df82c1ba38513dde8777c52cad24d9cf163ae75817411f7f3ca33ac1843b"
     },
     "/complete-wombat-cli-guide/inspect-usage-usage/common-time-windows": {
-      "zh": "c7e3a0cbd35f2fd99bc9ddeb4e4c6b4133576fcc0933d3217d8d5305fb3f9d0c",
-      "en": "cf77d4bca4af2f57ada6fc4987515191333fc518c691c44ae8f924a1eb741d59"
+      "zh": "1ec5492d08ad2560ce266112fe066af751de1d0388b0f8630421af87a2e506c5",
+      "en": "075843df414a6f99a240369b2e8a85b2f96e3686360768e247389ac1b6eb57d8"
     },
     "/complete-wombat-cli-guide/inspect-usage-usage/find-higher-usage-tasks": {
       "zh": "a7519037cfd645903fa675865cc4ac182906e8c2e6ee6c4be15045b5cf17fafa",
@@ -75,27 +75,27 @@
     },
     "/complete-wombat-cli-guide/inspect-problems-check/diagnose-the-current-project-once": {
       "zh": "b53ed58720674422f80b02c74ae976c2d4ea1c9752391a51f511ed32e3d11bd3",
-      "en": "67715d5cf27587291000fd6c39f8472263a917881357fdb65a55e373ad7c825a"
+      "en": "dcbbfecf11d0de6aa3ba2ffb8043c7435208bddca1e43acb472b4a07670d7098"
     },
     "/complete-wombat-cli-guide/inspect-problems-check/inspect-skills-mcp-rules-and-hooks": {
       "zh": "696d73ab226281d5d08993c5ae72d717ef92e2c7f452cdd03a44efab7ddce0d2",
-      "en": "71b450165d377b31be317d43dc42f94843886662b16b3b3c7f87f656681ac48a"
+      "en": "67b21b321b5a4490215ce800bfc4f7b85fc18b26045895fba13dcdbbe67fa785"
     },
     "/complete-wombat-cli-guide/inspect-problems-check/review-a-work-process": {
       "zh": "01a7e8cb3d07402eb17552b51ce9e3de6155fa7f65b988a32836dcee746bc984",
       "en": "f74b0d9dd7732043a2caf9e87bef7f36bc07bdb95d321797d379c94618cbc525"
     },
     "/complete-wombat-cli-guide/inspect-problems-check/verify-a-change": {
-      "zh": "b04324ac691be2460b9b1b43673340bc18fa8e9b983928d91bed4ef1a8bd53eb",
-      "en": "89045ad63c6435ebb5b089124719c06fbfa85dd87b8896af2e5792293162c575"
+      "zh": "40fb3c69133b162d70a22dddccd31cad3ae2e53d53b0b0a20a4e07996fb6714a",
+      "en": "f9704dab853d213f2d66e169d31fb1e0263059cc12f1547c2fcbcb6141b4165a"
     },
     "/complete-wombat-cli-guide/preview-and-perform-cleanup-clean": {
       "zh": "728aa940fe9b1ee9683883a3364920519f82c512129a234967e6d85c3a150b3b",
       "en": "879a844ff888605b6f2adc6e57f30cf463c029be84aa3178f7eaa4a8f4568079"
     },
     "/complete-wombat-cli-guide/preview-and-perform-cleanup-clean/inspect-candidates-first": {
-      "zh": "32fc1326a534f8cc0cc9a42fbf9d9451da46ba6c02702a646554059dc9886baa",
-      "en": "4dd0fd9395d1bfa284fad75a78445e027ec996d3db2e73f230422d5030a0748e"
+      "zh": "24cce76b86e1c0c2ad610626c9f8c0cec665962ee53727f592ad9bceca0ea4ae",
+      "en": "e54002ba37bc9080ea4517d056ec6bfd1db6fa8bf0de855415daf0d8e0c7a6f0"
     },
     "/complete-wombat-cli-guide/preview-and-perform-cleanup-clean/confirm-codex-cleanup-in-the-terminal": {
       "zh": "9ff51ba00e6b12a7267d6e89aed225622ef449ceadf96b1dd38d10b2605ae88d",
@@ -103,7 +103,7 @@
     },
     "/complete-wombat-cli-guide/preview-and-perform-cleanup-clean/verify-cleanup": {
       "zh": "74c429267bf5846545a4b1c3ca1d7c53de6b505992a6427203caeb30cc53b5c9",
-      "en": "333a56a4c9e5fee13c2dba407b2995df7235cbf252314d12f3b5b90a5abd0e23"
+      "en": "7a26449d8ab0e20910067191b6f994ab9e22b67b5f02c01acf00874877e7a3d6"
     },
     "/complete-wombat-cli-guide/check-and-maintain-installation-system": {
       "zh": "bd8e630e338285debcafceda8831101e477cbda0f8405394672a2f6eba0c6d94",
@@ -118,31 +118,31 @@
       "en": "3f9e7e6ec52d1ff41853c2464a851ab07db61dfcec4120738d90f7338465ade0"
     },
     "/complete-wombat-cli-guide/check-and-maintain-installation-system/interfaces-and-integration-entry": {
-      "zh": "4c0408d4411ad1a5acfdc6cef728c37be8f7c023b3e73faae7fa7571cf319874",
-      "en": "8e7617550af903f3300018821d1f2bb72496bcdb3297d810b140b4b0174e2543"
+      "zh": "a3e247151a9cbd0e0973432fa23d18ad013d4b96a7d061581b4fe0f74fbb04ee",
+      "en": "0a5053e2ea954f6bd9d5d59cfdd35eec9cbbaf281ab4af1879518060f8088b13"
     },
     "/complete-wombat-cli-guide/advanced-options": {
       "zh": "5dbc6a7f1b6c970817aa46fe00cc54507c7289ca324ee5ce3d0fdda75caa0c2a",
       "en": "f73fd45f6f7c5e7b46f64b9baad5dd5d9dc40bcee294a0bc73bb83fe45a77c7c"
     },
     "/complete-wombat-cli-guide/advanced-options/shared-conventions": {
-      "zh": "312aa48c71aabdd6bd45fd006c064323507433736120346a4a79764b976ec45f",
-      "en": "12e7bf78917658b0b8c0a5ed19c79c7be2099cf2d53c1551b4b4f3e06bb71e5a"
+      "zh": "09c26285ba4edbab1f71f947236a4ce851c27a8c6b0ec9098b10e917132cb566",
+      "en": "1817769796423cd1f57c9c2a3125c04093f548a12f9a1551c6fc10cb56233340"
     },
     "/complete-wombat-cli-guide/advanced-options/dates-scope-and-paging": {
-      "zh": "7d92b5c36a20225ad12624a81df53d3821b7f0f3aed7b3ffb4b0feed22ee4a32",
-      "en": "f1e080c619440412421e65915ee6c6e85cf014df2dcf8406dcd28cf941e0494a"
+      "zh": "bba58e41e873ecedcaeba6c42a6bd8315c4916cd853415587d1e954c829722bd",
+      "en": "e254bd439dece7e1dbda4dfef7bf4013adb2852b3bc46446849c32c2a70aa3d5"
     },
     "/complete-wombat-cli-guide/advanced-options/usage-filters-and-comparisons": {
-      "zh": "6ff180ac87dba1bade4d76046c5340d0109073cf678bcca303bcda0740a1fd67",
-      "en": "6126187902b885f343071c8815a4a1ab629849775ad9ed926b8761c0cc4b16ba"
+      "zh": "27ba716e83017f1f76b5ed7168be78db11e39229bc52a8965f91e71982a950ea",
+      "en": "e55f2e1ebd5e2ffa10e540ac3c4345c814700751fe8b1d3116b07697bfa2c6fe"
     },
     "/complete-wombat-cli-guide/advanced-options/checks-rechecks-and-explicit-decisions": {
-      "zh": "539c03ef0aa829ee2b3bcb62439acf5cc799b2295475f5dc5d4d3fdbf7e41f50",
-      "en": "bc384e9d94966aa2ea798df3bbb9bea2f91d466da7dcefedd5922358aeeafa16"
+      "zh": "42d34e1cb9fd72ccc65d2a4948214908b9378dc54e8a2935f1bf8b9b83dc2c99",
+      "en": "4b72322c3bd3c1f0e405cf4ad97c78b8698404e3954de56008c78bfb897d18bf"
     },
     "/complete-wombat-cli-guide/advanced-options/cleanup-selection-and-unattended-execution": {
-      "zh": "8ed8ee24a9383a32a0779996bf1484353d6abeb991605e27a7d2ecd95a34b7b0",
+      "zh": "cabf35f2af70fee857b4f813896b9c9a10b33aef7f2fb721b96b38801d323d65",
       "en": "710d32bc6d20cf5157c76b4875e3b0a40412190cc487065c8d0f5cb2e607aaa4"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation": {
@@ -154,44 +154,44 @@
       "en": "37a0a3349fa5bbe47f8058acaa62003306838ff399706975d25776f9ce704f4d"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/execute-structured-requests": {
-      "zh": "ba5ea538d5977fbe2ccd74921e5ae0d0128b82cc44f0ffe2ee8b3d30af88a814",
-      "en": "6505395d96721038e77b4a7983ff96a6a2278af2e2ac82ff2d713eba07ce94a0"
+      "zh": "8f9eb2bf2a1f2a9e6ab29c4dfd2b73fbb4ea78a1de5d07b38e7e77af8559b8e3",
+      "en": "c2b434d0e10e0cd04c47a37552b3f2db04b18f89529a6a6ab575e939f1adc1e2"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/complete-method-scope": {
-      "zh": "47213d5f8d8dbde49259b630af5536493ff457bc1e3650dbf0b5b260b8f8161c",
-      "en": "576a3fba8066e14086abb853c000a269c42c4f0854ac73226005509f9430cad1"
+      "zh": "91d5d8ba2f1144815da80410b1f593c8428ebccd3ccc32853873ef87261a90f2",
+      "en": "bfeb2648775386dcb94dc3ebaf42159fb93aab189fab31ed3ee08683dba10d2b"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/retain-scope-and-handle-failures": {
-      "zh": "55d003ff2c17e2f0a560ce229c12c7aa2798f2fb93462f29edbbc68df57e2689",
-      "en": "df664eb354c22c7859a03583ac4a80ea535f7b2690e1d2a927ea670765664ae7"
+      "zh": "4cc3f789fa9371d60290c8d5bae7240d06a178e363477ad64340a2e34077d096",
+      "en": "ce71fcb527512be5f02af19fe265bb57632e06a26a224659cee74857dd9aeb6f"
     },
     "/complete-wombat-cli-guide/results-errors-and-recovery": {
       "zh": "907647254e6e3c31097dae75accfdeba1b1cf5688c378db7faf2784505276f00",
       "en": "a00ae0e95691660fc771bf04e552f7114e82a35bdcdfca14bec4da1a8282e03b"
     },
     "/complete-wombat-cli-guide/results-errors-and-recovery/data-status": {
-      "zh": "2f1a60e225d5bb88daadf7a38b79f713259041ca5c1b97fb00ded2570d97e82e",
-      "en": "e2213270a21d28842705e504a6a1ead608e50ad9a250ba836eba91b86a83f2e0"
+      "zh": "2996ed80cd6716fe4dac7f989d33422a67a5ef1ffff891e311cd4584a5d7204b",
+      "en": "9127495effb804b3425d9583ac86e7fc8bf565229d5b8bae2e3c01080f00a6fb"
     },
     "/complete-wombat-cli-guide/results-errors-and-recovery/common-problems": {
-      "zh": "83983c6fa05cfb34ab037a335632b09a9172c638636e63befe7afa8e6db5102d",
-      "en": "3071ad0f59f23fb53e1a6dbf1b1ab855883ee4f38927d898a251d1b3a0e61ff1"
+      "zh": "b490777f9defa8ca4096a2f412296ca67a7e4adcf56f40b70dc09c62cbe0b924",
+      "en": "735b0dcbed4f7e44bfc85abea9ec3821901febbe8e98752a4f0befa223ed5b17"
     },
     "/complete-wombat-cli-guide/results-errors-and-recovery/rebuild-derived-indexes": {
-      "zh": "ddb59a423f4f63b2f8e098f5d66c02a29855779e201f0414aa21ca6c89f132de",
-      "en": "9e558e137a8a96a94df8767e29ecfb064660fb0730306998d8f7f1b835f05543"
+      "zh": "612d2028fb0d58add4ce31dac8dffd1da27890e2dd732a76be84fd886ed04c68",
+      "en": "20a3870ad5de6d38039e712c9dcf400e4d96c16e759c9161967784f5834b2073"
     },
     "/complete-wombat-cli-guide/results-errors-and-recovery/output-and-exit-codes": {
       "zh": "eaf448ae51fe5583807648d85b2ec53c50597fe8e86887f6f769ef3510daf6eb",
       "en": "24cd551f46f3505d17db698fb63e430668772660665e87f8c48d9444299e8494"
     },
     "/complete-wombat-cli-guide/results-errors-and-recovery/source-and-recovery-boundaries": {
-      "zh": "f6745312a0b59070f7b3f2224ce6fb606863f6a2d987091440f7b69de344f26f",
-      "en": "f778c2ebb80429663745aaecd8cfb631b67c8ab5002f6cd643cad66f1c13e268"
+      "zh": "53a590f087722c83118f0271637bb33b6165a72c19d9851851353299113fd0d0",
+      "en": "63d6141dfd1c2f9b7ebf8ca9004757e106fcde7df21358600097b14c942fe1ba"
     },
     "/complete-wombat-cli-guide/terms": {
-      "zh": "e47ff5ce43f160d8f97767a2e0cca5529f27db5f88e04460cc5642ac73cb5a20",
-      "en": "b445d3a7b51a6bf48429862d5cd34f41643f30b3b435f5d2ffe133188d3a5080"
+      "zh": "92b250768a530aac5c8af0a5c6fad90401b4bd3519ee8c7eac03b3ce31a1efe7",
+      "en": "b2a8adb48d2dac910919c31e13be94ed40bdbc692e499c87509185a0b3c2bb4e"
     },
     "/complete-wombat-cli-guide/continue-using-wombat": {
       "zh": "4be88d80e58d3b3ec006bb68e613d8221f13316f274c7e23fb4d202ce82fc16a",

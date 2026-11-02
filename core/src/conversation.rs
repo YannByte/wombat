@@ -36,6 +36,8 @@ use source::Reader;
 struct ScanCursor {
     binding: String,
     partition: usize,
+    target: Option<EventTarget>,
+    anchor: Option<Evidence>,
     offset: usize,
     chunk: usize,
 }
@@ -59,9 +61,9 @@ fn check(cancelled: &AtomicBool) -> Result<()> {
 }
 fn binding(request: &Request) -> Result<String> {
     Ok(crate::hash(serde_json::to_vec(&(
-        1,
+        2,
         request.action,
-        &request.snapshot_id,
+        &request.roots,
         &request.selection,
         &request.query,
         &request.baseline_snapshot_id,
@@ -136,7 +138,11 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
         return Err(error("INVALID_ARGUMENT"));
     }
     if request.action == Action::Search && request.query.is_none()
-        || request.query.is_some() && !matches!(request.action, Action::Search | Action::Records)
+        || request.query.is_some()
+            && !matches!(
+                request.action,
+                Action::Search | Action::Records | Action::Resolve
+            )
         || request
             .query
             .as_ref()
@@ -145,6 +151,19 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
             && request.selection.threads.is_empty()
             && request.selection.projects.is_empty()
             && (request.selection.since.is_none() || request.selection.until.is_none())
+    {
+        return Err(error("INVALID_ARGUMENT"));
+    }
+    if request.action == Action::Resolve
+        && (request.query.is_none()
+            || request.cursor.is_some()
+            || !request.targets.is_empty()
+            || request.anchor.is_some()
+            || request.radius.is_some()
+            || !request.selection.turns.is_empty()
+            || !request.selection.origins.is_empty()
+            || !request.selection.phases.is_empty()
+            || !request.selection.record_kinds.is_empty())
     {
         return Err(error("INVALID_ARGUMENT"));
     }
@@ -424,11 +443,7 @@ fn fragment(
     if content.chunks.is_empty() {
         return Err(error("CONTENT_UNAVAILABLE"));
     }
-    let key = crate::hash(serde_json::to_vec(&(
-        &request.snapshot_id,
-        &request.selection,
-        &target.evidence,
-    ))?);
+    let key = crate::hash(serde_json::to_vec(&(&request.selection, &target.evidence))?);
     let mut state = if let Some(cursor) = &target.cursor {
         serde_json::from_str::<FragmentCursor>(cursor).map_err(|_| error("INVALID_ARGUMENT"))?
     } else {
@@ -552,7 +567,56 @@ fn query_with_scan_budget(
     check(cancelled)?;
     let calendar = Calendar::new(&request.selection)?;
     if request.snapshot_id != snapshot.manifest.snapshot_ref.snapshot_id {
-        return Err(error("VIEW_EXPIRED"));
+        return Err(error("DATA_REVISION_MISMATCH"));
+    }
+    if request.action == Action::Resolve {
+        let id = request
+            .query
+            .as_deref()
+            .ok_or_else(|| error("INVALID_ARGUMENT"))?;
+        let mut found = snapshot.manifest.threads.iter().filter(|entry| {
+            let t = &entry.thread;
+            (t.id == id || t.upstream_id == id)
+                && (request.selection.threads.is_empty()
+                    || request.selection.threads.contains(&t.id))
+                && (request.selection.sources.is_empty()
+                    || request.selection.sources.contains(&t.source_instance_id))
+                && (request.selection.projects.is_empty()
+                    || t.project
+                        .as_ref()
+                        .is_some_and(|p| request.selection.projects.contains(p)))
+        });
+        let record = found.next().map(|entry| {
+            let t = &entry.thread;
+            crate::conversation_dto::ResolvedRecord {
+                id: t.id.clone(),
+                upstream_id: t.upstream_id.clone(),
+                source_instance_id: t.source_instance_id.clone(),
+                project: t.project.clone(),
+                title: t.title.clone(),
+            }
+        });
+        if found.next().is_some() {
+            return Err(error("AMBIGUOUS_RECORD"));
+        }
+        return Ok(Response {
+            record,
+            output_version: 2,
+            action: request.action,
+            snapshot_id: request.snapshot_id.clone(),
+            baseline_snapshot_id: None,
+            selection: request.selection.clone(),
+            items: vec![],
+            fragments: vec![],
+            next_cursor: None,
+            scan_complete: true,
+            partial: false,
+            limits: vec![],
+            scanned_events: 0,
+            source_bytes_read: 0,
+            freshness: None,
+            window: None,
+        });
     }
     let event_index = snapshot.event_index()?;
     let mut projects = BTreeMap::new();
@@ -580,7 +644,8 @@ fn query_with_scan_budget(
     }
     let mut reader = Reader::new(snapshot, request.max_scan_bytes.unwrap_or(8 * 1024 * 1024));
     let mut response = Response {
-        output_version: 1,
+        record: None,
+        output_version: 2,
         action: request.action,
         snapshot_id: request.snapshot_id.clone(),
         baseline_snapshot_id: request.baseline_snapshot_id.clone(),
@@ -666,20 +731,45 @@ fn query_with_scan_budget(
                 binding: key.clone(),
                 ..Default::default()
             });
-        if state.binding != key
-            || state.partition > event_index.partitions.len()
-            || (request.cursor.is_some()
-                && (state.partition >= event_index.partitions.len()
-                    || state.offset >= event_index.partitions[state.partition].count))
-        {
+        if state.binding != key {
             return Err(error("CURSOR_MISMATCH"));
         }
+        if request.cursor.is_some() {
+            let target = state
+                .target
+                .as_ref()
+                .ok_or_else(|| error("CURSOR_MISMATCH"))?;
+            state.partition = event_index
+                .partitions
+                .iter()
+                .position(|p| &p.target == target)
+                .ok_or_else(|| {
+                    operation_error(
+                        "SOURCE_CHANGED",
+                        "The cursor target changed; restart with the same filters and no cursor",
+                    )
+                })?;
+            if state.offset >= event_index.partitions[state.partition].count {
+                return Err(error("SOURCE_CHANGED"));
+            }
+            if let Some(anchor) = &state.anchor {
+                if event_target(anchor) != *target || anchor.event_offset > state.offset {
+                    return Err(error("CURSOR_MISMATCH"));
+                }
+                event(snapshot, anchor, cancelled).map_err(|_| {
+                    operation_error(
+                        "SOURCE_CHANGED",
+                        "The cursor position changed; restart with the same filters and no cursor",
+                    )
+                })?;
+            }
+        }
         let old = if request.action == Action::Changes {
-            let old = baseline.ok_or_else(|| error("VIEW_EXPIRED"))?;
+            let old = baseline.ok_or_else(|| error("DATA_REVISION_MISMATCH"))?;
             if request.baseline_snapshot_id.as_deref()
                 != Some(old.manifest.snapshot_ref.snapshot_id.as_str())
             {
-                return Err(error("VIEW_EXPIRED"));
+                return Err(error("DATA_REVISION_MISMATCH"));
             }
             let roots = |s: &Snapshot| {
                 s.manifest
@@ -701,6 +791,25 @@ fn query_with_scan_budget(
         } else {
             None
         };
+        let excluded = |partition: &crate::usage_store::EventPartition| {
+            let t = &partition.target;
+            (matches!(request.action, Action::Locate | Action::Search)
+                && partition.native_boundary.message_count == 0)
+                || (!request.selection.threads.is_empty()
+                    && t.thread_id
+                        .as_ref()
+                        .is_none_or(|id| !request.selection.threads.contains(id))
+                    || !request.selection.turns.is_empty()
+                        && t.turn_id
+                            .as_ref()
+                            .is_none_or(|id| !request.selection.turns.contains(id))
+                    || !request.selection.projects.is_empty()
+                        && t.thread_id
+                            .as_deref()
+                            .and_then(|id| projects.get(id))
+                            .and_then(|t| t.thread.project.as_ref())
+                            .is_none_or(|p| !request.selection.projects.contains(p)))
+        };
         let started = Instant::now();
         let limit = request.limit.unwrap_or(20);
         let mut metadata = 0;
@@ -715,35 +824,13 @@ fn query_with_scan_budget(
             }
             let partition = &event_index.partitions[state.partition];
             metadata += 1;
-            if matches!(request.action, Action::Locate | Action::Search)
-                && partition.native_boundary.message_count == 0
-            {
+            if excluded(partition) {
                 state.partition += 1;
                 state.offset = 0;
                 state.chunk = 0;
                 continue;
             }
             let t = &partition.target;
-            if !request.selection.threads.is_empty()
-                && t.thread_id
-                    .as_ref()
-                    .is_none_or(|id| !request.selection.threads.contains(id))
-                || !request.selection.turns.is_empty()
-                    && t.turn_id
-                        .as_ref()
-                        .is_none_or(|id| !request.selection.turns.contains(id))
-                || !request.selection.projects.is_empty()
-                    && t.thread_id
-                        .as_deref()
-                        .and_then(|id| projects.get(id))
-                        .and_then(|t| t.thread.project.as_ref())
-                        .is_none_or(|p| !request.selection.projects.contains(p))
-            {
-                state.partition += 1;
-                state.offset = 0;
-                state.chunk = 0;
-                continue;
-            }
             if state.offset >= partition.count {
                 state.partition += 1;
                 state.offset = 0;
@@ -802,6 +889,13 @@ fn query_with_scan_budget(
                     break 'scan;
                 }
                 response.scanned_events += 1;
+                state.anchor = Some(Evidence {
+                    event_id: e.id().to_owned(),
+                    source_instance_id: e.position().source_instance_id.to_string(),
+                    thread_id: e.thread_id().map(str::to_owned),
+                    turn_id: e.turn_id().map(str::to_owned),
+                    event_offset: *offset,
+                });
                 let offset = state.offset;
                 let is_message = matches!(e.payload(), Payload::Message { .. });
                 let change = old.as_ref().and_then(|old| {
@@ -834,7 +928,6 @@ fn query_with_scan_budget(
                                 Ok(Some((chunk, byte))) => {
                                     let mut item = activity(e, offset, &projects, change);
                                     let key = crate::hash(serde_json::to_vec(&(
-                                        &request.snapshot_id,
                                         &request.selection,
                                         &item.evidence,
                                     ))?);
@@ -873,6 +966,11 @@ fn query_with_scan_budget(
                 state.offset += 1;
                 state.chunk = 0;
                 if response.items.len() >= limit {
+                    // The frame is already decoded; skip its remaining control
+                    // facts when no later message remains, without a new call.
+                    if messages_only && events.last().is_some_and(|(last, _)| last == &offset) {
+                        state.offset = next_offset;
+                    }
                     break 'scan;
                 }
             }
@@ -880,12 +978,24 @@ fn query_with_scan_budget(
             state.chunk = 0;
         }
         while state.partition < event_index.partitions.len()
-            && state.offset >= event_index.partitions[state.partition].count
+            && (state.offset >= event_index.partitions[state.partition].count
+                || excluded(&event_index.partitions[state.partition]))
         {
             state.partition += 1;
             state.offset = 0;
         }
         response.scan_complete = state.partition == event_index.partitions.len();
+        state.target = event_index
+            .partitions
+            .get(state.partition)
+            .map(|p| p.target.clone());
+        if state
+            .anchor
+            .as_ref()
+            .is_some_and(|a| state.target.as_ref() != Some(&event_target(a)))
+        {
+            state.anchor = None;
+        }
         response.next_cursor = (!response.scan_complete)
             .then(|| serde_json::to_string(&state))
             .transpose()?;
@@ -898,18 +1008,4 @@ fn query_with_scan_budget(
         return Err(error("RESOURCE_LIMIT"));
     }
     Ok(response)
-}
-pub(crate) fn dispatch(request: Request) -> Result<Response> {
-    let snapshot = crate::usage_store::load(Some(&request.snapshot_id))?;
-    let baseline = request
-        .baseline_snapshot_id
-        .as_deref()
-        .map(|id| crate::usage_store::load(Some(id)))
-        .transpose()?;
-    query(
-        &snapshot,
-        baseline.as_ref(),
-        &request,
-        &AtomicBool::new(false),
-    )
 }

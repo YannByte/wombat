@@ -32,7 +32,7 @@ export function resultExitCode(result: UsageResult): number {
   return result.quality.status === "partial" ||
     result.inspection?.partial ||
     (result.freshness &&
-      !["current", "fixed"].includes(result.freshness.status))
+      !["current", "cached"].includes(result.freshness.status))
     ? 2
     : 0;
 }

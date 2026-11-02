@@ -15,7 +15,6 @@ export type ComparisonRequest =
     };
 export type DriverDimension = "project" | "model" | "thread";
 export type Action =
-  | "refresh"
   | "usage"
   | "threads"
   | "turns"
@@ -36,10 +35,6 @@ export interface Request {
   query: Request1;
   mode?: Mode & string;
   verify?: boolean;
-  /**
-   * One bounded wait owned by this caller; cancelling it leaves shared work running.
-   */
-  waitMs?: number | null;
   /**
    * Explicitly rebuild derived storage in a new generation; user records stay separate.
    */
@@ -67,7 +62,6 @@ export interface Request {
 export interface Request1 {
   comparison?: ComparisonRequest | null;
   action: Action;
-  snapshotId?: string | null;
   roots?: string[] | null;
   scope?: Scope;
   group?: Group | null;

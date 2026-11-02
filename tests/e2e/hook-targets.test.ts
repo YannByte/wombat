@@ -1,3 +1,4 @@
+import {comparable} from '../helpers/comparable.js';
 import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
@@ -30,11 +31,11 @@ test('Hook script findings, project scope, independent rechecks share version-bo
         await writeFile(native.mode, JSON.stringify({ hooks: { data: [a, b].map(cwd => ({ cwd, hooks: omitted ? [] : [hook], warnings: [], errors: [] })) } }));
     };
     await update();
-    const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
+    const old = { WOMBAT_CODEX_BIN:process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN:native.binary });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    const service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false }), [root], [a, b]);
     try {
 
@@ -47,18 +48,18 @@ test('Hook script findings, project scope, independent rechecks share version-bo
         assert.equal(original.findings[0].evidence?.hook?.project, a);
         assert.equal(original.findings[0].evidence?.hook?.target, './' + filename);
         assert.ok(!JSON.stringify(original).includes('Path('));
-        const checksA = await nativeTransport.optimize!({ action: 'checks', readView: first.readView, itemId: original.item.id, project: a });
+        const checksA = await nativeTransport.optimize!({ action: 'checks', itemId: original.item.id, project: a });
         assert.equal(checksA.checks[0].outcome, 'hit');
-        const checksB = await nativeTransport.optimize!({ action: 'checks', readView: first.readView, itemId: original.item.id, project: b });
+        const checksB = await nativeTransport.optimize!({ action: 'checks', itemId: original.item.id, project: b });
         assert.equal(checksB.checks[0].outcome, 'miss');
-        assert.equal((await nativeTransport.optimize!({ action: 'list', readView: first.readView, project: b })).pending, 0);
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[a,b],readView:first.readView}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
+        assert.equal((await nativeTransport.optimize!({ action: 'list', project: b })).pending, 0);
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[a,b]}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr);
-        assert.deepEqual(JSON.parse(cli.stdout).suggestions, first.suggestions);
-        await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision });
+        assert.deepEqual(comparable(JSON.parse(cli.stdout).suggestions), comparable(first.suggestions));
+        await nativeTransport.optimize!({ action: 'keep', suggestionId: original.id, decisionReason: 'necessary', decisionRevision: first.decisionRevision });
         await writeFile(path.join(a, filename), script);
         await rm(path.join(b, filename));
-        const rechecked = await nativeTransport.optimize!({ action: 'recheck', readView: first.readView, baselineId: original.baselineId });
+        const rechecked = await nativeTransport.optimize!({ action: 'recheck', baseline:original,baselineId: original.baselineId });
         assert.ok(rechecked.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
         const current = await nativeTransport.optimize!({ action: 'list' });
         assert.equal(current.pending, 1);
@@ -67,12 +68,12 @@ test('Hook script findings, project scope, independent rechecks share version-bo
         assert.notEqual(second.id, original.id);
         omitted = true;
         await update();
-        const unknown = await nativeTransport.optimize!({ action: 'recheck', readView: current.readView, baselineId: second.baselineId, suggestionId: second.id });
+        const unknown = await nativeTransport.optimize!({ action: 'recheck', baseline:second,baselineId: second.baselineId, suggestionId: second.id });
         assert.ok(unknown.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
         omitted = false;
         enabled = false;
         await update();
-        const disabled = await nativeTransport.optimize!({ action: 'recheck', readView: current.readView, baselineId: second.baselineId, suggestionId: second.id });
+        const disabled = await nativeTransport.optimize!({ action: 'recheck', baseline:second,baselineId: second.baselineId, suggestionId: second.id });
         assert.ok(disabled.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'));
         enabled = true;
         trust = 'untrusted';
@@ -93,8 +94,8 @@ test('Hook script findings, project scope, independent rechecks share version-bo
         assert.ok((await readFile(native.calls, 'utf8')).trim().split('\n').every(l => !JSON.parse(l).method.startsWith('thread/')));
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(old)) {
             if (v === undefined)
                 delete process.env[k];
@@ -115,30 +116,30 @@ test('native project inheritance is observed per view and unavailable registrati
     const metadata = { key: `${config}:session_start:0:0`, eventName: 'sessionStart', sourcePath: config, source: 'project', enabled: true, isManaged: false, currentHash: 'sha256:synthetic', trustStatus: 'trusted', handlerType: 'command', command: 'python3 ./local.py', displayOrder: 0, timeoutSec: 600 };
     const good = { hooks: { data: [parent, child].map(cwd => ({ cwd, hooks: [metadata], warnings: [], errors: [] })) } };
     await writeFile(native.mode, JSON.stringify(good));
-    const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
-    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+    const old = { WOMBAT_CODEX_BIN:process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN:native.binary });
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
+
     const client = createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false }), scope = { roots: [root], projectRoots: [parent, child], project: child };
     try {
         const first = await client.optimize!({ ...scope, action: 'list' }), finding = first.suggestions.find(s => s.findings.some(f => f.rule === 'hookTarget'))!;
         assert.ok(finding);
         assert.equal(finding.findings[0].evidence?.hook?.project, child);
-        const inventory = await client.config!({ roots: [root], projectRoots: [parent, child], readView: first.readView, kind: 'hook', scope: { project: child } });
+        const inventory = await client.config!({ roots: [root], projectRoots: [parent, child], kind: 'hook', scope: { project: child } });
         assert.equal(inventory.items[0].id, finding.item.id);
         assert.equal(finding.item.measurementStatus, 'declarationUnavailable');
-        await client.optimize!({ ...scope, action: 'keep', suggestionId: finding.id, decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision });
+        await client.optimize!({ ...scope, action: 'keep', suggestionId: finding.id, decisionReason: 'necessary', decisionRevision: first.decisionRevision });
         await writeFile(native.mode, JSON.stringify({ hooksError: true }));
-        const unavailable = await client.optimize!({ ...scope, action: 'recheck', readView: first.readView, baselineId: finding.baselineId, suggestionId: finding.id });
+        const unavailable = await client.optimize!({ ...scope, action: 'recheck', baseline:finding,baselineId: finding.baselineId, suggestionId: finding.id });
         assert.ok(unavailable.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
         await writeFile(path.join(child, 'local.py'), 'MUST_NOT_EXECUTE');
         await writeFile(native.mode, JSON.stringify(good));
-        const repaired = await client.optimize!({ ...scope, action: 'recheck', readView: first.readView, baselineId: finding.baselineId, suggestionId: finding.id });
+        const repaired = await client.optimize!({ ...scope, action: 'recheck', baseline:finding,baselineId: finding.baselineId, suggestionId: finding.id });
         assert.ok(repaired.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(old)) {
             if (v === undefined)
                 delete process.env[k];

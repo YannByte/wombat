@@ -23,8 +23,6 @@ export interface Request {
   action?: Action & string;
   roots?: string[] | null;
   projectRoots?: string[] | null;
-  snapshotId?: string | null;
-  readView?: string | null;
   /**
    * Check current configuration against committed usage without scheduling collection.
    */

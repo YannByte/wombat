@@ -10,32 +10,21 @@ export async function checkMonitor(
   ids: string[] | undefined,
   signal: AbortSignal,
 ) {
-  if (!client.monitor || !client.live)
+  if (!client.monitor)
     throw new CoreError('MONITOR_UNAVAILABLE', t('monitor.unavailable'));
   const settings = await client.monitor({ action: 'list' }, { signal });
   const selected = ids ?? settings.plans.filter((p) => p.enabled).map((p) => p.id);
   if (selected.some((id) => !settings.plans.some((p) => p.id === id)))
     throw new CoreError('NOT_FOUND', t('monitor.invalid'));
   if (!selected.length) return { ...settings, notifications: [] };
-  const live = await client.live(
-    {
-      query: { action: 'usage', roots, scope: { allTime: true }, limit: 1, compact: true },
-      mode: 'fresh',
-    },
-    { signal },
-  );
-  if (!['current', 'fixed'].includes(live.freshness.status) || live.freshness.initialScan)
-    throw new CoreError('SYNC_PENDING', t('monitor.pending'));
   return client.monitor(
-    { action: 'check', snapshotId: live.result.snapshotRef.snapshotId, ids: selected },
+    { action: 'check', roots, ids: selected },
     { signal },
   );
 }
 type MonitorResult = Awaited<ReturnType<NonNullable<UsageClient['monitor']>>>;
 const retryableWatchErrors = new Set([
-  'SYNC_PENDING',
   'TIMEOUT',
-  'VIEW_EXPIRED',
   'TRANSPORT_ERROR',
   'RESOURCE_LIMIT',
   'INDEX_UNAVAILABLE',

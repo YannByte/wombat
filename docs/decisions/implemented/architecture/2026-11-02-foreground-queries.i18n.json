@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-note-foreground-queries-without-public-views": {
+      "zh": "de2010081eec233512bc291ed32dadb20003bbcae03516ffe97ac5f81d8d2a9d",
+      "en": "a4e8cc7cf82db87680f4f0e43b7bf2a7d05df84c4d7021b8820474e6f085c1ae"
+    },
+    "/decision-note-foreground-queries-without-public-views/problem": {
+      "zh": "d87c08ecddd9aed55315041db88b16b5c8d72864dd1077b730433a74d46a5575",
+      "en": "ce677f0c18c9834a54a553a7a5095506ef500a28248c9a9463b9b98fe9f4d949"
+    },
+    "/decision-note-foreground-queries-without-public-views/decision": {
+      "zh": "f0f32088958a046662496bb2401aeb94b364b041dbb132fd9ced94d435822f88",
+      "en": "d7577fbc7628cb625285eba1457d62c751cdde350b88c2873aede0350347011c"
+    },
+    "/decision-note-foreground-queries-without-public-views/alternatives-considered": {
+      "zh": "c4863e0f1375a0cb4178dc0515a82d6e8c40b00f31330407a56ffc025609a7b1",
+      "en": "4ef4bb555d15bff1c57f213c7e10ebeceaa958a0604ffcd91c7085d02884b964"
+    },
+    "/decision-note-foreground-queries-without-public-views/consequences-and-verification": {
+      "zh": "b069044a004518dbd6388338e5a74aea297d402b9704863975cbb9c0404b202d",
+      "en": "a0d35a0a0664bd0fc25f782c48f528bf9eb7f9432c383cacc6bfc9e51bacf970"
+    }
+  }
+}

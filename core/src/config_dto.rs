@@ -1,4 +1,6 @@
 //! Read-only configuration analysis. Counts are evidence, never exclusive cost attribution.
+pub const REQUEST_VERSION: u32 = 2;
+
 use crate::usage_app_dto::{Page, UsageSummary};
 mod use_basis;
 use schemars::JsonSchema;
@@ -67,7 +69,11 @@ pub struct Request {
     pub action: Action,
     pub roots: Option<Vec<String>>,
     pub project_roots: Option<Vec<String>>,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub snapshot_id: Option<String>,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub read_view: Option<String>,
     /// Check current configuration against committed usage without scheduling collection.
     #[serde(default)]
@@ -320,9 +326,12 @@ pub struct Response {
     pub extension_review: Option<ExtensionReview>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_activity: Option<ExtensionActivityStatistics>,
+    #[schemars(range(min = 2, max = 2))]
     pub output_version: u32,
     pub action: Action,
     pub capabilities: Capabilities,
+    #[serde(skip)]
+    #[schemars(skip)]
     pub read_view: Option<String>,
     pub usage_revision: Option<String>,
     pub config_revision: String,

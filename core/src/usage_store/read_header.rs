@@ -152,25 +152,6 @@ pub(crate) fn load(
     Ok(Some(snapshot))
 }
 impl Snapshot {
-    pub(crate) fn expired_detail_lease(&self) -> bool {
-        self.is_summary_view() && self.cold_events.is_none()
-    }
-    pub(crate) fn freeze_cached_answers(&mut self) -> bool {
-        self.release_detail_cache();
-        if !self.exclusive_cold_lease() {
-            return false;
-        }
-        self.cold_events = None;
-        *self.timing_cache.lock().unwrap() = Default::default();
-        true
-    }
-    pub(crate) fn release_detail_cache(&self) {
-        if let Some(cache) = &self.lazy_details
-            && let Ok(mut value) = cache.try_lock()
-        {
-            *value = None;
-        }
-    }
     #[cfg(test)]
     pub(crate) fn lazy_details_empty_for_test(&self) -> bool {
         self.lazy_details
@@ -195,8 +176,8 @@ impl Snapshot {
         }
         let reader = self.cold_events.as_ref().ok_or_else(|| {
             operation_error(
-                "VIEW_EXPIRED",
-                "Live detail lease expired; reacquire the view",
+                "INDEX_UNAVAILABLE",
+                "Indexed details are unavailable; retain source data and inspect the index",
             )
         })?;
         let view = Arc::new(reader.restore_details(self)?);

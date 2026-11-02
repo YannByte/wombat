@@ -485,7 +485,7 @@ fn safe_status(value: &str) -> String {
 fn safe_error(value: &str) -> Option<&'static str> {
     [
         "INVALID_ARGUMENT",
-        "VIEW_EXPIRED",
+        "EVIDENCE_UNAVAILABLE",
         "SNAPSHOT_CORRUPT",
         "SOURCE_UNREADABLE",
         "RESOURCE_LIMIT",

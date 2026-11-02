@@ -46,7 +46,7 @@ export async function runProjectCli(argv:readonly string[]):Promise<number>{
       if(target||['--agents-bytes','--description-characters','--sort','--offset','--limit','--since','--until','--timezone'].some(k=>p.values.has(k)))invalidInput('--task');
       const scope={allTime:true,...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),sourceInstanceId:p.get('--source')};
       const selected=await resolveRecord(client,p.get('--task')!,scope,roots,argv,signal);
-      const turns=(await client.live!({query:{action:'turns',threadId:selected.thread.id,scope,snapshotId:selected.snapshotId,limit:20,compact:true},mode:'cached'},{signal})).result;
+      const turns=(await client.live!({query:{action:'turns',threadId:selected.thread.id,scope,limit:20,compact:true},mode:'cached'},{signal})).result;
       const available=turns.items.filter(i=>i.kind==='turn');
       let turn=p.get('--turn')??(available.length===1&&turns.page.total===1?available[0].id:undefined);
       if(!turn){
@@ -57,7 +57,7 @@ export async function runProjectCli(argv:readonly string[]):Promise<number>{
         if(!choice)throw new CoreError('CANCELLED',t('common.cancelled'));
         turn=available[pageNumber(choice,0,1,available.length)-1].id;
       }
-      const result=await client.optimize!({action:'activity',roots,activity:{snapshotId:selected.snapshotId,threadId:selected.thread.id,turnId:turn}},{signal});
+      const result=await client.optimize!({action:'activity',roots,activity:{threadId:selected.thread.id,turnId:turn}},{signal});
       process.stdout.write(p.json?JSON.stringify(result)+'\n':formatOptimizeText(result));return result.resultStatus==='partial'?2:0;
     }
     if(p.values.has('--turn'))invalidInput('--turn');

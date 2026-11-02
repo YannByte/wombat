@@ -91,22 +91,15 @@ try {
                 writeFileSync(native.mode, JSON.stringify({ kind: 'available', version: '0.160.1' }));
                 Object.assign(process.env, { CODEX_HOME: source, WOMBAT_DATA_HOME: data, WOMBAT_AUTO_PRICES: '0' });
                 const env = { ...agentEnv, CODEX_HOME: source, WOMBAT_DATA_HOME: data, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN: native.binary, WOMBAT_CORE_BIN: '' };
-                // Model turns can outlive the transient server's idle timeout. Own a resident
-                // fixture until finally, without installing or changing an OS service.
-                service = spawn(path.join(runtime, 'wombat-core'), ['--daemon'], { cwd: project, env, stdio: 'ignore', detached: true });
-                await once(service, 'spawn');
                 const cli = path.join(runtime, 'wombat.js');
                 const query = <T extends UsageResult | OptimizeResult | AccountResult>(args: CliInput): T => { const r = spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, { cwd: project, env, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' }); assert.ok([0, 2].includes(r.status ?? -1), r.stderr + r.stdout); const v = JSON.parse(r.stdout); assert.ok(!(v && typeof v === 'object' && 'error' in v), r.stdout); return v as T; };
-                const snapshot = query<UsageResult>({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}}).snapshotRef.snapshotId, threads = query<UsageResult>(queryInvocation({"action":"threads","snapshotId":snapshot,"scope":{"allTime":true}}, {mode:"auto"})), thread = threads.items.find(v => v.kind === 'thread' && v.upstreamId === 'qualification');
+                const snapshot = query<UsageResult>({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true},"roots":[source]},"mode":"auto"}}).snapshotRef.snapshotId, threads = query<UsageResult>(queryInvocation({"action":"threads","scope":{"allTime":true}}, {mode:"auto"})), thread = threads.items.find(v => v.kind === 'thread' && v.upstreamId === 'qualification');
                 assert.ok(thread && thread.kind === 'thread');
-                const prepared = await createNodeClient({ binaryPath: path.join(runtime, 'wombat-core'), codexBinaryPath: native.binary, automaticPrices: false }).service!({ action: 'status' }, { signal: AbortSignal.any([cancellation.signal, AbortSignal.timeout(10000)]) });
-                assert.ok(prepared.running && prepared.resident, 'Conversation fixture requires its isolated resident service');
-                result.service = { running: true, resident: true };
                 const prefix = `CODEX_HOME=${quote(source)} WOMBAT_DATA_HOME=${quote(data)} WOMBAT_AUTO_PRICES=0 WOMBAT_CODEX_BIN=${quote(native.binary)} node ${quote(cli)}`;
                 const schema = (name: string, properties: Record<string, unknown>) => { const file = path.join(temp, name + '.schema.json'); writeFileSync(file, JSON.stringify({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties })); return file; };
                 const run = async (stage: string, args: string[], answer: string) => { console.log(JSON.stringify({ stage, language: lang, scenario, status: 'running' })); const log = path.join(output, `${lang}-${scenario}-${stage}.log`), r = await runBoundedCommand({ command: [options.agentBin, ...args], cwd: project, env: agentEnv, logFile: log, timeoutMs: 360000, maxBytes: 4 * 1024 * 1024, signal: cancellation.signal }); assert.equal(r.exitCode, 0, `${stage} did not complete`); assert.ok(!r.timedOut && !r.outputLimit && !r.interrupted && !r.closeTimedOut && !r.spawnError && !r.logError); const events = stdoutFromLog(readFileSync(log, 'utf8')), metrics = agentMetrics(events); assert.equal(metrics.unsupportedToolCalls, 0); assert.ok(metrics.commands.some(c => c.includes(cli))); return { answer: JSON.parse(readFileSync(answer, 'utf8')), events, metrics }; };
                 if (isFocusedScenario(scenario)) {
-                    const turns = query<UsageResult>(queryInvocation({"action":"turns","threadId":thread.id,"snapshotId":snapshot,"scope":{"allTime":true}}, {mode:"auto"})), turn = turns.items.find(t => t.kind === 'turn' && t.ordinal !== null);
+                    const turns = query<UsageResult>(queryInvocation({"action":"turns","threadId":thread.id,"scope":{"allTime":true}}, {mode:"auto"})), turn = turns.items.find(t => t.kind === 'turn' && t.ordinal !== null);
                     assert.ok(turn && turn.kind === 'turn');
                     writeFileSync(native.calls, '');
                     const focusedSchema = schema('focused', { answer: { type: 'string' } }), focusedAnswer = path.join(temp, 'focused.answer.json');
@@ -137,13 +130,13 @@ try {
                         assert.ok(suggestion);
                         const session = nativeSessionId(response.events), answerFile = path.join(temp, 'config-recheck.answer.json');
                         const instruction = lang === 'zh' ? '现在只授权精简刚才选定合成 Skill 的 description，其余内容与文件不变。改成 Synthetic review helper for this fixture.，然后按原建议复查，说明结果和限制。' : 'You may now change only the selected synthetic Skill description to Synthetic review helper for this fixture. Preserve all other content and files. Recheck the original suggestion and explain the result and limits.';
-                        const next = await run('recheck', ['exec', 'resume', session, '--config', 'mcp_servers={}', '--skip-git-repo-check', '--json', '--output-schema', focusedSchema, '--output-last-message', answerFile, instruction + ` Target ${sample}; original suggestion ${suggestion.id}, readView ${suggestions.readView}, baseline ${suggestion.baselineId}. Use the same runtime prefix ${prefix}, roots, project and original decision scope. Do not create or change keep/not-applicable decisions, scan raw logs or write other files. Answer in ${lang === 'zh' ? 'Chinese' : 'English'}.`], answerFile);
+                        const next = await run('recheck', ['exec', 'resume', session, '--config', 'mcp_servers={}', '--skip-git-repo-check', '--json', '--output-schema', focusedSchema, '--output-last-message', answerFile, instruction + ` Target ${sample}; original suggestion ${suggestion.id}, readView ${suggestions.configRevision}, baseline ${suggestion.baselineId}. Use the same runtime prefix ${prefix}, roots, project and original decision scope. Do not create or change keep/not-applicable decisions, scan raw logs or write other files. Answer in ${lang === 'zh' ? 'Chinese' : 'English'}.`], answerFile);
                         assertConfiguration(expected);
                         assert.equal(readFileSync(sourceFile, 'utf8'), sourceBody);
-                        const recheck = query<OptimizeResult>({method:'optimize',params:{action:'recheck',readView:suggestions.readView,baselineId:suggestion.baselineId,roots:[source],projectRoots:[project],project}});
+                        const recheck = query<OptimizeResult>({method:'optimize',params:{action:'recheck',baseline:suggestion,baselineId:suggestion.baselineId,roots:[source],projectRoots:[project],project}});
                         assert.ok(recheck.checks.some(c=>c.rule==='descriptionSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
                         assert.equal(recheck.decisionRevision,suggestions.decisionRevision);
-                        assert.equal(query<UsageResult>(['usage', '--snapshot', snapshot, '--all-time']).summary.tokens.total, 1100000);
+                        assert.equal(query<UsageResult>(['usage','--cached','--all-time']).summary.tokens.total, 1100000);
                         result.followup = { answer: next.answer, metrics: next.metrics, originalSuggestionVerified: true, descriptionOnly: true };
                     }
                     const decisions = query<OptimizeResult>({method:'optimize',params:{action:'list',roots:[source],projectRoots:[project],project}});

@@ -30,8 +30,8 @@ test('MCP attempts, resources, fork replay and append/restart share exact CLI an
     const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    let service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const client = createNodeClient({ binaryPath: binary, automaticPrices: false });
     const scope = { roots: [root], projectRoots: [project], scope: { allTime: true } };
     const nativeEntry = projectTestClient(client, [root], [project]);
@@ -41,13 +41,13 @@ test('MCP attempts, resources, fork replay and append/restart share exact CLI an
         assert.ok(['current', 'stale'].includes(live.freshness.status));
         assert.equal(live.freshness.initialScan, false);
         assert.equal(live.freshness.error, null);
-        return client.config!({ ...scope, kind: 'mcp', snapshotId: live.result.snapshotRef.snapshotId });
+        return client.config!({ ...scope, kind: 'mcp'  });
     };
     try {
 
         const nativeTransport = nativeEntry;
         const live = await nativeTransport.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'fresh' });
-        const first = await nativeTransport.config!({ kind: 'mcp', snapshotId: live.result.snapshotRef.snapshotId, scope: { allTime: true } }), item = first.items.find(i => i.name === 'docs')!;
+        const first = await nativeTransport.config!({ kind: 'mcp', scope: { allTime: true } }), item = first.items.find(i => i.name === 'docs')!;
         assert.ok(item);
         assert.equal(item.usageCount, 2);
         assert.equal(item.counts.toolCalls, 1);
@@ -58,10 +58,10 @@ test('MCP attempts, resources, fork replay and append/restart share exact CLI an
         assert.equal(first.coverage.absenceObservable, false);
         assert.equal(item.useBasis?.status, 'observed');
         assert.deepEqual(item.useBasis?.coverage, { dispatchGaps: 0, identityGaps: 0, targetGaps: 0, timeGaps: 0, turnGaps: 0 });
-        const evidence = await nativeTransport.config!({ action: 'evidence', itemId: item.id, readView: first.readView, scope: { allTime: true } });
+        const evidence = await nativeTransport.config!({ action: 'evidence', itemId: item.id, scope: { allTime: true } });
         assert.deepEqual(evidence.evidence.map(e => e.eventType).sort(), ['resource_read', 'tool_call']);
         assert.ok(!JSON.stringify(evidence).includes('SECRET'));
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'evidence',roots:[root],projectRoots:[project],itemId:item.id,readView:first.readView,scope:{allTime:true}}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'evidence',roots:[root],projectRoots:[project],itemId:item.id,scope:{allTime:true}}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         assert.deepEqual(JSON.parse(cli.stdout).evidence, evidence.evidence);
         // A child arrives later with copied completed events and a genuinely new retry.
@@ -71,16 +71,16 @@ test('MCP attempts, resources, fork replay and append/restart share exact CLI an
         assert.equal(second.items[0].counts.toolCalls, 2);
         assert.equal(second.items[0].counts.resourceReads, 1);
         assert.equal(second.items[0].usage?.tokens.total, 110);
-        const frozen = await client.config!({ ...scope, readView: first.readView, kind: 'mcp' });
-        assert.equal(frozen.items[0].usageCount, 2);
+        const frozen = await client.config!({ ...scope, kind: 'mcp' });
+        assert.equal(frozen.items[0].usageCount, 3);
         await appendFile(parentFile, jsonl([end('next', 'u', 'read_file', true)]));
         const appended = await currentInventory();
         assert.equal(appended.items[0].usageCount, 4);
         assert.equal(appended.items[0].counts.failed, 2);
-        service.kill('SIGTERM');
-        await once(service, 'exit');
-        service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-        await once(service, 'spawn');
+
+
+
+
         const restored = await currentInventory();
         assert.equal(restored.items[0].usageCount, 4);
         assert.deepEqual(restored.items[0].counts, appended.items[0].counts);
@@ -94,11 +94,11 @@ test('MCP attempts, resources, fork replay and append/restart share exact CLI an
         assert.equal(uncertain.coverage.absenceObservable, false);
         assert.deepEqual(unknown.counts, restored.items[0].counts, 'unproven operations do not become confirmed uses');
         assert.equal(unknown.usage?.tokens.total, 110);
-        assert.equal((await client.config!({ ...scope, readView: restored.readView, kind: 'mcp' })).items[0].usageCount, 4, 'the retained complete view stays complete');
+        assert.equal((await client.config!({ ...scope, kind: 'mcp' })).items[0].usageCount, 4, 'the retained complete view stays complete');
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(old)) {
             if (v === undefined)
                 delete process.env[k];

@@ -16,6 +16,7 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
     }
     if request.activity.is_none()
         || request.baseline_id.is_some()
+        || request.baseline.is_some()
         || request.read_view.is_some()
         || request.project_roots.is_some()
         || request.project.is_some()
@@ -43,7 +44,7 @@ pub(crate) fn timing_request(request: &Request) -> Result<t::Request> {
     Ok(t::Request::Summary {
         thread_id: selected.thread_id.clone(),
         turn_id: selected.turn_id.clone(),
-        snapshot_id: Some(selected.snapshot_id.clone()),
+        snapshot_id: (!selected.snapshot_id.is_empty()).then(|| selected.snapshot_id.clone()),
         roots: request.roots.clone().unwrap_or_default(),
         scope: Some(t::Scope {
             source_instance_id: request.source_instance_id.clone(),

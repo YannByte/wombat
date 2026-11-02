@@ -30,9 +30,9 @@ function check(outcome: OptimizeSuggestion['checks'][number]['outcome'] = 'hit',
 function result(): OptimizeResult {
   const current = check();
   return {
-    outputVersion: 5, action: 'detail', capabilities: { staticChecks: true, manualEditReview: true, decisions: true, exactInstructionBlocks: true, declaredCopyDrift: true,
+    outputVersion: 6, action: 'detail', capabilities: { staticChecks: true, manualEditReview: true, decisions: true, exactInstructionBlocks: true, declaredCopyDrift: true,
       hookSupport: { effectiveRegistry: false, status: 'no_verified_adapter' } },
-    configRevision: 'synthetic-config', usageRevision: null, readView: 'synthetic-fixed-view', decisionRevision: 'synthetic-decision', checkedAt: at,
+    configRevision: 'synthetic-config', usageRevision: null, decisionRevision: 'synthetic-decision', checkedAt: at,
     suggestions: [{ reviewFormatVersion: 1, id: 'synthetic-suggestion', item: structuredClone(item), category: 'trim',
       checks: [current], findings: [], checkedAt: at, ruleVersion: 'synthetic-rules',
       baselineId: "synthetic-baseline" }],
@@ -66,5 +66,5 @@ test('check text preserves outcomes, comparison gaps, exact zero and source-text
  const text=formatOptimizeText(fixture);for(const o of ['hit','miss','insufficient','unsupported','error'] as const)assert.ok(text.includes(t(`optimize.check.${o}`)));assert.ok(text.includes(t('optimize.assessment.comparison.unknown')));assert.doesNotMatch(text,/\u001b|undefined|NaN/);
  fixture.checks=[{...check('miss','incomparable'),comparison:{status:'incomparable',reason:'ruleParametersOrMethodChanged'}}];assert.ok(formatOptimizeText(fixture).includes(t('optimize.assessment.comparison.incomparable')));
 }));
-test('formatting changes language while preserving facts and the opaque recheck baseline',()=>{const fixture=result(),before=JSON.stringify(fixture),saved=locale.getLocale();try{locale.setLocale('en');const en=formatOptimizeText(fixture);locale.setLocale('zh');const zh=formatOptimizeText(fixture);assert.notEqual(en,zh);assert.match(en,/synthetic-baseline/);assert.match(zh,/synthetic-baseline/);assert.equal(JSON.stringify(fixture),before);}finally{locale.setLocale(saved);}});
-test('rechecks require original view and baseline; removed lifecycle actions reject',async()=>{const {parseVerificationArgs}=await import('../src/optimize-cli.js');for(const a of [['verify'],['verify','--read-view','view'],['history'],['redisplay'],['handoff']])assert.throws(()=>parseVerificationArgs(a));const r=parseVerificationArgs(['verify','--read-view','view','--baseline','baseline']);assert.equal(r.request.baselineId,'baseline');});
+test('formatting changes language while preserving facts and the opaque recheck baseline',()=>{const fixture=result(),before=JSON.stringify(fixture),saved=locale.getLocale();try{locale.setLocale('en');const en=formatOptimizeText(fixture);locale.setLocale('zh');const zh=formatOptimizeText(fixture);assert.notEqual(en,zh);assert.match(en,/synthetic-suggestion/);assert.match(zh,/synthetic-suggestion/);assert.equal(JSON.stringify(fixture),before);}finally{locale.setLocale(saved);}});
+test('rechecks require an original report file; removed lifecycle actions reject',async()=>{const {parseVerificationArgs}=await import('../src/optimize-cli.js');for(const a of [['verify'],['verify','--read-view','view'],['history'],['redisplay'],['handoff']])assert.throws(()=>parseVerificationArgs(a));});

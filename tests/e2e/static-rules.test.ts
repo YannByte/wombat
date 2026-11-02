@@ -1,3 +1,4 @@
+import {comparable} from '../helpers/comparable.js';
 import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
@@ -20,8 +21,8 @@ test('local resource checks retain fixed evidence, expose independent outcomes a
     await writeFile(skill, body);
     const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
-    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore' });
-    await once(service, 'spawn');
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
+
     let nativeEntry: UsageClient | undefined;
     try {
         nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), [root], [project]);
@@ -34,41 +35,37 @@ test('local resource checks retain fixed evidence, expose independent outcomes a
         assert.equal(reference.target, 'references/forms.md');
         assert.equal(reference.startLine, 5);
         assert.equal(reference.status, 'referenceTargetMissing');
-        const checks = await nativeApi.optimize!({ action: 'checks', readView: first.readView, itemId: suggestion.item.id, limit: 1 });
+        const checks = await nativeApi.optimize!({ action: 'checks', itemId: suggestion.item.id, limit: 1 });
         assert.equal(checks.page.total, 1);
         assert.equal(checks.checks?.find(c => c.rule === 'localReference')?.outcome, 'hit');
         assert.equal(checks.checks?.find(c => c.rule === 'skillFormat')?.outcome, 'miss');
         assert.ok(!checks.checks.some(c=>c.rule==='skillInactivity'));
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'checks',roots:[root],projectRoots:[project],readView:first.readView,itemId:suggestion.item.id}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'checks',roots:[root],projectRoots:[project],itemId:suggestion.item.id}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
-        assert.deepEqual(JSON.parse(cli.stdout).checks, checks.checks);
-        await nativeApi.optimize!({ action: 'recheck', readView: first.readView, baselineId: suggestion.baselineId, suggestionId: suggestion.id });
+        assert.deepEqual(comparable(JSON.parse(cli.stdout).checks), comparable(checks.checks));
+        await nativeApi.optimize!({ action: 'recheck', baseline:suggestion,baselineId: suggestion.baselineId, suggestionId: suggestion.id });
         await mkdir(path.join(path.dirname(skill), 'references'));
         await writeFile(path.join(path.dirname(skill), 'references/forms.md'), 'Synthetic reference.\n');
-        const fixed = await nativeApi.optimize!({ action: 'recheck',readView:first.readView,baselineId:suggestion.baselineId }), fixedReferenceCheck = fixed.checks.find(c => c.rule === 'localReference')!;
+        const fixed = await nativeApi.optimize!({ action: 'recheck',baseline:suggestion,baselineId:suggestion.baselineId }), fixedReferenceCheck = fixed.checks.find(c => c.rule === 'localReference')!;
         assert.equal(fixed.pending, 0);
         assert.equal(fixedReferenceCheck.outcome, 'miss');
         assert.equal(fixedReferenceCheck.comparison.status, 'unknown');
         assert.equal(fixedReferenceCheck.comparison.reason, 'problemIdentityUnavailable');
-        assert.equal((await nativeApi.optimize!({ action: 'checks', readView: first.readView, itemId: suggestion.item.id })).checks?.find(c => c.rule === 'localReference')?.outcome, 'hit', 'a fixed view retains its original target observation');
+        assert.equal((await nativeApi.optimize!({ action: 'checks', itemId: suggestion.item.id })).checks?.find(c => c.rule === 'localReference')?.outcome, 'miss', 'a new call checks the current target');
         await rm(path.join(path.dirname(skill), 'references/forms.md'));
         const again = await nativeApi.optimize!({ action: 'list' });
-        await nativeApi.optimize!({ action: 'recheck', readView: again.readView, baselineId: again.suggestions[0].baselineId, suggestionId: again.suggestions[0].id });
+        await nativeApi.optimize!({ action: 'recheck', baseline:again.suggestions[0],baselineId: again.suggestions[0].baselineId, suggestionId: again.suggestions[0].id });
         await writeFile(skill, body.replace('references/forms.md#fields', '$RESOURCE/forms.md'));
-        const unknown = await nativeApi.optimize!({ action: 'recheck', readView:again.readView,baselineId:again.suggestions[0].baselineId });
+        const unknown = await nativeApi.optimize!({ action: 'recheck', baseline:again.suggestions[0],baselineId:again.suggestions[0].baselineId });
         assert.ok(unknown.checks.some(c=>c.outcome==='insufficient'));
         assert.equal(unknown.resultStatus,'partial','unknown evidence is a gap, without fabricating a new fault');
-        const unknownChecks = await nativeApi.optimize!({ action: 'checks', readView: unknown.readView, itemId: suggestion.item.id });
+        const unknownChecks = await nativeApi.optimize!({ action: 'checks', itemId: suggestion.item.id });
         assert.equal(unknownChecks.checks?.find(c => c.rule === 'localReference')?.outcome, 'insufficient');
         assert.equal(unknownChecks.checks?.find(c => c.rule === 'skillFormat')?.outcome, 'miss');
-        await assert.rejects(nativeApi.optimize!({ action: 'checks', readView: unknown.readView, itemId: 'foreign' }), { code: 'NOT_FOUND' });
+        await assert.rejects(nativeApi.optimize!({ action: 'checks', itemId: 'foreign' }), { code: 'NOT_FOUND' });
     }
     finally {
-        if (service.exitCode === null && service.signalCode === null) {
-            const ended = once(service, 'exit');
-            service.kill();
-            await ended;
-        }
+
         for (const [k, v] of Object.entries(saved)) {
             if (v === undefined)
                 delete process.env[k];
@@ -93,8 +90,8 @@ test('exact blocks, explicit copies, decision fingerprints and unavailable reche
     const previous = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    const service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), [root], [project]);
 
     const nativeApi = nativeEntry;
@@ -118,36 +115,36 @@ test('exact blocks, explicit copies, decision fingerprints and unavailable reche
         assert.equal(drift.category, 'repair');
         assert.equal(drift.findings[0].evidence?.versions.length, 2);
         assert.equal(drift.findings[0].evidence?.direction, 'sourceToCopy');
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project],readView:first.readView}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'optimize',params:{action:'list',roots:[root],projectRoots:[project]}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr);
-        assert.deepEqual(JSON.parse(cli.stdout).suggestions, first.suggestions);
-        await nativeApi.optimize!({ action: 'keep', decisionReason: 'necessary', readView: first.readView, decisionRevision: first.decisionRevision, suggestionId: drift.id });
+        assert.deepEqual(comparable(JSON.parse(cli.stdout).suggestions), comparable(first.suggestions));
+        await nativeApi.optimize!({ action: 'keep', decisionReason: 'necessary', decisionRevision: first.decisionRevision, suggestionId: drift.id });
         assert.equal((await nativeApi.optimize!({ action: 'list' })).suggestions.some(s => s.id === drift.id), false);
         await writeFile(source, text + '原件新增约束。\n');
         const changed = await nativeApi.optimize!({ action: 'list' }), newDrift = changed.suggestions.find(s => s.item.path === copy)!;
         assert.notEqual(newDrift.id, drift.id, 'unchanged copy must resurface when its declared source version changes');
-        await nativeApi.optimize!({ action: 'recheck', readView: changed.readView, baselineId:newDrift.baselineId, suggestionId: newDrift.id });
+        await nativeApi.optimize!({ action: 'recheck', baseline:newDrift,baselineId:newDrift.baselineId, suggestionId: newDrift.id });
         await rm(declaration);
-        const missing = await nativeApi.optimize!({ action:'recheck',readView:changed.readView,baselineId:newDrift.baselineId });
+        const missing = await nativeApi.optimize!({ action:'recheck',baseline:newDrift,baselineId:newDrift.baselineId });
         assert.ok(missing.checks.some(c=>c.rule==='declaredCopyDrift'&&c.comparison.status!=='comparable'));
         assert.equal(missing.resultStatus,'partial');
         await writeFile(declaration, manifest);
         await writeFile(copy, await readFile(source));
-        const fixed = await nativeApi.optimize!({ action:'recheck',readView:changed.readView,baselineId:newDrift.baselineId });
+        const fixed = await nativeApi.optimize!({ action:'recheck',baseline:newDrift,baselineId:newDrift.baselineId });
         assert.ok(fixed.checks.some(c=>c.rule==='declaredCopyDrift'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
         assert.ok(fixed.pending > 0, 'independent new findings remain pending');
         const shorter = '一条完整合成指令。\n';
         await writeFile(source, shorter);
         await writeFile(copy, shorter);
-        const verified = await nativeApi.optimize!({ action:'recheck',readView:changed.readView,baselineId:newDrift.baselineId });
+        const verified = await nativeApi.optimize!({ action:'recheck',baseline:newDrift,baselineId:newDrift.baselineId });
         assert.ok(verified.checks.some(c=>c.rule==='declaredCopyDrift'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
         assert.equal(await readFile(declaration, 'utf8'), manifest, 'review operations never change declarations');
         const serialized = JSON.stringify(first);
         assert.equal(serialized.includes('完整中文指令'), false, 'DTOs contain positions and fingerprints, never raw instructions');
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(previous)) {
             if (v === undefined)
                 delete process.env[k];
@@ -173,8 +170,8 @@ test('relation rechecks fail closed across heading changes and identical manifes
     await writeFile(path.join(other, 'child/AGENTS.md'), 'Independent synthetic instruction two.\n');
     const previous = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
-    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
+
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), [root], [project, other, nested]);
 
     const nativeApi = nativeEntry;
@@ -188,28 +185,24 @@ test('relation rechecks fail closed across heading changes and identical manifes
         const first = await nativeApi.optimize!({ action: 'list', project });
         const target = first.suggestions.find(s => s.item.path === path.join(project, 'AGENTS.md'))!;
         assert.equal(target.findings[0].evidence?.relation?.project, project);
-        await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,readView:first.readView,baselineId:target.baselineId });
+        await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,baseline:target,baselineId:target.baselineId });
         await writeFile(path.join(nested, 'AGENTS.md'), '# Condition B\n\nExact synthetic instruction.\n');
-        const unknown = await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,readView:first.readView,baselineId:target.baselineId });
+        const unknown = await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,baseline:target,baselineId:target.baselineId });
         assert.ok(unknown.checks.some(c=>c.rule==='exactInstructionBlocks'&&c.comparison.status!=='comparable'));
         assert.ok(unknown.issues.some(i => i.code === 'blockApplicabilityUnknown'));
         await writeFile(path.join(nested, 'AGENTS.md'), 'Independent replacement instruction.\n');
         await rm(path.join(project, '.wombat/analysis.json'));
-        const absent = await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,readView:first.readView,baselineId:target.baselineId });
+        const absent = await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,baseline:target,baselineId:target.baselineId });
         assert.ok(absent.checks.some(c=>c.rule==='exactInstructionBlocks'&&c.comparison.status!=='comparable'));
         await writeFile(path.join(project, '.wombat/analysis.json'), manifest);
-        const fixed = await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,readView:first.readView,baselineId:target.baselineId }), fixedCheck = fixed.checks.find(c => c.rule === 'exactInstructionBlocks')!;
+        const fixed = await nativeApi.optimize!({ action:'recheck',project,suggestionId:target.id,baseline:target,baselineId:target.baselineId }), fixedCheck = fixed.checks.find(c => c.rule === 'exactInstructionBlocks')!;
         assert.equal(fixedCheck.outcome, 'miss');
         assert.equal(fixedCheck.comparison.status, 'unknown');
         assert.equal(fixedCheck.comparison.reason, 'problemIdentityUnavailable');
 
     }
     finally {
-        if (service.exitCode === null && service.signalCode === null) {
-            const ended = once(service, 'exit');
-            service.kill('SIGTERM');
-            await ended;
-        }
+
         for (const [k, v] of Object.entries(previous)) {
             if (v === undefined)
                 delete process.env[k];
@@ -234,8 +227,8 @@ test('two sources share one physical configuration and one review while keeping 
     }
     const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: roots[0], WOMBAT_AUTO_PRICES: '0' });
-    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore' });
-    await once(service, 'spawn');
+    const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
+
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), roots, [project]);
     const nativeApi = nativeEntry;
     try {
@@ -249,7 +242,7 @@ test('two sources share one physical configuration and one review while keeping 
         assert.equal(item.relatedTurns, 2);
         assert.equal(item.usage?.tokens.total, 330);
         assert.deepEqual(item.sourceContexts!.map(c => c.counts.fileReads), [2, 2]);
-        const evidence = await nativeApi.config!({ action: 'evidence', readView: config.readView, itemId: item.id, scope: { allTime: true } });
+        const evidence = await nativeApi.config!({ action: 'evidence', itemId: item.id, scope: { allTime: true } });
         assert.equal(evidence.evidence.length, 4);
         assert.equal(new Set(evidence.evidence.map(e => e.sourceInstanceId)).size, 2);
         assert.equal(new Set(evidence.evidence.map(e => e.threadId)).size, 2);
@@ -259,11 +252,11 @@ test('two sources share one physical configuration and one review while keeping 
         assert.equal(first.suggestions[0].findings.length, 1);
         assert.equal(first.suggestions[0].findings[0].evidence?.positions.length, 2);
         for (const c of item.sourceContexts!) {
-            const filtered = await nativeApi.config!({ action: 'list', readView: config.readView, scope: { allTime: true, sourceInstanceId: c.sourceInstanceId } });
+            const filtered = await nativeApi.config!({ action: 'list', scope: { allTime: true, sourceInstanceId: c.sourceInstanceId } });
             assert.equal(filtered.items.find(i => i.id === item.id)!.counts.fileReads, 2);
-            assert.equal((await nativeApi.optimize!({ action: 'list', readView: first.readView, sourceInstanceId: c.sourceInstanceId })).suggestions[0].id, first.suggestions[0].id);
+            assert.equal((await nativeApi.optimize!({ action: 'list', sourceInstanceId: c.sourceInstanceId })).suggestions[0].id, first.suggestions[0].id);
         }
-        await nativeApi.optimize!({ action: 'keep', decisionReason: 'necessary', suggestionId: first.suggestions[0].id, readView: first.readView, decisionRevision: first.decisionRevision });
+        await nativeApi.optimize!({ action: 'keep', decisionReason: 'necessary', suggestionId: first.suggestions[0].id, decisionRevision: first.decisionRevision });
         for (const c of item.sourceContexts!) {
             const scoped = await nativeApi.optimize!({ action: 'list', sourceInstanceId: c.sourceInstanceId });
             assert.equal(scoped.pending, 1, 'a decision recorded across all source contexts does not silently transfer to a narrower source scope');
@@ -271,24 +264,20 @@ test('two sources share one physical configuration and one review while keeping 
         const allSources = await nativeApi.optimize!({ action:'list' });
         assert.equal(allSources.pending,0);
         await writeFile(skill,'---\nname: shared\ndescription: Synthetic description\n---\n\nOne complete synthetic instruction.\n');
-        const checked = await nativeApi.optimize!({action:'recheck',readView:first.readView,baselineId:first.suggestions[0].baselineId});
+        const checked = await nativeApi.optimize!({action:'recheck',baseline:first.suggestions[0],baselineId:first.suggestions[0].baselineId});
         const checkedBlock=checked.checks.find(c=>c.rule==='exactInstructionBlocks')!;
         assert.equal(checkedBlock.outcome,'miss');
         assert.equal(checkedBlock.comparison.status,'unknown');
         assert.equal(checkedBlock.comparison.reason,'problemIdentityUnavailable');
         assert.equal(checked.pending,0);
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots,projectRoots:[project],scope:{allTime:true},readView:checked.readView}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots,projectRoots:[project],scope:{allTime:true}}}, { env: process.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         assert.equal(JSON.parse(cli.stdout).items.filter((i: {
             path: string;
         }) => i.path === skill).length, 1);
     }
     finally {
-        if (service.exitCode === null && service.signalCode === null) {
-            const ended = once(service, 'exit');
-            service.kill('SIGTERM');
-            await ended;
-        }
+
         for (const [k, v] of Object.entries(saved)) {
             if (v === undefined)
                 delete process.env[k];

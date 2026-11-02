@@ -1,4 +1,6 @@
 //! User-owned budgets and periodic review notifications. Hosts explicitly drive checks.
+pub const REQUEST_VERSION: u32 = 2;
+
 use crate::{
     dto::operation_error,
     usage_app_dto::{Scope, SnapshotRef, TaskStatistics, UsageSummary},
@@ -51,6 +53,10 @@ pub enum Request {
         id: String,
     },
     Check {
+        #[serde(default)]
+        roots: Vec<String>,
+        #[serde(default, skip_serializing)]
+        #[schemars(skip)]
         snapshot_id: String,
         ids: Vec<String>,
     },
@@ -326,7 +332,7 @@ pub(crate) fn dispatch_snapshot(
         .map(|v| v.with_timezone(&Utc));
     if checked.is_none_or(|v| now - v > Duration::minutes(5) || v - now > Duration::minutes(1)) {
         return Err(operation_error(
-            "VIEW_EXPIRED",
+            "SOURCE_STALE",
             "Monitor needs a recent source check",
         ));
     }
@@ -411,7 +417,9 @@ fn dispatch_with(
                 return Err(operation_error("NOT_FOUND", "Notification not found"));
             }
         }
-        Request::Check { snapshot_id, ids } => {
+        Request::Check {
+            snapshot_id, ids, ..
+        } => {
             if ids.is_empty()
                 || ids.len() > 100
                 || ids.iter().any(|id| !valid_id(id))
@@ -438,8 +446,8 @@ fn dispatch_with(
                 && (at - published > Duration::minutes(5) || published - at > Duration::minutes(1))
             {
                 return Err(operation_error(
-                    "VIEW_EXPIRED",
-                    "Monitor needs a recent usage view",
+                    "SOURCE_STALE",
+                    "Monitor needs a recent source observation",
                 ));
             }
             let current = plans(db)?;
@@ -538,6 +546,7 @@ mod tests {
         )
         .unwrap();
         let check = || Request::Check {
+            roots: vec![],
             snapshot_id: snapshot.manifest.snapshot_ref.snapshot_id.clone(),
             ids: vec!["daily".into()],
         };

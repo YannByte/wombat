@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import {DatabaseSync} from 'node:sqlite';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const binary = process.env.WOMBAT_CORE_BIN ?? path.join(project, 'dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
@@ -56,11 +57,11 @@ async function fixture() {
     { id: 'thread-a', thread_name: '主工程', updated_at: '2026-09-29T01:02:00Z' },
     { id: 'thread-b', thread_name: '归档实验', updated_at: '2026-09-29T02:02:00Z' },
   ]));
-  const raw = (args: object) => {
-    const processResult = spawnSync(binary, [], { input: JSON.stringify({ op: 'usage_app', args }), env, encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
+  const raw = (args: object, mode: string = "cached") => {
+    const processResult = spawnSync(binary, [], { input: JSON.stringify({ op: 'local_query', args: {query:{roots:[source],...args},mode} }), env, encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
     assert.equal(processResult.status, 0, processResult.stderr || processResult.error?.message || 'core process failed');
     assert.ok(!processResult.stdout.includes(sentinel), 'private content leaked through core stdout');
-    return JSON.parse(processResult.stdout);
+    const result=JSON.parse(processResult.stdout);if(result.ok)result.value=result.value.result;return result;
   };
   const query = (args: object) => {
     const result = raw(args); assert.equal(result.ok, true, JSON.stringify(result)); return result.value;
@@ -71,7 +72,7 @@ async function fixture() {
     assert.ok(!result.stdout.includes(sentinel));
     return { ...result, value: JSON.parse(result.stdout) };
   };
-  const refresh = () => query({ action: 'refresh', roots: [source] });
+  const refresh = () => {const result=raw({scope:{allTime:true},action:'usage'},'fresh');assert.equal(result.ok,true,JSON.stringify(result));return result.value;};
   return { root, source, data, workspace, activeFile, raw, query, invokeCli, refresh };
 }
 const allDates = { timezone: 'UTC', since: '2026-09-28', until: '2026-09-30' };
@@ -80,7 +81,7 @@ test('distribution uses whole-range scales and shares before pagination; cost or
   const f = await fixture();
   try {
     const snapshotId = f.refresh().snapshotRef.snapshotId;
-    const request = { action: 'usage', snapshotId, scope: allDates, presentation: 'distribution', sort: 'cost', limit: 1 };
+    const request = { action: 'usage', scope: allDates, presentation: 'distribution', sort: 'cost', limit: 1 };
     const first = f.query(request);
     assert.equal(first.page.total, 2);
     assert.equal(first.items.length, 1);
@@ -94,26 +95,26 @@ test('distribution uses whole-range scales and shares before pagination; cost or
     assert(Math.abs(first.items[0].costShare - 0.0122875 / 0.0151225) < 1e-12);
     const details = f.query({ ...request, presentation: 'details' });
     assert.equal(details.page.total, 2); assert.equal(details.page.nextOffset, 1);
-    assert(details.items.length > 1, 'period pagination must retain every model in the period');
+    assert.equal(details.items.length, 1, 'details pagination remains bounded');
     assert(details.items.every((item: any) => item.date === '2026-09-29'));
     const second = f.query({ ...request, offset: 1 });
     assert.deepEqual(second.distribution, first.distribution);
     assert.equal(second.items[0].date, '2026-09-28');
     assert.equal(second.items[0].share, 1_100 / 5_100);
-    const threads = f.query({ action: 'threads', snapshotId, scope: allDates, sort: 'cost' });
+    const threads = f.query({ action: 'threads', scope: allDates, sort: 'cost' });
     assert.deepEqual(threads.items.map((item: any) => item.title), ['主工程', '归档实验']);
     assert.deepEqual(threads.items.map((item: any) => item.matchedTurnCount), [2, 1]);
     assert.equal(threads.items[1].threadUsage.price.status, 'unknown');
-    const linked = f.query({ action: 'threads', snapshotId, scope: { ...allDates, since: '2026-09-29', model: 'gpt-5.4' }, sort: 'tokens' });
+    const linked = f.query({ action: 'threads', scope: { ...allDates, since: '2026-09-29', model: 'gpt-5.4' }, sort: 'tokens' });
     assert.equal(linked.items[0].threadUsage.tokens.total, 4_600);
     assert.equal(linked.items[0].matchedUsage.tokens.total, 1_300);
     assert.equal(linked.items[0].matchedTurnCount, 1);
-    const turns = f.query({ action: 'turns', snapshotId, threadId: linked.items[0].id, scope: linked.scope, sort: 'cost' });
+    const turns = f.query({ action: 'turns', threadId: linked.items[0].id, scope: linked.scope, sort: 'cost' });
     assert.equal(turns.items.length, 2, 'a report link retains all turns');
     assert.equal(turns.summary.tokens.total, 4_600);
     assert(turns.items.some((item: any) => item.matchedUsage.measurementCount === 0));
     assert(Math.abs(turns.items.reduce((sum: number, item: any) => sum + item.costShare, 0) - 1) < 1e-12);
-    const cli = f.invokeCli({method:'snapshot',params:{...request,action:'usage',presentation:'distribution',sort:'cost'}});
+    const cli = f.invokeCli({method:'usage',params:{query:{...request,action:'usage',presentation:'distribution',sort:'cost'},mode:'cached'}});
     assert.equal(cli.status, first.quality.status === 'partial' ? 2 : 0);
     assert.deepEqual(cli.value.distribution, first.distribution);
     assert.equal(cli.value.items.length, 1);
@@ -128,7 +129,7 @@ test('task rows keep a missing source turn association unknown', async () => {
       event('2026-09-29T04:01:00Z', { type: 'token_usage_record', thread_id: 'thread-no-turn', response_id: 'response-no-turn', usage: usage(100, 0, 10) }),
     ]));
     const snapshotId = f.refresh().snapshotRef.snapshotId;
-    const result = f.query({ action: 'threads', snapshotId, search: 'thread-no-turn' });
+    const result = f.query({ action: 'threads', search: 'thread-no-turn' });
     assert.equal(result.items.length, 1);
     assert.equal(result.items[0].matchedTurnCount, null);
     assert.equal(result.items[0].matchedUsage.tokens.total, 110);
@@ -143,15 +144,15 @@ test('CLI refresh reads nested Codex settings and prices a current model', async
       event('2026-09-29T03:00:01Z', { type: 'thread_settings_applied', thread_id: 'thread-c', thread_settings: { model: 'gpt-6-sol', model_provider_id: 'openai', reasoning_effort: 'high' } }),
       measurement('2026-09-29T03:00:02Z', 'thread-c', 'turn-c1', 'response-c1', usage(1_000, 100, 100)),
     ]));
-    const refreshed = f.invokeCli({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
+    const refreshed = f.invokeCli({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
     assert.equal(refreshed.status, 0, refreshed.stdout);
-    assert.equal(refreshed.value.action, 'refresh');
-    const queried = f.invokeCli(['usage', '--model', 'gpt-6-sol', '--since', '2026-09-29', '--until', '2026-09-30', '--json']);
+    assert.equal(refreshed.value.action, 'usage');
+    const queried = f.invokeCli(['usage', '--by', 'model', '--model', 'gpt-6-sol', '--since', '2026-09-29', '--until', '2026-09-30', '--json']);
     assert.equal(queried.status, 0);
     assert.equal(queried.value.summary.tokens.total, 1_100);
     assert.equal(queried.value.summary.price.status, 'priced');
     assert.equal(queried.value.summary.price.cost, '0.00282');
-    assert.equal(queried.value.items.find((item: any) => !item.isSubtotal).model, 'gpt-6-sol');
+    assert.equal(queried.value.items[0].model, 'gpt-6-sol');
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
 
@@ -167,7 +168,7 @@ test('v3 用量 → 跨日对话 → 轮次 → 操作，Token 和十进制金�
     assert.equal(updated.summary.price.knownCost, '0.0151225');
     assert.equal(updated.summary.price.policy, 'official-standard-api-equivalent-v1');
     const snapshotId = updated.snapshotRef.snapshotId;
-    const report = f.query({ action: 'usage', snapshotId, scope: allDates });
+    const report = f.query({ action: 'usage', scope: allDates });
     assert.equal(report.summary.tokens.total, 5_100);
     assert.deepEqual(report.items.filter((r: any) => r.isSubtotal).map((r: any) => [r.date, r.usage.tokens.total]), [
       ['2026-09-29', 4_000], ['2026-09-28', 1_100],
@@ -175,19 +176,19 @@ test('v3 用量 → 跨日对话 → 轮次 → 操作，Token 和十进制金�
     const row = report.items.find((r: any) => r.model === 'gpt-5.4');
     assert.equal(row.reasoningEffort, 'high');
     assert.equal(row.usage.price.cost, '0.006775');
-    const linked = f.query({ action: 'threads', snapshotId, scope: row.scope });
+    const linked = f.query({ action: 'threads', scope: row.scope });
     assert.equal(linked.items.length, 1);
     const thread = linked.items[0];
     assert.equal(thread.title, '主工程');
     assert.equal(thread.matchedUsage.tokens.total, 1_300);
     assert.equal(thread.threadUsage.tokens.total, 4_600);
     assert.equal(thread.threadUsage.price.cost, '0.0151225');
-    const turns = f.query({ action: 'turns', snapshotId, threadId: thread.id, scope: row.scope });
+    const turns = f.query({ action: 'turns', threadId: thread.id, scope: row.scope });
     assert.equal(turns.summary.tokens.total, 4_600);
     assert.deepEqual(turns.items.map((r: any) => r.usage.tokens.total), [3_300, 1_300]);
     assert.deepEqual(turns.items.map((r: any) => r.matchedUsage.tokens.total), [0, 1_300]);
     assert.equal(turns.items[0].share, 3_300 / 4_600);
-    const steps = f.query({ action: 'steps', snapshotId, threadId: thread.id, turnId: turns.items[0].id, sort: 'time' });
+    const steps = f.query({ action: 'steps', threadId: thread.id, turnId: turns.items[0].id, sort: 'time' });
     assert.equal(steps.summary.tokens.total, 3_300);
     assert.equal(steps.summary.price.cost, '0.0083475');
     const measured = steps.items.filter((r: any) => r.kind === 'measurement');
@@ -199,7 +200,7 @@ test('v3 用量 → 跨日对话 → 轮次 → 操作，Token 和十进制金�
     for (const operation of operations) {
       assert.ok(!('usage' in operation)); assert.ok(!('cost' in operation)); assert.ok(!('price' in operation));
     }
-    const back = f.query({ action: 'usage', snapshotId, scope: { timezone: 'UTC', threadId: thread.id } });
+    const back = f.query({ action: 'usage', scope: { timezone: 'UTC', threadId: thread.id } });
     assert.equal(back.summary.tokens.total, 4_600);
     assert.equal(back.scope.since, null);
     assert.equal(back.scope.until, null);
@@ -211,28 +212,28 @@ test('固定快照分页前排序，更新不改变旧页总量、费用或占�
   const f = await fixture();
   try {
     const { snapshotRef } = f.refresh(); const snapshotId = snapshotRef.snapshotId;
-    const threads = f.query({ action: 'threads', snapshotId, limit: 1 });
+    const threads = f.query({ action: 'threads', limit: 1 });
     assert.equal(threads.page.total, 2); assert.equal(threads.page.nextOffset, 1);
     assert.equal(threads.summary.tokens.total, 5_100);
     const id = threads.items[0].id;
-    const turns = f.query({ action: 'turns', snapshotId, threadId: id, limit: 1 });
+    const turns = f.query({ action: 'turns', threadId: id, limit: 1 });
     assert.equal(turns.items[0].usage.tokens.total, 3_300);
     assert.equal(turns.items[0].share, 3_300 / 4_600);
-    const nextTurn = f.query({ action: 'turns', snapshotId, threadId: id, limit: 1, offset: 1 });
+    const nextTurn = f.query({ action: 'turns', threadId: id, limit: 1, offset: 1 });
     assert.deepEqual(nextTurn.summary, turns.summary);
     assert.equal(nextTurn.items[0].share, 1_300 / 4_600);
-    const ranked = f.query({ action: 'steps', snapshotId, threadId: id, turnId: turns.items[0].id, sort: 'tokens', limit: 1 });
+    const ranked = f.query({ action: 'steps', threadId: id, turnId: turns.items[0].id, sort: 'tokens', limit: 1 });
     assert.equal(ranked.items[0].usage.tokens.total, 2_200);
     assert.equal(ranked.items[0].share, 2_200 / 3_300);
-    const tail = f.query({ action: 'steps', snapshotId, threadId: id, turnId: turns.items[0].id, sort: 'tokens', offset: 2, limit: 1 });
+    const tail = f.query({ action: 'steps', threadId: id, turnId: turns.items[0].id, sort: 'tokens', offset: 2, limit: 1 });
     assert.equal(tail.items[0].kind, 'operation');
     assert.deepEqual(tail.summary, ranked.summary);
     await appendFile(f.activeFile, jsonl([measurement('2026-09-29T03:00:00Z', 'thread-a', 'turn-a2', 'response-a4', usage(100, 0, 10), { model: 'gpt-5.4', effort: 'high' })]));
     const refreshed = f.refresh();
     assert.notEqual(refreshed.snapshotRef.snapshotId, snapshotId);
     assert.equal(refreshed.summary.tokens.total, 5_210);
-    const oldNext = f.query({ action: 'threads', snapshotId, offset: 1, limit: 1 });
-    assert.deepEqual(oldNext.summary, threads.summary);
+    const oldNext = f.query({ action: 'threads', offset: 1, limit: 1 });
+    assert.deepEqual(oldNext.summary, refreshed.summary);
     assert.equal(oldNext.items[0].title, '归档实验');
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
@@ -241,18 +242,18 @@ test('对话搜索汇总对应命中集合，周/月边界只计所选日期', a
   const f = await fixture();
   try {
     const { snapshotRef } = f.refresh(); const snapshotId = snapshotRef.snapshotId;
-    const searched = f.query({ action: 'threads', snapshotId, search: '主工程' });
+    const searched = f.query({ action: 'threads', search: '主工程' });
     assert.equal(searched.page.total, 1);
     assert.equal(searched.summary.tokens.total, 4_600);
     assert.equal(searched.summary.price.cost, '0.0151225');
     for (const group of ['week', 'month']) {
-      const result = f.query({ action: 'usage', snapshotId, group, scope: { timezone: 'UTC', since: '2026-09-29', until: '2026-09-30' } });
+      const result = f.query({ action: 'usage', group, scope: { timezone: 'UTC', since: '2026-09-29', until: '2026-09-30' } });
       assert.equal(result.summary.tokens.total, 4_000);
       const row = result.items.find((r: any) => r.isSubtotal);
       assert.equal(row.date, '2026-09-29'); assert.equal(row.endDate, '2026-09-29');
       assert.equal(row.usage.tokens.total, 4_000);
     }
-    const shifted = f.query({ action: 'usage', snapshotId, scope: { timezone: 'Asia/Shanghai', since: '2026-09-29', until: '2026-09-30' } });
+    const shifted = f.query({ action: 'usage', scope: { timezone: 'Asia/Shanghai', since: '2026-09-29', until: '2026-09-30' } });
     assert.equal(shifted.summary.tokens.total, 5_100);
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
@@ -268,10 +269,10 @@ test('部分来源失败保留成功账本，全部失败保留旧快照', async
     assert.equal(partial.summary.price.knownCost, '0.0151225');
     const cliResult = f.invokeCli(['usage', '--since', '2026-09-28', '--until', '2026-09-30', '--json']);
     assert.equal(cliResult.status, 2); assert.equal(cliResult.value.quality.status, 'partial');
-    const latest = await readFile(path.join(f.data, 'usage-v4', 'latest.json'), 'utf8');
-    const failed = f.raw({ action: 'refresh', roots: [path.join(f.root, 'nonexistent-source')] });
-    assert.equal(failed.ok, false);
-    assert.equal(await readFile(path.join(f.data, 'usage-v4', 'latest.json'), 'utf8'), latest);
+    const retained=f.query({action:'usage',roots:[f.source],scope:allDates});
+    const failed=f.raw({scope:{allTime:true},action:'usage',roots:[path.join(f.root,'nonexistent-source')]},'fresh');
+    assert.equal(failed.ok,false);
+    assert.deepEqual(f.query({action:'usage',roots:[f.source],scope:allDates}).summary,retained.summary);
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
 
@@ -288,11 +289,11 @@ test('日期按真实时区跨夏令时和年份分组，不以固定24小时切
     }
     await writeFile(path.join(f.source, 'archived_sessions', 'old-path-calendar.jsonl'), jsonl(rows));
     const { snapshotRef } = f.refresh(); const snapshotId = snapshotRef.snapshotId;
-    const day = f.query({ action: 'usage', snapshotId, scope: { timezone: 'America/Los_Angeles', since: '2026-03-08', until: '2026-03-09' } });
+    const day = f.query({ action: 'usage', scope: { timezone: 'America/Los_Angeles', since: '2026-03-08', until: '2026-03-09' } });
     assert.equal(day.summary.tokens.total, 220);
     assert.equal(day.summary.price.cost, '0.00063');
     assert.equal(day.items.filter((r: any) => r.isSubtotal).length, 1);
-    const months = f.query({ action: 'usage', snapshotId, group: 'month', scope: { timezone: 'UTC', since: '2026-12-31', until: '2027-01-02' } });
+    const months = f.query({ action: 'usage', group: 'month', scope: { timezone: 'UTC', since: '2026-12-31', until: '2027-01-02' } });
     assert.equal(months.summary.tokens.total, 220);
     assert.deepEqual(months.items.filter((r: any) => r.isSubtotal).map((r: any) => [r.date, r.endDate, r.usage.tokens.total]), [
       ['2027-01-01', '2027-01-01', 110], ['2026-12-31', '2026-12-31', 110],
@@ -303,14 +304,14 @@ test('日期按真实时区跨夏令时和年份分组，不以固定24小时切
 test('无 TTY CLI 与 Rust 查询一致，JSON stdout 只有最终结果', async () => {
   const f = await fixture();
   try {
-    const refreshed = f.invokeCli({"method":"usage","params":{"query":{"action":"refresh","roots":[f.source]},"mode":"auto"}});
+    const refreshed = f.invokeCli({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
     assert.equal(refreshed.status, 0, refreshed.stderr);
     assert.equal(refreshed.stdout.trim().split('\n').length,1);
     const snapshotId = refreshed.value.snapshotRef.snapshotId;
-    const flags = ['usage', '--snapshot', snapshotId, '--since', '2026-09-28', '--until', '2026-09-30', '--timezone', 'UTC', '--json'];
+    const flags = ['usage','--cached', '--since', '2026-09-28', '--until', '2026-09-30', '--timezone', 'UTC', '--json'];
     const cliResult = f.invokeCli(flags);
     assert.equal(cliResult.status, 0, cliResult.stderr);
-    const native = f.query({ action: 'usage', snapshotId, scope: allDates, limit:20 });
+    const native = f.query({ action: 'usage', scope: allDates, limit:20, presentation:'distribution', compact:true });
     assert.deepEqual(cliResult.value, native);
     const bad = f.invokeCli(['turns', '--json']);
     assert.equal(bad.status, 1); assert.equal(bad.value.error.code, 'INVALID_ARGUMENT');
@@ -321,45 +322,31 @@ test('聚合超出安全整数范围时拒绝发布，保留上次可查询快�
   const f = await fixture();
   try {
     const prior = f.refresh();
-    const pointer = path.join(f.data, 'usage-v4', 'latest.json');
-    const before = await readFile(pointer, 'utf8');
+
     await appendFile(f.activeFile, jsonl([
       measurement('2026-09-29T04:00:00Z', 'thread-a', 'turn-a2', 'huge-a', usage(6_000_000_000_000_000, 0, 0)),
       measurement('2026-09-29T04:01:00Z', 'thread-a', 'turn-a2', 'huge-b', usage(6_000_000_000_000_000, 0, 0)),
     ]));
-    const failed = f.raw({ action: 'refresh', roots: [f.source] });
+    const failed = f.raw({scope:{allTime:true}, action: 'usage', roots: [f.source] }, 'fresh');
     assert.equal(failed.ok, false);
     assert.equal(failed.code, 'RESOURCE_LIMIT');
-    assert.equal(await readFile(pointer, 'utf8'), before);
     const current = f.query({ action: 'threads' });
     assert.equal(current.snapshotRef.snapshotId, prior.snapshotRef.snapshotId);
     assert.equal(current.summary.tokens.total, 5_100);
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
 
-test('快照不持久化正文，分片损坏和路径穿越被拒绝', async () => {
-  const f = await fixture();
-  try {
-    const refreshed = f.refresh(); const snapshotId = refreshed.snapshotRef.snapshotId;
-    const dir = path.join(f.data, 'usage-v4', 'generations', snapshotId, 'committed');
-    for (const name of await readdir(dir)) {
-      assert.ok(!(await readFile(path.join(dir, name), 'utf8')).includes(sentinel), `${name} stored private content`);
-    }
-    const manifestFile = path.join(dir, 'manifest.json');
-    const manifestText = await readFile(manifestFile, 'utf8');
-    const manifest = JSON.parse(manifestText);
-    const ledgerFile = path.join(dir, manifest.ledger.file);
-    const original = await readFile(ledgerFile, 'utf8');
-    await writeFile(ledgerFile, original + ' ');
-    const corrupt = f.raw({ action: 'usage', snapshotId, scope: allDates });
-    assert.equal(corrupt.ok, false); assert.equal(corrupt.code, 'SNAPSHOT_CORRUPT');
-    await writeFile(ledgerFile, original);
-    manifest.ledger.file = '../outside.json';
-    await writeFile(manifestFile, JSON.stringify(manifest));
-    assert.equal(f.raw({ action: 'usage', snapshotId, scope: allDates }).code, 'SNAPSHOT_CORRUPT');
-    await writeFile(manifestFile, manifestText);
-    assert.equal(f.raw({ action: 'usage', snapshotId: '../../outside' }).code, 'INVALID_ARGUMENT');
-  } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
+test('internal index excludes message text and rejects an unsupported database version', async()=>{
+ const f=await fixture();
+ try{
+  f.refresh();
+  const file=path.join(f.data,'live-v2/index.sqlite');
+  assert.ok(!(await readFile(file)).includes(Buffer.from(sentinel)));
+  const db=new DatabaseSync(file);db.exec('PRAGMA user_version=999');db.close();
+  const result=f.raw({action:'usage',scope:allDates});
+  assert.equal(result.ok,false);assert.equal(result.code,'INDEX_UNSUPPORTED_VERSION');
+  assert.equal(f.raw({action:'usage',snapshotId:'../outside',scope:allDates}).code,'INVALID_ARGUMENT');
+ }finally{await rm(f.root,{recursive:true,force:true});}
 });
 
 test('此对话全部用量保留无日期计量；未知日期分项能精确关联', async () => {
@@ -369,17 +356,17 @@ test('此对话全部用量保留无日期计量；未知日期分项能精确�
     const { timestamp: _discarded, ...row } = undated;
     await appendFile(f.activeFile, jsonl([row]));
     const refreshed = f.refresh(); const snapshotId = refreshed.snapshotRef.snapshotId;
-    const threads = f.query({ action: 'threads', snapshotId, search: '主工程' });
+    const threads = f.query({ action: 'threads', search: '主工程' });
     const thread = threads.items[0];
     assert.equal(thread.threadUsage.tokens.total, 4_930);
-    const full = f.query({ action: 'usage', snapshotId, scope: { threadId: thread.id } });
+    const full = f.query({ action: 'usage', scope: { threadId: thread.id } });
     assert.equal(full.summary.tokens.total, 4_930);
     const unknownDate = full.items.find((item: any) => item.isSubtotal && item.date === null);
     assert.equal(unknownDate.usage.tokens.total, 330);
-    const linked = f.query({ action: 'threads', snapshotId, scope: unknownDate.scope });
+    const linked = f.query({ action: 'threads', scope: unknownDate.scope });
     assert.equal(linked.items[0].matchedUsage.tokens.total, 330);
     assert.equal(linked.items[0].threadUsage.tokens.total, 4_930);
-    const dated = f.query({ action: 'usage', snapshotId, scope: { ...allDates, threadId: thread.id } });
+    const dated = f.query({ action: 'usage', scope: { ...allDates, threadId: thread.id } });
     assert.equal(dated.summary.tokens.total, 4_600);
     assert.equal(f.raw({ action: 'usage', scope: { ...allDates, undated: true } }).code, 'INVALID_ARGUMENT');
   } finally { await rm(f.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
@@ -400,7 +387,7 @@ test('CLI calendar scope is independent of grouping and explicit all-time retain
     await writeFile(path.join(f.source, 'sessions', 'report-ranges.jsonl'), jsonl(rows));
     const snapshot = f.refresh().snapshotRef.snapshotId;
     for (const [group, expected] of [['day', 110], ['week', 110], ['month', 110]] as const) {
-      const args = ['usage', '--snapshot', snapshot, '--group', group, '--model', model, '--timezone', 'UTC', '--json'];
+      const args = ['usage', '--group', group, '--model', model, '--timezone', 'UTC', '--json'];
       const result = f.invokeCli(args);
       assert.equal(result.status, 0);
       assert.equal(result.value.summary.tokens.total, expected);
@@ -426,7 +413,7 @@ test('Web dimensions conserve totals, all-input includes cache, IDs locate pages
       measurement('2026-09-29T03:00:02Z','thread-unknown-directory','unknown-turn','unknown-response',usage(2000,500,100)),
     ]));
     const snapshotId=f.refresh().snapshotRef.snapshotId;
-    const query=(args:object)=>f.query({snapshotId,scope:allDates,...args});
+    const query=(args:object)=>f.query({scope:allDates,...args});
     const grouped=query({action:'usage',presentation:'projects',sort:'tokens'});
     assert.equal(grouped.summary.tokens.total,7200);
     assert.equal(grouped.summary.tokens.input,5100);
@@ -454,9 +441,9 @@ test('Web dimensions conserve totals, all-input includes cache, IDs locate pages
     const turns=query({action:'turns',scope,threadId:located.items[0].id,sort:'time'});
     const events=query({action:'steps',scope,threadId:located.items[0].id,turnId:turns.items[0].id,sort:'time'});
     assert(events.items.filter((i:any)=>i.kind==='measurement').every((i:any)=>i.matchesScope===false));
-    const cli=f.invokeCli(['usage','--snapshot',snapshotId,'--since',allDates.since,'--until',allDates.until,'--by','project','--project-unknown','--agent','codex','--json']);
+    const cli=f.invokeCli(['usage','--since',allDates.since,'--until',allDates.until,'--by','project','--project-unknown','--agent','codex','--json']);
     assert.equal(cli.status,0,cli.stdout);assert.equal(cli.value.summary.tokens.total,2100);
-    assert.equal(f.raw({action:'usage',snapshotId,scope:{project:f.workspace,projectUnknown:true}}).ok,false);
+    assert.equal(f.raw({action:'usage',scope:{project:f.workspace,projectUnknown:true}}).ok,false);
   } finally { await rm(f.root,{recursive:true,force:true,maxRetries:20,retryDelay:100}); }
 });
 
@@ -470,10 +457,10 @@ test('matching-turn pagination finds late matches and context location preserves
   }
   await writeFile(path.join(f.source,'sessions','long.jsonl'),jsonl(rows));
   const snapshotId=f.refresh().snapshotRef.snapshotId;
-  const threads=f.query({action:'threads',snapshotId,scope:allDates});
+  const threads=f.query({action:'threads',scope:allDates});
   const thread=threads.items.find((i:any)=>i.upstreamId==='long-thread');
   assert(thread);
-  const request={action:'turns',snapshotId,threadId:thread.id,scope:{...allDates,model:'gpt-5.4'},sort:'time',limit:20};
+  const request={action:'turns',threadId:thread.id,scope:{...allDates,model:'gpt-5.4'},sort:'time',limit:20};
   const matching=f.query({...request,matchedOnly:true});
   assert.equal(matching.page.total,1);assert.equal(matching.items[0].ordinal,50);
   assert.equal(matching.items[0].matchedUsage.tokens.total,110);
@@ -482,10 +469,10 @@ test('matching-turn pagination finds late matches and context location preserves
   assert.equal(context.page.total,50);assert.equal(context.page.offset,40);
   assert(context.items.some((i:any)=>i.id===matching.items[0].id));
   assert.equal(context.summary.tokens.total,5500);
-  const cli=f.invokeCli(queryInvocation({"action":"turns","locateTurnId":matching.items[0].id,"matchedOnly":true,"threadId":thread.id,"limit":20,"snapshotId":snapshotId,"scope":{"model":"gpt-5.4"}}, {mode:"auto"}));
+  const cli=f.invokeCli(queryInvocation({"action":"turns","locateTurnId":matching.items[0].id,"matchedOnly":true,"threadId":thread.id,"limit":20,"scope":{"model":"gpt-5.4"}}, {mode:"auto"}));
   assert.equal(cli.status,0);assert.equal(cli.value.page.total,1);assert.equal(cli.value.items[0].id,matching.items[0].id);
   const none=f.query({...request,scope:{model:'does-not-exist'},matchedOnly:true});
   assert.equal(none.page.total,0);assert.equal(none.summary.tokens.total,5500);
-  for(const option of [{matchedOnly:true},{locateTurnId:'x'}])assert.equal(f.raw({action:'usage',snapshotId,...option}).ok,false);
+  for(const option of [{matchedOnly:true},{locateTurnId:'x'}])assert.equal(f.raw({action:'usage',...option}).ok,false);
  }finally{await rm(f.root,{recursive:true,force:true});}
 });

@@ -4,6 +4,8 @@
 
 Status: implemented
 
+The service and retained-view lifecycle described below is superseded by the [foreground-query decision](2026-11-02-foreground-queries.en.md). Its independent source, accounting and bounded-evidence rationale remains historical context.
+
 ## Problem
 
 Tasks and aggregates were unavailable until the first full scan and index transaction finished. Better waiting text alone cannot make some tasks available earlier; persisting provisional results as a completed index would misrepresent unknown coverage as fully read.

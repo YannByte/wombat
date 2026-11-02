@@ -8,8 +8,8 @@ const examples={
   root:[['history','wombat history search "release"'],['usage','wombat usage week'],['check','wombat check'],['clean','wombat clean'],['system','wombat system doctor']],
   history:[['history','wombat history search "release"'],['read','wombat history read RECORD --find "validation"'],['details','wombat history show RECORD']],
   usage:[['usage','wombat usage week'],['top','wombat usage top week'],['compare','wombat usage compare'],['stats','wombat usage stats']],
-  check:[['check','wombat check --project PATH'],['skills','wombat check skills --project PATH'],['task','wombat check --task RECORD --turn TURN'],['verify','wombat check verify --read-view VIEW --baseline BASELINE --project PATH']],
-  clean:[['clean','wombat clean --project PATH'],['codex','wombat clean --codex'],['apply','wombat clean --codex --apply'],['verify','wombat clean verify --read-view VIEW --baseline BASELINE']],
+  check:[['check','wombat check --project PATH'],['skills','wombat check skills --project PATH'],['task','wombat check --task RECORD --turn TURN'],['verify','wombat check verify --baseline check.json --suggestion ID']],
+  clean:[['clean','wombat clean --project PATH'],['codex','wombat clean --codex'],['apply','wombat clean --codex --apply'],['verify','wombat clean verify --plan cleanup.json']],
   system:[['system','wombat system doctor'],['update','wombat system update --check'],['api','wombat system api METHOD --json']],
   alerts:[['alerts','wombat usage alerts --once'],['watch','wombat usage alerts --id PLAN_ID']],
 } as const;

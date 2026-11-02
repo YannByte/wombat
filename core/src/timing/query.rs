@@ -202,7 +202,7 @@ fn query_impl(
     };
     if snapshot_id.is_some_and(|id| id != snapshot.manifest.snapshot_ref.snapshot_id) {
         return Err(operation_error(
-            "VIEW_EXPIRED",
+            "EVIDENCE_UNAVAILABLE",
             "Timing read identity is unavailable",
         ));
     }
@@ -1248,9 +1248,10 @@ pub fn error_output(error: &anyhow::Error) -> TimingErrorOutput {
         .unwrap_or("SOURCE_UNREADABLE");
     let (code, message) = match code {
         "INVALID_ARGUMENT" => ("INVALID_ARGUMENT", "Invalid timing request"),
-        "VIEW_EXPIRED" | "SNAPSHOT_EXPIRED" | "NO_SNAPSHOT" | "NOT_FOUND" => {
-            ("VIEW_EXPIRED", "Timing read identity is unavailable")
-        }
+        "EVIDENCE_UNAVAILABLE" | "DATA_REVISION_MISMATCH" | "NO_SNAPSHOT" | "NOT_FOUND" => (
+            "EVIDENCE_UNAVAILABLE",
+            "Timing read identity is unavailable",
+        ),
         "SNAPSHOT_CORRUPT" => ("SNAPSHOT_CORRUPT", "Timing snapshot cannot be read"),
         "RESOURCE_LIMIT" => ("RESOURCE_LIMIT", "Timing query exceeds resource budget"),
         "CANCELLED" => ("CANCELLED", "Timing query cancelled"),
@@ -1274,7 +1275,7 @@ fn safe_error(error: anyhow::Error) -> anyhow::Error {
     let output = error_output(&error);
     let code = match output.error.code.as_str() {
         "INVALID_ARGUMENT" => "INVALID_ARGUMENT",
-        "VIEW_EXPIRED" => "VIEW_EXPIRED",
+        "EVIDENCE_UNAVAILABLE" => "EVIDENCE_UNAVAILABLE",
         "SNAPSHOT_CORRUPT" => "SNAPSHOT_CORRUPT",
         "RESOURCE_LIMIT" => "RESOURCE_LIMIT",
         "CANCELLED" => "CANCELLED",

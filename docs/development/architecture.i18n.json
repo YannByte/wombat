@@ -10,28 +10,28 @@
       "en": "28a598b035fcef6728d9b87dab8fe37d1d5bb1264f7b5ece72420c53628ed6fa"
     },
     "/wombat-architecture/modules": {
-      "zh": "970212556e9594258118a53b6adc575db60cb4f511cac999b0e1f9358fda3515",
-      "en": "65d41e0f115d79deae1bb8fd3516375fe5e61aea4b186cf191b44ed64a60a581"
+      "zh": "db1fd63288c64e8862fdca0fa9eab5a25f91f368ee623fa8b3c55f416207955a",
+      "en": "9ee8ffcc86b40eafae2ab1038d0c6c07ef88335627a0b1a64510da8efbe697bf"
     },
-    "/wombat-architecture/host-and-service-responsibilities": {
-      "zh": "e4174ee8369cbbab5999b77b352c51ebdc1e8d0d32fee79a71110cfad605a5b9",
-      "en": "ec56ab6ce300d6cc44153dc016b880554157a59a4c1943663302b8fd3dee4a40"
+    "/wombat-architecture/foreground-host-responsibilities": {
+      "zh": "5477256cc3dbfcadb92fe641eeb2ca7d0d6fae4a6302140da2b2a419dea5eab7",
+      "en": "bfb304ca3d66f068d7489d5a3a18bfdd8f810ac1be1f469e7dbfc5c2e9b1a2f2"
     },
     "/wombat-architecture/domain-and-persistence": {
       "zh": "239ef154c5b483c2b69f8848c880e10aaf2a7add23507822000f14f6b2a901da",
       "en": "e54122a1691b681cbf4c55d66bd74d14a8c662474ae0181bc55f480f47ceef26"
     },
     "/wombat-architecture/domain-and-persistence/domain-map": {
-      "zh": "1b60df773f7c0572076a42ee8de6fd9a4a5311bf8885bb12321dcfa4c41936f7",
-      "en": "07b0421a4484965b72bfbc0000c1d990d431861837f46646927cb794b524bb35"
+      "zh": "9b31ae90c35acebc5af1e4e5522dee13545f9205131fa1dca3aaccdfbfc92e08",
+      "en": "7d01e2b687fcc753d8b3c96a7576ba554b02bb15f4c11bf4ae78f05d8b44fb41"
     },
     "/wombat-architecture/domain-and-persistence/usage-facts-and-derived-results": {
       "zh": "648bef661c234306b107ff5c52cace6aad6913cc2b55d24819a3c9040b7295fa",
       "en": "c0c2b977f4c64c4e1e5382733fe0c97fc54d5d10d075f3ba2059c8c0bae0bf5b"
     },
     "/wombat-architecture/domain-and-persistence/configuration-checks-and-rechecks": {
-      "zh": "a8049bce5b8a48b70878bb875802c9fa3891b5ffde9aed565112003cd738b062",
-      "en": "b03d59fad193183534b352686a29718b7a1f2923632c81dbb930146c763abc27"
+      "zh": "77b2e3fb68d691b0909228b068db0c7ef3696b706235d550b6324f4411886d36",
+      "en": "7a128c326fa76d001976d39befdebb4e98d9aaa2546dad24552cc0ee832562f8"
     },
     "/wombat-architecture/domain-and-persistence/persistence-boundaries-and-current-model-limits": {
       "zh": "8041e13f856fc2f29033e811148f0b7ecfd63dd8293d76c44c4bb8bfeb955ec6",

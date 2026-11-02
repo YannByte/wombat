@@ -9,7 +9,7 @@ function result(): LiveResult {
   return { outputVersion: 1, freshness: { status: 'current', revision: 'one' }, result: {
     outputVersion: 5, action: 'usage', snapshotRef: { snapshotId: 'one', createdAt: '2026-09-30T00:00:00Z' }, scope: {}, availableRange: {},
     summary: withTokenAnalysis({ tokens: { total: 110 }, measurementCount: 1, price: { currency: 'USD', policy: 'synthetic', priceRevision: 'old', cost: null, knownCost: '0', status: 'unknown', components: [], basis: [], issues: ['catalogPriceMissing'] } }),
-    items: [], page: { offset: 0, limit: 50, total: 0 }, quality: { status: 'complete', issues: [], sources: [] },
+    items: [], page: { offset: 0, limit: 50, total: 0 }, quality: { issueScope: 'index', queryImpact: 'none', status: 'complete', issues: [], sources: [] },
   } };
 }
 const prices: PricingResult = { outputVersion: 1, action: 'auto_update', origin: 'bundled', updated: false, source: 'synthetic', catalogHash: 'same', catalog: { revision: 'old', verifiedAt: 'synthetic', policy: 'synthetic', currency: 'USD', models: [] }, automatic: { status: 'unchanged', attemptId: 'a', attemptedAt: new Date().toISOString(), retryAt: new Date(Date.now() + 86400_000).toISOString() } };
@@ -23,7 +23,7 @@ test('automatic prices honor offline/fixed views, reuse cooldown, preserve scope
     const base: UsageClient = { query: async () => result().result, live: async request => { queries.push(request); return result(); }, prices: async () => { calls++; return structuredClone(prices); } };
     const client = withAutomaticPrices(base);
     await client.live!({ query: { action: 'usage' }, mode: 'cached' });
-    await client.live!({ query: { action: 'usage', snapshotId: 'fixed' } });
+    await client.live!({ query: { action: 'usage' }, mode:'cached' });
     // Default comparisons keep their committed view even if official prices are missing.
     const comparison = {action:'compare' as const,comparison:{kind:'sessions' as const,leftThreadId:'a',rightThreadId:'b'}};
     await client.live!({query:comparison});

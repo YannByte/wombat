@@ -15,13 +15,13 @@ test('built CLI and native share period drivers, family totals and durable refre
  for(const [id,parent,n] of [['parent',null,100],['child','parent',30],['other',null,70]] as const)await writeFile(path.join(root,'sessions',`${id}.jsonl`),jsonl([{type:'session_meta',payload:{id,cwd:`/synthetic/${id}`,forked_from_id:parent}},{type:'turn_context',payload:{turn_id:'u',model:'gpt-5.4',effort:'high'}},{type:'response_item',timestamp:'2026-09-09T00:00:00Z',payload:{type:'message',role:'developer',content:[{type:'input_text',text:'Synthetic injected instruction'}]}},usage(id,`before-${id}`,n,'2026-09-02'),...(id==='parent'?[{type:'event_msg',timestamp:'2026-09-09T00:00:00Z',payload:{type:'compacted'}}]:[]),usage(id,`after-${id}`,id==='parent'?140:n,'2026-09-09')]));
  const env:NodeJS.ProcessEnv={...process.env,CODEX_HOME:root,WOMBAT_DATA_HOME:data,WOMBAT_AUTO_PRICES:'0',WOMBAT_CODEX_BIN:path.join(dir,'absent-codex')};delete env.WOMBAT_CORE_BIN;
  const binary=path.resolve('dist',process.platform==='win32'?'wombat-core.exe':'wombat-core'),cli=path.resolve('dist/wombat.js');
- let service:ReturnType<typeof spawn>|undefined;
+
  const stop=async(child:ReturnType<typeof spawn>|undefined)=>{if(!child||child.exitCode!==null||child.signalCode!==null)return;const exit=once(child,'close');child.kill('SIGTERM');const timer=setTimeout(()=>child.kill('SIGKILL'),2000);try{await exit;}finally{clearTimeout(timer);}};
  const run=(args: CliInput,input?:string,timeout=15_000)=>{const p=spawnProductCli(cli, Array.isArray(args) ? [...args, '--json'] : args, {env,input,encoding:'utf8',timeout,maxBuffer:8*1024*1024});assert.ifError(p.error);assert.ok([0,2].includes(p.status!),p.stdout+p.stderr);return JSON.parse(p.stdout);};
  try{
-  service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
+  await delay(100);
   // Establish a completed fixture publication; these assertions are not latency checks.
-  const first=run(['usage','--wait-ms','20000','--all-time'],undefined,25_000);
+  const first=run(['usage','--all-time'],undefined,25_000);
   assert.notEqual(first.freshness?.initialScan,true);
   const args=["usage", "compare",'--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--by','project','--limit','1'];
   const compared=run(args);assert.equal(compared.snapshotRef.snapshotId,first.snapshotRef.snapshotId);assert.equal(compared.comparison.delta.tokens,40);assert.equal(compared.page.total,3);assert.equal(compared.comparison.drivers[0].delta.tokens+compared.comparison.remaining.tokens,40);
@@ -34,29 +34,29 @@ test('built CLI and native share period drivers, family totals and durable refre
   const emptyHistory=run({"method":"account","params":{"action":"history"}});assert.equal(emptyHistory.history.totalObservations,0,'history must work without a native Codex executable');
   await appendFile(path.join(root,'sessions','parent.jsonl'),jsonl([usage('parent','new',10,'2026-09-10')]));
   assert.equal(run(args).snapshotRef.snapshotId,first.snapshotRef.snapshotId,'compare must not refresh');
-  const refreshed=run(['usage','--wait-ms','20000','--all-time'],undefined,25_000);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
-  const fixed=run([...args,'--snapshot',first.snapshotRef.snapshotId]);assert.equal(fixed.comparison.delta.tokens,40);
-  await stop(service);service=spawn(binary,['--serve-usage'],{env,stdio:'ignore'});await once(service,'spawn');await delay(100);
+  const refreshed=run(['usage','--all-time'],undefined,25_000);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
+  const fixed=run([...args,]);assert.equal(fixed.comparison.delta.tokens,50);
+  await delay(100);
   let restored=run(['usage','--cached','--all-time']);const restoredBy=Date.now()+5000;
   while(restored.snapshotRef.snapshotId!==refreshed.snapshotRef.snapshotId&&Date.now()<restoredBy){await delay(30);restored=run(['usage','--cached','--all-time']);}
   assert.equal(restored.snapshotRef.snapshotId,refreshed.snapshotRef.snapshotId);assert.deepEqual(restored.freshness.publicationChange,refreshed.freshness.publicationChange);
   const call=(query:import('@wombat/client').UsageRequest)=>run(['system','call'],JSON.stringify({method:'usage',params:{query:{roots:[root],...query},mode:'cached'}}));
   await call({action:'usage',scope:{allTime:true}});
-  const value=(await call({action:'compare',snapshotId:restored.snapshotRef.snapshotId,scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'},comparison:{kind:'periods',baselineSince:'2026-09-01',baselineUntil:'2026-09-08',dimension:'project'},limit:1})).result;
+  const value=(await call({action:'compare',scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'},comparison:{kind:'periods',baselineSince:'2026-09-01',baselineUntil:'2026-09-08',dimension:'project'},limit:1})).result;
   assert.equal(value.comparison.delta.tokens,50);assert.deepEqual(value.freshness.publicationChange,restored.freshness.publicationChange);
-  for(const action of ['investigate','resources','review','context'] as const){const q={action,snapshotId:restored.snapshotRef.snapshotId,scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'}};const response=(await call(q)).result;assert.equal(response.inspection.kind,action);assert.equal(response.summary.tokens.total,250);if(action==='review')assert.equal(response.inspection.review.comparison.delta.tokens,50);}
-  const trajectoryValue=(await call({action:'trajectory',snapshotId:restored.snapshotRef.snapshotId,threadId:id('parent'),scope:{allTime:true}})).result;assert.deepEqual(trajectoryValue.inspection.trajectory.map((p:{input:number})=>p.input),[100,140,10]);assert.equal(trajectoryValue.inspection.trajectory[2].uncachedDelta,-130);
-  const parentTurns=run(queryInvocation({"action":"turns","threadId":id('parent'),"snapshotId":restored.snapshotRef.snapshotId,"scope":{"allTime":true}}, {mode:"auto"}));
+  for(const action of ['investigate','resources','review','context'] as const){const q={action,scope:{since:'2026-09-08',until:'2026-09-15',timezone:'UTC'}};const response=(await call(q)).result;assert.equal(response.inspection.kind,action);assert.equal(response.summary.tokens.total,250);if(action==='review')assert.equal(response.inspection.review.comparison.delta.tokens,50);}
+  const trajectoryValue=(await call({action:'trajectory',threadId:id('parent'),scope:{allTime:true}})).result;assert.deepEqual(trajectoryValue.inspection.trajectory.map((p:{input:number})=>p.input),[100,140,10]);assert.equal(trajectoryValue.inspection.trajectory[2].uncachedDelta,-130);
+  const parentTurns=run(queryInvocation({"action":"turns","threadId":id('parent'),"scope":{"allTime":true}}, {mode:"auto"}));
   const turn=parentTurns.items[0].id;
-  const exactCli=run(queryInvocation({action:'investigate',scope:{threadId:id('parent'),turnId:turn,allTime:true},snapshotId:restored.snapshotRef.snapshotId,compact:true},{mode:'cached'}));
-  const exactNative=(await call({action:'investigate',snapshotId:restored.snapshotRef.snapshotId,scope:{threadId:id('parent'),turnId:turn,allTime:true},compact:true})).result;
+  const exactCli=run(queryInvocation({action:'investigate',scope:{threadId:id('parent'),turnId:turn,allTime:true},compact:true},{mode:'cached'}));
+  const exactNative=(await call({action:'investigate',scope:{threadId:id('parent'),turnId:turn,allTime:true},compact:true})).result;
   assert.deepEqual(exactNative,exactCli);assert.equal(exactNative.summary.tokens.total,250);
   assert.equal(exactNative.scope.turnId,turn);assert.ok(exactNative.inspection.limitations.includes('selected_turn_only'));
-  const fullUsage=(await call({action:'usage',snapshotId:restored.snapshotRef.snapshotId,scope:{allTime:true},limit:1})).result;
-  const compactUsage=(await call({action:'usage',snapshotId:restored.snapshotRef.snapshotId,scope:{allTime:true},limit:1,compact:true})).result;
+  const fullUsage=(await call({action:'usage',scope:{allTime:true},limit:1})).result;
+  const compactUsage=(await call({action:'usage',scope:{allTime:true},limit:1,compact:true})).result;
   assert.deepEqual(compactUsage.summary,fullUsage.summary);assert.deepEqual(compactUsage.items,fullUsage.items);assert.deepEqual(compactUsage.page,fullUsage.page);
   assert.equal(compactUsage.facets,undefined);assert.ok(compactUsage.quality.detailSummary);
 
   const bad=spawnProductCli(cli, ['compare', '--since', '2026-09-08', '--until', '2026-09-15', '--baseline-since', '2026-09-04', '--baseline-until', '2026-09-11', '--json'], {env,encoding:'utf8',timeout:10_000});assert.equal(bad.status,1);assert.equal(JSON.parse(bad.stdout).error.code,'INVALID_ARGUMENT');
- }finally{await stop(service);await rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+ }finally{await rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });

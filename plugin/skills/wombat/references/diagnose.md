@@ -13,7 +13,7 @@ For open diagnosis, proactively trace important execution, validation or recover
 
 `check --task` inspects a complete selected turn and rejects date filters. For date-bounded evidence, retain dates in generated `conversation` selection instead.
 
-Treat failures, repeated reads/requests, input growth and waits as leads. Exclude expected negative tests, required validation and reasonable retries. Keep current configuration separate from historical loading. Component views can differ; no single complete project snapshot or whole-code audit is implied.
+Treat failures, repeated reads/requests, input growth and waits as leads. Exclude expected negative tests, required validation and reasonable retries. Keep current configuration separate from historical loading. Report sections retain their own gaps; shared indexed facts do not establish a whole-code audit or completed delivery.
 
 Combine signals from one mechanism in one explanation with their source positions retained. Prioritize consequence, evidence and feasible action without a score or finding quota. For each worthwhile action, state trigger/consequence, confidence, exact file/operation, smallest correction, behavior to preserve and original case to repeat. Prefer an existing validator, gate or recovery mechanism before adding another policy, Skill or service.
 

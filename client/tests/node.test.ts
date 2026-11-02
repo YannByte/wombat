@@ -21,7 +21,7 @@ test('node client sends only the fixed product protocol and preserves structured
     await assert.rejects(createNodeClient({ binaryPath }).query({ action: 'usage' }), (error: unknown) => {
       assert.ok(error instanceof CoreError);
       assert.equal(error.code, 'NO_SNAPSHOT');
-      assert.deepEqual(error.details, { op: 'usage_app', args: { action: 'usage' } });
+      assert.deepEqual(error.details, { op: 'local_query', args: { query: {action:'usage'}, mode:'auto' } });
       return true;
     });
   });

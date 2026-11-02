@@ -28,7 +28,6 @@ export interface Response {
   outputVersion: number;
   action: Action;
   capabilities: Capabilities;
-  readView?: string | null;
   usageRevision?: string | null;
   configRevision: string;
   checkedAt: string;

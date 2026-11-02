@@ -64,10 +64,10 @@ try {
   assert.equal(setup.runtimeChecks[0].status, 'compatible');
   pass('fresh-install-plugin', {release, invocation:'wombat:wombat', noSystemNodeOrRust:true});
   const query = async (name:string,args:CliInput)=>{if(Array.isArray(args))return JSON.parse(await run(name,[launcher,...args,'--json']));const r=spawnProductCli(path.join(destination,'lib/wombat.js'),args,{cwd,env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024},[],path.join(destination,'runtime/node'));writeFileSync(path.join(output,name+'.log'),r.stdout+r.stderr);assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);return JSON.parse(r.stdout);};
-  const empty = await query('empty', ['usage','--all-time','--fresh','--wait-ms','60000']);
+  const empty = await query('empty', ['usage','--all-time','--fresh']);
   assert.equal(empty.summary.measurementCount,0);
   writeFileSync(fixtureFile,sourceBody);
-  const first = await query('first',['usage','--all-time','--fresh','--wait-ms','60000']);
+  const first = await query('first',['usage','--all-time','--fresh']);
   assert.equal(first.summary.tokens.total,110);
   for (const language of ['zh','en']) {
     const tasks = await query('tasks-'+language, {method:'usage',params:{query:{action:'threads',scope:{allTime:true}},mode:'cached'}});
@@ -75,11 +75,11 @@ try {
     assert.ok(tasks.items.some((v: {kind:string})=>v.kind==='thread'));
   }
   appendFileSync(fixtureFile,record('two',220));
-  const updated = await query('updated',['usage','--all-time','--fresh','--wait-ms','60000']);
+  const updated = await query('updated',['usage','--all-time','--fresh']);
   assert.equal(updated.summary.tokens.total,330);
-  const fixed = await query('fixed',['usage','--snapshot',first.snapshotRef.snapshotId,'--all-time']);
-  assert.equal(fixed.summary.tokens.total,110);
-  pass('append-and-fixed-view',{previous:110,current:330});
+  const fixed = await query('fixed',['usage','--cached','--all-time']);
+  assert.equal(fixed.summary.tokens.total,330);
+  pass('append-and-cached-read',{previous:110,current:330});
   await run('plugin-only',['/bin/sh',installer,'--prefix',prefix,'--plugin-only']);
   assert.equal(readFileSync(path.join(prefix,'lib/wombat/current.txt'),'utf8').trim(),id);
   pass('plugin-only-retains-runtime');

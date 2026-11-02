@@ -9,7 +9,7 @@ import {
   cleanupOnboardingCores,
 } from './onboarding-cleanup.ts';
 
-test('failed startup can resolve the installed core without a successful Web URL', async () => {
+test('failed startup can resolve the installed core from its exact installation identity', async () => {
   const prefix = mkdtempSync(path.join(os.tmpdir(), 'wombat-cleanup-'));
   try {
     const root = path.join(prefix, 'lib/wombat'),
@@ -19,10 +19,10 @@ test('failed startup can resolve the installed core without a successful Web URL
     writeFileSync(core, 'synthetic');
     writeFileSync(path.join(root, 'current.txt'), id + '\n');
     assert.equal(installedOnboardingCore(prefix), core);
-    assertOnboardingCoreOwner(core + ' --serve-usage', core);
+    assertOnboardingCoreOwner(core, core);
     if(process.platform!=='win32') {
       const alias=path.join(prefix,'alias');symlinkSync(root,alias,'dir');
-      assertOnboardingCoreOwner(core+' --serve-usage',path.join(alias,'versions',id,'lib/wombat-core'));
+      assertOnboardingCoreOwner(core,path.join(alias,'versions',id,'lib/wombat-core'));
     }
     for (const command of ['/other/wombat-core --serve-usage', core + ' --other', ' --serve-usage'])
       assert.throws(() => assertOnboardingCoreOwner(command, core));

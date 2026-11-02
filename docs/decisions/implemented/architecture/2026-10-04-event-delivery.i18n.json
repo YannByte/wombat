@@ -2,8 +2,8 @@
   "version": 2,
   "sections": {
     "/decision-note-event-query-interfaces-and-shared-pages": {
-      "zh": "3e1864a0e8b8258872c37d49a6ab6751be7394bd324520601f0f848881b44f72",
-      "en": "9c28a61cb48a2f06b2b5d343d17217950cf5183cf4df371be998777e03ccb25d"
+      "zh": "f2155547791d7c2c306b052fea005dcee909f194fef244bdcbaed41eaf65742e",
+      "en": "7bb4eed9b65d236218a446fffd84770334cf2869dcecaca912f7738e71f0f1e4"
     },
     "/decision-note-event-query-interfaces-and-shared-pages/problem": {
       "zh": "302e5c0cad12c605d398eeb8db3ab82fc305dde46c940da30495f341bef210b6",
@@ -26,8 +26,8 @@
       "en": "d95de998a0eb42c6ce58d8ffecc89d0e930eb724b1f95e088f4b05b274311726"
     },
     "/decision-note-event-query-interfaces-and-shared-pages/decision/15-restricted-interfaces-and-host-integration": {
-      "zh": "cbf6c77463396d9e4bce054189484004ac8032a474408dcec1223525920e77f6",
-      "en": "0de7ca4c23b9636784249de81432fb240d684234c0dfa631a359b053d344fbee"
+      "zh": "0c36c7ec7b3512ffcee087f73e7858bc9e600ae157b2212b7b6fcb4818020a0a",
+      "en": "7a36eda4a305f5ccee28c5bf1b0e9ec3a5374b455e77ca3343ac255bd4e6de1b"
     },
     "/decision-note-event-query-interfaces-and-shared-pages/decision/16-web-presentation-and-resource-boundaries": {
       "zh": "34d086f81048102bcf2656975589d29c12e739ea76963a6378c9d94f78562271",

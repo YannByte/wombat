@@ -316,9 +316,9 @@
       "record": "docs/decisions/implemented/architecture/2026-10-11-packed-live-index.i18n.json"
     },
     {
-      "zh": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.md",
-      "en": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.en.md",
-      "record": "docs/decisions/proposed/architecture/2026-10-15-resident-indexing.i18n.json"
+      "zh": "docs/decisions/rejected/architecture/2026-10-15-resident-indexing.md",
+      "en": "docs/decisions/rejected/architecture/2026-10-15-resident-indexing.en.md",
+      "record": "docs/decisions/rejected/architecture/2026-10-15-resident-indexing.i18n.json"
     },
     {
       "zh": "docs/decisions/implemented/architecture/2026-10-31-demand-indexing.md",
@@ -344,6 +344,11 @@
       "zh": "docs/development/ci.md",
       "en": "docs/development/ci.en.md",
       "record": "docs/development/ci.i18n.json"
+    },
+    {
+      "zh": "docs/decisions/implemented/architecture/2026-11-02-foreground-queries.md",
+      "en": "docs/decisions/implemented/architecture/2026-11-02-foreground-queries.en.md",
+      "record": "docs/decisions/implemented/architecture/2026-11-02-foreground-queries.i18n.json"
     }
   ],
   "legacyUnpaired": [],

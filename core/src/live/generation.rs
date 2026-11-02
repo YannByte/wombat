@@ -44,14 +44,85 @@ pub(super) fn index_path(root: &Path) -> Result<PathBuf> {
     }
     Ok(directory.join("index.sqlite"))
 }
+const PENDING: &str = ".wombat-pending-index-v1";
+const COMPLETE: &str = ".wombat-complete-index-v1";
+const OWNERSHIP: &[u8] = b"wombat-owned-pending-index-v1\n";
+
+/// Called only while the foreground writer lock is held. Unknown directories and
+/// complete generations remain untouched; no source or user-record path is visited.
+pub(super) fn cleanup_pending(root: &Path, request_id: Option<&str>) -> Result<usize> {
+    let paths = pending_paths(root, request_id)?;
+    for path in &paths {
+        fs::remove_dir_all(path)?;
+    }
+    Ok(paths.len())
+}
+pub(super) fn has_pending(root: &Path, request_id: &str) -> Result<bool> {
+    Ok(!pending_paths(root, Some(request_id))?.is_empty())
+}
+fn pending_paths(root: &Path, request_id: Option<&str>) -> Result<Vec<PathBuf>> {
+    if let Some(id) = request_id {
+        validate_request_id(id)?;
+    }
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(rest) = name.strip_prefix("index-generation-") else {
+            continue;
+        };
+        let Some(id) = rest.get(..36) else { continue };
+        if validate_request_id(id).is_err()
+            || !rest[36..].starts_with('-')
+            || request_id.is_some_and(|expected| expected != id)
+        {
+            continue;
+        }
+        let path = entry.path();
+        let meta = fs::symlink_metadata(&path)?;
+        if !meta.is_dir() || meta.file_type().is_symlink() || path.join(COMPLETE).try_exists()? {
+            continue;
+        }
+        let marker = path.join(PENDING);
+        let Ok(meta) = fs::symlink_metadata(&marker) else {
+            continue;
+        };
+        if !meta.is_file()
+            || meta.file_type().is_symlink()
+            || meta.len() != OWNERSHIP.len() as u64
+            || fs::read(marker)? != OWNERSHIP
+        {
+            continue;
+        }
+        paths.push(path);
+    }
+    Ok(paths)
+}
+fn validate_request_id(id: &str) -> Result<()> {
+    if uuid::Uuid::parse_str(id)
+        .ok()
+        .is_none_or(|value| value.to_string() != id)
+    {
+        return Err(operation_error(
+            "INVALID_ARGUMENT",
+            "Invalid foreground request identity",
+        ));
+    }
+    Ok(())
+}
 pub(super) fn rebuild(
     root: &Path,
     key: &str,
     roots: &[String],
 ) -> Result<(rusqlite::Connection, Arc<Snapshot>)> {
+    let request_id =
+        std::env::var("WOMBAT_REQUEST_ID").unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+    validate_request_id(&request_id)?;
     let stage = tempfile::Builder::new()
-        .prefix("index-generation-")
+        .prefix(&format!("index-generation-{request_id}-"))
         .tempdir_in(root)?;
+    fs::write(stage.path().join(PENDING), OWNERSHIP)?;
     let path = stage.path().join("index.sqlite");
     let mut db = crate::live_index::open(&path)?;
     let view = sync(&mut db, key, roots, false, None, &mut BTreeMap::new())?.ok_or_else(|| {
@@ -69,6 +140,9 @@ pub(super) fn rebuild(
         .and_then(|n| n.to_str())
         .ok_or_else(|| operation_error("INDEX_UNAVAILABLE", "Invalid generation directory"))?
         .to_owned();
+    // A complete generation is recovery material even if the caller stops just
+    // before pointer publication. Pending cleanup must never remove it.
+    fs::write(stage.path().join(COMPLETE), b"complete\n")?;
     crate::storage::atomic_write(
         &root.join("active-index.json"),
         &serde_json::to_vec(&Pointer {
@@ -141,5 +215,34 @@ mod tests {
             fs::write(storage.path().join("active-index.json"), value.to_string()).unwrap();
             assert!(index_path(storage.path()).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::*;
+    #[test]
+    fn cleanup_only_removes_owned_unpublished_stages_and_rejects_foreign_ids() {
+        let root = tempfile::tempdir().unwrap();
+        let one = uuid::Uuid::new_v4().to_string();
+        let two = uuid::Uuid::new_v4().to_string();
+        let stage = root.path().join(format!("index-generation-{one}-pending"));
+        fs::create_dir(&stage).unwrap();
+        fs::write(stage.join(PENDING), OWNERSHIP).unwrap();
+        fs::write(stage.join("index.sqlite"), "partial").unwrap();
+        let complete = root.path().join(format!("index-generation-{one}-complete"));
+        fs::create_dir(&complete).unwrap();
+        fs::write(complete.join(PENDING), OWNERSHIP).unwrap();
+        fs::write(complete.join(COMPLETE), "complete").unwrap();
+        let unknown = root.path().join(format!("index-generation-{one}-foreign"));
+        fs::create_dir(&unknown).unwrap();
+        fs::write(unknown.join(PENDING), "unknown format").unwrap();
+        assert_eq!(cleanup_pending(root.path(), Some(&two)).unwrap(), 0);
+        assert!(stage.exists());
+        assert!(cleanup_pending(root.path(), Some("../../sources")).is_err());
+        assert_eq!(cleanup_pending(root.path(), Some(&one)).unwrap(), 1);
+        assert!(!stage.exists());
+        assert!(complete.exists());
+        assert!(unknown.exists());
     }
 }

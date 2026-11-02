@@ -13,7 +13,7 @@ export type Request =
       action: "remove";
     }
   | {
-      snapshotId: string;
+      roots?: string[];
       ids: string[];
       action: "check";
     }

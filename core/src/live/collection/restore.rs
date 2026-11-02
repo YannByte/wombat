@@ -141,72 +141,12 @@ mod tests {
                 "running"
             );
         }
-        let mut compact = super::restore(&db, &key, &roots).unwrap().unwrap();
+        let compact = super::restore(&db, &key, &roots).unwrap().unwrap();
         let query: crate::usage_app_dto::Request = serde_json::from_value(
             json!({"action":"usage","scope":{"allTime":true},"compact":true}),
         )
         .unwrap();
-        let cached = crate::usage_app::execute_snapshot(query.clone(), &compact).unwrap();
-        assert!(Arc::get_mut(&mut compact).unwrap().freeze_cached_answers());
-        assert_eq!(
-            serde_json::to_value(
-                crate::usage_app::execute_snapshot(query.clone(), &compact).unwrap()
-            )
-            .unwrap(),
-            serde_json::to_value(cached).unwrap()
-        );
-        let mut uncached = query;
-        uncached.scope.model = Some("synthetic-uncached-model".into());
-        assert_eq!(
-            crate::live_index::failure_code(
-                &crate::usage_app::execute_snapshot(uncached, &compact)
-                    .err()
-                    .unwrap()
-            ),
-            "VIEW_EXPIRED"
-        );
-        assert_eq!(
-            crate::live_index::failure_code(&compact.ledger().err().unwrap()),
-            "VIEW_EXPIRED"
-        );
-        // A resident reader must not pin an ever-growing WAL indefinitely.
-        // Pressure expires only releasable old leases and reopens the unchanged latest one.
-        drop(compact);
-        let old = super::restore(&db, &key, &roots).unwrap().unwrap();
-        let latest = super::restore(&db, &key, &roots).unwrap().unwrap();
-        let mut entry = crate::live::Entry::new(roots.clone());
-        entry.views.push_back((
-            Instant::now(),
-            Arc::new(
-                crate::usage_store::memory(
-                    Default::default(),
-                    "live:preview:no-lease".into(),
-                    crate::pricing_sync::current().unwrap(),
-                    None,
-                )
-                .unwrap(),
-            ),
-        ));
-        entry.views.push_back((Instant::now(), old));
-        entry.views.push_back((Instant::now(), latest));
-        let shared: crate::live::Shared = Arc::new((
-            Mutex::new(BTreeMap::from([(key.clone(), entry)])),
-            std::sync::Condvar::new(),
-        ));
-        // Other deliberately retained test views are active readers, so release them first.
-        drop(first);
-        db.execute_batch("PRAGMA wal_autocheckpoint=0; CREATE TABLE resident_pressure(value BLOB); INSERT INTO resident_pressure VALUES(zeroblob(34*1024*1024));").unwrap();
-        assert!(crate::live::service::wal_pressure(&db));
-        crate::live::service::reclaim_wal(&db, &shared).unwrap();
-        assert!(!crate::live::service::wal_pressure(&db));
-        let entries = shared.0.lock().unwrap();
-        let entry = entries.get(&key).unwrap();
-        assert!(!entry.views.front().unwrap().1.has_cold_lease());
-        assert!(entry.views.get(1).unwrap().1.expired_detail_lease());
-        assert!(!entry.views.back().unwrap().1.expired_detail_lease());
-        assert_eq!(entry.views.back().unwrap().1.ledger().unwrap().len(), 5);
-        drop(entries);
-        drop(shared);
+        assert!(crate::usage_app::execute_snapshot(query.clone(), &compact).is_ok());
         let source = sources(&roots).sources.remove(0);
         let scope = format!(
             "{}:resume",

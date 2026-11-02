@@ -168,11 +168,11 @@ export function summaryDetails(summary: UsageSummary): string[] {
   const categories = ['input', 'cacheRead', 'cacheCreate', 'output'] as const;
   return [...categories.map(category => { const component = summary.price.components.find(part => part.category === category || part.category === ({ cacheRead: 'cache_read', cacheCreate: 'cache_create' } as Record<string, string>)[category]); return `${categoryLabels[category]}  ${tokenSummaryText(summary, category)} Token · ${component?.status === 'partial' ? money(component.knownCost, 4) + '*' : component?.cost == null ? t("common.cost_unknown") : money(component.cost, 4)}`; }), t("cli.format.reasoning_portion_value_tokens", { p0: tokenSummaryText(summary, 'reasoning') })];
 }
-function qualityLine(result: UsageResult): string | undefined { return result.quality.status === 'partial' ? t("cli.format.data_status_value", { p0: result.quality.issues[0]?.message ?? t("cli.format.see_data_notes") }) : undefined; }
+function qualityLine(result: UsageResult): string | undefined { return result.quality.status === 'partial' ? t("cli.format.snapshot_quality") : undefined; }
 export function renderUsageResult(result: UsageResult, width = 120, group?: 'day' | 'week' | 'month'): string {
   if(result.statistics){const s=result.statistics,p=s.population;return [t('statistics.title'),t('statistics.population',{complete:p.completeTasks,total:p.measuredTasks}),`${t('statistics.mean')}: ${tokens(p.meanTokens)} · ${t('statistics.median')}: ${tokens(p.medianTokens)} · P90: ${tokens(p.p90Tokens)}`, ...(s.selectedTask?[t('statistics.selected',{rank:s.selectedTask.percentileRank==null?'—':(s.selectedTask.percentileRank*100).toFixed(1),tokens:tokens(s.selectedTask.tokens)})]:[]),...s.groups.map(g=>`${terminalText(g.key??t('webui.unknown'))} · ${g.population.measuredTasks} · ${tokens(g.population.meanTokens)} / ${tokens(g.population.medianTokens)} / ${tokens(g.population.p90Tokens)}`),...(s.growth?[t('statistics.growth',{count:s.growth.taskCountDelta,mean:tokens(s.growth.meanTokensDelta)}),t('statistics.contributions',{count:tokens(s.growth.taskCountContribution),intensity:tokens(s.growth.perTaskContribution)})]:[]),t('statistics.note')].join('\n')+'\n';}
 
-  const title = { statistics:t('statistics.title'),context:t('inspection.context'),investigate:t('inspection.investigate'),trajectory:t('inspection.trajectory'),resources:t('inspection.resources'),review:t('inspection.review'),compare: t('comparison.title'), refresh: t("cli.format.updated"), usage: t("cli.format.usage"), threads: t("common.threads"), turns: t("cli.format.turns"), steps: t("cli.format.records") }[result.action];
+  const title = { statistics:t('statistics.title'),context:t('inspection.context'),investigate:t('inspection.investigate'),trajectory:t('inspection.trajectory'),resources:t('inspection.resources'),review:t('inspection.review'),compare: t('comparison.title'), usage: t("cli.format.usage"), threads: t("common.threads"), turns: t("cli.format.turns"), steps: t("cli.format.records") }[result.action];
   const lines = [`Wombat · ${title}`, t("common.updated_value", { p0: dateLabel(result.snapshotRef.createdAt, result.snapshotRef.createdAt, result.scope.timezone ?? 'UTC', true) }), rangeLabel(result.scope.since, result.scope.until, result.snapshotRef.createdAt, result.scope.timezone ?? 'UTC'), usageLabel(result.summary), ...tokenCoverageLines(result.summary, width), ''];
   if (result.inspection) lines.push(...inspectionLines(result));
   if (result.comparison) lines.push(...comparisonLines(result));
@@ -182,7 +182,7 @@ export function renderUsageResult(result: UsageResult, width = 120, group?: 'day
   for (const item of result.items)
     lines.push(...itemLines(item, result, width, group));
   if (!result.items.length && !result.comparison && !result.inspection)
-    lines.push(result.action === 'refresh' ? t("cli.format.records_saved") : result.page.total > 0 ? t("cli.format.no_records_on_this_page_value", { p0: result.page.total }) : t("common.no_records"));
+    lines.push(result.page.total > 0 ? t("cli.format.no_records_on_this_page_value", { p0: result.page.total }) : t("common.no_records"));
   if (result.items.length > 0 && result.page.total > result.items.length)
     lines.push(`${result.page.offset + 1}—${result.page.offset + result.items.length} / ${result.page.total}`);
   if (result.summary.price.issues.length) lines.push(...result.summary.price.issues.map(pricingIssueText));

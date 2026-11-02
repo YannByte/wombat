@@ -7,7 +7,6 @@ mod instructions;
 #[cfg(test)]
 mod observation_tests;
 mod operations;
-pub(crate) mod preview;
 mod projection;
 mod runtime_review;
 mod skills;
@@ -383,7 +382,7 @@ mod reading;
 mod titles;
 use events::process;
 use facts::{Candidate, Facts, merge_optional};
-use reading::{State, file_changed, precision, read_file, read_file_flushing, timestamp};
+use reading::{State, precision, read_file, read_file_flushing, timestamp};
 use titles::read_titles;
 pub(super) fn safe_text(text: &str) -> String {
     let mut result = String::new();

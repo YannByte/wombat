@@ -17,7 +17,7 @@ test('six workflow signals share CLI, native and fixed-view evidence without raw
     const keys = ['WOMBAT_DATA_HOME', 'CODEX_HOME', 'WOMBAT_AUTO_PRICES', 'WOMBAT_CORE_BIN'] as const;
     const saved = keys.map(k => [k, process.env[k]] as const);
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    let service: ReturnType<typeof spawn> | undefined, nativeEntry: UsageClient | undefined;
+    let nativeEntry: UsageClient | undefined;
     try {
         await mkdir(path.join(root, 'sessions'), { recursive: true });
         for (const thread of ['a', 'b']) {
@@ -30,14 +30,11 @@ test('six workflow signals share CLI, native and fixed-view evidence without raw
             await writeFile(path.join(root, 'sessions', `${thread}.jsonl`), rows.map(r => JSON.stringify(r) + '\n').join(''));
         }
         Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CORE_BIN: binary });
-        service = spawn(binary, ['--serve-usage'], { env: process.env, stdio: 'ignore' });
-        await once(service, 'spawn');
+
+
         const client = createNodeClient({ binaryPath: binary, automaticPrices: false, timeoutMs: 15000 });
         const deadline = Date.now() + 10000;
-        while (!(await client.service!({ action: 'status' })).running) {
-            assert.ok(Date.now() < deadline, 'core listener startup timed out');
-            await delay(30);
-        }
+
         const live = await client.live!({ query: { action: 'usage', roots: [root], scope: { allTime: true } }, mode: 'fresh' });
         const snapshotId = live.result.snapshotRef.snapshotId;
         nativeEntry = projectTestClient(client, [root], [project]);
@@ -46,7 +43,7 @@ test('six workflow signals share CLI, native and fixed-view evidence without raw
         const query = async (request: UsageRequest) => (await nativeTransport.live!({ query: request, mode: 'cached' })).result;
         assert.equal((await query({ action: 'usage', scope: { allTime: true } })).snapshotRef.snapshotId, snapshotId);
         const scope = { since: '2026-09-08', until: '2026-09-15', timezone: 'UTC', project };
-        const result = await query({ action: 'investigate', snapshotId, scope });
+        const result = await query({ action: 'investigate', scope });
         const a = result.inspection!.activity!;
         assert.equal(a.findingCount, 1);
         assert.deepEqual(a.findings[0].signals, ['repeated_slow_request', 'failure_spike', 'duration_spike', 'recurring_workflow', 'repeated_failure', 'repeated_rejection']);
@@ -54,30 +51,20 @@ test('six workflow signals share CLI, native and fixed-view evidence without raw
         assert.equal(a.findings[0].baseline!.operations, 20);
         assert.equal(a.findings[0].baseline!.medianDurationMs, 3000);
         assert.doesNotMatch(JSON.stringify(result), /SYNTHETIC_PRIVATE_/);
-        const request: CliInput = queryInvocation({action:'investigate',snapshotId,scope:{project,since:scope.since,until:scope.until,timezone:'UTC'}},{mode:'cached'});
+        const request: CliInput = queryInvocation({action:'investigate',scope:{project,since:scope.since,until:scope.until,timezone:'UTC'}},{mode:'cached'});
         const json = spawnProductCli(path.resolve('dist/wombat.js'), request, { encoding: 'utf8', env: process.env, timeout: 15000 });
         assert.ok([0, 2].includes(json.status!), json.stderr + json.stdout);
         assert.deepEqual(JSON.parse(json.stdout).inspection.activity, a);
         for (const proof of [...a.findings[0].evidence, ...a.findings[0].baselineEvidence]) {
-            const steps = await query({ action: 'steps', snapshotId, threadId: proof.threadId, turnId: proof.turnId!, scope: proof.scope });
+            const steps = await query({ action: 'steps', threadId: proof.threadId, turnId: proof.turnId!, scope: proof.scope });
             assert.ok(steps.items.some(i => i.kind === 'operation' && i.id === proof.operationId));
         }
-        const all = await query({ action: 'investigate', snapshotId, scope: { allTime: true, project } });
+        const all = await query({ action: 'investigate', scope: { allTime: true, project } });
         assert.equal(all.inspection!.activity!.baselineScope, null);
         assert.ok(!all.inspection!.activity!.findings[0].signals.includes('failure_spike'));
     }
     finally {
-        if (service && service.exitCode === null) {
-            const closed = once(service, 'close');
-            service.kill('SIGTERM');
-            const kill = setTimeout(() => service?.kill('SIGKILL'), 2000);
-            try {
-                await closed;
-            }
-            finally {
-                clearTimeout(kill);
-            }
-        }
+
         for (const [k, v] of saved) {
             if (v === undefined)
                 delete process.env[k];

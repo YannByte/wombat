@@ -4,7 +4,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-/** Resolve ownership even when installation failed before Web announced its URL. */
+/** Resolve the exact core executable in an isolated installation. */
 export function installedOnboardingCore(prefix: string): string {
   const root = path.join(prefix, 'lib/wombat'),
     pointer = path.join(root, 'current.txt');
@@ -28,10 +28,7 @@ export function installedOnboardingCore(prefix: string): string {
 }
 
 export function assertOnboardingCoreOwner(command: string, core: string): void {
-  const suffix=' --serve-usage';
-  assert.ok(command.endsWith(suffix),'Refusing an unexpected test process command');
-  const executable=command.slice(0,-suffix.length);
-  assert.equal(realpathSync(executable),realpathSync(core),'Refusing to stop a process outside the test installation');
+  assert.equal(realpathSync(command),realpathSync(core),'Refusing to stop a process outside the test installation');
 }
 
 function absent(error: unknown): boolean {
@@ -62,7 +59,7 @@ export async function cleanupOnboardingCores(
 ): Promise<void> {
   let core: string | undefined;
   for (const directory of directories) {
-    const lock = path.join(directory, 'live-v2/service-v2.lock');
+    const lock = path.join(directory, 'live-v2/request.lock');
     if (!existsSync(lock)) continue;
     for (const value of holders(lock)) {
       assert.match(value, /^\d+$/);
@@ -95,7 +92,7 @@ export async function cleanupOnboardingCores(
           if (absent(error)) break;
           throw error;
         }
-        if (Date.now() > until) throw new Error('Owned core service did not stop');
+        if (Date.now() > until) throw new Error('Owned foreground core did not stop');
         await delay(50);
       }
     }

@@ -13,41 +13,27 @@ struct Request {
 fn main() {
     wombat_core::configure_allocator();
     let arguments: Vec<_> = std::env::args_os().collect();
-    if let Some(position) = arguments.iter().position(|arg| arg == "--daemon-config") {
-        let result = (|| -> anyhow::Result<()> {
-            let file = arguments.get(position + 1).ok_or_else(|| {
-                operation_error("INVALID_ARGUMENT", "Missing service startup configuration")
-            })?;
-            wombat_core::host_environment::configure(std::path::Path::new(file))?;
-            wombat_core::live::serve_resident()
-        })();
-        if let Err(error) = result {
-            eprintln!("{error:#}");
-            std::process::exit(1);
-        }
-        return;
-    }
-    if std::env::args().any(|arg| arg == "--daemon") {
-        if let Err(error) = wombat_core::live::serve_resident() {
-            eprintln!("{error:#}");
-            std::process::exit(1);
-        }
-        return;
-    }
-    if std::env::args().any(|arg| arg == "--serve-usage") {
-        if let Err(error) = wombat_core::live::serve() {
-            eprintln!("{error:#}");
-            std::process::exit(1);
-        }
-        return;
-    }
     if std::env::args().any(|arg| arg == "--version") {
         println!("wombat-core {}", env!("CARGO_PKG_VERSION"));
         return;
     }
     let result = (|| -> anyhow::Result<Value> {
+        if arguments.len() != 1 {
+            return Err(operation_error(
+                "INVALID_ARGUMENT",
+                "Core accepts --version or one JSON request on stdin",
+            ));
+        }
         let mut input = String::new();
-        io::stdin().read_to_string(&mut input)?;
+        io::stdin()
+            .take(2 * 1024 * 1024 + 1)
+            .read_to_string(&mut input)?;
+        if input.len() > 2 * 1024 * 1024 {
+            return Err(operation_error(
+                "RESOURCE_LIMIT",
+                "Core request exceeds 2 MiB",
+            ));
+        }
         let request: Request = serde_json::from_str(&input)
             .map_err(|e| operation_error("INVALID_ARGUMENT", format!("无效内核请求：{e}")))?;
         if !request.args.is_object() {

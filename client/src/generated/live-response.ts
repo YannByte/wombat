@@ -109,7 +109,6 @@ export type TokenBasis = "analyzed_totals";
 export type AutomaticStatus = "checking" | "updated" | "unchanged" | "failed";
 export type ProjectLoadState = "pending" | "loading" | "ready";
 export type Action =
-  | "refresh"
   | "usage"
   | "threads"
   | "turns"
@@ -209,6 +208,8 @@ export type Item =
       tool?: string | null;
       kind: "operation";
     };
+export type QualityIssueScope = "index";
+export type QualityQueryImpact = "none" | "unknown";
 
 export interface Response {
   outputVersion: number;
@@ -828,6 +829,14 @@ export interface Page {
   nextOffset?: number | null;
 }
 export interface Quality {
+  /**
+   * Issues and source statuses describe the whole snapshot, not this query window.
+   */
+  issueScope: QualityIssueScope;
+  /**
+   * Snapshot warnings without query-bound attribution cannot prove a scoped defect.
+   */
+  queryImpact: QualityQueryImpact;
   status: string;
   issues: Issue[];
   sources: SourceReport[];

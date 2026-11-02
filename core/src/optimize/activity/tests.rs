@@ -121,7 +121,7 @@ fn activity_selection_requires_fixed_scope_and_cannot_enter_configuration_or_han
     }
     let mut empty = valid;
     empty.activity.as_mut().unwrap().snapshot_id.clear();
-    assert!(validate(&empty).is_err());
+    assert!(validate(&empty).is_ok());
 }
 
 fn outcomes(success: u64, failed: u64, partial: bool) -> t::OutcomeStatistics {

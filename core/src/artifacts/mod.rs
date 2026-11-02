@@ -9,77 +9,43 @@ mod tests;
 use crate::{artifacts_dto::*, dto::operation_error};
 use anyhow::Result;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-const TTL: u64 = 600;
 const MAX_ITEMS: usize = 100;
 const MAX_RESPONSE: usize = 256 * 1024;
-const MAX_VIEWS: usize = 8;
-const MAX_VIEW_BYTES: usize = 2 * 1024 * 1024;
-#[derive(Clone)]
-struct View {
-    response: Response,
-    project_identity: String,
+fn item_id(scope: &Scope, project_identity: &str, item: &Item) -> Result<String> {
+    Ok(crate::hash(serde_json::to_vec(&(
+        2,
+        scope,
+        project_identity,
+        &item.path,
+        &item.owner,
+        &item.kind,
+        &item.assessment,
+        &item.regeneration,
+        &item.regeneration_version,
+        &item.use_state,
+        &item.observation,
+        &item.reasons,
+        &item.codex_evidence,
+    ))?))
 }
-#[derive(Default)]
-pub(crate) struct Store {
-    views: VecDeque<(String, Instant, Arc<View>, usize)>,
+fn baseline_id(response: &Response) -> Result<String> {
+    Ok(crate::hash(serde_json::to_vec(&(
+        &response.scope,
+        &response.project_identity,
+        response.policy_version,
+        &response.items,
+    ))?))
 }
-impl Store {
-    pub(crate) fn has_views(&mut self) -> bool {
-        self.views
-            .retain(|(_, at, _, _)| at.elapsed() < Duration::from_secs(TTL));
-        !self.views.is_empty()
-    }
-    fn get(&mut self, id: &str) -> Result<Arc<View>> {
-        self.has_views();
-        self.views
-            .iter()
-            .find(|(key, _, _, _)| key == id)
-            .map(|(_, _, v, _)| Arc::clone(v))
-            .ok_or_else(|| {
-                operation_error(
-                    "VIEW_EXPIRED",
-                    "Artifact view expired; inspect the original scope again",
-                )
-            })
-    }
-    fn insert(&mut self, view: View) -> Result<()> {
-        let bytes = serde_json::to_vec(&view.response)?.len();
-        if bytes > MAX_RESPONSE {
-            return Err(operation_error(
-                "RESOURCE_LIMIT",
-                "Artifact view exceeds its response budget",
-            ));
-        }
-        while self.views.len() >= MAX_VIEWS
-            || self.views.iter().map(|v| v.3).sum::<usize>() + bytes > MAX_VIEW_BYTES
-        {
-            self.views.pop_front();
-        }
-        self.views.push_back((
-            view.response.read_view.clone(),
-            Instant::now(),
-            Arc::new(view),
-            bytes,
-        ));
-        Ok(())
-    }
-}
-pub(crate) fn execute(
-    request: Request,
-    store: &Mutex<Store>,
-    cancelled: &dyn Fn() -> bool,
-) -> Result<Response> {
+pub(crate) fn execute(request: Request, cancelled: &dyn Fn() -> bool) -> Result<Response> {
     let host = projects::Native;
-    execute_with(request, store, cancelled, &host)
+    execute_with(request, cancelled, &host)
 }
 fn execute_with(
     request: Request,
-    store: &Mutex<Store>,
     cancelled: &dyn Fn() -> bool,
     host: &dyn projects::Host,
 ) -> Result<Response> {
@@ -121,16 +87,14 @@ fn execute_with(
                     &mut files,
                 )?);
             }
-            let id = format!("artifacts:{}", uuid::Uuid::new_v4());
             let checked = chrono::Utc::now();
             let mut response = Response {
-                output_version: 2,
+                output_version: 3,
                 policy_version: 2,
                 action: "inspect".into(),
-                read_view: id.clone(),
-                baseline_id: crate::hash(serde_json::to_vec(&(&id, &scope, 2))?),
+                project_identity: project_identity.clone(),
+                baseline_id: String::new(),
                 checked_at: checked.to_rfc3339(),
-                expires_at: (checked + chrono::Duration::seconds(TTL as i64)).to_rfc3339(),
                 scope,
                 items,
                 summary: empty_summary(),
@@ -148,24 +112,18 @@ fn execute_with(
             }
             finish(&mut response, &files, budget.partial)?;
             budget.check()?;
-            let view = View {
-                project_identity,
-                response: response.clone(),
-            };
-            store
-                .lock()
-                .map_err(|_| operation_error("CORE_ERROR", "Artifact view lock unavailable"))?
-                .insert(view)?;
+            for item in &mut response.items {
+                item.id = item_id(&response.scope, &response.project_identity, item)?;
+            }
+            response.baseline_id = baseline_id(&response)?;
             response
         }
         Request::Recheck {
-            read_view,
-            baseline_id,
+            baseline,
             selection,
         }
         | Request::Apply {
-            read_view,
-            baseline_id,
+            baseline,
             selection,
         } => {
             if selection.len() > MAX_ITEMS {
@@ -174,44 +132,50 @@ fn execute_with(
                     "Too many selected artifacts",
                 ));
             }
-            let view = store
-                .lock()
-                .map_err(|_| operation_error("CORE_ERROR", "Artifact view lock unavailable"))?
-                .get(&read_view)?;
-            if baseline_id != view.response.baseline_id {
+            if baseline.output_version != 3
+                || baseline.policy_version != 2
+                || baseline.action != "inspect"
+                || baseline_id(&baseline)? != baseline.baseline_id
+                || baseline.items.len() > MAX_ITEMS
+                || serde_json::to_vec(&baseline)?.len() > MAX_RESPONSE
+            {
                 return Err(operation_error(
                     "INVALID_ARGUMENT",
-                    "Artifact baseline does not match its original view",
+                    "Invalid original artifact plan; inspect again",
                 ));
             }
+            for item in &baseline.items {
+                if item.id != item_id(&baseline.scope, &baseline.project_identity, item)? {
+                    return Err(operation_error(
+                        "INVALID_ARGUMENT",
+                        "Original artifact identity does not match its scope and evidence",
+                    ));
+                }
+            }
+            let view = baseline;
             let selected: BTreeSet<_> = selection.iter().collect();
             if selected.len() != selection.len()
                 || selected
                     .iter()
-                    .any(|id| !view.response.items.iter().any(|item| &item.id == *id))
+                    .any(|id| !view.items.iter().any(|item| &item.id == *id))
             {
                 return Err(operation_error(
                     "INVALID_ARGUMENT",
                     "Selection must contain original artifact identities",
                 ));
             }
-            let owner_ok =
-                projects::scope_root(&view.response.scope.project_root, view.response.scope.codex)
-                    .ok()
-                    .and_then(|p| crate::file_metadata::FileMetadata::read(p).ok())
-                    .is_some_and(|m| m.physical == view.project_identity);
+            let owner_ok = projects::scope_root(&view.scope.project_root, view.scope.codex)
+                .ok()
+                .and_then(|p| crate::file_metadata::FileMetadata::read(p).ok())
+                .is_some_and(|m| m.physical == view.project_identity);
             if applying
                 && (selection.is_empty()
                     || selected.iter().any(|id| {
-                        view.response
-                            .items
-                            .iter()
-                            .find(|i| &i.id == *id)
-                            .is_none_or(|i| {
-                                !codex::is_kind(&i.kind)
-                                    || i.assessment != Assessment::Candidate
-                                    || i.observation.as_ref().is_none_or(|o| !o.complete)
-                            })
+                        view.items.iter().find(|i| &i.id == *id).is_none_or(|i| {
+                            !codex::is_kind(&i.kind)
+                                || i.assessment != Assessment::Candidate
+                                || i.observation.as_ref().is_none_or(|o| !o.complete)
+                        })
                     }))
             {
                 return Err(operation_error(
@@ -219,9 +183,31 @@ fn execute_with(
                     "Apply requires explicit, complete Codex candidates from the original view",
                 ));
             }
+            if applying {
+                let targets = projects::discover(&view.scope, &mut budget, host)?;
+                if view
+                    .items
+                    .iter()
+                    .filter(|i| selected.contains(&i.id))
+                    .any(|i| {
+                        !std::fs::symlink_metadata(&i.path)
+                            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+                            && !targets.iter().any(|t| {
+                                projects::text(&t.path).ok().as_deref() == Some(i.path.as_str())
+                                    && t.kind == i.kind
+                                    && t.owner.as_ref().and_then(|p| projects::text(p).ok())
+                                        == i.owner
+                            })
+                    })
+                {
+                    return Err(operation_error(
+                        "INVALID_ARGUMENT",
+                        "Selected objects are outside current cleanup policy; inspect again",
+                    ));
+                }
+            }
             let _install_guard = if applying
                 && view
-                    .response
                     .items
                     .iter()
                     .any(|i| selected.contains(&i.id) && i.kind == Kind::CodexDaemonRelease)
@@ -244,7 +230,7 @@ fn execute_with(
             let mut stopped = false;
             let mut files = BTreeMap::new();
             let mut items = vec![];
-            for old in &view.response.items {
+            for old in &view.items {
                 if !selected.is_empty() && !selected.contains(&old.id) {
                     continue;
                 }
@@ -280,7 +266,7 @@ fn execute_with(
                 let path = PathBuf::from(&old.path);
                 let mut item_files = BTreeMap::new();
                 let mut item = scan::inspect(
-                    &view.response.scope,
+                    &view.scope,
                     projects::Target {
                         path,
                         kind: old.kind.clone(),
@@ -309,6 +295,7 @@ fn execute_with(
                     && item.regeneration == old.regeneration
                     && item.regeneration_version == old.regeneration_version
                     && item.reasons == old.reasons
+                    && item.codex_evidence == old.codex_evidence
                 {
                     RecheckState::Unchanged
                 } else {
@@ -360,7 +347,7 @@ fn execute_with(
                 items,
                 summary: empty_summary(),
                 partial: false,
-                ..view.response.clone()
+                ..*view.clone()
             };
             finish(
                 &mut response,

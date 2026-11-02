@@ -46,13 +46,6 @@ fn query_response(r: &Request, id: String, scope: &Scope, view: &View) -> Respon
         .as_ref()
         .map(|s| s.manifest.snapshot_ref.snapshot_id.clone());
     result.coverage.history_status = if view.snapshot.as_ref().is_some_and(|s| {
-        s.manifest
-            .issues
-            .iter()
-            .any(|issue| issue.code == crate::adapters::codex::preview::ISSUE)
-    }) {
-        "syncing".into()
-    } else if view.snapshot.as_ref().is_some_and(|s| {
         !s.manifest.issues.is_empty()
             || s.manifest
                 .sources

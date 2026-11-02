@@ -5,7 +5,6 @@ import { readLocated } from "../plugin/skills/wombat/scripts/read-located.ts";
 
 const request: ConversationRequest = {
   action: "search",
-  snapshotId: "fixed",
   query: "needle",
   roots: ["/synthetic"],
   selection: {
@@ -20,7 +19,7 @@ const request: ConversationRequest = {
 };
 function result(): ConversationResult {
   return {
-    outputVersion: 1,
+    outputVersion: 2,
     action: "locate",
     snapshotId: "fixed",
     selection: request.selection!,
@@ -86,7 +85,6 @@ test("evidence composition preserves both responses, original filters and separa
   assert.equal(calls[0].cursor, request.cursor);
   assert.deepEqual(calls[1], {
     action: "read",
-    snapshotId: "fixed",
     roots: request.roots,
     selection: request.selection,
     maxScanBytes: undefined,
@@ -112,7 +110,7 @@ test("empty budgeted location remains incomplete and makes no read or hidden con
 });
 
 test("expiry, cancellation and changed versions propagate without retries", async () => {
-  for (const code of ["VIEW_EXPIRED", "CANCELLED", "SOURCE_CHANGED"]) {
+  for (const code of ["CURSOR_MISMATCH", "CANCELLED", "SOURCE_CHANGED"]) {
     let calls = 0;
     const failure = Object.assign(new Error(code), { code });
     await assert.rejects(
@@ -124,13 +122,8 @@ test("expiry, cancellation and changed versions propagate without retries", asyn
     );
     assert.equal(calls, 1);
   }
-  await assert.rejects(
-    readLocated(
-      async () => ({ ...result(), snapshotId: "replacement" }),
-      request,
-    ),
-    /view changed/,
-  );
+  const [revised]=await readLocated(async()=>({...result(),snapshotId:"replacement"}),request);
+  assert.equal(revised.snapshotId,"replacement", "A revision alone does not invalidate a scoped read");
   const locations = result();
   locations.items.push({
     evidence: { eventId: "one", sourceInstanceId: "source", eventOffset: 0 },
@@ -165,4 +158,19 @@ test("invalid action or byte and target budgets fail before dispatch", async () 
     [64, 1.5],
   ])
     await assert.rejects(readLocated(call, request, bytes, targets));
+});
+
+test('an explicit location-page budget advances empty pages without changing selection or content cursors',async()=>{
+  const calls:ConversationRequest[]=[];
+  const [locations,text]=await readLocated(async ({params})=>{
+    calls.push(params);
+    return {...result(),nextCursor:'page-'+calls.length};
+  },request,64,2,3);
+  assert.equal(text,null);
+  assert.equal(calls.length,3);
+  assert.equal(calls[1].cursor,'page-1');
+  assert.equal(calls[2].cursor,'page-2');
+  assert.equal(locations.nextCursor,'page-3');
+  assert.ok(calls.every(c=>c.selection===request.selection&&!('snapshotId' in c)));
+  await assert.rejects(readLocated(async()=>result(),request,64,2,3),/no progress/);
 });

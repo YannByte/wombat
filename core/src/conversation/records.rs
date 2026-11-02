@@ -6,6 +6,7 @@ use super::*;
 struct Cursor {
     binding: String,
     record: usize,
+    thread_id: Option<String>,
     event_cursor: Option<String>,
     skip: usize,
 }
@@ -64,6 +65,16 @@ pub(super) fn query(
             .cmp(&a.thread.last_activity_at)
             .then(a.thread.id.cmp(&b.thread.id))
     });
+    if request.cursor.is_some() {
+        let id = cursor
+            .thread_id
+            .as_deref()
+            .ok_or_else(|| error("CURSOR_MISMATCH"))?;
+        cursor.record = threads
+            .iter()
+            .position(|t| t.thread.id == id)
+            .ok_or_else(|| error("SOURCE_CHANGED"))?;
+    }
     if cursor.record > threads.len() {
         return Err(error("INVALID_ARGUMENT"));
     }
@@ -115,6 +126,7 @@ pub(super) fn query(
     response.next_cursor = if response.scan_complete {
         None
     } else {
+        cursor.thread_id = Some(threads[cursor.record].thread.id.clone());
         Some(serde_json::to_string(&cursor)?)
     };
     if response

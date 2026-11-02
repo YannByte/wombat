@@ -1,4 +1,6 @@
 //! Agent CLI request envelope. Product request DTOs keep their existing owners.
+pub const REQUEST_VERSION: u32 = 2;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,16 +15,12 @@ use std::collections::BTreeMap;
 pub enum Request {
     /// Assemble current project checks, configuration, bounded work history and read-only artifact candidates without editing project files.
     Project(crate::project_dto::Request),
-    /// Inspect or control local background indexing and current-user automatic startup.
-    Service(crate::service_dto::Request),
     /// Inspect artifacts, recheck original selections or explicitly remove selected Codex candidates; no session indexing.
     Artifacts(crate::artifacts_dto::Request),
     /// Discover activity, locate messages, search selected conversations or explicitly read bounded original text.
     Conversation(crate::conversation_dto::Request),
     /// Query current usage and synchronize sources as requested. Params wrap query, mode and verify.
     Usage(crate::live::Request),
-    /// Query fixed or saved usage views; explicit refresh scans sources and saves a new snapshot.
-    Snapshot(crate::usage_app_dto::Request),
     /// Inspect current configuration and associated evidence at a read view.
     Config(crate::config_dto::Request),
     /// List, inspect, handle or recheck recommendations; handling changes user decisions.
@@ -63,7 +61,6 @@ pub struct Description {
 #[serde(rename_all = "snake_case")]
 pub enum Recovery {
     ReadSchema,
-    ReacquireView,
     NarrowQuery,
     RetrySameScope,
     CheckSetup,
@@ -107,7 +104,7 @@ pub struct HelpExample {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HistoryRead {
-    #[schemars(range(min = 1, max = 1))]
+    #[schemars(range(min = 2, max = 2))]
     pub output_version: u32,
     pub result: crate::conversation_dto::Response,
     pub next_locations: Option<crate::conversation_dto::Request>,

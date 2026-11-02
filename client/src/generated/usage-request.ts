@@ -15,7 +15,6 @@ export type ComparisonRequest =
     };
 export type DriverDimension = "project" | "model" | "thread";
 export type Action =
-  | "refresh"
   | "usage"
   | "threads"
   | "turns"
@@ -34,7 +33,6 @@ export type Presentation = "distribution" | "details" | "projects" | "models";
 export interface Request {
   comparison?: ComparisonRequest | null;
   action: Action;
-  snapshotId?: string | null;
   roots?: string[] | null;
   scope?: Scope;
   group?: Group | null;

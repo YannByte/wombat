@@ -3,11 +3,9 @@ import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncRetur
 import type { AgentRequest, UsageRequest, LiveRequest } from '@wombat/client';
 
 export type CliInput = string[] | AgentRequest;
-/** Saved snapshots use the snapshot method; live views use the live wrapper. */
+/** Every usage query uses the foreground entry. */
 export function queryInvocation(query: UsageRequest, options: Omit<LiveRequest, 'query'> = {}): AgentRequest {
-  return query.snapshotId && !query.snapshotId.startsWith('live:')
-    ? { method: 'snapshot', params: query }
-    : { method: 'usage', params: { query, ...options } };
+  return {method:'usage',params:{query,...options}};
 }
 export function cliInvocation(input: CliInput): { args: string[]; input?: string } {
   return Array.isArray(input) ? { args: input } : { args: ['system','call'], input: JSON.stringify(input) };

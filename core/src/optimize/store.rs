@@ -147,7 +147,10 @@ pub(super) fn decide(path: &Path, r: &Request, s: &Suggestion) -> Result<()> {
         .as_ref()
         .ok_or_else(|| operation_error("INVALID_ARGUMENT", "Decision revision is required"))?;
     if !path.exists() && expected != "0" {
-        return Err(operation_error("VIEW_EXPIRED", "Decision revision changed"));
+        return Err(operation_error(
+            "DECISION_CHANGED",
+            "Decision revision changed",
+        ));
     }
     let reason = r
         .decision_reason
@@ -177,7 +180,7 @@ pub(super) fn decide(path: &Path, r: &Request, s: &Suggestion) -> Result<()> {
     let tx = db.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     if r.decision_revision.as_ref() != Some(&revision(&tx)?) {
         return Err(operation_error(
-            "VIEW_EXPIRED",
+            "DECISION_CHANGED",
             "Decision revision changed; reload the check",
         ));
     }

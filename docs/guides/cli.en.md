@@ -97,7 +97,7 @@ wombat history search "验收" --project "/path/to/project"
 
 Query text is a search term, not an instruction to execute. Results show matching records, source positions and read cursors to help identify the target. Search uses the same default 30-day window. Specify dates or `--all-time` for older content.
 
-An unfinished scan states the visited scope and how to continue. It cannot establish that no other matches exist. Pages retain a fixed query view so updates do not mix different versions of the records.
+An unfinished scan states the visited scope and how to continue. It cannot establish that no other matches exist. Keep the original filters and returned cursor. Unrelated updates do not invalidate the selected source position; changed evidence can require restarting the same query without that cursor.
 
 ### Inspect a record
 
@@ -144,6 +144,10 @@ wombat usage month
 Dates use the local timezone, and results state actual dates and the cutoff. Use `--timezone` for another zone. Original event timestamps do not change.
 
 Totals include recorded usage across the complete matching scope rather than adding the few displayed entries. Input, output and caches retain separate meanings. Missing source fields or incomplete reads state which values are unavailable or only known portions.
+
+Calendar reports default to period totals so model details do not displace dates. `--limit` and `--offset` page these totals; `--by model` or `--by project` selects a distribution. JSON defaults to compact coverage examples. Use the generated `usage` interface for explicit full-detail presentation and coverage.
+
+Source warnings describe the whole index. `quality.issueScope` identifies that scope; `queryImpact=unknown` means the warnings have not been attributed to this query. The selected summary reports measurement-field coverage separately. Historical warnings are neither proof of an error in the requested dates nor proof that those dates are unaffected.
 
 ### Find higher-usage tasks
 
@@ -202,7 +206,7 @@ The fact report starts with project, actual dates, timezone and coverage for eac
 
 The default scope is the current project and configuration explicitly applicable to it. History covers the last 30 local calendar days including today. `--project` selects both the current directory and records with explicit project identity. `--since`, `--until` and `--timezone` adjust history without changing the version represented by current files. User caches and unrelated global configuration are outside default cleanup scope.
 
-Unavailable history does not block independent current checks. Results identify missing or truncated portions; no history does not mean no project problems. Each part retains its own read version and recheck basis without claiming a single complete project snapshot. Unclear project identity, invalid arguments or inability to execute the whole request produce explicit errors.
+One foreground request reuses an incremental read and current configuration inventory across the report. Each section retains its own evidence gaps and recheck basis. This is not a whole-code audit or proof of delivery; invalid scope produces an explicit error.
 
 Combined reports reuse existing accounting rules and core totals. Combining leads does not change Token or cost results, and selected records are not summed as the whole project's usage.
 
@@ -228,7 +232,7 @@ wombat check hooks
 
 The use window defaults to the last 30 local calendar days including today. Order frequency and footprint only when units are comparable and evidence permits it. No observed use does not mean no value: rare release or recovery capabilities can remain enabled. Partial records show confirmed counts and gaps rather than complete zero use.
 
-Skill catalog estimates encode reference names, descriptions and locators. On-demand body quantities remain separate. The estimate is not all context actually visible to the current model. MCP definitions without reliable payloads remain unmeasured; Hook script size is not context occupancy. Current enablement, historical loading, actual use and service reachability are distinct facts.
+Skill catalog estimates encode reference names, descriptions and locators. On-demand body quantities remain separate. The estimate is not all context actually visible to the current model. MCP definitions without reliable payloads remain unmeasured; Hook script size is not context occupancy. Current enablement, historical loading, actual use and MCP reachability are distinct facts.
 
 ### Review a work process
 
@@ -242,11 +246,11 @@ Expected negative tests, required validation, reasonable retries or long waits d
 
 ### Verify a change
 
-An inspection returns a complete command to copy for recheck. Copy it from the original result instead of reconstructing the read view, baseline, scope and rules. Through the Skill, ask to recheck the original problem under the same conditions.
+Save the original structured report, then select its finding for recheck. For example: `wombat check --project PATH --json > check.json`, then `wombat check verify --baseline check.json --suggestion ID --json`. The original scope and rule overrides are read from the report; changing them invalidates the comparison.
 
 Recheck binds the original problem and conditions. Results distinguish a remaining hit, a comparable miss, incomparable conditions and insufficient evidence. Only a valid comparison under the same conditions establishes that this check no longer observes the problem. Engineering fixes also require the original project tests.
 
-Original views are temporary and are not guaranteed across service restarts. Reinspect when a view expires; a new inspection cannot recover the old before/after conclusion. Keep and not-applicable are user decisions, not repair results, and recheck does not revoke them automatically.
+Original reports are passed as data and do not expire with a process. Recheck still validates scope, rules and current observations. Keep/not-applicable are explicit user decisions and remain separate from repair results.
 
 ## Preview and perform cleanup: clean
 
@@ -260,7 +264,7 @@ wombat clean --codex
 
 The default only previews, with output starting “Preview only — no files deleted.” Project mode inspects regenerable build outputs and explicitly selected temporary paths. Repeat `--path` to select paths resolved from the current project. `--keep` preserves pending outputs or other selected material. Tracked files, user assets, source records and required state do not become deletion targets merely because their names resemble caches.
 
-`--codex` selects supported caches and old stages for the current user's Codex installation across projects, currently targeting macOS Codex layouts. It does not mean every platform, every AI product or the entire home directory. This mode rejects `--project`; use explicit absolute paths with `--path`. Explicitly add `--wombat-temp` for Wombat's own pending publication material. It cannot combine with `--codex` and excludes published indexes, saved snapshots and recovery generations.
+`--codex` selects supported caches and old stages for the current user's Codex installation across projects, currently targeting macOS Codex layouts. It does not mean every platform, every AI product or the entire home directory. This mode rejects `--project`; use explicit absolute paths with `--path`. Explicitly add `--wombat-temp` for Wombat's own pending publication material. It cannot combine with `--codex` and excludes published indexes, user data and recovery generations.
 
 Results separate candidates, review, protected, unknown and absent-at-path entries. They state ownership, regeneration basis, observed size and conditions that affect selection. Review deliverables, pending consumers and current use before choosing candidates. Logical size is not actual reclaimable space.
 
@@ -280,7 +284,7 @@ Without an interactive terminal, the command requires an explicit original inspe
 
 ### Verify cleanup
 
-Copy the `clean verify` command returned by cleanup to inspect the original entries. It compares the original selection without expanding cleanup scope. For project artifacts, the Skill checks ownership and pending consumers, uses trusted tools for authorized paths, then rechecks the same scope.
+Save the original inspection with `wombat clean --project PATH --json > cleanup.json`, then run `wombat clean verify --plan cleanup.json --item ITEM --json`. Recheck uses only the original selected entries and scope. Project artifact removal still uses authorized trusted native/project tools.
 
 Absence at the original path describes that path's current state, not actual freed disk space. Permanent deletion has no general restoration mechanism. Kept and unprocessed entries remain separate in results.
 
@@ -324,7 +328,7 @@ Updating the runtime and matching plugin resources are separate results. When pl
 
 ### Interfaces and integration entry
 
-`system api` and `system call` serve Skills, scripts and users needing detailed control. They retain service status/start/pause/resume/stop/autostart, account, budget, prices, source-directory authorization and preference capabilities.
+`system api` and `system call` serve Skills, scripts and detailed requests for account, budgets, prices, directory grants and preferences. Wombat runs in the foreground and has no service controls.
 
 `system hook codex` is integration input, not a daily inspection command. Its separate advisory receipt protocol accepts at most 64 KiB within four seconds, emits no stdout and does not block host work on receipt failure. Receipt does not prove native registration, loading or complete collection, and cannot change permissions or model context.
 
@@ -340,7 +344,7 @@ Options are accepted only where applicable. Unsupported options, repeated single
 |---|---|
 | `--help`, `-h` | Help for the current entry or subcommand, without queries or changes |
 | `--version` | Installed program version at the top level |
-| `--lang en|zh` | Presentation language; also available through `WOMBAT_LANG` |
+| `--lang en\|zh` | Presentation language; also available through `WOMBAT_LANG` |
 | `--json` | Structured output; watches emit one JSON object per line |
 | `--no-input` | Disable interactive questions; missing selections or confirmation conditions fail |
 | `--project PATH` | Explicit directory for queries, checks and cleanup supporting project scope |
@@ -366,7 +370,7 @@ Explicit time words cannot combine with `--since`, `--until` or `--all-time`. Wi
 
 Ordinary lists default to 20 entries; task rankings default to five. `--limit` accepts 1..200 and `--offset` is a nonnegative integer. Source reads retain byte boundaries rather than using entry counts. Text fragments and position lists each keep their own continuation cursors. Continue through returned complete commands or structured cursors, preserving scope and view.
 
-Full IDs, fixed views and cursors cannot be mixed with incompatible projects, sources or read versions. Reacquire the same scope after expiry or source-file changes. A new read does not pretend to continue an invalid old comparison.
+Full IDs and opaque cursors remain bound to the selected sources and filters. Source replacement can invalidate a position. Restart that query with the same scope and no cursor rather than reconstructing old evidence.
 
 ### Usage filters and comparisons
 
@@ -377,13 +381,11 @@ Full IDs, fixed views and cursors cannot be mixed with incompatible projects, so
 | `--against RECORD` | Compare another work record with `--task` |
 | `--family` | Include recorded descendants in task comparisons |
 | `--baseline-since DATE --baseline-until DATE` | Baseline dates alongside custom `--since` and `--until` |
-| `--group day|week|month` | Calendar grouping without expanding selected dates |
-| `--by project|model` | Usage or task-distribution dimension; period comparison also accepts `task` |
-| `--sort time|tokens|cost` | Usage-list ordering; `top` accepts only `tokens|cost`, defaulting to Tokens; unknown cost is not zero |
+| `--group day\|week\|month` | Calendar grouping without expanding selected dates |
+| `--by project\|model` | Usage or task-distribution dimension; period comparison also accepts `task` |
+| `--sort time\|tokens\|cost` | Usage-list ordering; `top` accepts only `tokens\|cost`, defaulting to Tokens; unknown cost is not zero |
 | `--compact --json` | Complete totals and requested entries with fewer quality examples and facets |
-| `--snapshot ID` | Explicit fixed usage view, incompatible with refresh |
-| `--wait-ms N` | Usage wait deadline, 1..600000 milliseconds, implying `--fresh` |
-| `--watch` | Changing live usage, incompatible with fixed views and `--cached` |
+| `--watch` | Observe current usage changes; incompatible with `--cached` |
 | `--rebuild`, `--include-history` | Explicit derived-data rebuild or historical-source inclusion; advanced data operations |
 
 Period and task comparisons cannot combine. Unknown-date/model filters, precise navigation, input trajectories, resource hotspots and risk leads remain in generated automation. Statistics preserve missing, partial and true-zero values without allocating Tokens or costs to tool operations.
@@ -392,22 +394,22 @@ Period and task comparisons cannot combine. Unknown-date/model filters, precise 
 
 Combined `check` supports date, timezone, project and source selection. Dates filter related history without treating current configuration as a historical version. `check skills` and `check mcp` also support paging. Skills support `--sort review|context_tokens|least_activity|recent|name`. MCP uses the same options except `context_tokens` without definition payloads. Entries missing footprint or frequency evidence are marked separately rather than sorted as zero.
 
-`check --task RECORD [--turn TURN]` inspects the selected complete turn and cannot combine with date or configuration-check arguments. Date-bounded excerpts use `conversation` date/turn selection. `check verify --read-view VIEW --baseline BASELINE` retains original conditions and accepts the source, project and rule parameters required by the original result. `--agents-bytes` and `--description-characters` adjust only the corresponding product reminders, not format-specification thresholds.
+`check --task RECORD [--turn TURN]` inspects the selected complete turn and cannot combine with date or configuration-check arguments. Date-bounded excerpts use `conversation` date/turn selection. `check verify --baseline check.json --suggestion ID` retains original conditions and accepts the source, project and rule parameters required by the original result. `--agents-bytes` and `--description-characters` adjust only the corresponding product reminders, not format-specification thresholds.
 
-`verify` is the ordinary command name. Automation retains the generated `recheck` action. The naming change does not alter the original problem, read view, scope or comparison conditions.
+`verify` is the ordinary command name. Automation retains the generated `recheck` action. The naming change does not alter the original problem, supplied baseline, scope or comparison conditions.
 
 Use the Skill or `system call` method `optimize` to explicitly keep an item or mark it not applicable, including reason and decision revision. These writes are separate from derived indexes. Inventory details, evidence, related scopes and rule discovery remain available through structured `config` and `optimize` actions.
 
 ### Cleanup selection and unattended execution
 
 ```sh
-wombat clean verify --read-view VIEW --baseline BASELINE --item ITEM
+wombat clean verify --plan cleanup.json --item ITEM
 ```
 
 The following is an explicit deletion request. Use it only after reviewing the original candidates and supplying actual selections.
 
 ```sh
-wombat clean --apply --read-view VIEW --baseline BASELINE --item ITEM
+wombat clean --apply --plan cleanup.json --item ITEM
 ```
 
 Replace uppercase placeholders with original inspection values; do not run a deletion template literally. Recheck can omit `--item` to inspect the original scope. Deletion requires explicit entries and accepts repeatable `--item`. Only supported original Codex candidates can be removed.
@@ -450,9 +452,11 @@ For example, put this in `request.json` to request three higher-usage tasks:
 {"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":3,"compact":true},"mode":"auto"}}
 ```
 
-Structured requests are independent of ordinary commands' natural-date defaults. This example supplies no dates, so interpret the returned `scope`. Supply explicit dates and timezone for today or a selected period. Retain returned fixed-view identities; an ordinary fresh read does not save a snapshot.
+Structured requests are independent of ordinary commands' natural-date defaults. This example supplies no dates, so interpret the returned `scope`. Supply explicit dates and timezone for today or a selected period. Keep the returned data revision as provenance, not as a follow-up selector. Each command reads current or explicitly cached facts.
 
 Input is one object up to 1 MiB, read within ten seconds; output is at most 2 MiB. Ordinary commands can prompt only when both stdin and stdout are interactive terminals and neither `--json` nor `--no-input` is set. Other cases and `system call` never wait for record selection or deletion confirmation. Ambiguity, missing params and scope conflicts return errors in the selected format without broadening scope or selecting the first match.
+
+Exact IDs resolve metadata without scanning activity; date filters still apply to the subsequent text read. A budgeted title lookup returns `SCAN_INCOMPLETE` with a continuation request in `error.details.next`. Execute it through `system call`. This state differs from data readiness and does not require an index refresh.
 
 ### Complete method scope
 
@@ -460,16 +464,14 @@ Input is one object up to 1 MiB, read within ten seconds; output is at most 2 Mi
 
 | Method | Actions | Purpose and boundary |
 |---|---|---|
-| `usage` | `usage`, `threads`, `turns`, `steps`, `statistics`, `compare`, `investigate`, `trajectory`, `resources`, `review`, `context`, `refresh` | Current or fixed usage/analysis, returning `result` and data status |
-| `snapshot` | Corresponding fixed-view queries and explicit `refresh` | `refresh` saves a snapshot, unlike ordinary freshness |
+| `usage` | `usage`, `threads`, `turns`, `steps`, `statistics`, `compare`, `investigate`, `trajectory`, `resources`, `review`, `context` | Current usage/analysis, returning `result` and data status |
 | `project` | Assemble current project evidence | Configuration, checks, records, original usage and cleanup candidates; independent status/read versions without project edits |
-| `conversation` | `records`, `activity`, `locate`, `search`, `read`, `changes` | Activity, locations, source text and source changes; changes are not accepted code delivery |
+| `conversation` | `resolve`, `records`, `activity`, `locate`, `search`, `read` | Activity, locations and source text; records are not accepted code delivery |
 | `config` | `list`, `detail`, `evidence`, `related_scopes`, `capabilities` | Read-only configuration, measurements, native observations and associated use |
 | `optimize` | `list`, `detail`, `checks`, `activity`, `capabilities`, `recheck`, `keep`, `not_applicable` | Checks and comparisons; only explicit decisions write user storage |
 | `artifacts` | `inspect`, `recheck`, `apply` | Cleanup observations and protected Codex removal, without conversation indexing |
 | `timing` | `summary`, `evidence`, `capabilities` | Exact task/turn process evidence, without replacing missing time with zero |
 | `setup` | Observe runtime and native integration | Compatibility and discovery, not installation or model work |
-| `service` | `status`, `start`, `pause`, `resume`, `stop`, `enable`, `disable` | Local query service and explicit autostart control |
 | `account` | `read`, `refresh`, `history` | Account and allowance observations, not a project's inferred subscription balance |
 | `monitor` | `list`, `upsert`, `remove`, `check`, `acknowledge` | Budget plans and notices; saving a plan does not start alert monitoring |
 | `prices` | `status`, `update`, `auto_update` | Auxiliary pricing; failures preserve prices and do not change raw Tokens |
@@ -477,13 +479,13 @@ Input is one object up to 1 MiB, read within ten seconds; output is at most 2 Mi
 | `preferences` | `get`, `set` | Supported preferences such as presentation language, without source-text changes |
 | `collection` | `status`, `events`, `configure`, `pause`, `resume` | Optional receipt observations/control, not proof of complete history |
 
-Generated Schemas own concrete fields, combinations, versions and limits. Do not invent params from this table. Selection structures for `usage`, `snapshot`, `conversation` and `timing` are distinct. Retain full identities, snapshots, original filters and each cursor independently.
+Generated Schemas own concrete fields, combinations, versions and limits. Do not invent params from this table. Selection structures for `usage`, `conversation` and `timing` are distinct. Keep full identities, original filters and each cursor independently.
 
 ### Retain scope and handle failures
 
 The Skill translates questions into scoped queries, selects evidence and uses native tools for authorized changes or recovery. Daily reports, resuming work and knowledge organization combine these capabilities rather than adding a report database, automatic execution history or default daily delivery.
 
-Scripts inspect exit codes, data status and per-item outcomes. A query timeout can release this caller while shared indexing continues. A write timeout does not prove no write occurred. Inspect current state before retrying; do not automatically repeat removal, grants or decision writes.
+Inspect exit codes, data status and per-item outcomes. Timeout or cancellation stops the owned core process. A completed write may still have taken effect; inspect state before retrying. Do not automatically replay deletion, grants or decision writes.
 
 <a id="recovery"></a>
 
@@ -495,10 +497,9 @@ Scripts inspect exit codes, data status and per-item outcomes. A query timeout c
 |---|---|---|
 | Complete result | A usable complete result for this scope | Inspect detail or continue your task |
 | No matches in scope | The completed query found no match | Check terms, project and dates; expand scope explicitly if needed |
-| Preparing data | This update has not completed | Use the known portion or wait with `--fresh` |
 | Partial result | Some sources, times, identities or operations are unresolved | Use known facts, select a precise record and retain gaps |
 | Unmeasured metric | No reliable observation for that metric | Do not fill zero or infer disabling, deletion or improvement |
-| Expired original view | The old evidence conditions can no longer be used | Requery or reinspect without reconstructing prior success |
+| Invalidated source cursor | The referenced source or position changed | Restart the same query without that cursor; preserve the original filters |
 
 ### Common problems
 
@@ -511,19 +512,19 @@ Scripts inspect exit codes, data status and per-item outcomes. A query timeout c
 | Installed program but missing plugin discovery | Run `system doctor` and follow the specific discovery/resource result |
 | Unsupported config format or arguments | Read command help or method Schema and correct input for the original task |
 | Read scope or budget exceeded | Narrow project, task, dates or turn; continue the original cursor instead of repeatedly broadening reads |
-| Source changes during reading | Reacquire the same scope and continue with a new view |
-| Unsupported index or snapshot format | Preserve original data, explicitly rebuild derived indexes or recreate the needed snapshot |
+| Source changes during reading | Retry the same scope without invalidated cursors; never substitute old text or claim success |
+| Unsupported index format | Preserve the original data and explicitly rebuild derived indexes |
 | Cleanup changed, protected or unconfirmed | Retain completed outcomes and reinspect concrete remaining objects without force removal |
 
 ### Rebuild derived indexes
 
-Use this command only when diagnosis explicitly requires a derived-index rebuild. It rereads selected sources and can require waiting. It does not repair an unsupported old saved snapshot. Retain the original `--root` options when using selected sources.
+Use this command only when diagnosis explicitly requires a derived-index rebuild. It rereads selected sources and can require waiting. Retain the original `--root` options when using selected sources.
 
 ```sh
-wombat usage --rebuild --wait-ms 600000
+wombat usage --rebuild
 ```
 
-The valid generation remains until the new index succeeds; user decisions and grants remain separate. For a new saved snapshot, inspect `system api snapshot --json`, then explicitly request `snapshot` action `refresh`. Do not delete source conversations to resolve index problems.
+The valid generation remains until the new index succeeds; user decisions and grants remain separate. Do not delete source conversations to resolve index problems.
 
 ### Output and exit codes
 
@@ -542,7 +543,7 @@ An unknown optional metric does not automatically fail the entire task; consider
 
 Work records remain read-only. Indexes are rebuildable derived data; explicit user decisions, identities and grants remain separate. Rebuild retains existing data until a new generation is ready and switches only after success. Failure preserves the valid generation. Unknown formats do not trigger implicit migration or deletion.
 
-History and statistics come from local records; queries invoke no model. Program updates and price completion can use the network. Set `WOMBAT_AUTO_PRICES=0` to disable automatic price completion when needed. Fixed views retain their pricing basis. Sending record content externally requires separate authorization.
+History and statistics come from local records; queries invoke no model. Program updates and price completion can use the network. Set `WOMBAT_AUTO_PRICES=0` to disable automatic price completion when needed. Each result records its pricing basis. Sending record content externally requires separate authorization.
 
 Cache hits, lower usage, an absent candidate path, a keep decision or a successful check command do not automatically establish delivery or improvement. Return to the original problem, the same conditions and actual project validation when a conclusion is needed.
 
@@ -556,8 +557,7 @@ Cache hits, lower usage, an absent candidate path, a keep decision or a successf
 | Turn | An identifiable interaction span within a record, not each individual tool operation |
 | Token | A model content-processing unit, distinct from characters or words |
 | Source | Selected local record directory and its identity, distinct from the inspected project directory |
-| Read view | A fixed data version for consistent paging and follow-up evidence |
-| Saved snapshot | Explicitly saved query data, not automatically created by ordinary reads or waiting for updates |
+| Data revision | Provenance for one result; not a lease or a follow-up request parameter |
 | Baseline | The original problem and comparison conditions needed for a valid before/after check |
 | Cleanup candidate | An object with cleanup evidence that still needs purpose/protection review, not deletion authorization |
 | Schema | Machine-readable descriptions of request and result fields |

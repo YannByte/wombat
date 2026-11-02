@@ -10,24 +10,24 @@
       "en": "414af637f91e6d3f85bc93308cbfc952e72539bbf3aa452ab39047eea3054af2"
     },
     "/cli-command-entry/agent-interface-principles": {
-      "zh": "040c2b07cf9af5012254452d9ce7634eb26dd06781a80423c87778a9be236ce7",
-      "en": "9b6510d8f82bcbef0d655babcf3b7417b1a74175aee6b94ae524a11bfec8f0d2"
+      "zh": "ea65203bf3286172a6760957edfd91b3f782c9a3014af06133052291c208ddf6",
+      "en": "3a58d220cba4f320e1b1ec632ede57b2cb948a66f8de2b68982cc75b78dd2e04"
     },
     "/cli-command-entry/limits-and-verification": {
       "zh": "034d075fbd63008bb597fc9c549a9f9f6a0ba81ce5a9257698551f783eca9d03",
       "en": "9c37e143d06cedf0a6d658ce2a5e0f6548d634212e3e4fca1d7c1ccf19de0fdc"
     },
     "/cli-command-entry/whole-turn-timing": {
-      "zh": "b56da7bf3e0bebc8128dc67844da55e357e762dc4305c3ba3d0f3d49ecf5bb75",
-      "en": "b627e8487b38868ae7d6dc565b370d9455c9369a2815370d0996fcba44535c17"
+      "zh": "aea66a2ed1f0148ec2dc3595a25778732361300703c3bf0c115f119de8947ad7",
+      "en": "ee5c6e4fe88f1a6529436b513cb755e1cf127250461ce613583545f884ff42c1"
     },
     "/cli-command-entry/unsupported-formats-and-recovery": {
-      "zh": "92ffdac1685e74934adc0078776031cae1af25271a6b7e492c74c23b48cd2a09",
-      "en": "15df29442a30c2ea3f5d512429f501d877a603041c8fd1894d9f5a4234c89b69"
+      "zh": "1c65a5cec972833ddd3bfa39411baeb01c7e562c3c42d06275aec0e3566fd4c7",
+      "en": "5013a5ce0f74a43e05da81ebc7558d65d3a9c8ddebce7499fe7cab368998dbe6"
     },
     "/cli-command-entry/local-host-operations": {
-      "zh": "1366c28a1f49966e8ba0812d2084bff26718ee71e24861024b9ef035fd8f4dc2",
-      "en": "02140edd7d7d6e1668684c90691a07b363bbbaabe71acf9c94fdc4419597c1f8"
+      "zh": "6a8deeb7908e2b13b47ff7cc2bcd3bf2ac460579dedda9c4435fa9d0fca48099",
+      "en": "2bbc4b208bdc77de21603456b78ce3a92671cb12a8960f76a215cfc44a904639"
     },
     "/cli-command-entry/release-updates": {
       "zh": "c58a2d90bcf91a6db795aa2a76b17e5fa81b70169a1d0f601b6954c491186e4f",

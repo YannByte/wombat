@@ -143,7 +143,6 @@ export interface Response {
   outputVersion: number;
   action: Action;
   capabilities: Capabilities;
-  readView?: string | null;
   configRevision: string;
   usageRevision?: string | null;
   decisionRevision: string;
@@ -619,7 +618,7 @@ export interface RuleDefinition {
 }
 export interface ActivityResult {
   formatVersion: number;
-  readView: ReadView;
+  basis: ReadView;
   scope: LocalScope;
   analysisMethod: string;
   freshness: QueryFreshness;

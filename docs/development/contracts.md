@@ -6,16 +6,16 @@ Rust 的 `core/src/usage_app_dto.rs` 定义请求与响应，`adapters/contract.
 
 生成文件：
 
-- [实时请求 Schema](../schemas/live-request-v1.schema.json)和[实时响应 Schema](../schemas/live-response-v1.schema.json)，源头为`core/src/live.rs`；`live`封装当前用量结果与独立新鲜度。
-- [请求 Schema](../schemas/usage-request-v3.schema.json)
+- [实时请求 Schema](../schemas/live-request-v2.schema.json)和[实时响应 Schema](../schemas/live-response-v1.schema.json)，源头为`core/src/live.rs`；`live`封装当前用量结果与独立新鲜度。
+- [请求 Schema](../schemas/usage-request-v4.schema.json)
 - [响应 Schema](../schemas/usage-app-v5.schema.json)
 - [价表请求 Schema](../schemas/pricing-request-v1.schema.json)和[价表响应 Schema](../schemas/pricing-response-v1.schema.json)，源头为 `core/src/pricing_sync.rs`
-- [监控请求](../schemas/monitor-request-v1.schema.json)与[响应](../schemas/monitor-response-v1.schema.json)来自 `core/src/monitor.rs`；计划、提醒和确认使用独立协议。
+- [监控请求](../schemas/monitor-request-v2.schema.json)与[响应](../schemas/monitor-response-v1.schema.json)来自 `core/src/monitor.rs`；计划、提醒和确认使用独立协议。
 - `client/src/generated/usage-request.ts`、`usage-app.ts` 和校验器
 
 运行 `corepack pnpm contracts:generate` 重生，`contracts:check` 拒绝漂移。通用客户端校验请求与响应，不提供通用 shell、任意文件写入或任意操作分派。
 
-`outputVersion=5` 是公共结果版本，`schemaVersion=5` 是内部快照版本；来源适配器和价格各有独立版本。内核通信封装为 `{op:"usage_app",args:Request}` → `{ok:true,value:Response}` 或 `{ok:false,error,code,details}`。用量操作为刷新、用量、对话、轮次、步骤；独立价表接口为 `prices`，提供 status/update，响应 `outputVersion=1`。
+`outputVersion=5` 是公共结果版本，`schemaVersion=5` 是内部快照版本；来源适配器和价格各有独立版本。内核通信封装为 `{op:"local_query",args:{query:Request,mode:"auto"}}` → `{ok:true,value:Response}` 或 `{ok:false,error,code,details}`。用量操作包括用量、对话、轮次、步骤；独立价表接口为 `prices`，提供 status/update，响应 `outputVersion=1`。
 
 公开操作、枚举、分页和错误详见[CLI](../guides/cli.md)。计量整数不能超过 JavaScript 安全整数；金额始终为十进制字符串。新字段及规则必须同时检查生成类型、CLI JSON 和当前快照。
 
@@ -23,7 +23,7 @@ Rust 的 `core/src/usage_app_dto.rs` 定义请求与响应，`adapters/contract.
 
 用量请求增加可选 `presentation`，默认明细，分布只保留时段小计；显式指定任一种 presentation 时 offset/limit/page.total 按时段计数，明细一页包含所选时段的全部模型行，不拆日期组；省略 presentation 维持原有逐行分页。`sort: cost` 与按分析小计的 Token 排序均由内核完成。响应 `distribution` 给出筛选范围内按分析小计计算的 Token 最大值、并列峰值日期及准确筛选 Scope、金额最大值和未计价 Token 数；用量、轮次和计量的 `costShare` 以完整范围已计价金额为分母，未知或零分母返回缺失。对话按 matchedUsage 或最近匹配计量排序，threadUsage 保留全量。轮次默认完整；仅 turns 接受 matchedOnly 与 locateTurnId，先筛选排序再定位分页。匹配轮次只改变 items/page，不改变全对话汇总和份额分母；步骤仍完整。
 
-实时新鲜度initialScan表示仅包含首次扫描的临时任务元数据，来源partial且用量未知。预览不落盘，不属于无指定版本的cached结果；fresh/refresh仍等待完整同步。普通固定版本不变；边界见[首次任务视图决策](../decisions/implemented/architecture/2026-10-04-initial-task-preview.md)。
+前台调用在完成同步后返回已采集事实。缓存读取使用 SQLite 中已提交的事实，不创建临时视图。
 
 
 - [采集请求](../schemas/collection-request-v1.schema.json)与[响应](../schemas/collection-response-v1.schema.json)来自 `core/src/collection.rs`；偏好、安全接收与当前日志关联独立于 Token 账本。
@@ -31,23 +31,23 @@ Rust 的 `core/src/usage_app_dto.rs` 定义请求与响应，`adapters/contract.
 
 ## 客户端入口
 
-`@wombat/client` 导出生成的 `UsageRequest`、`UsageResult` 等类型，以及 `UsageClient.query(request, { signal, onProgress })`。`UsageClient.prices({action:"status"|"update"}, {signal,onProgress})` 返回生成的 `PricingResult`，含完整价表和版本/来源哈希。`UsageClient.live({query,mode,verify}, options)`为可选宿主能力；Node实现提供它，CLI默认使用，固定快照仍使用query。`createUsageClient(transport, pricingTransport, liveTransport, configTransport, optimizeTransport, preferencesTransport, directoriesTransport)` 包装受限传输并执行协议校验；其通用入口不包含 Node 或 React 依赖。
+`@wombat/client` 导出生成的请求与结果类型。`UsageClient.query(request, options)` 读取当前用量；Node 提供 `live({query,mode,verify}, options)`，显式控制 auto/fresh/cached。两者均使用前台内核边界。`createUsageClient` 校验窄接口传输与结果。可移植入口不依赖 Node 或 React。
 
 `@wombat/client/node` 提供 `createNodeClient({ binaryPath, timeoutMs, maxResponseBytes })`，负责本机子进程生命周期。调用方无需接触任意内核操作字符串。其他宿主可实现同一窄传输接口，并复用生成契约与校验器。
 
 Node价表传输只下载固定官方HTTPS文档；内核`prices`操作的宿主请求在update时携带document，status不接受document。原始文档不出现在公共请求或响应类型中；Rust解析及发布，其他宿主需实现同一固定来源获取流程。
 
-## 整轮耗时契约 v6
+## 整轮耗时契约 v7
 
-`core/src/timing_dto.rs` 定义类型化 `timing` 操作。生成契约包括[请求](../schemas/timing-request-v1.schema.json)、[响应联合](../schemas/timing-response-v6.schema.json)、[本地](../schemas/timing-local-response-v6.schema.json)与[分享](../schemas/timing-share-response-v6.schema.json)投影，以及[安全错误](../schemas/timing-error-output-v1.schema.json)。客户端导出 `TimingRequest` 和 `TimingResult`；字段以 Rust DTO 和生成 Schema 为准，不在此重复维护字段清单。
+`core/src/timing_dto.rs` 定义类型化 `timing` 操作。生成契约包括[请求](../schemas/timing-request-v2.schema.json)、[响应联合](../schemas/timing-response-v7.schema.json)、[本地](../schemas/timing-local-response-v7.schema.json)与[分享](../schemas/timing-share-response-v7.schema.json)投影，以及[安全错误](../schemas/timing-error-output-v1.schema.json)。客户端导出 `TimingRequest` 和 `TimingResult`；字段以 Rust DTO 和生成 Schema 为准，不在此重复维护字段清单。
 
-请求操作为 `summary`、`evidence` 和 `capabilities`。摘要要求完整任务与轮次身份，可选固定快照、来源范围、`auto`/`fresh`/`cached` 模式及 `local`/`share-v1` 隐私配置。证据页要求相同目标和固定快照；`turn_events`、`use_objects` 与 `use_records` 使用绑定视图和范围的不透明游标。capabilities 不扫描来源。摘要使用 `outputVersion=5` 和分析方法 `safe_event_turn_v7`；操作起止归并方法单独版本化，旧响应版本明确拒绝。本地结果可含本地身份与路径，`share-v1` 是单独的白名单投影，不包含这些信息。耗时查询不触发价表下载、配置扫描、Hook 或账户观察。命令及错误处理见 [CLI 指南](../guides/cli.md)。
+请求操作为 `summary`、`evidence` 和 `capabilities`。摘要要求完整任务与轮次身份，接受显式来源根、来源范围、`auto`/`fresh`/`cached` 模式及 `local`/`share-v1` 隐私配置。证据页要求相同目标和范围；`turn_events`、`use_objects` 与 `use_records` 使用绑定来源证据和范围的不透明游标。capabilities 不扫描来源。摘要使用 `outputVersion=7` 和分析方法 `safe_event_turn_v7`；操作起止归并方法单独版本化，旧响应版本明确拒绝。本地结果可含本地身份与路径，`share-v1` 是单独的白名单投影，不包含这些信息。耗时查询不触发价表下载、配置扫描、Hook 或账户观察。命令及错误处理见 [CLI 指南](../guides/cli.md)。
 
-## 只读配置契约 v1
+## 只读配置契约 v2
 
-`core/src/config_dto.rs` 生成[请求](../schemas/config-request-v1.schema.json)与[响应](../schemas/config-response-v1.schema.json)，Node 提供 `UsageClient.config`。list/detail/evidence/related_scopes/capabilities 不写来源；capabilities 不扫描。无 readView 时重采集。默认 UTC 近30天、截止日排他；`scope.allTime` 包含未知日期，不能同时给日期。配置范围不接受模型或强度；当前内容测量与日期无关。
+`core/src/config_dto.rs` 生成[请求](../schemas/config-request-v2.schema.json)与[响应](../schemas/config-response-v2.schema.json)，Node 提供 `UsageClient.config`。list/detail/evidence/related_scopes/capabilities 不写来源；capabilities 不扫描。每次调用采集当前配置。默认 UTC 近30天、截止日排他；`scope.allTime` 包含未知日期，不能同时给日期。配置范围不接受模型或强度；当前内容测量与日期无关。
 
-readView 固定配置元数据和用量引用，全局最多8版、10分钟；淘汰、过期和重启返回 VIEW_EXPIRED。有效配置版本延长内核寿命并保留原用量，供返回任务轮次。续查 roots/projectRoots 必须与创建时一致。
+复查接收原始选定发现、来源和项目范围及规则输入，重新比较当前证据，不保留视图，也没有视图过期。缺少证据不能证明修复。
 
 来源根盘点准确文件名 AGENTS.md、config.toml 顶层 MCP、skills 和 .agents/skills；默认 ~/.codex 还读 ~/.agents/skills。授权项目中有界递归发现 AGENTS.md，读取 .agents/skills 与 .codex/config.toml；不进入 .git、node_modules、target、dist、.codex、.agents 或符号链接目录。大小写不敏感的文件系统仍核验准确目录项名。只提供发现事实，不推断加载优先级或历史采用。扫描单文件10 MiB、总读64 MiB、检查条目和新配置各10,000、深度8、问题256，超限公开 resourceLimited。
 
@@ -55,7 +55,7 @@ readView 固定配置元数据和用量引用，全局最多8版、10分钟；�
 
 Hook单独测量当前声明原文：JSON对象、TOML平铺表头至末尾值或内联对象，保留原始转义和空白；不含其他配置、组级匹配器及引用脚本。bytesSource为hookDeclarationUtf8，estimate.payload为hookDeclaration，估算指纹绑定声明文本，item.contentHash仍绑定完整配置文件。无法可靠取得范围的嵌套TOML声明保持declarationUnavailable，不报配置无效；启用/信任/触发仍需要独立宿主证据。hooks.state是状态表，不作为事件。文件版本哈希每次读取仅计算一次，JSON借用声明原文，不复制脚本或命令正文进清单/缓存。
 
-配置响应hookRegistry独立提供授权项目的原生注册观察：启用、信任、处理类型、声明文件版本及注册哈希，不表示运行或注入。按校验后的结构、来源身份和文件哈希绑定普通文件键、插件独立JSON及内联声明键。原生版本仅用于诊断，不用版本白名单决定是否接入；当前CODEX_HOME必须属于所选来源，项目必须显式授权，不用来源目录冒充工作目录。Node先有界预检本地Hook声明及显式启用的插件；两者均无时不启动原生宿主。预检另有每文件10MiB/总32MiB预算。Node在两次一致的hooks/list之间对授权范围内普通文件流式计算哈希，Rust再次匹配当前清单版本；进入视图时超过60秒、原生失败、必需字段无效、重复身份、未知键形状或路径越界保持未知/partial。最多64个项目、512条注册、每文件10MiB/总32MiB哈希读取、64KiB缓冲和5秒查询取消期限；文件系统阻塞不承诺硬实时。完整注册观察不持久缓存，不导出命令/任意报错文本；发现与用户决定保留复查所需的项目、注册哈希及文件版本。固定readView保持原观察，新读取和发送复核重新获取，时间戳不改变相同证据的配置版本。CLI 文本与 JSON 共享结果。Unix已开放下述静态命令子集的hookTarget检查；Windows命令及运行证据仍待补。
+配置响应hookRegistry独立提供授权项目的原生注册观察：启用、信任、处理类型、声明文件版本及注册哈希，不表示运行或注入。按校验后的结构、来源身份和文件哈希绑定普通文件键、插件独立JSON及内联声明键。原生版本仅用于诊断，不用版本白名单决定是否接入；当前CODEX_HOME必须属于所选来源，项目必须显式授权，不用来源目录冒充工作目录。Node先有界预检本地Hook声明及显式启用的插件；两者均无时不启动原生宿主。预检另有每文件10MiB/总32MiB预算。Node在两次一致的hooks/list之间对授权范围内普通文件流式计算哈希，Rust再次匹配当前清单版本；进入查询时超过60秒、原生失败、必需字段无效、重复身份、未知键形状或路径越界保持未知/partial。最多64个项目、512条注册、每文件10MiB/总32MiB哈希读取、64KiB缓冲和5秒查询取消期限；文件系统阻塞不承诺硬实时。完整注册观察不持久缓存，不导出命令/任意报错文本；发现与用户决定保留复查所需的项目、注册哈希及文件版本。每次前台读取重新获取当前观察，时间戳不改变相同证据的配置版本。CLI 文本与 JSON 共享结果。Unix已开放下述静态命令子集的hookTarget检查；Windows命令及运行证据仍待补。
 
 插件注册包含明确pluginId，键中的身份、包内相对路径、事件及位置必须一致；相对路径不得含空分量、点分量或反斜线，并须与授权普通文件的路径后缀精确匹配。只读取原生列出的独立JSON或plugin.json内联声明；内联单对象及对象数组按原生hooks[n]位置绑定，测量真实JSON指针处的处理声明。清单阶段每个物理文件只读一次，不猜测缓存布局或遍历插件目录。清单只纳入注册涉及的声明与授权项目，不把插件配置视为全局生效；安全文件元数据及最近项目范围可保留，注册身份/状态仍只在视图中。注册缺失但来源文件未成功读取时，保留最近声明为stale；明确文件不存在或成功读取后声明消失才转历史。文件版本变化须重新绑定；未知形状保持未知。CLI 文本显示插件身份，JSON使用生成契约。
 
@@ -77,9 +77,9 @@ currentItems 不计明确缺失的路径，清单仍公开缺失行；显式读�
 
 ## 优化与偏好契约
 
-Rust 的 `optimize_dto.rs` 生成[请求](../schemas/optimize-request-v1.schema.json)与[响应 v5](../schemas/optimize-response-v5.schema.json)。支持 list/detail/checks/capabilities、显式 keep/not_applicable 和 recheck，以及固定轮次 activity。目录仅列十项已实现的静态规则；`partial` 来自实际范围或检查证据缺口，即使没有命中也保留缺口。
+Rust 的 `optimize_dto.rs` 生成[请求](../schemas/optimize-request-v2.schema.json)与[响应 v5](../schemas/optimize-response-v6.schema.json)。支持 list/detail/checks/capabilities、显式 keep/not_applicable 和 recheck，以及固定轮次 activity。目录仅列十项已实现的静态规则；`partial` 来自实际范围或检查证据缺口，即使没有命中也保留缺口。
 
-检查与复查只读，不创建自动观察、历史状态或采用记录。响应的 `readView` 固定配置证据，建议的 `baselineId` 绑定原视图、问题、项目/来源和规则参数。recheck 先验证原视图授权，再读取当前配置，并按原条件比较独立检查。过期或改变范围/参数拒绝；对象消失或规则不再适用返回不足，不判修复。检查结论与比较状态分别表达，当前未命中不能绕过不可比较状态。
+检查与复查只读，不创建自动观察或采用历史。基线 ID 绑定传回的原始发现、来源和项目范围及规则。复查校验该范围，检查当前配置并比较独立检查。范围或规则变化时拒绝；对象缺失或规则不适用表示证据不足，不能当作修复。检查结论与比较状态分别表达。
 
 只有显式用户决定写入独立用户存储。现行决定存储格式保持为 4，以保留有效决定与身份；只读检查不追加事件或修改文件。不迁移未知版本，不删除原数据。索引重建不能改变用户决定。历史处理展示、自动记录、采纳对比、重新显示和发送任务已移除。
 

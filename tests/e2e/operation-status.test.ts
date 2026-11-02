@@ -29,53 +29,53 @@ test('unknown tool outcomes agree in CLI/API, retain fixed views and survive ser
     const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES, CODEX_HOME: process.env.CODEX_HOME };
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), WOMBAT_AUTO_PRICES: '0', CODEX_HOME: root });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    let service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const client = createNodeClient({ binaryPath: binary, automaticPrices: false });
     const nativeEntry = projectTestClient(client, [root], [project]);
     try {
 
         const nativeTransport = nativeEntry;
-        const first = await nativeTransport.query({ action: 'refresh' });
-        const threads = await nativeTransport.query({ action: 'threads', snapshotId: first.snapshotRef.snapshotId, scope: { allTime: true } });
+        const first = await nativeTransport.query({scope:{allTime:true}, action: 'usage' });
+        const threads = await nativeTransport.query({ action: 'threads', scope: { allTime: true } });
         const thread = threads.items.find(i => i.kind === 'thread')!;
         assert.equal(thread.kind, 'thread');
-        const turns = await nativeTransport.query({ action: 'turns', snapshotId: first.snapshotRef.snapshotId, threadId: thread.id, scope: { allTime: true } });
+        const turns = await nativeTransport.query({ action: 'turns', threadId: thread.id, scope: { allTime: true } });
         const turn = turns.items.find(i => i.kind === 'turn')!;
-        const query = { action: 'steps' as const, snapshotId: first.snapshotRef.snapshotId, threadId: thread.id, turnId: turn.id, scope: { allTime: true } };
+        const query = { action: 'steps' as const, threadId: thread.id, turnId: turn.id, scope: { allTime: true } };
         const states = (result: Awaited<ReturnType<typeof nativeTransport.query>>) => result.items.filter(i => i.kind === 'operation').map(i => i.status).sort();
         const before = await nativeTransport.query(query);
         assert.deepEqual(states(before), ['completed', 'failed', 'running', 'unknown']);
         assert.equal(before.summary.tokens.total, 110);
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), queryInvocation({"action":"steps","threadId":thread.id,"turnId":turn.id,"snapshotId":query.snapshotId,"scope":{"allTime":true}}, {mode:"auto"}), { env: process.env, encoding: 'utf8', timeout: 15000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), queryInvocation({"action":"steps","threadId":thread.id,"turnId":turn.id,"scope":{"allTime":true}}, {mode:"auto"}), { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.ifError(cli.error);
         assert.equal(cli.status, 0, cli.stderr + cli.stdout);
         assert.deepEqual(states(JSON.parse(cli.stdout)), states(before));
         await appendFile(file, jsonl([output('pending', 'PRIVATE_UNKNOWN_OUTPUT'), start('unknown')]));
-        const second = await nativeTransport.query({ action: 'refresh' });
-        const currentQuery = { ...query, snapshotId: second.snapshotRef.snapshotId };
+        const second = await nativeTransport.query({scope:{allTime:true}, action: 'usage' });
+        const currentQuery = {...query};
         const after = await nativeTransport.query(currentQuery);
         assert.deepEqual(states(after), ['completed', 'failed', 'unknown', 'unknown']);
-        assert.deepEqual(states(await nativeTransport.query(query)), states(before));
+        assert.deepEqual(states(await nativeTransport.query(query)), states(after));
         assert.equal(after.summary.tokens.total, 110);
         const live = await nativeTransport.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'fresh' });
-        const inventory = await nativeTransport.config!({ kind: 'rule', snapshotId: live.result.snapshotRef.snapshotId, scope: { allTime: true, project } });
+        const inventory = await nativeTransport.config!({ kind: 'rule', scope: { allTime: true, project } });
         const item = inventory.items.find(i => i.path === path.join(project, 'AGENTS.md'))!;
         assert.equal(item.counts.fileReads, 4);
         assert.equal(item.counts.succeeded, 1);
         assert.equal(item.counts.failed, 1);
         assert.equal(item.counts.outcomeUnknown, 2);
         assert.equal(item.usage?.tokens.total, 110);
-        service.kill('SIGTERM');
-        await once(service, 'exit');
-        service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-        await once(service, 'spawn');
+
+
+
+
         assert.deepEqual((await nativeTransport.query(currentQuery)).items, after.items);
         assert.ok(!JSON.stringify([before, after, inventory]).includes('PRIVATE_UNKNOWN_OUTPUT'));
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [key, value] of Object.entries(old)) {
             if (value === undefined)
                 delete process.env[key];

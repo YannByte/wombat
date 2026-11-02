@@ -1,3 +1,4 @@
+import {comparable} from '../helpers/comparable.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
@@ -23,7 +24,7 @@ test('extension activity reports full filtered counts before pagination and sepa
     const usage = await nativeApi.live!({ query: { action: 'usage', scope }, mode: 'fresh' });
     assert.ok(['current','stale'].includes(usage.freshness.status));
     assert.equal(usage.freshness.initialScan, false);
-    const full = await nativeApi.config!({ action: 'list', snapshotId: usage.result.snapshotRef.snapshotId, scope, kinds: ['skill', 'mcp'], sort: 'name' });
+    const full = await nativeApi.config!({ action: 'list', scope, kinds: ['skill', 'mcp'], sort: 'name' });
     assert.equal(full.items.length, 3);
     assert.deepEqual([full.extensionActivity!.observedUse, full.extensionActivity!.noObservedUse, full.extensionActivity!.unavailable], [1, 2, 0]);
     const used = full.items.find(item => item.name === 'used')!, idle = full.items.find(item => item.name === 'idle')!;
@@ -32,16 +33,16 @@ test('extension activity reports full filtered counts before pagination and sepa
     assert.equal(usedActivity.observedRecords, 1); assert.equal(usedActivity.noObservedUseDays, 3);
     assert.equal(idleActivity.observedRecords, 0); assert.equal(idleActivity.noObservedUseDays, 4);
     for (const item of full.extensionActivity!.items) assert.equal(item.absenceObservable, false);
-    const request = { action: 'list' as const, readView: full.readView, scope, kinds: ['skill' as const, 'mcp' as const], sort: 'name' as const, limit: 1, offset: 1 };
+    const request = { action: 'list' as const, scope, kinds: ['skill' as const, 'mcp' as const], sort: 'name' as const, limit: 1, offset: 1 };
     const page = await nativeApi.config!(request);
     assert.equal(page.items.length, 1); assert.equal(page.extensionActivity!.items.length, 1);
     assert.deepEqual([page.extensionActivity!.observedUse, page.extensionActivity!.noObservedUse, page.extensionActivity!.unavailable], [1, 2, 0]);
-    const mismatched = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'config', params: request }), 1));
-    assert.equal(mismatched.error.code, 'INVALID_ARGUMENT', 'A pinned read view requires the same explicit source and project roots');
+    const mismatched = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'config', params: request }), 2));
+    assert.ok(mismatched.coverage.issues.some((i:{code:string})=>i.code==='projectNotAuthorized'), 'A new call requires explicit project authorization');
     const cli = JSON.parse(f.cli(['system','call'], JSON.stringify({ method: 'config', params: { ...request, roots: [f.root], projectRoots: [f.project] } }), 2));
     assert.equal(cli.coverage.status, 'partial', 'Configured native integration remains unknown in this isolated fixture');
-    assert.deepEqual(cli.extensionActivity, page.extensionActivity);
-    const allTime = await nativeApi.config!({ action: 'list', readView: full.readView, scope: { project: f.project, allTime: true }, kinds: ['skill'] });
+    assert.deepEqual(comparable(cli.extensionActivity), comparable(page.extensionActivity));
+    const allTime = await nativeApi.config!({ action: 'list', scope: { project: f.project, allTime: true }, kinds: ['skill'] });
     const unknownStart = allTime.extensionActivity!.items.find(item => item.itemId === idle.id)!;
     assert.equal(unknownStart.observedRecords, 0); assert.equal(unknownStart.noObservedUseDays, null, 'No all-time window start can be invented');
   });

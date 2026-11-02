@@ -1,9 +1,11 @@
 //! Narrow, object-bound review operations. No source writes or command execution.
+pub const REQUEST_VERSION: u32 = 2;
+
 use crate::config_dto::{Issue, Item};
 use crate::usage_app_dto::Page;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-pub const OUTPUT_VERSION: u32 = 5;
+pub const OUTPUT_VERSION: u32 = 6;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
@@ -24,8 +26,11 @@ pub struct Request {
     pub action: Action,
     pub roots: Option<Vec<String>>,
     pub project_roots: Option<Vec<String>>,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub read_view: Option<String>,
     pub baseline_id: Option<String>,
+    pub baseline: Option<Box<Suggestion>>,
     pub decision_revision: Option<String>,
     pub project: Option<String>,
     pub source_instance_id: Option<String>,
@@ -424,10 +429,12 @@ impl Default for Capabilities {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Response {
-    #[schemars(range(min = 5, max = 5))]
+    #[schemars(range(min = 6, max = 6))]
     pub output_version: u32,
     pub action: Action,
     pub capabilities: Capabilities,
+    #[serde(skip)]
+    #[schemars(skip)]
     pub read_view: Option<String>,
     pub config_revision: String,
     pub usage_revision: Option<String>,
@@ -449,6 +456,8 @@ pub struct Response {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivitySelection {
     #[schemars(length(min = 1, max = 4096))]
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub snapshot_id: String,
     #[schemars(length(min = 1, max = 4096))]
     pub thread_id: String,
@@ -525,6 +534,7 @@ pub struct ActivityCheck {
 pub struct ActivityResult {
     #[schemars(range(min = 3, max = 3))]
     pub format_version: u32,
+    #[serde(rename = "basis")]
     pub read_view: crate::timing_dto::ReadView,
     pub scope: crate::timing_dto::LocalScope,
     pub analysis_method: String,

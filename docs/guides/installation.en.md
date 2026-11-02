@@ -2,7 +2,7 @@
 
 [中文](installation.md) | English
 
-Wombat `v0.6.0` supports macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Installation includes everything needed to run Wombat. No development tools or API key are required.
+Wombat `v0.7.0` supports macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Installation includes everything needed to run Wombat. No development tools or API key are required.
 
 ## Install the runtime and plugin
 
@@ -23,7 +23,7 @@ Install a compatible local Codex first. The installer installs Wombat, registers
 If the plugin stage fails, Wombat and its data remain installed. The error identifies the stage, error code, recovery action and private diagnostic summary path. For discovery permission errors, disconnects or timeouts, correct the reported condition and run only `wombat system doctor --project PATH --json`; do not reinstall. For a disabled or conflicting Skill, check the project's plugin settings in Codex before the same read-only check. Only a failed plugin installation or confirmed version/content mismatch needs `--plugin-only` on macOS/Linux or `-PluginOnly` on PowerShell. Keep any custom prefix option. This reuses the current runtime without downloading it or changing PATH; omit version and download-source options. Review the diagnostic summary before attaching it to an [issue](https://github.com/YannByte/wombat/issues): it includes local project and Skill paths, but excludes raw command output and Hook configuration.
 
 
-Installation starts no indexing and registers no automatic startup by default. Queries trigger preparation and reuse committed results. To keep an optional resident query service, add `--service` on macOS/Linux or `-Service` on Windows; it stays idle without queries. `--plugin-only` / `-PluginOnly` does not change the service. Existing automatic-start registrations remain until method `service` with action `disable` through `wombat system call` removes them; updated services also index only on demand. Installation success does not establish data readiness. See [query service controls](cli.en.md) for progress, pause, resume and removal.
+Installation provides the CLI and Skill without indexing, a resident service or automatic startup. The first query prepares its internal index in the foreground; later queries reuse committed facts and collect increments. No initialization command is required. If an older version was explicitly registered for automatic startup, disable it with that version before upgrading; the new runtime does not manage old service registrations.
 
 ## Update
 

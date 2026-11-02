@@ -1,3 +1,4 @@
+import {comparable} from '../helpers/comparable.js';
 import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { projectTestClient } from '../helpers/project-client.js';
 import type { UsageClient } from '@wombat/client';
@@ -35,10 +36,10 @@ for (const array of [false, true])
                 ], warnings: [], errors: [] })) };
         const setMode = (extra: object = {}) => writeFile(native.mode, JSON.stringify({ hooks, ...extra }));
         await setMode();
-        const old = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-        Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
-        const binary = path.resolve('dist/wombat-core'), service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-        await once(service, 'spawn');
+        const old = { WOMBAT_CODEX_BIN:process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+        Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CODEX_BIN:native.binary });
+        const binary = path.resolve('dist/wombat-core');
+
         const client = createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false });
         const nativeEntry = projectTestClient(client, [root], [a, b]);
         try {
@@ -56,9 +57,9 @@ for (const array of [false, true])
             assert.ok(inventory.hookRegistry.contexts.every(c => c.registrations.length === 2 && c.registrations.every(r => r.pluginId === 'sample@test')));
             for (const privateText of ['PRIVATE_ARG', 'UNLISTED_PRIVATE', 'UNRESOLVED'])
                 assert.ok(!JSON.stringify(inventory).includes(privateText));
-            const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots:[root],projectRoots:[a,b],kind:'hook',readView:inventory.readView}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
+            const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots:[root],projectRoots:[a,b],kind:'hook'}}, { env: process.env, encoding: 'utf8', timeout: 15000 });
             assert.ok(cli.status === 0 || cli.status === 2, cli.stderr);
-            assert.deepEqual(JSON.parse(cli.stdout).hookRegistry, inventory.hookRegistry);
+            assert.deepEqual(comparable(JSON.parse(cli.stdout).hookRegistry), comparable(inventory.hookRegistry));
             const suggestions = await nativeTransport.optimize!({ action: 'list', project: a });
             const suggestion = suggestions.suggestions.find(s => s.item.id === item.id)!;
             assert.ok(suggestion);
@@ -67,12 +68,12 @@ for (const array of [false, true])
             assert.equal(finding.evidence?.hook?.target, path.join(a, '工具 script.py'));
             assert.equal(finding.evidence?.hook?.nativeKey, key(0));
             assert.ok(!(await nativeTransport.optimize!({ action: 'list', project: b })).suggestions.some(s => s.findings.some(f => f.rule === 'hookTarget')));
-            await nativeTransport.optimize!({ action: 'keep', suggestionId: suggestion.id, decisionReason: 'necessary', readView: suggestions.readView, decisionRevision: suggestions.decisionRevision, project: a });
+            await nativeTransport.optimize!({ action: 'keep', suggestionId: suggestion.id, decisionReason: 'necessary', decisionRevision: suggestions.decisionRevision, project: a });
             await writeFile(path.join(a, '工具 script.py'), `from pathlib import Path\nPath(${JSON.stringify(marker)}).touch()\n`);
-            const resolved = await nativeTransport.optimize!({ action: 'recheck', readView: suggestions.readView, baselineId: suggestion.baselineId, suggestionId: suggestion.id, project: a });
+            const resolved = await nativeTransport.optimize!({ action: 'recheck', baseline:suggestion,baselineId: suggestion.baselineId, suggestionId: suggestion.id, project: a });
             assert.ok(resolved.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='miss'));
             await setMode({ hooks: { data: hooks.data.map(c => ({ ...c, hooks: c.hooks.map(h => ({ ...h, command: 'python3 "${UNKNOWN}/tool.py"' })) })) } });
-            const uncertain = await nativeTransport.optimize!({ action: 'recheck', readView: suggestions.readView, baselineId: suggestion.baselineId, suggestionId: suggestion.id, project: a });
+            const uncertain = await nativeTransport.optimize!({ action: 'recheck', baseline:suggestion,baselineId: suggestion.baselineId, suggestionId: suggestion.id, project: a });
             assert.ok(uncertain.checks.some(c=>c.rule==='hookTarget'&&c.outcome==='insufficient'));
             await setMode({ hooksAfter: { data: hooks.data.map(c => ({ ...c, hooks: c.hooks.map(h => ({ ...h, command: 'python3 changed.py' })) })) } });
             assert.equal((await nativeTransport.config!({ kind: 'hook' })).hookRegistry.status, 'unavailable');
@@ -87,8 +88,8 @@ for (const array of [false, true])
             assert.ok(!methods.some(m => m.startsWith('thread/')));
         }
         finally {
-            service.kill('SIGTERM');
-            await once(service, 'exit').catch(() => { });
+
+
             await native.waitForExit();
             for (const [k, v] of Object.entries(old)) {
                 if (v === undefined)

@@ -6,7 +6,6 @@ import {appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdi
 import {once} from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
-import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
@@ -39,7 +38,7 @@ for (const item of set.assets) {
 }
 
 const scratch = mkdtempSync(path.join(os.tmpdir(), 'wombat-github-release-'));
-let service: ChildProcess | undefined;
+
 const stage = (name: string) => console.log(`Release archive verification: ${name}`);
 async function within<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -79,15 +78,6 @@ function downloadPublishedRelease(tag: string, targetArchive: string): string {
   assert(validatePublishedRelease(directory, tag, targetArchive), `Downloaded ${tag} ${target} assets failed identity or checksum validation`);
   return pathToFileURL(directory).href;
 }
-const stopService = async () => {
-  if (!service?.pid || service.exitCode !== null || service.signalCode !== null) return;
-  const exited = once(service, 'exit');
-  if (process.platform === 'win32') {
-    const killed = spawnSync('taskkill', ['/PID', String(service.pid), '/T', '/F'], {encoding: 'utf8', windowsHide: true});
-    assert.ifError(killed.error);
-  } else assert.equal(service.kill('SIGKILL'), true, 'Failed to stop installed shared service');
-  await within(exited, 10_000, 'Installed shared service shutdown');
-};
 try {
   stage('first-install preparation');
   const prefix = path.join(scratch, 'first-install-prefix');
@@ -153,19 +143,17 @@ try {
   assert.equal(doctor.installationChecks.find((check: {id: string}) => check.id === 'core')?.status, 'pass');
   assert.equal(existsSync(env.CODEX_HOME!), false, 'Doctor created the missing source directory');
   assert.deepEqual(existsSync(dataHome) ? inventory(dataHome) : [], doctorDataBefore, 'Doctor changed product data');
-  service = spawn(core, ['--serve-usage'], {env, windowsHide: true, stdio: 'ignore'});
-  await once(service, 'spawn');
-  await delay(150);
-  assert.equal(service.exitCode, null, 'Installed shared service exited during startup');
-  assert.equal(query(['usage', '--cached'], 1).error.code, 'NO_SNAPSHOT');
+
+
+  assert.equal(query(['usage', '--cached'], 1).error.code, 'INDEX_UNAVAILABLE');
   const sessions = path.join(env.CODEX_HOME!, 'sessions'); mkdirSync(sessions, {recursive: true});
   const log = path.join(sessions, 'synthetic.jsonl');
   const row = (id: string) => JSON.stringify({timestamp: new Date().toISOString(), type: 'event_msg', payload: {type: 'token_usage_record', thread_id: 'thread', turn_id: 'turn', response_id: id, usage: {input_tokens: 100, cached_input_tokens: 0, output_tokens: 10, total_tokens: 110}}}) + '\n';
   writeFileSync(log, JSON.stringify({type: 'session_meta', payload: {id: 'thread'}}) + '\n' + JSON.stringify({type: 'turn_context', payload: {turn_id: 'turn', model: 'gpt-5.4', model_provider: 'openai'}}) + '\n' + row('one'));
   assert.equal(query(['usage', '--fresh']).summary.tokens.total, 110);
-  const snapshot = query({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto"}}); appendFileSync(log, row('two'));
+  appendFileSync(log, row('two'));
   assert.equal(query(['usage', '--fresh']).summary.tokens.total, 220);
-  assert.equal(query(['usage', '--snapshot', snapshot.snapshotRef.snapshotId]).summary.tokens.total, 110);
+  assert.equal(query(['usage','--cached']).summary.tokens.total, 220);
   assert.equal(query({"method":"usage","params":{"query":{"action":"threads"},"mode":"fresh"}}).summary.tokens.total, 220);
 
   if (process.platform === 'win32') {
@@ -197,7 +185,7 @@ try {
     180_000, 'Managed installation upgrade');
   assert.deepEqual({currentVersion: updated.currentVersion, availableVersion: updated.availableVersion, updateAvailable: updated.updateAvailable, updated: updated.updated},
     {currentVersion: previousTag.slice(1), availableVersion: set.version, updateAvailable: true, updated: true});
-  assert.equal(updated.serviceRestart, undefined, 'Isolated upgrade unexpectedly restarted a native service');
+  assert.equal('serviceRestart' in updated, false);
   const upgradedId = readFileSync(path.join(upgradeRoot, 'current.txt'), 'utf8').trim();
   assert.notEqual(upgradedId, previousId); assert(existsSync(path.join(upgradeRoot, 'versions', previousId)));
   const upgradedLauncher = path.join(upgradePrefix, 'bin', process.platform === 'win32' ? 'wombat.cmd' : 'wombat');
@@ -208,8 +196,7 @@ try {
 
   console.log(JSON.stringify({version: set.version, source: set.source, target, runtime: run(runtime, ['--version']).trim(),
     archive: asset.archive, archiveBytes: asset.bytes, installedBytes: inventory(installed).reduce((total, file) => total + file.size, 0),
-    metadataReadMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, fixedSnapshot: true, cliOnly: true}));
+    metadataReadMs, firstInstallMs, preparation, firstInstall: true, launcher: true, upgradedFrom: previousTag.slice(1), emptyAppPath: true, live: true, append: true, cachedRead: true, cliOnly: true}));
 } finally {
-  await stopService();
   rmSync(scratch, {recursive: true, force: true, maxRetries: 20, retryDelay: 500});
 }

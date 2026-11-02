@@ -16,7 +16,7 @@ Status: proposed
 
 元数据发现与正文读取分开。读取前校验来源身份和选定内容，明确保留变化、缺失、不支持和不完整状态。索引边界之外的追加内容不能悄然进入固定结果。使用现有 Rust 时区及归属规则。公开 DTO 和校验器必须从 Rust 生成。通过已授权的 Web 宿主和非 TTY 接口交付，支持取消和响应预算。
 
-[合成数据实验](../../../../scripts/benchmark-conversation-access.ts) 测试 SQLite 位置索引和直接跳转读取。[原型](../../../../scripts/conversation-access-prototype.ts) 使用测试专用格式，属于研究代码，不是生产适配器或公开契约。原型中的完整记录指纹仍属于实验方案。生产使用 [隐私规则](../../../reference/privacy.md) 约束的有界文本块指纹；已交付行为和边界由 [内核参考](../../../reference/core.md) 维护。现有快照和普通查询响应继续排除对话正文。显式内容读取接口需要单独说明边界。
+[合成数据实验](https://github.com/YannByte/wombat/blob/475d0bbf0cc86281875b227c00d7c1e413c9ba81/scripts/benchmark-conversation-access.ts) 测试 SQLite 位置索引和直接跳转读取。[原型](../../../../scripts/conversation-access-prototype.ts) 使用测试专用格式，属于研究代码，不是生产适配器或公开契约。原型中的完整记录指纹仍属于实验方案。生产使用 [隐私规则](../../../reference/privacy.md) 约束的有界文本块指纹；已交付行为和边界由 [内核参考](../../../reference/core.md) 维护。现有快照和普通查询响应继续排除对话正文。显式内容读取接口需要单独说明边界。
 
 ## 考虑过的方案
 

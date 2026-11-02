@@ -16,7 +16,7 @@ test('opportunity rules run through actual native sources, CLI and native withou
     const dir = realpathSync.native(await mkdtemp(path.join(tmpdir(), 'wombat-opportunity-'))), root = path.join(dir, 'source'), data = path.join(dir, 'data');
     const saved = ['WOMBAT_DATA_HOME', 'CODEX_HOME', 'WOMBAT_AUTO_PRICES', 'WOMBAT_CORE_BIN'].map(k => [k, process.env[k]] as const);
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    let service: ReturnType<typeof spawn> | undefined, nativeEntry: UsageClient | undefined;
+    let nativeEntry: UsageClient | undefined;
     try {
         await mkdir(path.join(root, 'sessions'), { recursive: true });
         const current = new Date();
@@ -53,21 +53,18 @@ test('opportunity rules run through actual native sources, CLI and native withou
             await writeFile(path.join(root, 'sessions', thread + '.jsonl'), rows.map(r => JSON.stringify(r) + '\n').join(''));
         }
         Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0', WOMBAT_CORE_BIN: binary });
-        service = spawn(binary, ['--serve-usage'], { env: process.env, stdio: 'ignore' });
-        await once(service, 'spawn');
+
+
         const client = createNodeClient({ binaryPath: binary, automaticPrices: false, timeoutMs: 15000 });
         const deadline = Date.now() + 10000;
-        while (!(await client.service!({ action: 'status' })).running) {
-            assert.ok(Date.now() < deadline, 'core listener startup timed out');
-            await delay(30);
-        }
+
         const live = await client.live!({ query: { action: 'usage', roots: [root], scope: { allTime: true } }, mode: 'fresh' });
         const snapshotId = live.result.snapshotRef.snapshotId;
         nativeEntry = projectTestClient(client, [root], [path.join(dir, 'project')]);
 
         const nativeTransport = nativeEntry;
         assert.equal((await nativeTransport.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'cached' })).result.snapshotRef.snapshotId, snapshotId);
-        const result = (await nativeTransport.live!({ query: { action: 'investigate', snapshotId, scope: { allTime: true, timezone: 'UTC' } }, mode: 'cached' })).result;
+        const result = (await nativeTransport.live!({ query: { action: 'investigate', scope: { allTime: true, timezone: 'UTC' } }, mode: 'cached' })).result;
         const review = result.inspection!.opportunities!;
         assert.equal(review.checks.length, 17);
         const checks = new Map(review.checks.map(c => [c.rule, c]));
@@ -76,35 +73,25 @@ test('opportunity rules run through actual native sources, CLI and native withou
         assert.doesNotMatch(JSON.stringify(result), /SYNTHETIC_PRIVATE_REVIEW_BODY/);
         assert.ok(!JSON.stringify(result).includes(credential));
         const nodeQuery = async (query: UsageRequest) => (await client.live!({ query, mode: 'cached' })).result;
-        const priced = (await nodeQuery({ action: 'investigate', snapshotId, scope: { allTime: true, timezone: 'UTC', model: 'gpt-5.4' } })).inspection!.opportunities!;
+        const priced = (await nodeQuery({ action: 'investigate', scope: { allTime: true, timezone: 'UTC', model: 'gpt-5.4' } })).inspection!.opportunities!;
         for (const rule of ['estimate_concentration', 'model_review'] as const)
             assert.equal(priced.checks.find(c => c.rule === rule)!.status, 'hit', JSON.stringify(priced));
-        const period = (await nodeQuery({ action: 'review', snapshotId, scope: { since: prior, until, timezone: 'UTC', model: 'gpt-5.4' } })).inspection!.opportunities!;
+        const period = (await nodeQuery({ action: 'review', scope: { since: prior, until, timezone: 'UTC', model: 'gpt-5.4' } })).inspection!.opportunities!;
         assert.equal(period.checks.find(c => c.rule === 'estimate_increase')!.status, 'hit');
-        const request: CliInput = queryInvocation({action:'investigate',snapshotId,scope:{allTime:true,timezone:'UTC'}},{mode:'cached'});
+        const request: CliInput = queryInvocation({action:'investigate',scope:{allTime:true,timezone:'UTC'}},{mode:'cached'});
         const json = spawnProductCli(path.resolve('dist/wombat.js'), request, { env: process.env, encoding: 'utf8', timeout: 15000 });
         assert.ok([0, 2].includes(json.status!), json.stderr + json.stdout);
         assert.deepEqual(JSON.parse(json.stdout).inspection.opportunities, review);
         for (const check of review.checks)
             for (const finding of check.findings)
                 for (const proof of finding.evidence) {
-                    const rows = await nodeQuery({ action: proof.turnId ? 'steps' : 'turns', snapshotId, threadId: proof.threadId, ...(proof.turnId ? { turnId: proof.turnId } : {}), scope: proof.scope, limit: 200 });
+                    const rows = await nodeQuery({ action: proof.turnId ? 'steps' : 'turns', threadId: proof.threadId, ...(proof.turnId ? { turnId: proof.turnId } : {}), scope: proof.scope, limit: 200 });
                     if (proof.operationId)
                         assert.ok(rows.items.some(r => r.kind === 'operation' && r.id === proof.operationId));
                 }
     }
     finally {
-        if (service && service.exitCode === null) {
-            const done = once(service, 'close');
-            service.kill('SIGTERM');
-            const kill = setTimeout(() => service?.kill('SIGKILL'), 2000);
-            try {
-                await done;
-            }
-            finally {
-                clearTimeout(kill);
-            }
-        }
+
         for (const [k, v] of saved) {
             if (v === undefined)
                 delete process.env[k];

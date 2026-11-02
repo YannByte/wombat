@@ -9,7 +9,7 @@ Wombat is a local CLI and one main Skill for project engineering diagnosis and w
 ```mermaid
 flowchart LR
   L[Agent logs] --> R[Rust facts / accounting / queries]
-  R --> D[SQLite index / fixed views]
+  R --> D[Internal SQLite index]
   D --> N[Typed Node client]
   N --> C[CLI JSON / text]
   S[One main Skill] --> C
@@ -20,9 +20,9 @@ flowchart LR
 
 | Module | Responsibility and public boundary |
 |---|---|
-| `core/` | Adapters, accounting, pricing, storage, live service, and queries; an independent Rust library and executable, without UI framework dependencies |
+| `core/` | Adapters, accounting, pricing, storage, foreground collection, and queries; an independent Rust library and executable, without UI framework dependencies |
 | `client/` | Rust-generated DTOs, schema validation, `UsageClient`, stable errors, cancellation, and progress; the generic entry imports neither Node nor terminal libraries |
-| `client/src/node/` | Restricted core communication, subprocesses, live connections, official price downloads, timeouts, and output limits; exported as `@wombat/client/node` |
+| `client/src/node/` | Bounded foreground core calls, subprocesses, official price downloads, timeouts, and output limits; exported as `@wombat/client/node` |
 | `client/src/locale/` | Shared typed Chinese/English dictionaries, language selection, and presentation formatting; source content and protocol values stay untranslated |
 | `cli/` | Arguments, JSON/text, exit codes and local query lifecycle; the default command shows task help without querying sources |
 | `plugin/` | User plugins |
@@ -32,9 +32,11 @@ Dependencies point from `cli → client/node → core`. The main Skill reuses pu
 Business rules stay in Rust: adapters own source semantics and identity; `pricing.rs` / `pricing_sync.rs` own amounts and catalog eligibility; `live.rs` / `live_index.rs` own incremental indexes and versions; `usage_store.rs` owns immutable snapshots; `usage_app.rs` / `usage_app_dto.rs` own operations, filters, sorting, full-scope totals, and pagination. Lists never recompute totals, shares, or pricing from the current page.
 
 
-## Host and service responsibilities
+## Foreground host responsibilities
 
 The CLI supplies explicit source and project scope. The core owns version-bound evidence, user decisions and check facts. Codex acceptance does not establish resolution. Rechecks never revoke user decisions.
+
+Each command owns a foreground core child. SQLite transactions provide internal consistency; no public view handle or resident service is required. Original diagnostic and cleanup results are passed back as recheck baselines.
 
 ## Domain and persistence
 
@@ -42,7 +44,7 @@ The following model describes current domain relationships. Rust owns rules and 
 
 ### Domain map
 
-| Read views | `Snapshot` and `Manifest` fix query evidence | Rebuildable indexes and user decisions stay separate; native Codex tools own task creation |
+Internal `Snapshot` and `Manifest` bind evidence within one query. Foreground processes close after each request; indexes and user decisions stay separate.
 
 ### Usage facts and derived results
 
@@ -71,9 +73,9 @@ Pricing adds amounts and their basis to measurements without changing raw Token 
 
 ### Configuration, checks, and rechecks
 
-Configuration `Item` combines a physical current object and source memberships. `UseBasis` retains counting scope, method, view and coverage. Current configuration cannot establish historical loading. Related-turn usage is not configuration-owned cost. See [config_dto.rs](../../core/src/config_dto.rs).
+Configuration `Item` combines a physical current object and source memberships. `UseBasis` retains counting scope, method, provenance and coverage. Current configuration cannot establish historical loading. Related-turn usage is not configuration-owned cost. See [config_dto.rs](../../core/src/config_dto.rs).
 
-`RuleAssessment` and `Finding` retain independent checks and specific problems. `Suggestion` supplies an original-view-bound baseline ID. Checks and rechecks are read-only; only explicit `UserDecision` writes to separate user storage. Rechecks require original scope and rules. Expired views and missing evidence cannot establish repair. See [optimize_dto.rs](../../core/src/optimize_dto.rs).
+`RuleAssessment` and `Finding` retain independent checks and specific problems. `Suggestion` supplies a baseline ID bound to the supplied original finding. Checks and rechecks are read-only; only explicit `UserDecision` writes to separate user storage. Rechecks require original scope and rules. Missing evidence cannot establish repair. See [optimize_dto.rs](../../core/src/optimize_dto.rs).
 
 Codex owns authorized edits, tests, task creation and recovery. Wombat supplies selected evidence. Account observations remain independent and cannot establish project allowance consumption. See [account_dto.rs](../../core/src/account_dto.rs).
 

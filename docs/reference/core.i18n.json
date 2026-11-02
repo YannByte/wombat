@@ -3,39 +3,39 @@
   "sections": {
     "/rust-core": {
       "zh": "e8c72137736cf4f63a2d4064c36a2f481bef897b8827b537c201d3d897f96127",
-      "en": "f91a56534aef01a87c09ffbc8c5596663a979dd5dbc7985e81c27c8b2d9d5081"
+      "en": "c2e50e4abf248d84e6ba5921208a555b14616414d365d1ca79ae6eefaaf455e7"
     },
     "/rust-core/entry-points-and-responsibilities": {
       "zh": "9b76ca849fdbf2fa8d45030f2a540113595745aeba19fc6e9daea2add81170c1",
       "en": "1e43e6645e6a9220e44c914a7f611ce8386c12eb9bc4024774551213bc7c68ca"
     },
     "/rust-core/internal-business-modules": {
-      "zh": "f05a5baf956b3c74749b96aa963f949c88be6fd37f06475423cc3c2660c59165",
-      "en": "3d62c65b8054a6e462207a62a46fa1c8d4ddd4fb9b11dd1d410a3e8464dd986e"
+      "zh": "36542bad3fc92f1ce2c58a367948fd1a8982e3f6c4e53e48e7a246814cb2746c",
+      "en": "1b11e94c107b5b4c44f87373efd2cc839edf2beea75e861c0fd57c3fa39a2a54"
     },
     "/rust-core/artifact-observations": {
-      "zh": "6d51bec5e772c64c5ac79230958573acc6816bb2aeceaddf1524e9254ca30c45",
-      "en": "5bbb4954516159928b051bd2fc61e259d7f95b4807ea11db7932460bc023ebc9"
+      "zh": "2dcd2285388ca2318f341cc5dfaff178b4d9c99017a52fd64a48cf44dcccd936",
+      "en": "5237ccf1f5ce6d3efbcf59ecf4b179834491aef86e444d2b4858e0c5d73a32b3"
     },
     "/rust-core/limits-and-verification": {
-      "zh": "b3fe4a7ace9bb8382c646fe2dbf9336a642a2a2e68a92c1e903a25c6eba3201b",
+      "zh": "8a3773393ed6c74457da4cb47ceef7b6bcfbfffb982bb5e10aa480097ceb3a15",
       "en": "1826738a7c8cccbafb5b431552ad185c5f1401ab0222f5b94b638aa55e199e1d"
     },
-    "/rust-core/storage-and-service-lifecycle": {
-      "zh": "ade9de5b4b270c1a728aadd8340e4f32ca9369b9bc34308053e368b00b1f5dc8",
-      "en": "c40230e687239cf060f3829d329f8923e6cd8ae79aeefb30e43fd1730d4264c1"
+    "/rust-core/foreground-queries-and-internal-storage": {
+      "zh": "b0328d721f04b3e716bb1b1aa8dc766c2ea97519a4e5a9dbd59a8187638ec146",
+      "en": "5d09a75a2323ba7792928e964f707e3dd7e981d82d1cad6d71012432e0d64c4f"
     },
     "/rust-core/runtime-collection": {
       "zh": "1682a7a522f79ea35e1e54ec89701c25a4e13adedece3302a9b13ffd18ee087d",
       "en": "8c0516d8d857cfd36d923cd690cac7f540551834e73740ea4735c45a579e89d3"
     },
     "/rust-core/task-statistics-and-monitoring": {
-      "zh": "aadf64f5da6891af95116c6b161c4275aee4b41ed16b88d0ed6dc671d07180cd",
-      "en": "2b853b98df5be8becac0c3a4685aa05eef20a3766fdd55bcf74c8eb54152344f"
+      "zh": "bf14a001c632aa50fbb2b4af79706bb658ec6400f70b75719e78ec6bf1594aa4",
+      "en": "736edc4b6ec1d0771205260d0230229cd70bfe1269abbbdefe673e06fe1e85f9"
     },
     "/rust-core/conversation-evidence": {
-      "zh": "94a69c8c429b1198ed4c75cd92403793061e976897801f9dd36a021b4aac38be",
-      "en": "bfe23b0abf07dee61376f7967a6e4704172a3a04c7087034fa0fb552f8c27f62"
+      "zh": "ebd0e09e2fd8db7291764bd4149ce79b24e2f766516bb27c88e9c950b295dd66",
+      "en": "2059ad1d26b4052fca3332e5b2b16b14871e672056f8714f8ae84925d0fe7b95"
     }
   }
 }

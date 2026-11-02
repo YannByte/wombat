@@ -60,7 +60,7 @@ fn fixture() -> (tempfile::TempDir, Host, PathBuf) {
     };
     (d, h, project)
 }
-fn inspect(project: &Path, h: &Host, store: &Mutex<Store>) -> Response {
+fn inspect(project: &Path, h: &Host) -> Response {
     execute_with(
         Request::Inspect {
             project_root: project.to_str().unwrap().into(),
@@ -69,20 +69,17 @@ fn inspect(project: &Path, h: &Host, store: &Mutex<Store>) -> Response {
             product_temporary: false,
             codex: true,
         },
-        store,
         &|| false,
         h,
     )
     .unwrap()
 }
-fn apply(r: &Response, ids: Vec<String>, h: &Host, s: &Mutex<Store>) -> Result<Response> {
+fn apply(r: &Response, ids: Vec<String>, h: &Host) -> Result<Response> {
     execute_with(
         Request::Apply {
-            read_view: r.read_view.clone(),
-            baseline_id: r.baseline_id.clone(),
+            baseline: Box::new(r.clone()),
             selection: ids,
         },
-        s,
         &|| false,
         h,
     )
@@ -115,7 +112,7 @@ fn daemon(h: &Host) -> PathBuf {
 fn codex_six_rules_keep_state_active_versions_pending_updates_and_recent_reports() {
     let (_d, h, p) = fixture();
     let root = daemon(&h);
-    let store = Mutex::default();
+
     let cache = h.paths.home.join("Library/Caches/Codex/Default/Cache");
     write(&cache.join("item"), b"cache");
     let stage = h
@@ -143,7 +140,7 @@ fn codex_six_rules_keep_state_active_versions_pending_updates_and_recent_reports
     write(&pending.join("new.dmp"), b"recent report");
     write(&h.paths.codex.join("sessions/keep.jsonl"), b"conversation");
     write(&h.paths.codex.join("state_5.sqlite"), b"state");
-    let r = inspect(&p, &h, &store);
+    let r = inspect(&p, &h);
     assert!(!r.partial);
     let candidates: Vec<_> = r
         .items
@@ -157,7 +154,7 @@ fn codex_six_rules_keep_state_active_versions_pending_updates_and_recent_reports
             .any(|i| i.path == active.to_str().unwrap() && i.assessment == Assessment::Protected)
     );
     let ids = candidates.iter().map(|i| i.id.clone()).collect();
-    let removed = apply(&r, ids, &h, &store).unwrap();
+    let removed = apply(&r, ids, &h).unwrap();
     assert!(!removed.partial);
     assert!(
         removed
@@ -177,15 +174,15 @@ fn codex_six_rules_keep_state_active_versions_pending_updates_and_recent_reports
 fn daemon_pointer_and_install_lock_changes_block_the_original_selection() {
     let (_d, h, p) = fixture();
     let root = daemon(&h);
-    let s = Mutex::default();
-    let before = inspect(&p, &h, &s);
+
+    let before = inspect(&p, &h);
     let target = before
         .items
         .iter()
         .find(|i| i.assessment == Assessment::Candidate)
         .unwrap();
     let lock = codex::lock(&h.paths).unwrap();
-    assert!(apply(&before, vec![target.id.clone()], &h, &s).is_err());
+    assert!(apply(&before, vec![target.id.clone()], &h).is_err());
     drop(lock);
     fs::remove_file(root.join("current")).unwrap();
     std::os::unix::fs::symlink(
@@ -193,7 +190,7 @@ fn daemon_pointer_and_install_lock_changes_block_the_original_selection() {
         root.join("current"),
     )
     .unwrap();
-    let after = apply(&before, vec![target.id.clone()], &h, &s).unwrap();
+    let after = apply(&before, vec![target.id.clone()], &h).unwrap();
     assert!(after.partial);
     assert!(matches!(after.items[0].removal, Some(Removal::Skipped)));
     assert!(Path::new(&target.path).is_dir());
@@ -203,17 +200,17 @@ fn process_restart_and_new_runtime_completion_stop_cleanup() {
     let (_d, h, p) = fixture();
     let cache = h.paths.home.join("Library/Caches/Codex/Default/Cache");
     write(&cache.join("item"), b"cache");
-    let s = Mutex::default();
-    let r = inspect(&p, &h, &s);
+
+    let r = inspect(&p, &h);
     let id = r.items[0].id.clone();
     h.process.set(UseState::InUse);
-    let result = apply(&r, vec![id], &h, &s).unwrap();
+    let result = apply(&r, vec![id], &h).unwrap();
     assert!(result.partial);
     assert!(cache.join("item").is_file());
     h.process.set(UseState::NoObservedOpenFiles);
     let runtime = h.paths.home.join(".cache/codex-runtimes/partial-1");
     write(&runtime.join("item"), b"partial");
-    let r = inspect(&p, &h, &s);
+    let r = inspect(&p, &h);
     let id = r
         .items
         .iter()
@@ -223,7 +220,7 @@ fn process_restart_and_new_runtime_completion_stop_cleanup() {
         .clone();
     write(&runtime.join("runtime.json"), b"{}");
     fs::create_dir_all(runtime.join("dependencies/python")).unwrap();
-    let after = apply(&r, vec![id], &h, &s).unwrap();
+    let after = apply(&r, vec![id], &h).unwrap();
     assert!(after.partial);
     assert!(runtime.is_dir());
 }
@@ -232,15 +229,12 @@ fn unknown_process_open_files_future_updates_and_unrecognized_state_are_preserve
     let (_d, h, p) = fixture();
     let cache = h.paths.home.join("Library/Caches/Codex/Default/Cache");
     write(&cache.join("item"), b"cache");
-    let s = Mutex::default();
+
     h.process.set(UseState::Unknown);
-    assert_eq!(inspect(&p, &h, &s).items[0].assessment, Assessment::Unknown);
+    assert_eq!(inspect(&p, &h).items[0].assessment, Assessment::Unknown);
     h.process.set(UseState::NoObservedOpenFiles);
     h.usage.set(UseState::InUse);
-    assert_eq!(
-        inspect(&p, &h, &s).items[0].assessment,
-        Assessment::Protected
-    );
+    assert_eq!(inspect(&p, &h).items[0].assessment, Assessment::Protected);
     h.usage.set(UseState::NoObservedOpenFiles);
     let stage = h
         .paths
@@ -249,7 +243,7 @@ fn unknown_process_open_files_future_updates_and_unrecognized_state_are_preserve
     write(&stage.join("Codex.app/Contents/Info.plist"), b"bundle");
     old(&stage);
     h.staged.set(Some(200));
-    let r = inspect(&p, &h, &s);
+    let r = inspect(&p, &h);
     let future = r
         .items
         .iter()
@@ -257,8 +251,8 @@ fn unknown_process_open_files_future_updates_and_unrecognized_state_are_preserve
         .unwrap();
     assert_eq!(future.assessment, Assessment::Protected);
     assert!(future.reasons.contains(&Reason::PendingUpdate));
-    assert!(apply(&r, vec![future.id.clone()], &h, &s).is_err());
-    assert!(apply(&r, vec![], &h, &s).is_err());
+    assert!(apply(&r, vec![future.id.clone()], &h).is_err());
+    assert!(apply(&r, vec![], &h).is_err());
     let secret = h.paths.codex.join("state_5.sqlite");
     write(&secret, b"keep");
     let r = execute_with(
@@ -269,7 +263,6 @@ fn unknown_process_open_files_future_updates_and_unrecognized_state_are_preserve
             product_temporary: false,
             codex: false,
         },
-        &s,
         &|| false,
         &h,
     )
@@ -285,15 +278,15 @@ fn linked_roots_are_kept_and_packaged_links_never_delete_their_targets() {
     let root = h.paths.home.join("Library/Caches/Codex/Default");
     fs::create_dir_all(&root).unwrap();
     std::os::unix::fs::symlink(&outside, root.join("Cache")).unwrap();
-    let s = Mutex::default();
-    let r = inspect(&p, &h, &s);
+
+    let r = inspect(&p, &h);
     assert_eq!(r.items[0].assessment, Assessment::Protected);
     fs::remove_file(root.join("Cache")).unwrap();
     write(&root.join("Cache/file"), b"cache");
     std::os::unix::fs::symlink(&outside, root.join("Cache/link")).unwrap();
-    let r = inspect(&p, &h, &s);
+    let r = inspect(&p, &h);
     assert_eq!(r.items[0].assessment, Assessment::Candidate);
-    apply(&r, vec![r.items[0].id.clone()], &h, &s).unwrap();
+    apply(&r, vec![r.items[0].id.clone()], &h).unwrap();
     assert!(outside.join("keep").is_file());
 }
 
@@ -302,9 +295,9 @@ fn linked_roots_are_kept_and_packaged_links_never_delete_their_targets() {
 fn broken_current_invalid_marker_and_directory_lock_protocol_never_produce_candidates() {
     let (_d, h, p) = fixture();
     let root = daemon(&h);
-    let s = Mutex::default();
+
     fs::remove_file(root.join("current")).unwrap();
-    let r = inspect(&p, &h, &s);
+    let r = inspect(&p, &h);
     assert!(
         !r.items
             .iter()
@@ -317,7 +310,7 @@ fn broken_current_invalid_marker_and_directory_lock_protocol_never_produce_candi
     )
     .unwrap();
     write(&root.join("auto-update-version"), b"../outside");
-    let r = inspect(&p, &h, &s);
+    let r = inspect(&p, &h);
     assert!(
         r.items
             .iter()
@@ -325,7 +318,7 @@ fn broken_current_invalid_marker_and_directory_lock_protocol_never_produce_candi
     );
     write(&root.join("auto-update-version"), b"3.0.0-darwin-arm64");
     fs::create_dir(root.join("install.lock.d")).unwrap();
-    let r = inspect(&p, &h, &s);
+    let r = inspect(&p, &h);
     assert!(r.partial);
     assert!(
         r.items
@@ -346,7 +339,7 @@ fn explicit_keep_unknown_runtime_and_crash_subdirectories_survive() {
     old(&pending.join("nested"));
     let cache = h.paths.home.join("Library/Caches/Codex/Default/Cache");
     write(&cache.join("file"), b"cache");
-    let s = Mutex::default();
+
     let r = execute_with(
         Request::Inspect {
             project_root: p.to_str().unwrap().into(),
@@ -355,7 +348,6 @@ fn explicit_keep_unknown_runtime_and_crash_subdirectories_survive() {
             product_temporary: false,
             codex: true,
         },
-        &s,
         &|| false,
         &h,
     )
@@ -382,17 +374,15 @@ fn already_absent_is_distinct_from_removed_and_cancelled_apply_changes_nothing()
     let (_d, h, p) = fixture();
     let cache = h.paths.home.join("Library/Caches/Codex/Default/Cache");
     write(&cache.join("file"), b"cache");
-    let s = Mutex::default();
-    let r = inspect(&p, &h, &s);
+
+    let r = inspect(&p, &h);
     let id = r.items[0].id.clone();
     assert!(
         execute_with(
             Request::Apply {
-                read_view: r.read_view.clone(),
-                baseline_id: r.baseline_id.clone(),
+                baseline: Box::new(r.clone()),
                 selection: vec![id.clone()]
             },
-            &s,
             &|| true,
             &h
         )
@@ -400,7 +390,7 @@ fn already_absent_is_distinct_from_removed_and_cancelled_apply_changes_nothing()
     );
     assert!(cache.join("file").is_file());
     fs::remove_dir_all(&cache).unwrap();
-    let result = apply(&r, vec![id], &h, &s).unwrap();
+    let result = apply(&r, vec![id], &h).unwrap();
     assert!(matches!(
         result.items[0].removal,
         Some(Removal::AlreadyAbsent)
@@ -417,8 +407,8 @@ fn unknown_installed_build_uses_age_only_without_inventing_a_version() {
     write(&stage.join("Codex.app/Contents/Info.plist"), b"metadata");
     old(&stage);
     h.installed.set(None);
-    let s = Mutex::default();
-    let r = inspect(&p, &h, &s);
+
+    let r = inspect(&p, &h);
     let item = r
         .items
         .iter()
@@ -442,8 +432,8 @@ fn an_incomplete_staged_inventory_cannot_be_applied_even_with_other_known_candid
             b"metadata",
         );
     }
-    let s = Mutex::default();
-    let r = inspect(&p, &h, &s);
+
+    let r = inspect(&p, &h);
     let item = r
         .items
         .iter()
@@ -451,7 +441,7 @@ fn an_incomplete_staged_inventory_cannot_be_applied_even_with_other_known_candid
         .unwrap();
     assert_eq!(item.assessment, Assessment::Unknown);
     assert!(!item.observation.as_ref().unwrap().complete);
-    assert!(apply(&r, vec![item.id.clone()], &h, &s).is_err());
+    assert!(apply(&r, vec![item.id.clone()], &h).is_err());
     assert!(stage.is_dir());
 }
 #[cfg(target_os = "macos")]
@@ -495,8 +485,8 @@ fn old_crash_reports_are_streamed_in_bounded_batches_without_touching_recent_fil
         old(&path);
     }
     write(&pending.join("recent.dmp"), b"keep");
-    let s = Mutex::default();
-    let first = inspect(&p, &h, &s);
+
+    let first = inspect(&p, &h);
     assert!(first.partial);
     let ids: Vec<_> = first
         .items
@@ -505,14 +495,14 @@ fn old_crash_reports_are_streamed_in_bounded_batches_without_touching_recent_fil
         .map(|i| i.id.clone())
         .collect();
     assert_eq!(ids.len(), 100);
-    let result = apply(&first, ids, &h, &s).unwrap();
+    let result = apply(&first, ids, &h).unwrap();
     assert!(
         result
             .items
             .iter()
             .all(|i| matches!(i.removal, Some(Removal::Removed)))
     );
-    let second = inspect(&p, &h, &s);
+    let second = inspect(&p, &h);
     assert_eq!(
         second
             .items
@@ -528,7 +518,7 @@ fn selected_leaf_does_not_widen_to_its_parent_cache_and_exact_reports_need_no_si
     let (_d, h, p) = fixture();
     let cache = h.paths.home.join("Library/Caches/Codex/Default/Cache");
     write(&cache.join("file"), b"keep");
-    let s = Mutex::default();
+
     let r = execute_with(
         Request::Inspect {
             project_root: p.to_str().unwrap().into(),
@@ -537,7 +527,6 @@ fn selected_leaf_does_not_widen_to_its_parent_cache_and_exact_reports_need_no_si
             product_temporary: false,
             codex: true,
         },
-        &s,
         &|| false,
         &h,
     )
@@ -566,7 +555,6 @@ fn selected_leaf_does_not_widen_to_its_parent_cache_and_exact_reports_need_no_si
             product_temporary: false,
             codex: true,
         },
-        &s,
         &|| false,
         &h,
     )

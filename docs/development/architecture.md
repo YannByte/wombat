@@ -9,7 +9,7 @@ Wombat 通过本地 CLI 和一个主 Skill 提供工程诊断与工作分析。S
 ```mermaid
 flowchart LR
   L[Agent logs] --> R[Rust facts / accounting / queries]
-  R --> D[SQLite index / fixed views]
+  R --> D[Internal SQLite index]
   D --> N[Typed Node client]
   N --> C[CLI JSON / text]
   S[One main Skill] --> C
@@ -20,7 +20,7 @@ flowchart LR
 
 | 模块 | 职责与公开边界 |
 |---|---|
-| `core/` | 适配器、计量、计价、存储、实时服务和查询；独立 Rust library 与可执行入口，不依赖界面框架 |
+| `core/` | 适配器、计量、计价、存储、前台采集和查询；独立 Rust library 与可执行入口，不依赖界面框架 |
 | `client/` | Rust 生成 DTO、Schema 校验、`UsageClient`、稳定错误、取消与进度；通用入口不导入 Node 或终端库 |
 | `client/src/node/` | 受限内核通信、子进程、实时连接、官方价格下载、超时及输出上限；公开为 `@wombat/client/node` |
 | `client/src/locale/` | 共享类型化中英字典、语言选择与纯展示格式化；原始内容和协议值不翻译 |
@@ -32,9 +32,11 @@ flowchart LR
 业务规则保留在 Rust：适配器拥有来源语义与身份；`pricing.rs` / `pricing_sync.rs` 拥有金额与价表资格；`live.rs` / `live_index.rs` 拥有增量索引与版本；`usage_store.rs` 拥有不可变快照；`usage_app.rs` / `usage_app_dto.rs` 拥有操作、筛选、排序、完整范围汇总和分页。列表不从当前页重算总量、占比或计价。
 
 
-## 宿主与服务职责
+## 前台宿主职责
 
 CLI 提供明确的来源与项目范围。内核负责绑定版本的证据、用户决定与检查事实。Codex 接受任务不代表问题已解决，复查不能撤销用户决定。
+
+每条命令拥有本次前台内核子进程。SQLite 事务保证内部一致性，不需要公开视图句柄或常驻服务。诊断及清理的原始结果作为数据传入复查。
 
 ## 业务与持久化
 
@@ -42,7 +44,7 @@ CLI 提供明确的来源与项目范围。内核负责绑定版本的证据、�
 
 ### 领域地图
 
-| 读视图 | `Snapshot` 与 `Manifest` 固定查询证据 | 可重建索引与用户决定分别存储；Codex 原生工具负责创建任务 |
+内部 `Snapshot` 和 `Manifest` 绑定单次查询的证据。前台进程在请求结束后关闭，索引与用户决定分别存储。
 
 ### 用量事实与派生结果
 
@@ -71,9 +73,9 @@ flowchart LR
 
 ### 配置、检查与复查
 
-配置 `Item` 结合当前物理对象和来源成员，`UseBasis` 保留计数范围、方法、视图和覆盖。当前配置不能证明历史加载；关联轮次用量不是配置独占费用。见 [config_dto.rs](../../core/src/config_dto.rs)。
+配置 `Item` 结合当前物理对象和来源成员，`UseBasis` 保留计数范围、方法、来源依据和覆盖。当前配置不能证明历史加载；关联轮次用量不是配置独占费用。见 [config_dto.rs](../../core/src/config_dto.rs)。
 
-`RuleAssessment` 与 `Finding` 保留独立检查及具体问题；`Suggestion` 提供原视图绑定的基线 ID。检查与复查只读，只有显式 `UserDecision` 写入独立用户存储。复查必须使用原范围和规则；视图过期或证据不足不能当作修复。见 [optimize_dto.rs](../../core/src/optimize_dto.rs)。
+`RuleAssessment` 与 `Finding` 保留独立检查及具体问题；`Suggestion` 提供与传回的原始发现绑定的基线 ID。检查与复查只读，只有显式 `UserDecision` 写入独立用户存储。复查必须使用原范围和规则；证据不足不能当作修复。见 [optimize_dto.rs](../../core/src/optimize_dto.rs)。
 
 Codex 负责授权编辑、测试、任务创建和恢复，Wombat 只提供选定证据。账户观察独立展示，不能推断项目额度消耗。见 [account_dto.rs](../../core/src/account_dto.rs)。
 

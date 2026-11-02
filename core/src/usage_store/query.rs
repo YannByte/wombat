@@ -4,20 +4,7 @@ impl Snapshot {
     pub(crate) fn is_live(&self) -> bool {
         self.live_rows.is_some()
     }
-    pub(crate) fn export_live(&self) -> Result<Snapshot> {
-        if let Some(view) = self.detailed_view()? {
-            return view.export_live();
-        }
-        let prices = crate::pricing_sync::current()?;
-        if prices.catalog_hash != self.manifest.price_catalog_hash {
-            return Err(operation_error(
-                "PRICE_CHANGED",
-                "价表已经更新，请重新同步后保存",
-            ));
-        }
-        let collected = self.live_collected()?;
-        save_with_prices(&product_home()?, collected, prices)
-    }
+    #[cfg(test)]
     pub(super) fn live_collected(&self) -> Result<Collected> {
         self.live_rows
             .as_ref()
@@ -186,9 +173,6 @@ impl Snapshot {
         ))
     }
     pub fn ledger(&self) -> Result<Vec<PricedMeasurement>> {
-        if self.expired_detail_lease() {
-            return Err(operation_error("VIEW_EXPIRED", "Live data lease expired"));
-        }
         if self.has_stored_ledger() {
             return self.stored_measurements(None, None);
         }

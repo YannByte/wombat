@@ -1,6 +1,6 @@
 [package]
 name = "wombat-core"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -31,7 +31,6 @@ shlex = "=2.0.1"
 typed-path = "=0.12.3"
 regex = "=1.13.1"
 zstd = { version = "=0.14.3", default-features = false }
-notify = "=8.2.0"
 mimalloc = { version = "=0.1.52", features = ["v2"] }
 libmimalloc-sys = { version = "=0.1.49", features = ["extended", "v2"] }
 ciborium = "=0.2.2"

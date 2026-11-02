@@ -4,7 +4,6 @@ export type Request =
   | {
       threadId: string;
       turnId: string;
-      snapshotId?: string | null;
       roots?: string[];
       scope?: Scope | null;
       mode?: Mode & string;
@@ -14,7 +13,6 @@ export type Request =
   | {
       threadId: string;
       turnId: string;
-      snapshotId: string;
       roots?: string[];
       scope?: Scope | null;
       cursor?: Cursor | null;

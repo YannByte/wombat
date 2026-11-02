@@ -1,5 +1,6 @@
 import {writeHelp} from './help.js';
 import path from 'node:path';
+import {readBaseline} from './read-baseline.js';
 import {CoreError,type ArtifactsRequest,type ArtifactsResult} from '@wombat/client';
 import {createNodeClient} from '@wombat/client/node';
 import {t} from '@wombat/client/locale';
@@ -7,7 +8,7 @@ import {ask,canPrompt,invalidInput,pageNumber,projectDirectory,withCancellation}
 import {terminalText} from './display-text.js';
 
 export function parseArtifactsArgs(argv:readonly string[]):{request:ArtifactsRequest;json:boolean;help:boolean;guided:boolean}{
-  let action:'inspect'|'recheck'|'apply'='inspect',json=false,help=false,project=process.cwd(),readView='',baselineId='',productTemporary=false,codex=false,apply=false;
+  let action:'inspect'|'recheck'|'apply'='inspect',json=false,help=false,project=process.cwd(),plan='',productTemporary=false,codex=false,apply=false;
   const paths:string[]=[],keepPaths:string[]=[],selection:string[]=[],seen=new Set<string>();
   const args=[...argv];
   if(args[0]==='verify'){action='recheck';args.shift();}
@@ -22,26 +23,25 @@ export function parseArtifactsArgs(argv:readonly string[]):{request:ArtifactsReq
     if(name==='--apply'){if(action!=='inspect'||inline!==undefined)fail();apply=true;continue;}
     if(name==='--codex'){if(action!=='inspect'||inline!==undefined)fail();codex=true;continue;}
     if(name==='--wombat-temp'){if(action!=='inspect'||inline!==undefined)fail();productTemporary=true;continue;}
-    if(!['--project','--path','--keep','--read-view','--baseline','--item'].includes(name))fail();
+    if(!['--project','--path','--keep','--plan','--item'].includes(name))fail();
     const value=inline??args[++i];
     if(!value||value.startsWith('--')||value.includes('\0'))fail();
     switch(name){
       case '--project':project=path.resolve(value);break;
       case '--path':paths.push(value);break;
       case '--keep':keepPaths.push(value);break;
-      case '--read-view':readView=value;break;
-      case '--baseline':baselineId=value;break;
+      case '--plan':plan=value;break;
       case '--item':selection.push(value);break;
     }
   }
   if(codex&&(productTemporary||seen.has('--project')))fail();
-  const guided=apply&&!readView&&!baselineId;
+  const guided=apply&&!plan;
   if(apply&&!guided)action='apply';
   if(action!=='inspect'&&['--project','--path','--keep','--codex','--wombat-temp'].some(f=>seen.has(f)))fail();
-  if(action==='inspect'&&(readView||baselineId||selection.length))fail();
+  if(action==='inspect'&&(plan||selection.length))fail();
   if(guided&&!codex)fail();
-  if(action!=='inspect'&&!help&&(!readView||!baselineId||action==='apply'&&!selection.length))fail();
-  const request:ArtifactsRequest=action==='inspect'?{action,projectRoot:project,paths,keepPaths,productTemporary,codex}:{action,readView,baselineId,selection};
+  if(action!=='inspect'&&!help&&(!plan||action==='apply'&&!selection.length))fail();
+  const request:ArtifactsRequest=action==='inspect'?{action,projectRoot:project,paths,keepPaths,productTemporary,codex}:{action,baseline:(help?{}:readBaseline(plan)) as ArtifactsResult,selection};
   return {request,json,help,guided};
 }
 export function formatArtifactsText(result:ArtifactsResult):string{
@@ -87,14 +87,14 @@ export async function runArtifactsCli(argv:readonly string[]):Promise<number>{
       if(!selected.length)throw new CoreError('CANCELLED',t('common.cancelled'));
       const yes=await ask(t('cli.clean.confirm',{count:selected.length}),signal);
       if(!['yes','确认'].includes(yes.toLowerCase()))throw new CoreError('CANCELLED',t('common.cancelled'));
-      const removed=await client.artifacts!({action:'apply',readView:result.readView,baselineId:result.baselineId,selection:selected},{signal});
+      const removed=await client.artifacts!({action:'apply',baseline:result,selection:selected},{signal});
       process.stdout.write(formatArtifactsText(removed));
-      const checked=await client.artifacts!({action:'recheck',readView:result.readView,baselineId:result.baselineId,selection:selected},{signal});
+      const checked=await client.artifacts!({action:'recheck',baseline:result,selection:selected},{signal});
       process.stdout.write(formatArtifactsText(checked));
       return removed.partial||checked.partial?2:0;
     }
     process.stdout.write(json?JSON.stringify(result)+'\n':formatArtifactsText(result));
-    if(!json&&request.action==='inspect')process.stdout.write('wombat clean verify --read-view '+JSON.stringify(result.readView)+' --baseline '+JSON.stringify(result.baselineId)+'\n');
+
     return result.partial?2:0;
   });
 }

@@ -29,12 +29,10 @@ pub mod conversation_source;
 pub mod directories;
 pub mod dto;
 mod file_metadata;
-pub mod host_environment;
+mod host_environment;
 mod host_process;
 pub mod live;
 mod live_index;
-#[cfg(windows)]
-mod live_windows;
 mod log_io;
 pub mod monitor;
 pub(crate) mod observation_versions;
@@ -46,7 +44,6 @@ pub mod pricing;
 pub mod pricing_sync;
 pub mod project_dto;
 mod query_cache;
-pub mod service_dto;
 pub mod session_events;
 pub(crate) mod session_relations;
 pub mod setup_dto;
@@ -94,27 +91,27 @@ pub fn absolute(path: impl AsRef<Path>) -> Result<PathBuf> {
     Ok(result)
 }
 
+fn contract_schema<T: schemars::JsonSchema>(version: u32) -> Result<Value> {
+    let mut schema = serde_json::to_value(
+        schemars::generate::SchemaSettings::draft07()
+            .into_generator()
+            .into_root_schema_for::<T>(),
+    )?;
+    schema["$comment"] = serde_json::json!(format!("Wombat request protocol {version}"));
+    Ok(schema)
+}
+
 pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
     match op {
-        "schema_artifacts_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<artifacts_dto::Request>(),
-        )?),
+        "schema_artifacts_request" => {
+            contract_schema::<artifacts_dto::Request>(artifacts_dto::REQUEST_VERSION)
+        }
         "schema_artifacts_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<artifacts_dto::Response>(),
         )?),
-        "monitor" => Ok(serde_json::to_value(monitor::dispatch(
-            serde_json::from_value(args.clone())
-                .map_err(|_| dto::operation_error("INVALID_ARGUMENT", "Invalid monitor request"))?,
-        )?)?),
-        "schema_monitor_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<monitor::Request>(),
-        )?),
+        "schema_monitor_request" => contract_schema::<monitor::Request>(monitor::REQUEST_VERSION),
         "schema_monitor_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
@@ -125,11 +122,7 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
                 .into_generator()
                 .into_root_schema_for::<agent_dto::ErrorOutput>(),
         )?),
-        "schema_agent_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<agent_dto::Request>(),
-        )?),
+        "schema_agent_request" => contract_schema::<agent_dto::Request>(agent_dto::REQUEST_VERSION),
         "schema_agent_description" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
@@ -162,43 +155,29 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
                 .into_generator()
                 .into_root_schema_for::<collection::Response>(),
         )?),
-        "service_offline" => Ok(serde_json::to_value(live::service_offline(
-            serde_json::from_value(args.clone())?,
-        )?)?),
-        "schema_service_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<service_dto::Request>(),
-        )?),
-        "schema_service_response" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<service_dto::Response>(),
-        )?),
-        "conversation" => Ok(serde_json::to_value(conversation::dispatch(
-            serde_json::from_value(args.clone()).map_err(|_| {
-                dto::operation_error("INVALID_ARGUMENT", "Invalid conversation request")
-            })?,
-        )?)?),
-        "schema_conversation_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<conversation_dto::Request>(),
-        )?),
+        "local_query" => live::dispatch(args.clone()),
+        "cleanup_rebuild" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase", deny_unknown_fields)]
+            struct Cleanup {
+                request_id: String,
+            }
+            let request: Cleanup = serde_json::from_value(args.clone()).map_err(|_| {
+                dto::operation_error("INVALID_ARGUMENT", "Invalid temporary cleanup request")
+            })?;
+            Ok(serde_json::json!({"removed":live::cleanup_rebuild(&request.request_id)?}))
+        }
+        "schema_conversation_request" => {
+            contract_schema::<conversation_dto::Request>(conversation_dto::REQUEST_VERSION)
+        }
         "schema_conversation_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<conversation_dto::Response>(),
         )?),
-        "timing" => Ok(serde_json::to_value(timing::dispatch(
-            serde_json::from_value(args.clone())
-                .map_err(|_| dto::operation_error("INVALID_ARGUMENT", "Invalid timing request"))?,
-        )?)?),
-        "schema_timing_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<timing_dto::Request>(),
-        )?),
+        "schema_timing_request" => {
+            contract_schema::<timing_dto::Request>(timing_dto::REQUEST_VERSION)
+        }
         "schema_timing_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
@@ -294,32 +273,23 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
                 .into_generator()
                 .into_root_schema_for::<project_dto::Response>(),
         )?),
-        "schema_optimize_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<optimize_dto::Request>(),
-        )?),
+        "schema_optimize_request" => {
+            contract_schema::<optimize_dto::Request>(optimize_dto::REQUEST_VERSION)
+        }
         "schema_optimize_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<optimize_dto::Response>(),
         )?),
-        "schema_config_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<config_dto::Request>(),
-        )?),
+        "schema_config_request" => {
+            contract_schema::<config_dto::Request>(config_dto::REQUEST_VERSION)
+        }
         "schema_config_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<config_dto::Response>(),
         )?),
-        "live_endpoint" => live::endpoint(),
-        "schema_live_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<live::Request>(),
-        )?),
+        "schema_live_request" => contract_schema::<live::Request>(live::REQUEST_VERSION),
         "schema_live_response" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
@@ -336,17 +306,14 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
                 .into_generator()
                 .into_root_schema_for::<pricing_sync::Response>(),
         )?),
-        "usage_app" => usage_app::dispatch(args),
         "schema_usage_app" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()
                 .into_generator()
                 .into_root_schema_for::<usage_app_dto::Response>(),
         )?),
-        "schema_usage_request" => Ok(serde_json::to_value(
-            schemars::generate::SchemaSettings::draft07()
-                .into_generator()
-                .into_root_schema_for::<usage_app_dto::Request>(),
-        )?),
+        "schema_usage_request" => {
+            contract_schema::<usage_app_dto::Request>(usage_app_dto::REQUEST_VERSION)
+        }
         _ => Err(dto::operation_error(
             "INVALID_ARGUMENT",
             format!("未知内核操作：{op}"),

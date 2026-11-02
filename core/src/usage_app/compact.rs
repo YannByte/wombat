@@ -132,3 +132,29 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[test]
+fn snapshot_warning_does_not_claim_a_defect_in_the_selected_date_window() {
+    let mut snapshot = super::inspection::tests::snapshot(
+        &[("a", "a", "2026-09-02T00:00:00Z", 100)],
+        "quality-scope",
+    );
+    snapshot.manifest.issues.push(Issue {
+        code: "tokenTotalMismatch".into(),
+        message: "Historical observation".into(),
+        source_instance_id: Some("synthetic".into()),
+        evidence: Some(EvidenceRef {
+            file: "/synthetic/old-source.jsonl".into(),
+            line: 1,
+        }),
+    });
+    let request:Request=serde_json::from_value(serde_json::json!({"action":"usage","scope":{"since":"2026-09-02","until":"2026-09-03","timezone":"UTC"},"compact":true})).unwrap();
+    let result = execute_snapshot(request, &snapshot).unwrap();
+    assert_eq!(result.summary.tokens.total, Some(100));
+    let quality = serde_json::to_value(result.quality).unwrap();
+    assert_eq!(quality["status"], "partial");
+    assert_eq!(quality["issueScope"], "index");
+    assert_eq!(quality["queryImpact"], "unknown");
+    assert_eq!(quality["detailSummary"]["issueCount"], 1);
+}

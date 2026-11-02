@@ -8,7 +8,7 @@ export function isLocalAccessDenied(error: unknown): boolean {
 }
 
 export function localAccessError(): CoreError {
-  return new CoreError('LOCAL_ACCESS_DENIED', 'Local process or service access was denied');
+  return new CoreError('LOCAL_ACCESS_DENIED', 'Local process access was denied');
 }
 
 /** Retain at most one short diagnostic line; logs are never commands or grants. */

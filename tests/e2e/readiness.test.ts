@@ -12,7 +12,7 @@ test('initial recent preparation, batch reads and history expansion agree across
   }
   await utimes(path.join(f.root,'sessions/cold.jsonl'),new Date('2020-01-01'),new Date('2020-01-01'));
   const scope={since:day,until:new Date(Date.parse(day)+86400000).toISOString().slice(0,10),timezone:'UTC'};
-  const params={query:{action:'usage',scope,compact:true},mode:'fresh',waitMs:20000,also:[{action:'threads',scope,compact:true},{action:'statistics',scope,compact:true}]};
+  const params={query:{action:'usage',scope,compact:true},mode:'fresh',also:[{action:'threads',scope,compact:true},{action:'statistics',scope,compact:true}]};
   const recent=JSON.parse(f.cli(['system','call','--json'],JSON.stringify({method:'usage',params}),2));
   assert.equal(recent.result.summary.tokens.total,110);assert.equal(recent.freshness.initialScan,false);
   assert(recent.result.quality.sources.some((s:any)=>s.issues.some((i:any)=>i.code==='historyDeferred')));
@@ -22,9 +22,9 @@ test('initial recent preparation, batch reads and history expansion agree across
   assert.equal(restored.freshness.revision,recent.freshness.revision);assert.equal(restored.additional?.[1].statistics?.population.completeTaskTokens,110);
   for(const patch of [{roots:['/outside']},{snapshotId:recent.freshness.revision}])
    await assert.rejects(nativeApi.live!({query:{action:'usage',scope},also:[{action:'usage',...patch}]}),{code:'INVALID_ARGUMENT'});
-  const complete=await nativeApi.live!({query:{action:'usage',scope:{allTime:true},compact:true},mode:'fresh',waitMs:20000});
+  const complete=await nativeApi.live!({query:{action:'usage',scope:{allTime:true},compact:true},mode:'fresh'});
   assert.equal(complete.result.summary.tokens.total,330);assert(!complete.result.quality.sources.some(s=>s.issues.some(i=>i.code==='historyDeferred')));
-  await f.stop();await f.start();
+
   const restarted=await nativeApi.live!({query:{action:'usage',scope:{allTime:true},compact:true},mode:'cached',also:[{action:'statistics',scope:{allTime:true},compact:true}]});
   assert.deepEqual(restarted.result.summary,complete.result.summary);assert.equal(restarted.additional?.[0].statistics?.population.completeTaskTokens,330);
  });

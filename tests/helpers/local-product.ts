@@ -39,71 +39,15 @@ async function localProduct() {
         WOMBAT_AUTO_PRICES: "0",
         WOMBAT_CORE_BIN: binary,
     });
-    let service: ChildProcess | undefined;
     let nativeEntry: UsageClient | undefined;
-    const client = createNodeClient({
-        binaryPath: binary,
-        automaticPrices: false,
-    });
-    const stop = async () => {
-        if (!service || service.exitCode !== null || service.signalCode !== null)
-            return;
-        const exiting = once(service, "exit");
-        const force = setTimeout(() => service?.kill("SIGKILL"), 5000);
-        try {
-            service.kill("SIGTERM");
-            await exiting;
-        }
-        finally {
-            clearTimeout(force);
-        }
-    };
-    const start = async (resident = false) => {
-        // Listener removal can precede the final checkpoint and process lock release.
-        // Reuse only this fixture's confirmed child, never a matching process name.
-        if (service && service.exitCode === null && service.signalCode === null) {
-            await once(service, "exit", { signal: AbortSignal.timeout(10000) });
-        }
-        service = spawn(binary, [resident ? "--daemon" : "--serve-usage"], {
-            env: process.env,
-            stdio: "ignore",
-        });
-        await once(service, "spawn");
-        const deadline = Date.now() + 5000;
-        while (Date.now() < deadline) {
-            assert.equal(service.exitCode, null, "Owned core exited during startup");
-            if ((await client.service!({ action: "status" })).running)
-                return;
-            await delay(25);
-        }
-        assert.fail("Owned service listener did not become available");
-    };
+    const client = createNodeClient({binaryPath: binary,automaticPrices:false});
     const close = async () => {
-        try {
+        for(const [key,value] of Object.entries(saved)){
+            if(value===undefined)delete process.env[key];else process.env[key]=value;
         }
-        finally {
-            try {
-                await stop();
-            }
-            finally {
-                for (const [key, value] of Object.entries(saved)) {
-                    if (value === undefined)
-                        delete process.env[key];
-                    else
-                        process.env[key] = value;
-                }
-                await rm(dir, { recursive: true, force: true });
-            }
-        }
+        await rm(dir,{recursive:true,force:true});
     };
     const rows = (values: unknown[]) => values.map((value) => JSON.stringify(value) + "\n").join("");
-    try {
-        await start();
-    }
-    catch (error) {
-        await close();
-        throw error;
-    }
     return {
         dir,
         root,
@@ -111,8 +55,6 @@ async function localProduct() {
         data,
         entry,
         client,
-        stop,
-        start,
         close,
         write: (id: string, values: unknown[]) => writeFile(path.join(root, "sessions", id + ".jsonl"), rows(values)),
         append: (id: string, values: unknown[]) => appendFile(path.join(root, "sessions", id + ".jsonl"), rows(values)),

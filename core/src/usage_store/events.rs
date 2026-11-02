@@ -559,7 +559,7 @@ impl Snapshot {
         if self.is_summary_view() {
             let cold = self.cold_events.as_ref().ok_or_else(|| {
                 operation_error(
-                    "VIEW_EXPIRED",
+                    "INDEX_UNAVAILABLE",
                     "Live detail lease expired; reacquire the view",
                 )
             })?;

@@ -1,17 +1,17 @@
 {
-  "summary": "Wombat now organizes local history, usage, project diagnosis and cleanup around five task-oriented commands. One Skill selects the evidence needed for the task and helps verify authorized improvements.",
+  "summary": "Wombat now runs queries on demand and exits when each request completes. Search work history, inspect usage and recheck improvements without retained views or a background service.",
   "highlights": [
-    "Use history, usage, check, clean and system as the five CLI entries. Search or resume conversations, read selected dates and turns, and query familiar periods such as week. Commands provide focused text and JSON help; detailed generated methods are available through system api and system call.",
-    "Run wombat check for a read-only project diagnosis covering checks, AI configuration, recent work and cleanup candidates. Each section retains its own completeness or error state. Review consequential findings and confirm selected changes before applying them; diagnosis does not automatically edit the project.",
-    "Use one Skill with five task references for history and usage, diagnosis, AI environment review, cleanup, and execution with verification. Suggestions identify the affected owner, the smallest useful change and the original case to repeat. No project initialization is required.",
-    "Find conversation records from event evidence even when metering is absent. Read history in bounded pages and selected turns while keeping usage accounting independent and preserving unknown, zero, partial and unpriced results.",
-    "CI builds now run independent checks in parallel, reuse verified native artifacts, use pinned prebuilt audit tools and cache dependencies. Documentation-only PRs skip the heavy matrix while still resolving the CI result; main pushes retain full five-platform verification."
+    "Run local CLI queries in the foreground. Installation no longer offers Wombat service startup or autostart options; internal SQLite indexes still support incremental collection and consistent accounting.",
+    "Read clear daily usage totals with compact JSON by default. Index-wide source warnings remain separate from the coverage of selected measurements, so unrelated historical warnings do not become unsupported claims about a selected date range.",
+    "Resolve complete conversation IDs directly and continue bounded source reads across unrelated index updates. Changed source evidence still fails explicitly rather than returning substituted text.",
+    "Save the original check or cleanup JSON report and supply it for verification. Rechecks preserve the original scope and rules across processes; cleanup continues to validate current ownership, physical identity, protected files and active consumers.",
+    "Cancel a rebuild without leaving its unpublished temporary index behind. Completed indexes, recovery copies, user decisions and original conversation records stay separate from temporary cleanup."
   ],
   "knownLimitations": [
-    "The CLI surface has changed without compatibility aliases. Update the runtime and Codex plugin together. Replace old top-level api and call commands with system api and system call; use command --help --json for the current interface.",
-    "Codex is the production history source. Unsupported mappings, missing records and changed evidence remain explicit limitations. Current configuration and absent usage cannot prove historical loading or justify removal.",
-    "Project diagnosis combines independently observed sections; it is not an atomic snapshot of every project component. Partial or unavailable sections do not establish a complete review or a verified repair.",
-    "Supported Codex artifact cleanup currently targets macOS layouts and permanently removes only authorized selected candidates. General project cleanup uses authorized project or native tools. No general undo or automatic cleanup history is provided.",
-    "CLI queries run locally without model calls or conversation uploads. Selected Skill evidence enters the current Codex conversation and consumes Tokens. Large evidence queries may require narrower dates or turns; no hard request-latency or memory limit is promised."
+    "This release removes public view selectors, saved-view operations and service controls without compatibility aliases. Update the runtime, plugin and automation together; use command --help --json or system api for current inputs.",
+    "If an older installation has resident startup enabled, stop it and remove its autostart registration with that version before upgrading. This release does not manage legacy service registrations.",
+    "Original reports are recheck baselines, not deletion permission or proof that conditions are unchanged. Missing, changed or incomplete evidence cannot establish a verified repair or justify cleanup.",
+    "First collection and expanded history queries can require waiting. No hard latency or memory ceiling is promised. Codex artifact cleanup remains limited to supported macOS layouts.",
+    "Local CLI analysis does not call models or upload conversations. Selected Skill evidence enters the current Codex conversation. Unknown source formats are rejected without migration or automatic data deletion."
   ]
 }

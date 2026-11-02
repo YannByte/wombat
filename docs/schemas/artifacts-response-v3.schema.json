@@ -1,0 +1,430 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Response",
+  "type": "object",
+  "properties": {
+    "outputVersion": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 3
+    },
+    "policyVersion": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 2
+    },
+    "action": {
+      "type": "string"
+    },
+    "projectIdentity": {
+      "type": "string"
+    },
+    "baselineId": {
+      "type": "string"
+    },
+    "checkedAt": {
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/definitions/Scope"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Item"
+      }
+    },
+    "summary": {
+      "$ref": "#/definitions/Summary"
+    },
+    "partial": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "outputVersion",
+    "policyVersion",
+    "action",
+    "projectIdentity",
+    "baselineId",
+    "checkedAt",
+    "scope",
+    "items",
+    "summary",
+    "partial"
+  ],
+  "definitions": {
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "projectRoot": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "keepPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "productTemporary": {
+          "type": "boolean"
+        },
+        "codex": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "projectRoot",
+        "paths",
+        "keepPaths",
+        "productTemporary",
+        "codex"
+      ]
+    },
+    "Item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/Kind"
+        },
+        "assessment": {
+          "$ref": "#/definitions/Assessment"
+        },
+        "regeneration": {
+          "$ref": "#/definitions/Regeneration"
+        },
+        "regenerationVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "useState": {
+          "$ref": "#/definitions/UseState"
+        },
+        "observation": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Observation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Reason"
+          }
+        },
+        "recheck": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RecheckState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "codexEvidence": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CodexEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "removal": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Removal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "kind",
+        "assessment",
+        "regeneration",
+        "useState",
+        "reasons"
+      ]
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "build_output",
+        "selected_temporary",
+        "product_temporary",
+        "codex_desktop_cache",
+        "codex_update_stage",
+        "codex_marketplace_stage",
+        "codex_daemon_release",
+        "codex_runtime",
+        "codex_crash_report"
+      ]
+    },
+    "Assessment": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "review",
+        "protected",
+        "unknown",
+        "absent"
+      ]
+    },
+    "Regeneration": {
+      "type": "string",
+      "enum": [
+        "cargo_cache",
+        "type_script_output",
+        "codex_cache",
+        "superseded_package",
+        "discarded_stage",
+        "diagnostic",
+        "unknown"
+      ]
+    },
+    "UseState": {
+      "type": "string",
+      "enum": [
+        "no_observed_open_files",
+        "in_use",
+        "unknown"
+      ]
+    },
+    "Observation": {
+      "type": "object",
+      "properties": {
+        "physicalIdentity": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "string"
+        },
+        "logicalBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "allocatedBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "physicalIdentity",
+        "fingerprint",
+        "logicalBytes",
+        "files",
+        "complete"
+      ]
+    },
+    "Reason": {
+      "type": "string",
+      "enum": [
+        "declared_build_output",
+        "cache_tag",
+        "task_ownership_required",
+        "product_stage",
+        "user_kept",
+        "user_asset",
+        "tracked_content",
+        "untracked_content",
+        "nested_repository",
+        "symlink",
+        "special_file",
+        "shared_output",
+        "no_repository",
+        "git_unavailable",
+        "regeneration_unknown",
+        "in_use",
+        "use_unknown",
+        "read_unavailable",
+        "scan_limit",
+        "changed_during_scan",
+        "not_found",
+        "owner_changed",
+        "referenced_product_data",
+        "known_codex_cache",
+        "superseded_version",
+        "active_version",
+        "pending_update",
+        "recent",
+        "incomplete_runtime",
+        "active_runtime",
+        "process_unknown",
+        "installation_busy",
+        "installation_unknown",
+        "unsupported_platform",
+        "conditions_changed",
+        "removal_failed"
+      ]
+    },
+    "RecheckState": {
+      "type": "string",
+      "enum": [
+        "unchanged",
+        "changed",
+        "gone",
+        "unavailable"
+      ]
+    },
+    "CodexEvidence": {
+      "type": "object",
+      "properties": {
+        "parentIdentity": {
+          "type": "string"
+        },
+        "installLockIdentity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minimumAgeDays": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "currentRelease": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pendingRelease": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "installedBuild": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stagedBuild": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "parentIdentity"
+      ]
+    },
+    "Removal": {
+      "type": "string",
+      "enum": [
+        "removed",
+        "already_absent",
+        "skipped",
+        "failed"
+      ]
+    },
+    "Summary": {
+      "type": "object",
+      "properties": {
+        "candidates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "review": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "protected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unknown": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "absent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "observedLogicalBytes": {
+          "description": "Deduplicated observed logical file bytes, never a reclaim estimate.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "candidates",
+        "review",
+        "protected",
+        "unknown",
+        "absent",
+        "observedLogicalBytes",
+        "complete"
+      ]
+    }
+  }
+}

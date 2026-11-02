@@ -18,7 +18,7 @@ const steps = [
   ['Rust formatting', cargo, ['fmt', '--manifest-path', 'core/Cargo.toml', '--', '--check']],
   ['Rust lint', cargo, ['clippy', '--locked', '--manifest-path', 'core/Cargo.toml', '--all-targets', '--', '-D', 'warnings']],
   ['Build', 'corepack', ['pnpm', 'build']],
-  ['Shared-service startup probe', 'corepack', ['pnpm', 'release:probe']],
+  ['Foreground startup probe', 'corepack', ['pnpm', 'release:probe']],
   ['Types and module boundaries', 'corepack', ['pnpm', 'typecheck']],
   ['Generated contracts', 'corepack', ['pnpm', 'contracts:check']],
   ['Tests', 'corepack', ['pnpm', 'test']],

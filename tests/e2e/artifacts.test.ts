@@ -21,13 +21,13 @@ test('assembled cleanup is read-only, retains original selection, protects asset
   assert.ok(['candidate','unknown'].includes(before.items[0].assessment));
   assert.equal(before.items[0].regeneration,'cargo_cache');
   assert.equal(await readFile(path.join(output,'object.o'),'utf8'),'synthetic compile output');
-  const entries=await readdir(f.data,{recursive:true});
+  const entries=await readdir(f.data,{recursive:true}).catch((e:NodeJS.ErrnoException)=>{if(e.code==='ENOENT')return [];throw e;});
   assert.ok(!entries.some(v=>/\.sqlite(?:-|$)|ledger\.json$|manifest\.json$/.test(v)),'cleanup does not build a session index or saved snapshot');
   const held=await open(path.join(output,'object.o'),'r');
   try {const busy=await f.client.artifacts!({action:'inspect',projectRoot:f.project});assert.ok(['protected','unknown'].includes(busy.items[0].assessment));assert.ok(['in_use','unknown'].includes(busy.items[0].useState));} finally {await held.close();}
-  const q={action:'recheck' as const,readView:before.readView,baselineId:before.baselineId,selection:[before.items[0].id]};
+  const q={action:'recheck' as const,baseline:before,selection:[before.items[0].id]};
   const cli=invoke({method:'artifacts',params:q});
-  assert.equal(cli.readView,before.readView);
+  assert.equal('readView' in cli,false);
   assert.deepEqual(cli.items.map(i=>i.id),before.items.map(i=>i.id));
   await writeFile(path.join(output,'MEMORY.md'),'user asset');
   const protectedResult=await f.client.artifacts!(q);assert.equal(protectedResult.items[0].assessment,'protected');
@@ -51,13 +51,13 @@ test('Codex cleanup uses the real daemon lock and only the original selected obs
   const daemon=path.join(f.root,'packages/app-server-daemon'),releases=path.join(daemon,'releases');
   for(const v of ['1.0.0-darwin-arm64','2.0.0-darwin-arm64','3.0.0-darwin-arm64']){await mkdir(path.join(releases,v),{recursive:true});await writeFile(path.join(releases,v,'runtime'),'synthetic');}
   const {symlink}=await import('node:fs/promises');await symlink(path.join(releases,'2.0.0-darwin-arm64'),path.join(daemon,'current'));await writeFile(path.join(daemon,'auto-update-version'),'3.0.0-darwin-arm64');await writeFile(path.join(daemon,'install.lock'),'');await writeFile(path.join(f.root,'state_5.sqlite'),'persistent state');
-  const response=await f.client.artifacts!({action:'inspect',projectRoot:f.project,codex:true,paths:[daemon]});assert.equal(response.outputVersion,2);assert.equal(response.partial,false);
+  const response=await f.client.artifacts!({action:'inspect',projectRoot:f.project,codex:true,paths:[daemon]});assert.equal(response.outputVersion,3);assert.equal(response.partial,false);
   const old=response.items.find(i=>i.path===path.join(releases,'1.0.0-darwin-arm64'))!;assert.equal(old.assessment,'candidate');assert.equal(old.codexEvidence!.currentRelease,'2.0.0-darwin-arm64');assert.equal(old.codexEvidence!.pendingRelease,'3.0.0-darwin-arm64');
-  const request={method:'artifacts' as const,params:{action:'apply' as const,readView:response.readView,baselineId:response.baselineId,selection:[old.id]}};
+  const request={method:'artifacts' as const,params:{action:'apply' as const,baseline:response,selection:[old.id]}};
   const result=JSON.parse(f.cli(request)) as ArtifactsResult;assert.equal(result.items[0].removal,'removed');assert.equal(result.items[0].recheck,'gone');
   assert.equal(await readFile(path.join(releases,'2.0.0-darwin-arm64/runtime'),'utf8'),'synthetic');assert.equal(await readFile(path.join(releases,'3.0.0-darwin-arm64/runtime'),'utf8'),'synthetic');assert.equal(await readFile(path.join(f.root,'state_5.sqlite'),'utf8'),'persistent state');
   const recheck=await f.client.artifacts!({...request.params,action:'recheck'});assert.equal(recheck.items[0].recheck,'gone');
   await assert.rejects(f.client.artifacts!({...request.params,selection:response.items.filter(i=>i.assessment==='protected').map(i=>i.id)}),{code:'INVALID_ARGUMENT'});
-  const entries=await readdir(f.data,{recursive:true});assert.ok(!entries.some(p=>/index.*\.sqlite|ledger\.json$/.test(p)),'Codex cleanup does not build a usage index');
+  const entries=await readdir(f.data,{recursive:true}).catch((e:NodeJS.ErrnoException)=>{if(e.code==='ENOENT')return [];throw e;});assert.ok(!entries.some(p=>/index.*\.sqlite|ledger\.json$/.test(p)),'Codex cleanup does not build a usage index');
  });
 });

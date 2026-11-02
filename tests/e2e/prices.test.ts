@@ -25,7 +25,7 @@ test('first offline scan prices Sol 6.1 at request boundaries without a download
     await writeFile(path.join(source, 'sessions', 'source.jsonl'), rows.map(row => JSON.stringify(row)).join('\n') + '\n');
     const env = { ...process.env, WOMBAT_AUTO_PRICES: '0', WOMBAT_DATA_HOME: path.join(root, 'data'),
       CODEX_HOME: source, WOMBAT_CORE_BIN: '', NODE_OPTIONS: '' };
-    const result = spawnProductCli(entry, {"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}}, { env, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+    const result = spawnProductCli(entry, {"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true},"roots":[source]},"mode":"auto"}}, { env, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const value = JSON.parse(result.stdout);
@@ -67,7 +67,7 @@ test('built CLI price update changes new snapshots only, is idempotent, and fail
       { type: 'event_msg', payload: { type: 'token_usage_record', thread_id: 'price-case', turn_id: 'turn', response_id: 'response', usage: { input_tokens: 160000, cached_input_tokens: 50000, cache_write_input_tokens: 10000, output_tokens: 20000, reasoning_output_tokens: 0, total_tokens: 180000 } } },
     ].map(row => ({ timestamp: '2026-09-29T00:00:00Z', ...row }));
     await writeFile(path.join(source, 'sessions', 'source.jsonl'), rows.map(row => JSON.stringify(row)).join('\n') + '\n');
-    const before = run({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});
+    const before = run({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true},"roots":[source]},"mode":"auto"}});
     assert.equal(before.status, 0);
     assert.equal(before.value.summary.price.cost, '0.435');
     const updated = run({"method":"prices","params":{"action":"update"}});
@@ -80,9 +80,9 @@ test('built CLI price update changes new snapshots only, is idempotent, and fail
     const status = run({"method":"prices","params":{"action":"status"}});
     assert.equal(status.value.catalogHash, updated.value.catalogHash);
     assert.equal(status.stderr, '');
-    const old = run(['usage', '--snapshot', before.value.snapshotRef.snapshotId, '--since', '2026-09-29', '--until', '2026-09-30']);
-    assert.equal(old.value.summary.price.cost, '0.435');
-    const after = run({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}});
+    const old = run(['usage','--root',source, '--since', '2026-09-29', '--until', '2026-09-30']);
+    assert.equal(old.value.summary.price.cost, '0.4125');
+    const after = run({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true},"roots":[source]},"mode":"auto"}});
     assert.equal(after.value.summary.price.cost, '0.4125');
     assert.equal(after.value.summary.price.priceRevision, updated.value.catalog.revision);
     assert.equal(after.value.summary.tokens.total, before.value.summary.tokens.total);
@@ -94,7 +94,7 @@ test('built CLI price update changes new snapshots only, is idempotent, and fail
     }
     assert.equal(run(['prices', '--url', 'https://example.com']).value.error.code, 'INVALID_ARGUMENT');
     // Ordinary refresh must not touch the network even after a live catalog is installed.
-    assert.equal(run({"method":"usage","params":{"query":{"action":"refresh","roots":[source]},"mode":"auto"}}, { TEST_PRICE_ERROR: '1' }).status, 0);
+    assert.equal(run({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true},"roots":[source]},"mode":"auto"}}, { TEST_PRICE_ERROR: '1' }).status, 0);
   } finally { await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }
 });
 
@@ -124,11 +124,11 @@ test('missing model prices trigger one official fetch across processes, preserve
       assert.ifError(p.error); assert.ok(p.status === 0 || p.status === 2, p.stdout + p.stderr);
       return JSON.parse(p.stdout);
     };
-    const saved = run({"method":"usage","params":{"query":{"action":"refresh"},"mode":"auto"}}, { WOMBAT_AUTO_PRICES: '0' });
+    const saved = run({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true}},"mode":"auto"}}, { WOMBAT_AUTO_PRICES: '0' });
     assert.equal(saved.summary.price.cost, null);
     const query = ['usage', '--since', '2026-09-29', '--until', '2026-09-30'];
     assert.equal(run([...query, '--cached']).priceUpdate, undefined);
-    assert.equal(run([...query, '--snapshot', saved.snapshotRef.snapshotId]).summary.price.cost, null);
+    assert.equal(run([...query, '--cached']).summary.price.cost, null);
     await assert.rejects(readFile(count), { code: 'ENOENT' });
     const failed = run([...query, '--fresh'], { TEST_PRICE_ERROR: '1' });
     assert.equal(failed.priceUpdate.status, 'failed');
@@ -145,7 +145,7 @@ test('missing model prices trigger one official fetch across processes, preserve
     assert.equal(updated.summary.price.cost, '0.0001686');
     assert.equal(updated.summary.tokens.total, 110);
     assert.equal(updated.summary.price.status, 'priced');
-    assert.equal(run([...query, '--snapshot', saved.snapshotRef.snapshotId]).summary.price.cost, null);
+    assert.equal(run([...query, '--cached']).summary.price.cost, '0.0001686');
     assert.equal(run([...query, '--fresh']).priceUpdate, undefined);
     assert.equal((await readFile(count, 'utf8')).trim().split('\n').length, 2);
   } finally { await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 1000 }); }

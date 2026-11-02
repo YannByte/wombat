@@ -15,7 +15,7 @@ test('monitor thresholds, late reviews and acknowledgement survive restarts and 
     await f.write('task', [row('session_meta', { id: 'task', cwd: f.project }, today), row('turn_context', { turn_id: 'turn', model: 'gpt-5.4' }, today), measurement('task', 'past', 10, yesterday), measurement('task', 'initial', 79, today)]);
     const nativeApi = await f.native();
     const snapshot = async () => (await nativeApi.live!({ query: { action: 'usage', scope: { allTime: true } }, mode: 'fresh' })).result.snapshotRef.snapshotId;
-    const check = async (id = 'budget') => nativeApi.monitor!({ action: 'check', snapshotId: await snapshot(), ids: [id] });
+    const check = async (id = 'budget') => nativeApi.monitor!({ action: 'check', ids: [id] });
     const plan = { id: 'budget', enabled: true, period: 'day' as const, tokenLimit: 100, warningRatio: 0.8, review: false, scope: { project: f.project, timezone: 'UTC' } };
     await nativeApi.monitor!({ action: 'upsert', plan });
     assert.equal((await check()).notifications.length, 0);
@@ -40,9 +40,9 @@ test('monitor thresholds, late reviews and acknowledgement survive restarts and 
     assert.equal(amended.length, 1); assert.equal(amended[0].summary.tokens.total, 25); assert.notEqual(amended[0].id, review[0].id);
     const before = await nativeApi.monitor!({ action: 'list' });
     assert.equal(before.notifications.length, 4); assert.equal(before.notifications.find(n => n.id === warning[0].id)?.acknowledged, true);
-    await f.stop();
+
     await rm(path.join(f.data, 'live-v2'), { recursive: true, force: true });
-    await f.start(); await snapshot();
+     await snapshot();
     const restored = JSON.parse(f.cli({method:'monitor',params:{action:'list'}}));
     assert.deepEqual(restored.plans, before.plans); assert.deepEqual(restored.notifications, before.notifications);
     assert.equal((await check()).notifications.length, 0); assert.equal((await check('review')).notifications.length, 0);
@@ -52,13 +52,13 @@ test('monitor thresholds, late reviews and acknowledgement survive restarts and 
     await assert.rejects(nativeApi.monitor!({ action: 'upsert', plan: { ...plan, scope: { ...plan.scope, allTime: true } } }), { code: 'INVALID_ARGUMENT' });
     await assert.rejects(nativeApi.monitor!({ action: 'upsert', plan: { ...plan, warningRatio: 0 } }), { code: 'INVALID_ARGUMENT' });
     assert.equal((await nativeApi.monitor!({ action: 'list' })).plans.length, 1, 'Rejected writes cannot create plans');
-    await f.stop();
+
     const file = path.join(f.data, 'user-v1/monitor.sqlite');
     const db = new DatabaseSync(file); db.exec('PRAGMA user_version=99'); db.close();
     const unknown = await readFile(file);
-    await f.start();
+
     await assert.rejects(nativeApi.monitor!({ action: 'list' }), { code: 'UNSUPPORTED_VERSION' });
-    await f.stop();
+
     assert.deepEqual(await readFile(file), unknown, 'An unsupported user-store version must remain byte-for-byte intact');
   });
 });

@@ -8,18 +8,16 @@ base_url=""
 modify_path=1
 install_plugin_requested=0
 plugin_only=0
-start_service=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --version) version=${2:?missing version}; shift 2 ;;
     --prefix) prefix=${2:?missing prefix}; shift 2 ;;
     --base-url) base_url=${2:?missing base URL}; shift 2 ;;
-    --service) start_service=1; shift ;;
     --no-modify-path) modify_path=0; shift ;;
     --plugin) install_plugin_requested=1; shift ;;
     --plugin-only) install_plugin_requested=1; plugin_only=1; shift ;;
-    -h|--help) echo "Usage: install.sh [--version VERSION|latest] [--prefix PATH] [--base-url URL] [--no-modify-path] [--service] [--plugin|--plugin-only]"; exit 0 ;;
+    -h|--help) echo "Usage: install.sh [--version VERSION|latest] [--prefix PATH] [--base-url URL] [--no-modify-path] [--plugin|--plugin-only]"; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -28,8 +26,7 @@ install_root="$prefix/lib/wombat"
 bin_dir="$prefix/bin"
 launcher="$bin_dir/wombat"
 if [ "$plugin_only" -eq 1 ]; then
-  start_service=0
-  [ "$version" = latest ] && [ -z "$base_url" ] || { echo "--plugin-only uses the current installed version; omit --version and --base-url" >&2; exit 2; }
+    [ "$version" = latest ] && [ -z "$base_url" ] || { echo "--plugin-only uses the current installed version; omit --version and --base-url" >&2; exit 2; }
   [ -f "$install_root/.managed-by-wombat" ] && [ ! -L "$install_root" ] && [ ! -L "$install_root/current.txt" ] || { echo "A managed Wombat installation is required for --plugin-only" >&2; exit 1; }
   [ "$(wc -c < "$install_root/current.txt")" -le 128 ] || { echo "Invalid Wombat installation pointer" >&2; exit 1; }
   IFS= read -r release_id < "$install_root/current.txt"
@@ -152,12 +149,6 @@ esac' ;;
 }
 configure_path
 fi
-start_service() {
-  [ "$start_service" -eq 1 ] || return 0
-  echo "Enabling the optional resident query service..."
-  printf '%s\n' '{"method":"service","params":{"action":"enable"}}' | "$launcher" call
-}
-start_service
 install_plugin() {
   [ "$install_plugin_requested" -eq 1 ] || return 0
   "$destination/runtime/node" --input-type=commonjs - "$destination/lib/skill" <<'WOMBAT_PLUGIN_BOOTSTRAP'

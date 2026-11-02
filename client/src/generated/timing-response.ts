@@ -115,7 +115,7 @@ export interface LocalResponse {
   methodVersion: string;
   profile: LocalProfile;
   privacy: Privacy;
-  readView: ReadView;
+  basis: ReadView;
   scope: LocalScope;
   capabilities: Capabilities;
   anchors: Anchors;

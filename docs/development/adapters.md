@@ -20,7 +20,7 @@ Wombat 的独立合成样本使用协议字段与手算期望，不安装或运�
 | A11 读取与隐私 | `large_line_is_fully_skipped_without_losing_next_event_and_tail_is_reported`：完整大行不截断，未完成尾行公开；`source_failure_isolated_and_cancellation_reported`、`explicit_missing_root_has_failure_receipt_and_resource_caps_are_public`：失败隔离、取消与上限回执；工具样本验证正文、参数和结果正文不进入快照。 |
 | A12 关联与守恒 | `tools_merge_by_call_identity_and_never_store_arguments_or_outputs`：call/item 身份合并，MCP 和明确 Skill 文件读取保留安全元数据；集成“用量 → 跨日对话 → 轮次 → 操作”验证同一计量并集的 Token / 金额与占比。 |
 | A13 MCP运行 | 原生完成/持久项结果、工具与资源分项、轮次身份、失败重试、分叉重放、冲突及正文排除；[样本](../../core/src/adapters/codex/tests/mcp.rs)与[CLI追加和重启](../../tests/e2e/mcp-evidence.test.ts)。 |
-| A14 分叉索引与异常关系 | [独立样本](../../core/src/adapters/codex/tests/fork_graph.rs)将随机稀疏/循环分叉与独立祖先遍历对照，验证十万层链无递归、独立调用保留，循环及其后代保留计量并公开缺口；[完整刷新基准](../../scripts/benchmark-forks.ts)校验结果、峰值内存和落盘字节。 |
+| A14 分叉索引与异常关系 | [独立样本](../../core/src/adapters/codex/tests/fork_graph.rs)将随机稀疏/循环分叉与独立祖先遍历对照，验证十万层链无递归、独立调用保留，循环及其后代保留计量并公开缺口；[完整刷新基准](https://github.com/YannByte/wombat/blob/475d0bbf0cc86281875b227c00d7c1e413c9ba81/scripts/benchmark-forks.ts)校验结果、峰值内存和落盘字节。 |
 | A15 工具结果状态 | [样本](../../core/src/adapters/codex/tests/operations.rs)验证未知返回结束运行状态、已知结果保留、乱序/重放/分叉和追加重启一致，旧查询不被修改，正文仍不落盘。 |
 | A16 AGENTS.md加载证据 | Codex原生`agents_md.instructions`元数据建立项目指令加载事实，绑定任务、轮次、时间和准确路径；普通用户文本不能伪造加载，注入正文不进入派生索引。Rust、CLI合成链路及本机真实历史验证当前项目根规则为已加载。 |
 | A17 Skill可用与观察采用 | Codex原生`host_skills.instructions`解析根别名、名称和准确`SKILL.md`路径，绑定来源、项目、任务、轮次及目录摘要；普通用户文本不能伪造可用目录。正向采用声明仅匹配原生目录名称，定向读取仅接受结构化路径或`exec`包装中的有界字面读取命令；同一Skill同一轮去重，不保存目录简介、助手正文或命令。 |

@@ -23,13 +23,12 @@ const requests = [
     },
   },
   {
-    method: 'snapshot',
-    params: {
+    method: 'usage',
+    params: {query:{
       action: 'investigate',
-      snapshotId: 'fixed',
       scope: { threadId: 'complete-id', turnId: 'complete-turn' },
       compact: true,
-    },
+    },mode:'cached'},
   },
   { method: 'config', params: { action: 'capabilities' } },
   { method: 'optimize', params: { action: 'list', limit: 3 } },
@@ -41,12 +40,10 @@ const requests = [
   { method: 'prices', params: { action: 'status' } },
   { method: 'monitor', params: { action: 'list' } },
   { method: 'collection', params: { action: 'status' } },
-  { method: 'service', params: { action: 'status' } },
   {
     method: 'conversation',
     params: {
       action: 'locate',
-      snapshotId: 'fixed',
       selection: { projects: ['/synthetic'], recordKinds: ['response_snapshot'] },
       limit: 3,
     },
@@ -118,7 +115,6 @@ test('structured calls retain nested selection, emit unmodified product JSON and
                 action: 'summary',
                 threadId: 'thread',
                 turnId: 'turn',
-                snapshotId: 'fixed',
                 scope: { sourceInstanceId: 'source' },
               },
             }
@@ -228,7 +224,7 @@ test('oversized product output returns one recovery error without a partial JSON
 });
 test('errors retain stable product codes and actionable recovery without private details', async () => {
   for (const [code, recovery] of [
-    ['VIEW_EXPIRED', 'reacquire_view'],
+    ['SOURCE_CHANGED', 'retry_same_scope'],
     ['SKILL_RUNTIME_MISMATCH', 'check_setup'],
     ['SYNC_PENDING', 'retry_same_scope'],
     ['RESOURCE_LIMIT', 'narrow_query'],

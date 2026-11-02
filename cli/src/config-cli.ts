@@ -31,7 +31,6 @@ export function formatConfigText(result: ConfigResult,request:ConfigRequest={act
   }
   for (const row of result.evidence) out.push(`${row.timestamp ?? '—'}\t${row.threadId}\t${configEvidenceLabel(row.eventType)}\t${eventStatusLabel(row.outcome)}\n`);
   for (const row of result.relatedScopes) out.push(`${terminalText(row.project ?? '—')}\t${row.evidenceCount}\n`);
-  out.push(t('config.readVersion', { version: result.readView ?? '—' }) + '\n');
   out.push(t('config.coverageNote') + '\n');
   return out.join('');
 }

@@ -4,7 +4,9 @@
 
 Status: implemented
 
-The resident-indexing lifecycle partially supersedes the idle-exit choice; see the [resident-indexing proposal](../../proposed/architecture/2026-10-15-resident-indexing.en.md). Source isolation and immutable read semantics remain applicable.
+The service and retained-view lifecycle described below is superseded by the [foreground-query decision](2026-11-02-foreground-queries.en.md). Its independent source, accounting and bounded-evidence rationale remains historical context.
+
+The resident-indexing lifecycle partially supersedes the idle-exit choice; see the [resident-indexing proposal](../../rejected/architecture/2026-10-15-resident-indexing.en.md). Source isolation and immutable read semantics remain applicable.
 
 ## Problem
 

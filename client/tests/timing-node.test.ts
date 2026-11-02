@@ -6,7 +6,7 @@ import path from 'node:path';
 import { CoreError, type TimingRequest } from '@wombat/client';
 import { createNodeClient } from '@wombat/client/node';
 
-test('Node timing routes only explicit stored views and capabilities directly to core', async () => {
+test('Node timing uses one foreground child for capabilities, summaries and evidence', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'wombat-timing-route-'));
   const binaryPath = path.join(dir, 'core.cjs');
   const calls = path.join(dir, 'calls');
@@ -14,24 +14,17 @@ test('Node timing routes only explicit stored views and capabilities directly to
   await writeFile(binaryPath, body); await chmod(binaryPath, 0o700);
   try {
     const reader = createNodeClient({ binaryPath, codexBinaryPath: path.join(dir, 'must-not-run') });
-    for (const [request, operation] of [
-      [{ action: 'capabilities' }, 'timing'],
-      [{ action: 'summary', threadId: 'thread', turnId: 'turn', snapshotId: 'stored' }, 'timing'],
-      [{ action: 'evidence', threadId: 'thread', turnId: 'turn', snapshotId: 'stored' }, 'timing'],
-      [{ action: 'summary', threadId: 'thread', turnId: 'turn' }, 'live_endpoint'],
-      [{ action: 'summary', threadId: 'thread', turnId: 'turn', snapshotId: 'live:scope:fixed' }, 'live_endpoint'],
-      [{ action: 'evidence', threadId: 'thread', turnId: 'turn', snapshotId: 'live:scope:fixed' }, 'live_endpoint'],
-    ] as const) {
-      await assert.rejects(reader.timing!(request as TimingRequest), (error: unknown) => {
-        assert.ok(error instanceof CoreError); assert.equal(error.code, 'SYNTHETIC_ROUTE');
-        assert.deepEqual(error.details, { op: operation, args: operation === 'timing' ? request : {} });
-        return true;
+    const requests:TimingRequest[]=[{action:'capabilities'},{action:'summary',threadId:'thread',turnId:'turn'},{action:'evidence',threadId:'thread',turnId:'turn'}];
+    for (const request of requests) {
+      await assert.rejects(reader.timing!(request), (error:unknown)=>{
+        assert.ok(error instanceof CoreError);assert.equal(error.code,'SYNTHETIC_ROUTE');
+        assert.deepEqual(error.details,{op:'local_query',args:{timing:request}});return true;
       });
     }
     const operations = (await readFile(calls, 'utf8')).trim().split('\n').map(line => JSON.parse(line).op);
-    assert.deepEqual(operations, ['timing', 'timing', 'timing', 'live_endpoint', 'live_endpoint', 'live_endpoint']);
+    assert.deepEqual(operations, ['local_query','local_query','local_query']);
     const cancelled = new AbortController(); cancelled.abort();
     await assert.rejects(reader.timing!({ action: 'capabilities' }, { signal: cancelled.signal }), { code: 'CANCELLED' });
-    assert.equal((await readFile(calls, 'utf8')).trim().split('\n').length, 6);
+    assert.equal((await readFile(calls, 'utf8')).trim().split('\n').length, 3);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

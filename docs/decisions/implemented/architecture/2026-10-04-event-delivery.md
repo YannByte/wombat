@@ -4,6 +4,8 @@
 
 Status: implemented
 
+下文中的服务与保留视图生命周期已由[前台查询决策](2026-11-02-foreground-queries.md)替代；独立来源、计量及有界证据方面的理由继续作为历史背景保留。
+
 ## 问题
 
 本记录承接[升级总方案](2026-10-04-codex-task-timing.md)中第 7 节、第 8 节、第 9 节、第 15 节、第 16 节的全部设计责任，作为该部分唯一详细方案。总方案保留研究依据、跨模块约束及交付限制；其他专项的决策边界见总方案入口。
@@ -52,9 +54,9 @@ Rust 定义 summary/evidence/capabilities 窄请求、本机/分享响应及独�
 
 P0 的耗时分析 Request 为带 action 的生成联合类型：`summary` 返回整轮摘要，`evidence` 返回分页的安全事实，`capabilities` 返回字段级能力且不扫描。summary 必须有 threadId/turnId；evidence 还须带上次结果的固定 snapshotId，分页默认50、最多200，不改变摘要分母。capabilities 不接受任务或来源路径；只声明解析器支持的字段，目标轮次的实际可用性由 summary 的覆盖信息单独说明。`privacyProfile` 为 local/share-v1；分享不开放本机 evidence 操作。未知字段在 Rust、客户端及宿主边界都拒绝。
 
-实时请求通过现有按需服务增加窄信封 `{timing: Request}`；固定磁盘快照使用独立内核操作 `{op:"timing",args:Request}`。Node 的一个 `UsageClient.timing(request, options)` 负责选择这两种受限传输，调用者不接触 op 字符串。在 [live/transport.rs](../../../../core/src/live/transport.rs) 的共享请求分发接入同一信封，沿用 Unix socket 与 Windows 命名管道共用处理逻辑，并分别验证平台连接。
+实时请求通过现有按需服务增加窄信封 `{timing: Request}`；固定磁盘快照使用独立内核操作 `{op:"timing",args:Request}`。Node 的一个 `UsageClient.timing(request, options)` 负责选择这两种受限传输，调用者不接触 op 字符串。在 [live/transport.rs](https://github.com/YannByte/wombat/blob/475d0bbf0cc86281875b227c00d7c1e413c9ba81/core/src/live/transport.rs) 的共享请求分发接入同一信封，沿用 Unix socket 与 Windows 命名管道共用处理逻辑，并分别验证平台连接。
 
-从 [live/selection.rs](../../../../core/src/live/selection.rs) 的 `select_view` 抽出内部 `ReadViewSelector`，负责来源范围、selector、mode 与版本选择，现有用量与新耗时分析各自先做业务参数校验，再调用共用选择器。不得构造虚假的 usage/refresh 请求来借用同步，或把新 action 塞进旧 `live.query` 联合类型。选择器继续返回 `Arc<Snapshot>` 与 freshness，保留 auto 最多2秒、fresh 最多10秒、cached不扫描及已有过期机制。`UsageClient.timing` 不走 `withAutomaticPrices` 的补价逻辑，也不触发 Node 的 Hook 采集、账户读取或 Codex 交接。首次预览返回 partial，不为耗时查询自动升级到新版本；用户刷新后整组用量与耗时一起切换。配置保留的同一快照允许按现有查询路径解析；不存在或已过期则明确失败，不回退到最新数据。
+从 [live/selection.rs](https://github.com/YannByte/wombat/blob/475d0bbf0cc86281875b227c00d7c1e413c9ba81/core/src/live/selection.rs) 的 `select_view` 抽出内部 `ReadViewSelector`，负责来源范围、selector、mode 与版本选择，现有用量与新耗时分析各自先做业务参数校验，再调用共用选择器。不得构造虚假的 usage/refresh 请求来借用同步，或把新 action 塞进旧 `live.query` 联合类型。选择器继续返回 `Arc<Snapshot>` 与 freshness，保留 auto 最多2秒、fresh 最多10秒、cached不扫描及已有过期机制。`UsageClient.timing` 不走 `withAutomaticPrices` 的补价逻辑，也不触发 Node 的 Hook 采集、账户读取或 Codex 交接。首次预览返回 partial，不为耗时查询自动升级到新版本；用户刷新后整组用量与耗时一起切换。配置保留的同一快照允许按现有查询路径解析；不存在或已过期则明确失败，不回退到最新数据。
 
 生成脚本新增 diagnostic request、local response、share response 的 Schema/TS/校验器；无论传输为何，响应需验证 outputVersion、action、profile 与读取身份。`createUsageClient` 增加独立可选 timing transport，未装配该可选能力的宿主明确不可用；传输协议版本不符直接拒绝，UI 不伪造数据。实现时整理传输装配参数，避免继续在多个调用点复制长位置参数；对外 `UsageClient` 仍为窄类型方法，不变成通用 dispatch。
 

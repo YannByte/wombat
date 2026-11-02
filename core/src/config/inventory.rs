@@ -8,9 +8,6 @@ pub(crate) fn prepare_observed(
     native: Option<&hooks::Capture>,
     native_skills: Option<&review::Capture>,
 ) -> Result<View> {
-    // Serialize inventory refreshes, not usage queries or reads of retained views.
-    static REFRESH: Mutex<()> = Mutex::new(());
-    let _refresh = REFRESH.lock().unwrap_or_else(|e| e.into_inner());
     let roots = r.roots.clone().unwrap_or_default();
     let discovery = crate::adapters::codex::CodexAdapter.discover(&DiscoveryRequest {
         roots: roots.iter().map(PathBuf::from).collect(),

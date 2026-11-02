@@ -1,3 +1,4 @@
+import {comparable} from '../helpers/comparable.js';
 import {spawnProductCli} from '../../scripts/cli-invocation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,12 +35,12 @@ test('extension review joins native metadata and pinned use without changing the
   await mode([skill]);
   Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
   const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-  const service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env }); await once(service, 'spawn');
+
   const client = projectTestClient(createNodeClient({ binaryPath: binary, codexBinaryPath: native.binary, automaticPrices: false }), [root], [project]);
   const scope = { since: '2026-10-29', until: '2026-10-30', timezone: 'UTC', project };
   try {
     const usage = await client.live!({ query: { action: 'usage', scope }, mode: 'fresh' });
-    const request = { review: true, kind: 'skill' as const, scope, snapshotId: usage.result.snapshotRef.snapshotId };
+    const request = { review: true, kind: 'skill' as const, scope };
     const before = await client.config!(request);
     const item = before.items.find(i => i.path === file)!;
     assert.ok(item, 'native-only plugin Skill must join the physical inventory');
@@ -52,12 +53,12 @@ test('extension review joins native metadata and pinned use without changing the
     const estimate = item.contextFootprint?.estimate?.tokens;
     assert.ok(estimate && estimate > 0);
     const calls = await readFile(native.calls, 'utf8');
-    const pinned = await client.config!({ review: true, kind: 'skill', readView: before.readView, scope });
-    assert.deepEqual(pinned.items, before.items);
-    assert.equal(await readFile(native.calls, 'utf8'), calls, 'retained reads do not rerun native discovery');
+    const pinned = await client.config!({ review: true, kind: 'skill', scope });
+    assert.deepEqual(comparable(pinned.items), comparable(before.items));
+    assert.ok((await readFile(native.calls, 'utf8')).length > calls.length, 'each request captures current discovery');
     await writeFile(file, body + 'Long body. '.repeat(1000));
     const grown = await client.config!(request);
-    assert.equal(grown.items.find(i => i.path === file)?.contextFootprint?.estimate?.tokens, estimate);
+    assert.equal(grown.items.find(i => i.path === file)!.contextFootprint!.estimate!.tokens, estimate, "Catalog metadata estimate excludes an on-demand body");
     assert.ok(grown.items.find(i => i.path === file)!.bodyTokenEstimate!.tokens > item.bodyTokenEstimate!.tokens);
     await mode([{ ...skill, enabled: false }]);
     const disabled = await client.config!(request);
@@ -67,7 +68,7 @@ test('extension review joins native metadata and pinned use without changing the
     const restored = await client.config!(request);
     assert.equal(restored.extensionReview?.enabledItems, 1);
     assert.equal(restored.items.find(i => i.path === file)?.id, item.id);
-    const after = await client.live!({ query: { action: 'usage', scope, snapshotId: usage.result.snapshotRef.snapshotId }, mode: 'cached' });
+    const after = await client.live!({ query: { action: 'usage', scope  }, mode: 'cached' });
     assert.deepEqual(after.result.summary, usage.result.summary);
     assert.equal(after.result.summary.tokens.total, 110);
     await mode([skill, { ...skill, enabled: false }]);
@@ -79,10 +80,10 @@ test('extension review joins native metadata and pinned use without changing the
     assert.ok(unavailable.coverage.issues.some(i => i.code === 'CODEX_REQUEST_REJECTED'));
     assert.equal(unavailable.extensionReview?.enabledItems, 0);
     await mode([skill]);
-    const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{review:true,kind:'skill',roots:[root],projectRoots:[project],scope, snapshotId:usage.result.snapshotRef.snapshotId}}, { env: { ...process.env, WOMBAT_CODEX_BIN: native.binary }, encoding: 'utf8', timeout: 15000 });
+    const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{review:true,kind:'skill',roots:[root],projectRoots:[project],scope }}, { env: { ...process.env, WOMBAT_CODEX_BIN: native.binary }, encoding: 'utf8', timeout: 15000 });
     assert.ok([0, 2].includes(cli.status!), cli.stderr + cli.stdout);
     assert.equal(JSON.parse(cli.stdout).extensionReview.enabledItems, 1);
-    const api = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'system', 'call'], { env: process.env, input: JSON.stringify({ method: 'config', params: { review: true, readView: before.readView, roots: [root], projectRoots: [project], kind: 'skill', scope } }), encoding: 'utf8', timeout: 15000 });
+    const api = spawnSync(process.execPath, [path.resolve('dist/wombat.js'), 'system', 'call'], { env: {...process.env,WOMBAT_CODEX_BIN:native.binary}, input: JSON.stringify({ method: 'config', params: { review: true, roots: [root], projectRoots: [project], kind: 'skill', scope } }), encoding: 'utf8', timeout: 15000 });
     assert.ok([0, 2].includes(api.status!), api.stderr + api.stdout);
     assert.equal(JSON.parse(api.stdout).items[0].contextFootprint.estimate.tokens, estimate);
     const outside = path.join(dir, 'outside/SKILL.md');
@@ -98,7 +99,7 @@ test('extension review joins native metadata and pinned use without changing the
     const methods = (await readFile(native.calls, 'utf8')).trim().split('\n').map(l => JSON.parse(l).method);
     assert.ok(methods.every(m => ['initialize', 'skills/list'].includes(m)));
   } finally {
-    service.kill('SIGTERM'); await once(service, 'exit').catch(() => {});
+
     for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
     await native.waitForExit(); await rm(dir, { recursive: true, force: true });
   }

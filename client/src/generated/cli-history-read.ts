@@ -1,6 +1,6 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = ("activity" | "locate" | "read" | "search" | "changes") | "records";
+export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -28,10 +28,10 @@ export interface HistoryRead {
   nextLocations?: Request | null;
 }
 export interface Response {
+  record?: ResolvedRecord | null;
   outputVersion: number;
   action: Action;
   snapshotId: string;
-  baselineSnapshotId?: string | null;
   selection: Selection;
   items: Activity[];
   fragments: Fragment[];
@@ -49,6 +49,13 @@ export interface Response {
    * When present, completeness applies only to this requested source window.
    */
   window?: ContextWindow | null;
+}
+export interface ResolvedRecord {
+  id: string;
+  upstreamId: string;
+  sourceInstanceId: string;
+  project?: string | null;
+  title?: string | null;
 }
 export interface Selection {
   since?: string | null;
@@ -173,7 +180,6 @@ export interface ContextWindow {
 }
 export interface Request {
   action: Action;
-  snapshotId: string;
   roots?: string[];
   selection?: Selection;
   limit?: number | null;
@@ -183,7 +189,6 @@ export interface Request {
   offset?: number | null;
   cursor?: string | null;
   query?: string | null;
-  baselineSnapshotId?: string | null;
   targets?: ReadTarget[];
   maxScanBytes?: number | null;
   anchor?: Evidence | null;

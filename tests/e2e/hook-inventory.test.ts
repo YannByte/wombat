@@ -21,8 +21,8 @@ test('Hook declaration measurements agree in CLI and HTTP without measuring or e
     await writeFile(path.join(project, '工具.js'), `require('node:fs').writeFileSync(${JSON.stringify(marker)},'executed');\n/*${'x'.repeat(2000000)}*/`);
     Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
-    const service = spawn(binary, ['--serve-usage'], { stdio: 'ignore', env: process.env });
-    await once(service, 'spawn');
+
+
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), [root], [project]);
     try {
 
@@ -39,7 +39,7 @@ test('Hook declaration measurements agree in CLI and HTTP without measuring or e
         assert.equal(item.usageCount, null);
         assert.ok(!JSON.stringify(result).includes('SYNTHETIC_NOT_EXPOSED'));
         assert.ok(!JSON.stringify(result).includes('writeFileSync'));
-        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots:[root],projectRoots:[project],kind:'hook',readView:result.readView}}, { encoding: 'utf8', env: process.env, timeout: 15000 });
+        const cli = spawnProductCli(path.resolve('dist/wombat.js'), {method:'config',params:{action:'list',roots:[root],projectRoots:[project],kind:'hook'}}, { encoding: 'utf8', env: process.env, timeout: 15000 });
         assert.equal(cli.status, 2, cli.stderr + cli.stdout);
         const cliItem = JSON.parse(cli.stdout).items[0];
         assert.deepEqual([cliItem.bytes, cliItem.characters, cliItem.contentTokens, cliItem.estimate], [item.bytes, item.characters, item.contentTokens, item.estimate]);
@@ -50,8 +50,8 @@ test('Hook declaration measurements agree in CLI and HTTP without measuring or e
         await assert.rejects(access(marker));
     }
     finally {
-        service.kill('SIGTERM');
-        await once(service, 'exit').catch(() => { });
+
+
         for (const [k, v] of Object.entries(old)) {
             if (v === undefined)
                 delete process.env[k];

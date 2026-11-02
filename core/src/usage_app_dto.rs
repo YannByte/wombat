@@ -1,4 +1,6 @@
 //! Public usage query contract. All calculations remain in the Rust core.
+pub const REQUEST_VERSION: u32 = 4;
+
 use crate::adapters::contract::{Issue, SourceReport, TokenField, TokenFields, TokenUsage};
 use crate::pricing::PriceResult;
 use schemars::JsonSchema;
@@ -33,10 +35,12 @@ pub struct Scope {
     #[serde(default)]
     pub turn_id: Option<String>,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
+    #[schemars(skip)]
     Refresh,
+    #[default]
     Usage,
     Threads,
     Turns,
@@ -73,11 +77,13 @@ pub enum Presentation {
     Projects,
     Models,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Request {
     pub comparison: Option<ComparisonRequest>,
     pub action: Action,
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     pub snapshot_id: Option<String>,
     pub roots: Option<Vec<String>>,
     #[serde(default)]
@@ -207,11 +213,26 @@ pub struct Page {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Quality {
+    /// Issues and source statuses describe the whole snapshot, not this query window.
+    pub issue_scope: QualityIssueScope,
+    /// Snapshot warnings without query-bound attribution cannot prove a scoped defect.
+    pub query_impact: QualityQueryImpact,
     pub status: String,
     pub issues: Vec<Issue>,
     pub sources: Vec<SourceReport>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail_summary: Option<QualityDetailSummary>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityIssueScope {
+    Index,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityQueryImpact {
+    None,
+    Unknown,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

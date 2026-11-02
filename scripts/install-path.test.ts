@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {chmodSync, readdirSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -49,23 +49,10 @@ test('POSIX installer respects path opt-out and does not edit profiles for custo
 
 const pluginSource = installer.match(/(install_plugin\(\) \{[\s\S]*?\n\})\ninstall_plugin\n/)?.[1];
 assert(pluginSource, 'install.sh must expose the tested install_plugin function');
-const serviceSource=installer.match(/(start_service\(\) \{[\s\S]*?\n\})\nstart_service\n/)?.[1];
-assert(serviceSource,'install.sh must expose the tested start_service function');
-test('optional resident registration precedes plugin checks and respects defaults and reports failure',{skip:process.platform==='win32'},t=>{
-  const root=mkdtempSync(path.join(os.tmpdir(),'wombat-install-service-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
-  const destination=path.join(root,'version'),launcher=path.join(root,'wombat'),marker=path.join(root,'calls'),script=path.join(root,'test.sh');
-  mkdirSync(path.join(destination,'runtime'),{recursive:true});symlinkSync(process.execPath,path.join(destination,'runtime/node'));
-  writeFileSync(launcher,'#!/bin/sh\nprintf "%s\\n" "$*" >> "$MARKER"\ncat >> "$MARKER"\nexit "${FAIL_SERVICE:-0}"\n');chmodSync(launcher,0o755);
-  writeFileSync(script,'set -eu\n'+serviceSource+'\nstart_service\n');
-  assert.match(installer, /^start_service=0$/m);
-  assert.match(installer, /--service\) start_service=1/);
-  assert.match(windowsInstaller, /\[switch\]\$Service/);
-  const env={...process.env,launcher,destination,MARKER:marker,start_service:'1'};
-  execFileSync('sh',[script],{env,stdio:'pipe'});assert.equal(readFileSync(marker,'utf8'),'call\n{"method":"service","params":{"action":"enable"}}\n');
-  rmSync(marker);execFileSync('sh',[script],{env:{...env,start_service:'0'},stdio:'pipe'});assert(!existsSync(marker));
-  assert.throws(()=>execFileSync('sh',[script],{env:{...env,FAIL_SERVICE:'17'},stdio:'pipe'}));
-  assert(installer.indexOf('\nstart_service\n')<installer.indexOf('\ninstall_plugin\n'));
-  assert(windowsInstaller.indexOf('if ($Service)')<windowsInstaller.indexOf('if ($Plugin)'));
+test('installer rejects the removed service option before changing files',()=>{
+ const work=mkdtempSync(path.join(os.tmpdir(),'wombat-service-option-'));
+ try {assert.throws(()=>execFileSync('sh',[path.resolve('scripts/install/install.sh'),'--service','--prefix',work],{encoding:'utf8',timeout:5000,stdio:'pipe'}));assert.deepEqual(readdirSync(work),[]);}
+ finally {rmSync(work,{recursive:true,force:true});}
 });
 test('plugin-only reuses a managed custom-prefix runtime without downloading or editing profiles',{skip:process.platform==='win32'},t=>{
   const root=mkdtempSync(path.join(os.tmpdir(),'wombat-plugin-resume-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
