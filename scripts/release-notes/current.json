@@ -5,7 +5,8 @@
     "Read clear daily usage totals with compact JSON by default. Index-wide source warnings remain separate from the coverage of selected measurements, so unrelated historical warnings do not become unsupported claims about a selected date range.",
     "Resolve complete conversation IDs directly and continue bounded source reads across unrelated index updates. Changed source evidence still fails explicitly rather than returning substituted text.",
     "Save the original check or cleanup JSON report and supply it for verification. Rechecks preserve the original scope and rules across processes; cleanup continues to validate current ownership, physical identity, protected files and active consumers.",
-    "Cancel a rebuild without leaving its unpublished temporary index behind. Completed indexes, recovery copies, user decisions and original conversation records stay separate from temporary cleanup."
+    "Cancel a rebuild without leaving its unpublished temporary index behind. Completed indexes, recovery copies, user decisions and original conversation records stay separate from temporary cleanup.",
+    "Update the Markdown parser to the patched release that resolves RUSTSEC-2026-0433."
   ],
   "knownLimitations": [
     "This release removes public view selectors, saved-view operations and service controls without compatibility aliases. Update the runtime, plugin and automation together; use command --help --json or system api for current inputs.",

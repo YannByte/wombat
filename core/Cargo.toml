@@ -24,7 +24,7 @@ rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled
 toml_edit = { version = "=0.25.15", default-features = false, features = ["parse"] }
 tiktoken-rs = "=0.12.0"
 serde-saphyr = { version = "=1.3.0", default-features = false, features = ["deserialize"] }
-pulldown-cmark = { version = "=0.13.5", default-features = false }
+pulldown-cmark = { version = "=0.13.6", default-features = false }
 unicode-normalization = "=0.1.25"
 percent-encoding = "=2.3.2"
 shlex = "=2.0.1"

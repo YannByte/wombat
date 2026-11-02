@@ -44,7 +44,13 @@ test('cleanup baselines cross process boundaries without expiry or an index',{ti
   const before=await f.client.artifacts!({action:'inspect',projectRoot:f.project,paths:['temporary.txt']});
   const file=path.join(f.dir,'cleanup.json');await writeFile(file,JSON.stringify(before));
   const raw=f.cli(['clean','verify','--plan',file,'--item',before.items[0].id,'--json'],'',before.partial?2:0);
-  const after=JSON.parse(raw);assert.equal(after.items[0].id,before.items[0].id);assert.equal(after.items[0].recheck,'unchanged');
+  const after=JSON.parse(raw);assert.equal(after.items[0].id,before.items[0].id);
+  if(process.platform==='win32'){
+   // Windows has no supported open-file probe; retained identity cannot prove unchanged conditions.
+   assert.equal(before.items[0].useState,'unknown');assert.ok(before.items[0].reasons.includes('use_unknown'));
+   assert.equal(after.items[0].recheck,'unavailable');assert.equal(after.items[0].assessment,'unknown');
+   assert.ok(after.items[0].reasons.includes('use_unknown'));assert.equal(after.partial,true);
+  }else assert.equal(after.items[0].recheck,'unchanged');
   assert.equal('readView' in after,false);assert.equal('expiresAt' in after,false);
   const entries=await readdir(f.data,{recursive:true}).catch((e:NodeJS.ErrnoException)=>{if(e.code==='ENOENT')return [];throw e;});
   assert.ok(!entries.some(v=>v.endsWith('.sqlite')));
