@@ -3,12 +3,13 @@
 //! Adapters own call/result aliases and explicit fork inheritance. This projection
 //! neither pairs log records nor guesses operation identity from paths or time.
 use crate::adapters::contract::{
-    CommandSource, Operation, ParsedCommand, WORK_OBSERVATION_VERSION, WorkData,
+    CommandSource, MatchGap, OPERATION_MATCH_VERSION, Operation, ParsedCommand,
+    WORK_OBSERVATION_VERSION, WorkData, WorkStage,
 };
 use std::collections::BTreeSet;
 use typed_path::Utf8TypedPath;
 
-pub(crate) const METHOD_VERSION: u32 = 3;
+pub(crate) const METHOD_VERSION: u32 = 4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum UseKind {
@@ -55,7 +56,14 @@ pub(crate) fn normalized_path(path: &str, base: Option<&str>) -> Option<String> 
         base.join(path.as_str())
     };
     // Historical paths never consult the host OS, cwd, or filesystem.
-    Some(absolute.normalize().as_str().to_owned())
+    let mut normalized = absolute.normalize().as_str().to_owned();
+    // Match the adapter's Windows drive canonicalization without folding path
+    // components or consulting the current host filesystem.
+    if normalized.as_bytes().get(1) == Some(&b':') && normalized.as_bytes()[0].is_ascii_alphabetic()
+    {
+        normalized.as_mut_str()[..1].make_ascii_lowercase();
+    }
+    Some(normalized)
 }
 pub(crate) fn read_targets(operation: &Operation) -> Option<ReadTargets<'_>> {
     if let Some(work) = &operation.work
@@ -86,6 +94,37 @@ pub(crate) fn read_targets(operation: &Operation) -> Option<ReadTargets<'_>> {
         if paths.is_empty() && !unbound {
             return None;
         }
+        // Native execution and determinate argv/target agreement are stronger
+        // than a display label. Reuse the adapter verifier, never wrapper text.
+        if operation.kind.as_ref() == "command"
+            && work.stage == WorkStage::Terminal
+            && operation.status.as_ref() != "declined"
+            && matches!(
+                source,
+                Some(CommandSource::Agent | CommandSource::UnifiedExecStartup)
+            )
+            && !unbound
+            && let Some(matching) = operation.matching.as_ref().filter(|matching| {
+                matching.format_version == OPERATION_MATCH_VERSION
+                    && matching.request_fingerprint.is_some()
+                    && !matching.read_targets.is_empty()
+                    && matching
+                        .gaps
+                        .iter()
+                        .all(|gap| *gap == MatchGap::MissingReceiver)
+            })
+        {
+            return Some(ReadTargets {
+                paths: matching
+                    .read_targets
+                    .iter()
+                    .map(|target| target.path.as_str())
+                    .collect(),
+                candidate: false,
+                unbound: false,
+                native_cwd: Some(cwd.as_deref()),
+            });
+        }
         return Some(ReadTargets {
             paths,
             candidate: true,
@@ -114,6 +153,12 @@ pub(crate) fn read_targets(operation: &Operation) -> Option<ReadTargets<'_>> {
 
 /// Catalogs, declarations, discovery and unresolved MCP identities are not uses.
 pub(crate) fn use_kind(operation: &Operation) -> Option<UseKind> {
+    use_kind_with_targets(operation, read_targets(operation).as_ref())
+}
+pub(crate) fn use_kind_with_targets(
+    operation: &Operation,
+    reads: Option<&ReadTargets<'_>>,
+) -> Option<UseKind> {
     if matches!(
         operation.work.as_ref().map(|work| &work.data),
         Some(WorkData::Command {
@@ -123,8 +168,11 @@ pub(crate) fn use_kind(operation: &Operation) -> Option<UseKind> {
     ) {
         return None;
     }
-    if read_targets(operation).is_some_and(|targets| targets.candidate) {
+    if reads.is_some_and(|targets| targets.candidate) {
         return None;
+    }
+    if reads.is_some_and(|targets| targets.paths.iter().any(|path| is_skill_file(path))) {
+        return Some(UseKind::SkillRead);
     }
     match operation.kind.as_ref() {
         "skillRead" => Some(UseKind::SkillRead),
@@ -280,27 +328,27 @@ pub(crate) struct Projection {
 impl Projection {
     /// Outcomes never subtract dispatched uses. Reliable source identities are
     /// already canonicalized; independent retries retain independent IDs.
+    #[cfg(test)]
     pub(crate) fn observe(&mut self, operation: &Operation) {
-        self.associate(operation);
+        let _ = self.associate(operation);
         if time_basis(operation) == TimeBasis::Unknown {
             self.note_time_gap(operation);
         }
     }
 
     /// Consumers retaining every replay's time coverage call this once per canonical use.
-    pub(crate) fn observe_with_time_accounted(&mut self, operation: &Operation) {
-        if time_basis(operation) == TimeBasis::SourceOperationTime {
-            self.observe(operation);
-        } else {
-            self.associate(operation);
-        }
+    pub(crate) fn observe_with_time_accounted(&mut self, operation: &Operation) -> Option<u64> {
+        self.associate(operation)
     }
-    fn associate(&mut self, operation: &Operation) {
-        if let Some((thread, id)) = operation_identity(operation) {
-            self.operations.insert((thread.to_owned(), id.to_owned()));
+    fn associate(&mut self, operation: &Operation) -> Option<u64> {
+        let delta = if let Some((thread, id)) = operation_identity(operation) {
+            Some(u64::from(
+                self.operations.insert((thread.to_owned(), id.to_owned())),
+            ))
         } else {
             self.coverage.identity_gaps += 1;
-        }
+            None
+        };
         self.related_tasks.insert(operation.thread_id.to_string());
         if let Some(turn) = operation.turn_id.as_deref().filter(|turn| !turn.is_empty()) {
             self.related_turns
@@ -308,6 +356,7 @@ impl Projection {
         } else {
             self.coverage.turn_gaps += 1;
         }
+        delta
     }
 
     pub(crate) fn note_time_gap(&mut self, operation: &Operation) {

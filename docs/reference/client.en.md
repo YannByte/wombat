@@ -28,7 +28,7 @@ Native process access failures preserve `LOCAL_ACCESS_DENIED` when an OS denial 
 
 The CLI exposes timing summaries, evidence and capabilities. Use `corepack pnpm verify:e2e` for real-core and CLI acceptance on the selected platform.
 
-`UsageClient.config` supplies measurements and use evidence. `optimize` supplies read-only checks, original-condition rechecks and explicit user decisions; `preferences` gets/sets zh/en. Configuration `useBasis` retains fixed scope, method, source completeness and coverage. Locale explains facts without recalculation or adoption inference. See [public contracts](../development/contracts.en.md) for fields and versions.
+`UsageClient.config` supplies measurements, use explanations and same-input comparisons. `validateConfigRequest` checks untrusted baseline input against the generated contract. `optimize` supplies read-only checks, original-condition rechecks and explicit user decisions; `preferences` gets/sets zh/en. Configuration `useBasis` retains fixed scope, method, source completeness and coverage. Locale explains facts without recalculation or adoption inference. See [public contracts](../development/contracts.en.md) for fields and versions.
 
 `createNodeClient({automaticPrices:false})` disables only the client’s automatic-price decorator; explicit prices operations remain available. CLI live queries retain their existing default behavior.
 

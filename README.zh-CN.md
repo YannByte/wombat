@@ -50,7 +50,7 @@ Wombat 是 OpenAI Codex 的插件和本地 CLI。可以检索会话历史、统�
 
 ## 为 Codex 安装 Wombat
 
-**正式版：[`v0.6.1`](https://github.com/YannByte/wombat/releases/tag/v0.6.1)。**
+**正式版：[`v0.6.2`](https://github.com/YannByte/wombat/releases/tag/v0.6.2)。**
 
 先安装支持原生插件的 Codex，并确保本机可用 `codex` 命令。Wombat 本机分析无需单独配置 API Key 或安装开发工具。
 

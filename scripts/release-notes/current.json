@@ -1,18 +1,18 @@
 {
-  "summary": "Wombat now runs queries on demand and exits when each request completes. Search work history, inspect usage and recheck improvements without retained views or a background service.",
+  "summary": "Skill usage is easier to check and explain. Wombat recognizes verified native Skill reads, shows concise activity summaries, and can trace or recompute a selected count without a background service.",
   "highlights": [
-    "Run local CLI queries in the foreground. Installation no longer offers Wombat service startup or autostart options; internal SQLite indexes still support incremental collection and consistent accounting.",
-    "Read clear daily usage totals with compact JSON by default. Index-wide source warnings remain separate from the coverage of selected measurements, so unrelated historical warnings do not become unsupported claims about a selected date range.",
-    "Resolve complete conversation IDs directly and continue bounded source reads across unrelated index updates. Changed source evidence still fails explicitly rather than returning substituted text.",
-    "Save the original check or cleanup JSON report and supply it for verification. Rechecks preserve the original scope and rules across processes; cleanup continues to validate current ownership, physical identity, protected files and active consumers.",
-    "Cancel a rebuild without leaving its unpublished temporary index behind. Completed indexes, recovery copies, user decisions and original conversation records stay separate from temporary cleanup.",
-    "Update the Markdown parser to the patched release that resolves RUSTSEC-2026-0433."
+    "See whether a Skill was used in the selected period, with short default reports and detailed counting evidence available on demand.",
+    "Inspect included and excluded records with check skills --explain, select one item, or locate unassigned operations. Explanations include original conversation positions and actual counting contributions.",
+    "Save an explanation and pass it back with --baseline to recompute the same selection. Comparisons distinguish result changes from changed evidence, configuration or scope; paginated differences disclose their coverage.",
+    "Count verified native terminal reads of SKILL.md while keeping catalog listings, declined executions, user-shell commands and unverified shell classifications separate. Failed dispatched reads still count.",
+    "Preserve committed usage counts on cached queries and unrelated configuration metadata during category-specific discovery.",
+    "Read requested configuration categories first, so a large project instruction walk cannot exhaust discovery before known Skills are found.",
+    "Filter stored ledger groups and unrelated operation frames before decoding, reuse turn associations and borrow existing facts. Token and pricing accounting are unchanged."
   ],
   "knownLimitations": [
-    "This release removes public view selectors, saved-view operations and service controls without compatibility aliases. Update the runtime, plugin and automation together; use command --help --json or system api for current inputs.",
-    "If an older installation has resident startup enabled, stop it and remove its autostart registration with that version before upgrading. This release does not manage legacy service registrations.",
-    "Original reports are recheck baselines, not deletion permission or proof that conditions are unchanged. Missing, changed or incomplete evidence cannot establish a verified repair or justify cleanup.",
-    "First collection and expanded history queries can require waiting. No hard latency or memory ceiling is promised. Codex artifact cleanup remains limited to supported macOS layouts.",
-    "Local CLI analysis does not call models or upload conversations. Selected Skill evidence enters the current Codex conversation. Unknown source formats are rejected without migration or automatic data deletion."
+    "Detailed explanations use bounded pages; unresolved targets remain available for investigation rather than being assigned to arbitrary Skills.",
+    "Recomputation uses current rules over normalized local facts. It does not execute recorded commands, call models, or run historical parser versions.",
+    "The configuration protocol is now v3 and use-counting method v4. Update the CLI, plugin and integrations together; previous protocol results are rejected without compatibility aliases.",
+    "Local CLI analysis does not upload conversations. Selected Skill evidence enters the current Codex conversation. Codex artifact cleanup remains limited to supported macOS layouts."
   ]
 }

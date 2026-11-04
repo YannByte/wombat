@@ -1,7 +1,28 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { locale, useBasisCount, useBasisPresentation, type PublicUseBasis } from '../src/locale/index.js';
+import { locale, useBasisCount, useBasisPresentation, configUsageText, type PublicUseBasis } from '../src/locale/index.js';
+import type { ConfigItem, ConfigResult } from '@wombat/client';
 export const basis: PublicUseBasis = { methodVersion: 3, status: 'partial', unit: 'object_use', capturedAt: '2026-10-02T00:00:00Z', snapshotId: 'live:fixed', scope: { sourceInstanceIds: ['synthetic-source'], project: '/synthetic/project', threadId: 'task', agentKind: 'codex', window: { kind: 'date_window', since: '2026-09-01', until: '2026-10-01', timezone: 'UTC' } }, timeBasis: 'source_operation_time', coverage: { dispatchGaps: 1, identityGaps: 2, targetGaps: 3, timeGaps: 4, turnGaps: 5 }, sourceCompleteness: 'partial' };
+
+test('short use summaries name the selected-period result while preserving scan failures and positive observations', () => {
+  const saved = locale.getLocale();
+  const coverage: ConfigResult['coverage'] = { status: 'partial', historyStatus: 'current', absenceObservable: false, issues: [], supportedEvidence: [] };
+  const item = {kind:'skill',usageCount:0,observation:'unknown',counts:{fileReads:0},useBasis:{...basis,sourceCompleteness:'complete'}} as ConfigItem;
+  const original = structuredClone(item);
+  try { for (const language of ['zh', 'en'] as const) {
+    locale.setLocale(language);
+    assert.equal(configUsageText(item,coverage),language==='zh'?'所选时间内未使用':'Not used in the selected period');
+    assert.equal(configUsageText({...item,usageCount:12},coverage),language==='zh'?'使用了 12 次':'Used 12 times');
+    assert.equal(configUsageText({...item,usageCount:1},coverage),language==='zh'?'使用了 1 次':'Used 1 time');
+    assert.match(configUsageText(item,{...coverage,historyStatus:'partial'}),/统计未完成|Statistics incomplete/);
+    assert.equal(configUsageText({...item,useBasis:{...item.useBasis!,sourceCompleteness:'partial'}},{...coverage,historyStatus:'partial',historyReadComplete:true}),language==='zh'?'所选时间内未使用':'Not used in the selected period');
+    assert.match(configUsageText({...item,useBasis:{...item.useBasis!,sourceCompleteness:'partial'}},coverage),/统计未完成|Statistics incomplete/);
+    assert.match(configUsageText({...item,usageCount:null,useBasis:null},{...coverage,historyStatus:'unavailable'}),/统计不可用|statistics unavailable/);
+    assert.match(configUsageText({...item,observation:'used'},coverage),/已使用|Used;/);
+    assert.match(configUsageText({...item,kind:'rule',counts:{...item.counts,fileReads:2}},coverage),/读取了 2 次|Read 2 times/);
+  }} finally { locale.setLocale(saved); }
+  assert.deepEqual(item,original,'Presentation must not change the projection');
+});
 test('public basis explains the fixed scope and five gaps in both languages without claiming dispatch or absence', () => {
   const saved = locale.getLocale();
   try { for (const language of ['zh', 'en'] as const) {
@@ -22,7 +43,7 @@ test('public basis explains the fixed scope and five gaps in both languages with
 test('generated config validators accept observed, partial, unavailable and null bases and reject untyped time claims', async () => {
   const { validate: config } = await import('../src/generated/validate-config-response.js');
   const item = { id:'item',name:'synthetic',kind:'skill',sourceInstanceId:'synthetic-source',path:'/synthetic/SKILL.md',authorizedProjects:[],sourceContexts:[],configuredState:'enabled',contentHash:'synthetic',observedAt:basis.capturedAt,current:true,stale:false,estimateStatus:'unknown',measurementStatus:'unknown',bodyEstimateStatus:'unknown',observation:'unknown',counts:{fileReads:0,toolCalls:0,resourceReads:0,succeeded:0,failed:0,outcomeUnknown:0},relatedTurns:0,relatedTasks:0 };
-  const configBase = { outputVersion:2,action:'list',capabilities:{kinds:['skill'],evidenceTypes:[],tokenEstimates:false,historicalContent:false,historicalContentHashes:true,writes:false,projectRegistry:false},configRevision:'synthetic',checkedAt:basis.capturedAt,scope:{},authorizedProjects:[],summary:{currentItems:1,historicalItems:0,observedItems:0},items:[],evidence:[],relatedScopes:[],page:{offset:0,limit:1,total:1},coverage:{status:'partial',historyStatus:'fixed',issues:[],supportedEvidence:[],absenceObservable:false},hookRegistry:{status:'unavailable',contexts:[]} };
+  const configBase = { outputVersion:3,action:'list',capabilities:{kinds:['skill'],evidenceTypes:[],tokenEstimates:false,historicalContent:false,historicalContentHashes:true,writes:false,projectRegistry:false},configRevision:'synthetic',checkedAt:basis.capturedAt,scope:{},authorizedProjects:[],summary:{currentItems:1,historicalItems:0,observedItems:0},items:[],evidence:[],relatedScopes:[],page:{offset:0,limit:1,total:1},coverage:{status:'partial',historyStatus:'fixed',issues:[],supportedEvidence:[],absenceObservable:false},hookRegistry:{status:'unavailable',contexts:[]} };
   for(const useBasis of [basis,{...basis,status:'observed'},{...basis,status:'unavailable'},null]){
     assert.ok(config({...configBase,items:[{...item,usageCount:useBasis?.status==='partial'?2:null,useBasis}]}));
   }

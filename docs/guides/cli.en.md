@@ -230,7 +230,16 @@ wombat check hooks
 | `rules` | Instruction files, references, repeated blocks and drift through explicit relations |
 | `hooks` | Observed native registrations, enablement and trust, and verifiable target problems |
 
-The use window defaults to the last 30 local calendar days including today. Order frequency and footprint only when units are comparable and evidence permits it. No observed use does not mean no value: rare release or recovery capabilities can remain enabled. Partial records show confirmed counts and gaps rather than complete zero use.
+The use window defaults to the last 30 local calendar days including today. Reports show “Used N times” or “Not used in the selected period.” Incomplete scans and history read errors are reported separately. Low-frequency release or recovery capabilities can remain enabled. Use `wombat check skills --explain` to see counting methods, data versions and evidence gaps; the same option works for `mcp`, `rules` and `hooks`. JSON retains the original counts and coverage fields with or without this option.
+
+Explanations show each included or excluded record, its counting contribution and original chat/log position. Use `--item ID` with a returned item ID to inspect one object, or `--unassigned` to find unresolved targets. Verified native read commands count as reads; catalog listings and unverified shell classifications do not. Save the explanation when you need to compare a fix:
+
+```sh
+wombat check skills --explain --json > explanation.json
+wombat check skills --baseline explanation.json
+```
+
+The second command inherits the original project, sources, dates and object selection. It recomputes local facts without executing recorded commands or calling a model. Matching inputs report unchanged or changed results; changes to input facts, configuration or scope are reported separately. Counts and fingerprints cover the whole selection even when record output is paginated. Use the returned continuation command for more records. Individual differences cover the available pages and do not imply a complete comparison of omitted records.
 
 Skill catalog estimates encode reference names, descriptions and locators. On-demand body quantities remain separate. The estimate is not all context actually visible to the current model. MCP definitions without reliable payloads remain unmeasured; Hook script size is not context occupancy. Current enablement, historical loading, actual use and MCP reachability are distinct facts.
 

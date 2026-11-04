@@ -81,6 +81,7 @@ pub struct UseCoverage {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UseTotals {
+    #[schemars(extend("const" = crate::usage_observations::METHOD_VERSION))]
     pub method_version: u32,
     pub source_coverage: UseSourceCoverage,
     pub object_count: Count,

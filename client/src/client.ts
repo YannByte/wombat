@@ -415,7 +415,6 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
             throwIfCancelled(options);
             if (
               !validateConfigResult(result) ||
-              result.outputVersion !== 2 ||
               result.action !== (request.action ?? 'list')
             )
               throw new CoreError('PROTOCOL_ERROR', '配置数据格式不正确');
@@ -504,12 +503,6 @@ function matchesTiming(request: TimingRequest, result: TimingResult): boolean {
     result.action !== request.action ||
     result.profile !== profile ||
     result.methodVersion !== 'safe_event_turn_v7'
-  )
-    return false;
-  if (
-    ('uses' in result &&
-      ('totals' in result.uses ? result.uses.totals : result.uses).methodVersion !== 3) ||
-    ('totals' in result && result.totals.methodVersion !== 3)
   )
     return false;
   if (

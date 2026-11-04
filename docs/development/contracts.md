@@ -43,9 +43,11 @@ Node价表传输只下载固定官方HTTPS文档；内核`prices`操作的宿主
 
 请求操作为 `summary`、`evidence` 和 `capabilities`。摘要要求完整任务与轮次身份，接受显式来源根、来源范围、`auto`/`fresh`/`cached` 模式及 `local`/`share-v1` 隐私配置。证据页要求相同目标和范围；`turn_events`、`use_objects` 与 `use_records` 使用绑定来源证据和范围的不透明游标。capabilities 不扫描来源。摘要使用 `outputVersion=7` 和分析方法 `safe_event_turn_v7`；操作起止归并方法单独版本化，旧响应版本明确拒绝。本地结果可含本地身份与路径，`share-v1` 是单独的白名单投影，不包含这些信息。耗时查询不触发价表下载、配置扫描、Hook 或账户观察。命令及错误处理见 [CLI 指南](../guides/cli.md)。
 
-## 只读配置契约 v2
+## 只读配置契约 v3
 
-`core/src/config_dto.rs` 生成[请求](../schemas/config-request-v2.schema.json)与[响应](../schemas/config-response-v2.schema.json)，Node 提供 `UsageClient.config`。list/detail/evidence/related_scopes/capabilities 不写来源；capabilities 不扫描。每次调用采集当前配置。默认 UTC 近30天、截止日排他；`scope.allTime` 包含未知日期，不能同时给日期。配置范围不接受模型或强度；当前内容测量与日期无关。
+`core/src/config_dto.rs` 生成[请求](../schemas/config-request-v3.schema.json)与[响应](../schemas/config-response-v3.schema.json)，Node 提供 `UsageClient.config`。list/detail/evidence/explain/related_scopes/capabilities 不写来源；capabilities 不扫描。每次调用采集当前配置。默认 UTC 近30天、截止日排他；`scope.allTime` 包含未知日期，不能同时给日期。配置范围不接受模型或强度；当前内容测量与日期无关。
+
+`explain` 在实际使用投影中按需记录判定，分页返回原始位置、计入或排除原因及数值贡献。紧凑基线分别绑定规范化输入、配置和范围，不依赖观察时间。重算使用当前规则，只有相同输入才支持规则结果比较；逐条差异明确披露明细页覆盖情况。不保存事件流水或中间状态历史。配置查询在解码前筛选存储中的计量分组，每条选中计量只关联轮次一次；内存事实直接借用，避免复制。 按配置类别查询时只发现所需类别，保留其他类别的缓存元数据；综合发现先读取明确配置位置，再进行宽范围指令查找。字节读取完成状态与操作归属缺口分开，普通元数据缺口不表示扫描未完成。解释结果为每个规范化操作保留最多四个原始位置，并展示最多 20 条来源级诊断及完整总数；归并阶段不作为多次使用。
 
 复查接收原始选定发现、来源和项目范围及规则输入，重新比较当前证据，不保留视图，也没有视图过期。缺少证据不能证明修复。
 
@@ -63,7 +65,7 @@ hookTarget仅在当前文件版本匹配、原生明确启用且trusted/managed�
 
 分析仅重读所需声明文件，每文件10MiB/单轮32MiB，同文件只解析一次；只保留静态路径及最多512条注册的稀疏检查，不建清单×项目矩阵。建议绑定项目、原生键/哈希和文件版本；历史按原来命中的项目复查，其他项目的新问题独立待处理，缺原授权/注册不通过。交接工作目录从实际命中的授权项目选择；声明字数未知不阻止版本已核验的脚本引用交接。原生确认的父子项目继承只补充当前视图，不写配置缓存；原生暂时不可读时，当前授权对象的项目历史和决定仍保留，复查结果为未知。
 
-Skill YAML 校验必填字段类型、名称及已核验目录匹配，选填 license/allowed-tools/compatibility 字符串和 metadata 字符串映射；未知宿主字段不直接报错。名称按[官方参考校验器](https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/validator.py)去两端空白、NFKC、Unicode小写/字母数字/连字符及64码点检查，compatibility≤500码点。description 长度只由字符串字段产生；头部64 KiB、事件10,000、深度32，无别名/include，重复键拒绝。超限或未支持标签不报格式错误。最近匹配来源/项目的原生Skill目录包含对象时显示最近可用；目录缺失不宣称禁用。正向采用声明或非失败的定向`SKILL.md`读取形成近似使用证据，同一任务轮次去重为usageCount，并另计相关任务和读取次数；未观察到保持缺失，不能解释为未使用或已遵循内容。日期仅筛历史活动证据，不改变最近目录状态；lastRecordAt为最后匹配活动。MCP工具尝试与明确资源读取仍分别计数，目录/模板查询不计使用，工具前缀不认定实例。
+Skill YAML 校验必填字段类型、名称及已核验目录匹配，选填 license/allowed-tools/compatibility 字符串和 metadata 字符串映射；未知宿主字段不直接报错。名称按[官方参考校验器](https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/validator.py)去两端空白、NFKC、Unicode小写/字母数字/连字符及64码点检查，compatibility≤500码点。description 长度只由字符串字段产生；头部64 KiB、事件10,000、深度32，无别名/include，重复键拒绝。超限或未支持标签不报格式错误。最近匹配来源/项目的原生Skill目录包含对象时显示最近可用；目录缺失不宣称禁用。使用方法 v4 按规范化调用身份计数明确读取、MCP 尝试，以及确定命令参数与适配器核验目标一致的原生终态读取。失败尝试仍计数；用户 Shell 命令、已拒绝的原生读取、目录发现和仅供显示的读取标签不计数。身份、目标和日期缺口与已知正向记录分开保留。日期只筛选历史活动，不改变最近目录状态；关联轮次用量不是配置独占费用。
 
 MCP 解析读取原生 mcp_tool_call_begin/end 和 McpToolCall 持久项，结果缺失保留未知。调用身份按任务/轮次隔离；明确分叉的同一上游轮次与调用归回有记录的祖先，追加和重启保留相同结果。资源请求只保留服务与操作类型，不保存 URI、参数或返回正文。保留名没有明确对应请求时操作类型未知；更多边界见[决定](../decisions/implemented/architecture/2026-10-04-mcp-runtime-evidence.md)。
 

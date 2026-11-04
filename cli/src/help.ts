@@ -21,7 +21,8 @@ export function commandHelp(topic:Topic,args:readonly string[]):CliHelp {
   const action=topic==='usage'?args[1]:args[0];
   const selected=action&&!action.startsWith('-')?examples[topic].filter(([,command])=>command.startsWith('wombat '+topic+' '+action+' ')||command==='wombat '+topic+' '+action):[];
   const choices=selected.length?selected:examples[topic];
-  return {outputVersion:1,command:topic==='root'?'wombat':topic==='alerts'?'wombat usage alerts':'wombat '+topic,commands:topic==='root'?commandNames:[],help:t(helpKeys[topic]),examples:choices.map(([task,command])=>({task:t(taskKeys[task]),command})),next:topic==='root'?commandNames.map(c=>`wombat ${c} --help --json`):methods[topic]?[`wombat system api ${methods[topic]} --json`]:['wombat system api --json']};
+  const method=topic==='check'&&['skills','mcp','rules','hooks'].includes(action??'')?'config':topic==='check'&&action==='verify'?'optimize':methods[topic];
+  return {outputVersion:1,command:topic==='root'?'wombat':topic==='alerts'?'wombat usage alerts':'wombat '+topic,commands:topic==='root'?commandNames:[],help:t(helpKeys[topic]),examples:choices.map(([task,command])=>({task:t(taskKeys[task]),command})),next:topic==='root'?commandNames.map(c=>`wombat ${c} --help --json`):method?[`wombat system api ${method} --json`]:['wombat system api --json']};
 }
 export function writeHelp(topic:Topic,args:readonly string[]):void {
   const help=commandHelp(topic,args);

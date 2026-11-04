@@ -115,7 +115,7 @@ export interface ShareResponse {
   freshness: ShareFreshness;
 }
 export interface UseTotals {
-  methodVersion: number;
+  methodVersion: 4;
   sourceCoverage: UseSourceCoverage;
   objectCount: TimingMetricUint64;
   /**

@@ -152,7 +152,7 @@ export function configEvidenceLabel(type: string): string {
   switch(type){case 'instruction_load':return t('config.instruction_load');case 'skill_available':return t('config.skill_available');case 'skill_use':return t('config.skill_use');case 'file_read':return t('config.file_read');case 'tool_call':return t('config.tool_call');case 'resource_read':return t('config.resource_read');default:return t('webui.unknown');}
 }
 
-export { useBasisCount, useBasisPresentation, type PublicUseBasis } from "./use-basis.js";
+export { useBasisCount, useBasisPresentation, configUsageText, type PublicUseBasis } from "./use-basis.js";
 
 /** Explain core assessment reason codes without interpreting unknown source details. */
 export function assessmentReason(code: string): string {

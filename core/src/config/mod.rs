@@ -53,10 +53,11 @@ pub(crate) use scope::validate;
 use scope::{applicable, in_time, matches_row, normalize_at, usage};
 pub(crate) fn capabilities() -> Response {
     Response {
+        explanation: None,
         extension_activity: None,
         extension_review: None,
         hook_registry: HookRegistry::default(),
-        output_version: 2,
+        output_version: 3,
         action: Action::Capabilities,
         capabilities: Capabilities::default(),
         read_view: None,
@@ -83,6 +84,7 @@ pub(crate) fn capabilities() -> Response {
             next_offset: None,
         },
         coverage: Coverage {
+            history_read_complete: None,
             status: "complete".into(),
             history_status: "notRequested".into(),
             issues: vec![],

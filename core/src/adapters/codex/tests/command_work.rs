@@ -1,4 +1,33 @@
 use super::*;
+
+#[test]
+fn declined_native_read_retains_dispatch_uncertainty_after_exit_code_reconciliation() {
+    let root = tempfile::tempdir().unwrap();
+    write(
+        root.path(),
+        "sessions/declined.jsonl",
+        &[
+            meta("t"),
+            json!({"type":"event_msg","timestamp":"2026-10-04T00:00:00Z","payload":{"type":"item_completed","thread_id":"t","turn_id":"u","item":{"type":"CommandExecution","id":"declined","cwd":"/synthetic","source":"unified_exec_startup","command":["/bin/sh","-lc","cat /synthetic/SKILL.md"],"parsed_cmd":[{"type":"read","path":"/synthetic/SKILL.md"}],"status":"declined","exit_code":1}}}),
+        ],
+    );
+    let out = collect(root.path());
+    let op = &out.operations[0];
+    assert_eq!(op.status.as_ref(), "failed");
+    assert!(
+        op.matching
+            .as_ref()
+            .unwrap()
+            .gaps
+            .contains(&MatchGap::UnconfirmedRead)
+    );
+    assert!(
+        crate::usage_observations::read_targets(op)
+            .unwrap()
+            .candidate
+    );
+    assert_eq!(crate::usage_observations::use_kind(op), None);
+}
 fn cmd(id: &str, phase: &str, parsed: Value, source: Value) -> Value {
     json!({"type":"event_msg","timestamp":"2026-10-05T01:00:00Z","payload":{"type":phase,"turn_id":"turn","item":{"type":"CommandExecution","id":id,"cwd":"file:///synthetic/command-cwd","parsed_cmd":parsed,"source":source,"command":["PRIVATE_COMMAND","PRIVATE_ARG"],"aggregated_output":"PRIVATE_OUTPUT","interaction_input":"PRIVATE_INTERACTION","status":if phase == "item_started" {"in_progress"} else {"completed"}}}})
 }

@@ -3,6 +3,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CoreError, createUsageClient, type UsageRequest, type UsageResult } from '@wombat/client';
 
+test('configuration transport follows the generated current protocol and rejects the preceding result version',async()=>{
+ const config={outputVersion:3,action:'list',capabilities:{kinds:['skill'],evidenceTypes:[],tokenEstimates:true,historicalContent:false,historicalContentHashes:true,writes:false,projectRegistry:false},configRevision:'synthetic',checkedAt:'2026-11-03T00:00:00Z',scope:{},authorizedProjects:[],summary:{currentItems:0,historicalItems:0,observedItems:0},items:[],evidence:[],relatedScopes:[],page:{offset:0,limit:20,total:0},coverage:{status:'partial',historyStatus:'current',issues:[],supportedEvidence:[],absenceObservable:false},hookRegistry:{status:'unavailable',contexts:[]}};
+ const client=createUsageClient({query:async()=>response,config:async()=>config});
+ assert.deepEqual(await client.config!({action:'list'}),config);
+ const old=createUsageClient({query:async()=>response,config:async()=>({...config,outputVersion:2})});
+ await assert.rejects(old.config!({action:'list'}),{code:'PROTOCOL_ERROR'});
+});
+
 const response: UsageResult = {
   outputVersion: 5,
   action: 'usage',

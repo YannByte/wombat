@@ -17,6 +17,7 @@ pub(super) fn project_history(
     let mut evidence = vec![];
     let mut uncertain_items = BTreeSet::new();
     let mut related = BTreeMap::<Option<String>, (usize, BTreeSet<usize>)>::new();
+    let mut trace = super::trace::Trace::new(r);
     if let Some(snapshot) = &view.snapshot {
         let threads = snapshot
             .manifest
@@ -28,8 +29,50 @@ pub(super) fn project_history(
             .iter()
             .map(|(id, t)| (*id, t.project.as_deref()))
             .collect::<BTreeMap<_, _>>();
-        let owned_ledger = snapshot.ledger()?;
-        let ledger = owned_ledger.iter().collect::<Vec<_>>();
+        let full_scope = Scope {
+            project: None,
+            ..scope.clone()
+        };
+        let owned_ledger;
+        let ledger = if let Some(rows) = snapshot.live_ledger() {
+            rows.into_iter()
+                .filter(|row| matches_row(row, &full_scope, tz, &projects))
+                .collect::<Vec<_>>()
+        } else if snapshot.has_stored_ledger() {
+            let filter_scope = crate::usage_app_dto::Scope {
+                agent_kind: scope.agent_kind.clone(),
+                source_instance_id: scope.source_instance_id.clone(),
+                thread_id: scope.thread_id.clone(),
+                since: scope.since.clone(),
+                until: scope.until.clone(),
+                ..Default::default()
+            };
+            let filter =
+                crate::usage_store::ledger_projection::Filter::scope(&filter_scope, &projects);
+            let mut rows = vec![];
+            snapshot.visit_ledger_filtered(
+                tz,
+                scope.thread_id.as_deref(),
+                None,
+                crate::usage_store::ledger_projection::Scan::new(&filter, None),
+                |_, read| {
+                    rows.extend(
+                        read()?
+                            .into_iter()
+                            .filter(|row| matches_row(row, &full_scope, tz, &projects)),
+                    );
+                    Ok(())
+                },
+            )?;
+            owned_ledger = rows;
+            owned_ledger.iter().collect::<Vec<_>>()
+        } else {
+            owned_ledger = snapshot.ledger()?;
+            owned_ledger
+                .iter()
+                .filter(|row| matches_row(row, &full_scope, tz, &projects))
+                .collect::<Vec<_>>()
+        };
         let mut turns = BTreeMap::<(&str, &str), Vec<usize>>::new();
         for (n, row) in ledger.iter().enumerate() {
             if let (Some(t), Some(u)) = (&row.fact.thread_id, &row.fact.turn_id) {
@@ -53,10 +96,18 @@ pub(super) fn project_history(
                 }
             }
         }
-        let operations = snapshot.operation_facts()?;
-        observe_available_skills(&operations, scope, &threads, &paths, items);
+        let operations = snapshot.selected_operation_facts(&|thread| {
+            scope
+                .source_instance_id
+                .as_ref()
+                .is_none_or(|id| id == &thread.source_instance_id)
+                && scope.thread_id.as_ref().is_none_or(|id| id == &thread.id)
+        })?;
+        if items.iter().any(|item| item.kind == Kind::Skill) {
+            observe_available_skills(&operations, scope, &threads, &paths, items);
+        }
         let mut item_rows = vec![BTreeSet::<usize>::new(); items.len()];
-        let mut item_turns = vec![BTreeSet::<String>::new(); items.len()];
+        let mut item_turns = vec![BTreeSet::<(&str, &str)>::new(); items.len()];
         let mut item_tasks = vec![BTreeSet::<String>::new(); items.len()];
         let mut item_uses = (0..items.len())
             .map(|_| Projection::default())
@@ -113,15 +164,32 @@ pub(super) fn project_history(
             {
                 continue;
             }
+            trace.begin();
             let instruction_load = op.kind.as_ref() == "instructionLoad";
             let skill_available = op.kind.as_ref() == "skillAvailable";
-            let use_kind = usage_observations::use_kind(op);
-            let candidate_read = usage_observations::is_skill_read_candidate(op);
             let reads = usage_observations::read_targets(op);
+            let use_kind = usage_observations::use_kind_with_targets(op, reads.as_ref());
+            let candidate_read = reads
+                .as_ref()
+                .is_some_and(|targets| targets.candidate && targets.may_be_skill());
             let file_read = instruction_load
+                || reads
+                    .as_ref()
+                    .is_some_and(|targets| !targets.candidate && !targets.paths.is_empty())
                 || op.kind.as_ref() == "skillRead"
                 || (op.name.as_ref() == "read_file"
                     && matches!(op.kind.as_ref(), "tool" | "skillRead"));
+            let mcp = matches!(
+                op.kind.as_ref(),
+                "mcpTool" | "mcpResource" | "mcpConflict" | "mcpUnclassified"
+            );
+            if r.kind.as_ref().is_some_and(|kind| match kind {
+                Kind::Hook => true,
+                Kind::Mcp => !mcp,
+                Kind::Skill | Kind::Rule => mcp,
+            }) {
+                continue;
+            }
             if matches!(op.kind.as_ref(), "mcpConflict" | "mcpUnclassified") {
                 if scope
                     .project
@@ -131,6 +199,7 @@ pub(super) fn project_history(
                         || usage_observations::time_basis(op) == TimeBasis::Unknown)
                 {
                     unassigned_sources.insert(thread.source_instance_id.clone());
+                    trace.record(op, thread, None, UseReason::TargetMissing, None)?;
                 }
                 continue;
             }
@@ -155,6 +224,7 @@ pub(super) fn project_history(
                     .is_none_or(|p| thread.project.as_ref() == Some(p))
             {
                 unassigned_skill_sources.insert(thread.source_instance_id.clone());
+                trace.record(op, thread, None, UseReason::TargetMissing, None)?;
             }
             if reads.as_ref().is_some_and(|reads| {
                 reads.unbound
@@ -175,6 +245,15 @@ pub(super) fn project_history(
                 read_paths.insert(String::new());
             }
             for read_path in &read_paths {
+                if !read_path.is_empty()
+                    && r.kind.as_ref().is_some_and(|kind| match kind {
+                        Kind::Skill => !usage_observations::is_skill_file(read_path),
+                        Kind::Rule => usage_observations::is_skill_file(read_path),
+                        _ => false,
+                    })
+                {
+                    continue;
+                }
                 let candidates = if reads.is_some() {
                     paths.get(&(thread.source_instance_id.clone(), read_path.clone()))
                 } else if file_read || skill_available {
@@ -213,6 +292,9 @@ pub(super) fn project_history(
                             code: "usageOperationTargetUnknown".into(),
                             path: None,
                         });
+                        if !unbound_read {
+                            trace.record(op, thread, None, UseReason::TargetNotFound, None)?;
+                        }
                     }
                     continue;
                 };
@@ -229,6 +311,19 @@ pub(super) fn project_history(
                     })
                     .collect::<Vec<_>>();
                 if candidates.len() != 1 {
+                    if r.unassigned {
+                        trace.record(op, thread, None, UseReason::TargetAmbiguous, None)?;
+                    } else {
+                        for index in &candidates {
+                            trace.record(
+                                op,
+                                thread,
+                                Some(&items[*index]),
+                                UseReason::TargetAmbiguous,
+                                None,
+                            )?;
+                        }
+                    }
                     if (use_kind.is_some() || candidate_read)
                         && scope
                             .project
@@ -256,17 +351,36 @@ pub(super) fn project_history(
                     item_uses[n].note_time_gap(op);
                 }
                 if !in_time(op.timestamp.as_deref(), scope, tz) {
+                    trace.record(
+                        op,
+                        thread,
+                        Some(&items[n]),
+                        if usage_observations::time_basis(op) == TimeBasis::Unknown {
+                            UseReason::TimeMissing
+                        } else {
+                            UseReason::OutsideWindow
+                        },
+                        Some(0),
+                    )?;
                     continue;
                 }
                 if let Some(identity) = usage_observations::operation_identity(op)
                     && !seen.insert((identity, n))
                 {
+                    trace.record(op, thread, Some(&items[n]), UseReason::Duplicate, Some(0))?;
                     continue;
                 }
                 if usage_observations::operation_identity(op)
                     .is_some_and(|identity| conflicts.contains(&identity))
                 {
                     item_uses[n].coverage.target_gaps += 1;
+                    trace.record(
+                        op,
+                        thread,
+                        Some(&items[n]),
+                        UseReason::IdentityConflict,
+                        None,
+                    )?;
                     continue;
                 }
                 let item = &mut items[n];
@@ -277,13 +391,14 @@ pub(super) fn project_history(
                         .is_none_or(|p| thread.project.as_ref() == Some(p))
                     {
                         item_uses[n].coverage.dispatch_gaps += 1;
+                        trace.record(op, thread, Some(item), UseReason::DispatchUnknown, None)?;
                         if item.kind == Kind::Rule {
                             result.coverage.issues.push(Issue {
                                 code: "ruleReadDispatchUnknown".into(),
                                 path: Some(item.path.clone()),
                             });
                         }
-                        if r.item_id.as_ref() == Some(&item.id) {
+                        if r.action == Action::Evidence && r.item_id.as_ref() == Some(&item.id) {
                             evidence.push(Evidence {
                                 id: op.id.clone(),
                                 source_instance_id: Some(thread.source_instance_id.clone()),
@@ -308,7 +423,8 @@ pub(super) fn project_history(
                     continue;
                 }
                 if skill_available {
-                    if r.item_id.as_ref() == Some(&item.id) {
+                    trace.record(op, thread, Some(item), UseReason::CatalogOnly, Some(0))?;
+                    if r.action == Action::Evidence && r.item_id.as_ref() == Some(&item.id) {
                         evidence.push(Evidence {
                             id: op.id.clone(),
                             source_instance_id: Some(thread.source_instance_id.clone()),
@@ -328,29 +444,23 @@ pub(super) fn project_history(
                 }
                 let observed_use =
                     use_kind.is_some() && matches!(item.kind, Kind::Skill | Kind::Mcp);
-                let full_scope = Scope {
-                    project: None,
-                    ..scope.clone()
-                };
                 let indices = op
                     .turn_id
                     .as_deref()
                     .and_then(|u| turns.get(&(thread.id.as_str(), u)))
-                    .into_iter()
-                    .flatten()
-                    .copied()
-                    .filter(|i| matches_row(ledger[*i], &full_scope, tz, &projects))
-                    .collect::<BTreeSet<_>>();
-                if r.item_id.as_ref() == Some(&item.id) {
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                if r.action == Action::RelatedScopes && r.item_id.as_ref() == Some(&item.id) {
                     let entry = related.entry(thread.project.clone()).or_default();
                     entry.0 += 1;
-                    entry.1.extend(&indices);
+                    entry.1.extend(indices);
                 }
                 if scope
                     .project
                     .as_ref()
                     .is_some_and(|p| thread.project.as_ref() != Some(p))
                 {
+                    trace.record(op, thread, Some(item), UseReason::OutsideProject, Some(0))?;
                     continue;
                 }
                 if op.timestamp > item.last_record_at {
@@ -431,15 +541,35 @@ pub(super) fn project_history(
                         _ => context.counts.outcome_unknown += 1,
                     }
                 }
-                item_rows[n].extend(&indices);
+                if op
+                    .turn_id
+                    .as_deref()
+                    .is_some_and(|turn| item_turns[n].insert((thread.id.as_str(), turn)))
+                {
+                    item_rows[n].extend(indices);
+                }
                 item_tasks[n].insert(thread.id.clone());
-                if observed_use || item.kind == Kind::Rule && !instruction_load {
-                    item_uses[n].observe_with_time_accounted(op);
-                }
-                if let Some(u) = &op.turn_id {
-                    item_turns[n].insert(format!("{}:{u}", thread.id));
-                }
-                if r.item_id.as_ref() == Some(&item.id) {
+                let delta = if observed_use || item.kind == Kind::Rule && !instruction_load {
+                    item_uses[n].observe_with_time_accounted(op)
+                } else {
+                    Some(0)
+                };
+                trace.record(
+                    op,
+                    thread,
+                    Some(item),
+                    if instruction_load {
+                        UseReason::InstructionLoad
+                    } else if delta.is_none() {
+                        UseReason::IdentityMissing
+                    } else if delta == Some(1) {
+                        UseReason::Counted
+                    } else {
+                        UseReason::NotUse
+                    },
+                    delta,
+                )?;
+                if r.action == Action::Evidence && r.item_id.as_ref() == Some(&item.id) {
                     evidence.push(Evidence {
                         id: op.id.clone(),
                         source_instance_id: Some(thread.source_instance_id.clone()),
@@ -498,7 +628,7 @@ pub(super) fn project_history(
                 item.usage_count = if snapshot.is_live()
                     && matches!(
                         view.history_status.as_str(),
-                        "current" | "fixed" | "partial"
+                        "current" | "fixed" | "partial" | "cached"
                     ) {
                     Some(projection.observed_count())
                 } else {
@@ -536,7 +666,7 @@ pub(super) fn project_history(
                 && snapshot.is_live()
                 && matches!(
                     view.history_status.as_str(),
-                    "current" | "fixed" | "partial"
+                    "current" | "fixed" | "partial" | "cached"
                 )
             {
                 item.use_basis = Some(usage_observations::basis(
@@ -577,6 +707,7 @@ pub(super) fn project_history(
             })
             .collect::<Result<_>>()?;
     }
+    result.explanation = trace.finish(scope, view, result.coverage.history_read_complete)?;
     Ok(HistoricalEvidence {
         evidence,
         uncertain_items,

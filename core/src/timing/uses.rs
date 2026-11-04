@@ -244,7 +244,7 @@ pub(crate) fn project(input: Input<'_>) -> Result<TurnUses<'_>> {
                 unbound = reads.unbound;
                 for raw in &reads.paths {
                     check(input.cancelled)?;
-                    if !usage_observations::is_skill_file(raw) && candidate {
+                    if !usage_observations::is_skill_file(raw) {
                         charge(&mut remaining, raw.len())?;
                         continue;
                     }
@@ -371,7 +371,7 @@ pub(crate) fn project(input: Input<'_>) -> Result<TurnUses<'_>> {
                 && !record.target_conflict
                 && record.state == UseState::Used
             {
-                object
+                let _ = object
                     .projection
                     .observe_with_time_accounted(record.operation);
             }

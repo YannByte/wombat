@@ -153,6 +153,7 @@
         "methodVersion": {
           "type": "integer",
           "minimum": 0,
+          "const": 4,
           "maximum": 4294967295
         },
         "sourceCoverage": {

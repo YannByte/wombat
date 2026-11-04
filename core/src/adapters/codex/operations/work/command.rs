@@ -192,6 +192,13 @@ pub(in crate::adapters::codex::operations) fn observe(
             .retain(|gap| *gap != MatchGap::MissingParameters);
         matching.gaps.push(MatchGap::UnsupportedParameters);
     }
+    // Keep rejection evidence even if later generic outcome reconciliation
+    // selects a stronger failure status from a contradictory exit code.
+    if item.status.as_deref() == Some("declined")
+        && !matching.gaps.contains(&MatchGap::UnconfirmedRead)
+    {
+        matching.gaps.push(MatchGap::UnconfirmedRead);
+    }
     (
         WorkObservation {
             format_version: WORK_OBSERVATION_VERSION,

@@ -52,14 +52,23 @@ impl Snapshot {
             .iter()
             .flat_map(|turns| turns.values().flat_map(|t| t.operations.iter()))
     }
+    #[cfg(test)]
     pub(crate) fn operation_facts(&self) -> Result<Vec<Arc<Operation>>> {
+        self.selected_operation_facts(&|_| true)
+    }
+    /// Exclude unrelated threads before decoding cold operation frames.
+    pub(crate) fn selected_operation_facts(
+        &self,
+        select: &dyn Fn(&crate::adapters::contract::Thread) -> bool,
+    ) -> Result<Vec<Arc<Operation>>> {
         if let Some(view) = self.detailed_view()? {
-            return view.operation_facts();
+            return view.selected_operation_facts(select);
         }
         let loaded: std::collections::HashSet<_> = self
             .manifest
             .threads
             .iter()
+            .filter(|entry| select(&entry.thread))
             .map(|t| t.thread.id.as_str())
             .collect();
         let mut out = Vec::new();

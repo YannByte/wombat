@@ -20,6 +20,54 @@ pub(crate) fn validate(r: &Request) -> Result<()> {
         return Err(operation_error("INVALID_ARGUMENT", "读取版本不能混用"));
     }
     validate_scope(&r.scope)?;
+    if (r.unassigned || r.baseline.is_some() || r.baseline_records.is_some())
+        && r.action != Action::Explain
+        || r.unassigned && r.item_id.is_some()
+        || r.baseline_records.is_some() && r.baseline.is_none()
+        || r.baseline_records
+            .as_ref()
+            .is_some_and(|records| records.len() > 200)
+    {
+        return Err(operation_error(
+            "INVALID_ARGUMENT",
+            "unassigned/baseline 仅用于解释查询，unassigned 不能与 itemId 混用",
+        ));
+    }
+    if r.action == Action::Explain
+        && (r.observation.is_some() || r.kinds.is_some() || r.search.is_some())
+    {
+        return Err(operation_error(
+            "INVALID_ARGUMENT",
+            "explain 不支持 observation/kinds/search，请使用 itemId/kind 选择对象",
+        ));
+    }
+    if let Some(baseline) = &r.baseline {
+        if baseline.format_version != 1 {
+            return Err(operation_error(
+                "UNSUPPORTED_VERSION",
+                "不支持此计数解释基线 formatVersion",
+            ));
+        }
+        if baseline.reasons.len() > 14
+            || baseline.roots.len() > 64
+            || baseline.project_roots.len() > 64
+            || baseline.counted > MAX_SAFE_INTEGER
+            || baseline.total_records > MAX_SAFE_INTEGER as usize
+            || [
+                &baseline.input_revision,
+                &baseline.configuration_revision,
+                &baseline.result_revision,
+            ]
+            .iter()
+            .any(|s| s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            return Err(operation_error(
+                "INVALID_ARGUMENT",
+                "计数解释基线超出范围或版本指纹无效",
+            ));
+        }
+        validate_scope(&baseline.scope)?;
+    }
     Ok(())
 }
 fn validate_scope(scope: &Scope) -> Result<Tz> {

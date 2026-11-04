@@ -1674,6 +1674,30 @@
           ],
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "unassigned": {
+          "description": "Explain unresolved records rather than attributing them to every inventory item.",
+          "type": "boolean",
+          "default": false
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UseReplayBaseline"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baselineRecords": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/UseTraceRecord"
+          }
         }
       },
       "additionalProperties": false
@@ -1684,6 +1708,7 @@
         "list",
         "detail",
         "evidence",
+        "explain",
         "related_scopes",
         "capabilities"
       ]
@@ -1772,6 +1797,233 @@
         "review",
         "context_tokens",
         "least_activity"
+      ]
+    },
+    "UseReplayBaseline": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "methodVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "scope": {
+          "$ref": "#/definitions/Scope3"
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "projectRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Kind2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "itemId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unassigned": {
+          "type": "boolean"
+        },
+        "inputRevision": {
+          "description": "Normalized input facts, not raw source bodies or a guarantee of native coverage.",
+          "type": "string"
+        },
+        "configurationRevision": {
+          "type": "string"
+        },
+        "resultRevision": {
+          "type": "string"
+        },
+        "counted": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "totalRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UseReasonCount"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "formatVersion",
+        "methodVersion",
+        "scope",
+        "roots",
+        "projectRoots",
+        "unassigned",
+        "inputRevision",
+        "configurationRevision",
+        "resultRevision",
+        "counted",
+        "totalRecords",
+        "reasons"
+      ]
+    },
+    "UseReasonCount": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/UseReason"
+        },
+        "records": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "records"
+      ]
+    },
+    "UseReason": {
+      "type": "string",
+      "enum": [
+        "counted",
+        "identity_missing",
+        "time_missing",
+        "dispatch_unknown",
+        "target_missing",
+        "target_not_found",
+        "target_ambiguous",
+        "identity_conflict",
+        "duplicate",
+        "outside_window",
+        "outside_project",
+        "catalog_only",
+        "instruction_load",
+        "not_use"
+      ]
+    },
+    "UseTraceRecord": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "itemId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eventType": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/UseReason"
+        },
+        "countDelta": {
+          "description": "None means the evidence cannot establish a numeric contribution.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/EvidenceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceObservationCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "additionalEvidence": {
+          "description": "Up to three further source observations; phases are not independent uses.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceRef"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "sourceInstanceId",
+        "threadId",
+        "eventType",
+        "outcome",
+        "reason",
+        "sourceObservationCount",
+        "additionalEvidence"
+      ]
+    },
+    "EvidenceRef": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "file",
+        "line"
       ]
     },
     "Request7": {

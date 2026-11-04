@@ -32,7 +32,7 @@ use std::{
 };
 use wire::*;
 
-pub const VERSION: &str = "codex-rollout-13";
+pub const VERSION: &str = "codex-rollout-14";
 pub struct CodexAdapter;
 pub(crate) fn thread_identity(source: &str, native: &str) -> String {
     stable_id(&["codex", source, "thread", native])

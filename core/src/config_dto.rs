@@ -1,11 +1,13 @@
 //! Read-only configuration analysis. Counts are evidence, never exclusive cost attribution.
-pub const REQUEST_VERSION: u32 = 2;
+pub const REQUEST_VERSION: u32 = 3;
 
 use crate::usage_app_dto::{Page, UsageSummary};
 mod use_basis;
+mod use_trace;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 pub use use_basis::*;
+pub use use_trace::*;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -14,6 +16,7 @@ pub enum Action {
     List,
     Detail,
     Evidence,
+    Explain,
     RelatedScopes,
     Capabilities,
 }
@@ -32,7 +35,7 @@ pub enum Observation {
     LoadedOnly,
     Unknown,
 }
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Scope {
     pub all_time: Option<bool>,
@@ -89,6 +92,11 @@ pub struct Request {
     pub item_id: Option<String>,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
+    /// Explain unresolved records rather than attributing them to every inventory item.
+    #[serde(default)]
+    pub unassigned: bool,
+    pub baseline: Option<Box<UseReplayBaseline>>,
+    pub baseline_records: Option<Vec<UseTraceRecord>>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -298,6 +306,9 @@ pub struct Issue {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Coverage {
+    /// Whether selected source bytes were read completely; independent of attribution gaps.
+    #[serde(default)]
+    pub history_read_complete: Option<bool>,
     pub status: String,
     pub history_status: String,
     pub issues: Vec<Issue>,
@@ -323,10 +334,12 @@ pub struct RelatedScope {
 #[serde(rename_all = "camelCase")]
 pub struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<UseExplanation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extension_review: Option<ExtensionReview>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_activity: Option<ExtensionActivityStatistics>,
-    #[schemars(range(min = 2, max = 2))]
+    #[schemars(range(min = 3, max = 3))]
     pub output_version: u32,
     pub action: Action,
     pub capabilities: Capabilities,

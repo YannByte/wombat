@@ -84,14 +84,19 @@ pub(super) fn publish_query(
     );
     let offset = r.offset.unwrap_or(0);
     let limit = r.limit.unwrap_or(50);
-    if r.action != Action::List {
+    if !matches!(r.action, Action::List | Action::Explain) || r.item_id.is_some() {
         items.retain(|i| Some(&i.id) == r.item_id.as_ref());
         if items.is_empty() {
             return Err(operation_error("NOT_FOUND", "未找到配置"));
         }
     }
     evidence.sort_by(|a, b| (&a.timestamp, &a.id).cmp(&(&b.timestamp, &b.id)));
-    let total = if r.action == Action::Evidence {
+    let total = if r.action == Action::Explain {
+        result
+            .explanation
+            .as_ref()
+            .map_or(0, |explanation| explanation.page.total)
+    } else if r.action == Action::Evidence {
         evidence.len()
     } else if r.action == Action::RelatedScopes {
         result.related_scopes.len()
@@ -104,7 +109,9 @@ pub(super) fn publish_query(
         total,
         next_offset: (offset.saturating_add(limit) < total).then_some(offset.saturating_add(limit)),
     };
-    result.items = if r.action == Action::List {
+    result.items = if r.action == Action::Explain {
+        items.into_iter().take(limit).collect()
+    } else if r.action == Action::List {
         items.into_iter().skip(offset).take(limit).collect()
     } else {
         items

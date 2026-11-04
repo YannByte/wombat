@@ -184,7 +184,7 @@ export type Group = "day" | "week" | "month";
 export type Sort = "tokens" | "cost" | "recent" | "time";
 export type Presentation = "distribution" | "details" | "projects" | "models";
 export type Mode = "auto" | "fresh" | "cached";
-export type Action3 = "list" | "detail" | "evidence" | "related_scopes" | "capabilities";
+export type Action3 = "list" | "detail" | "evidence" | "explain" | "related_scopes" | "capabilities";
 export type Kind2 = "rule" | "skill" | "mcp" | "hook";
 export type Observation2 = "used" | "loaded_only" | "unknown";
 export type Sort2 =
@@ -198,6 +198,21 @@ export type Sort2 =
   | "review"
   | "context_tokens"
   | "least_activity";
+export type UseReason =
+  | "counted"
+  | "identity_missing"
+  | "time_missing"
+  | "dispatch_unknown"
+  | "target_missing"
+  | "target_not_found"
+  | "target_ambiguous"
+  | "identity_conflict"
+  | "duplicate"
+  | "outside_window"
+  | "outside_project"
+  | "catalog_only"
+  | "instruction_load"
+  | "not_use";
 export type Action4 =
   "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type UseBasisStatus = ("observed" | "unavailable") | "partial";
@@ -529,6 +544,12 @@ export interface Request6 {
   itemId?: string | null;
   offset?: number | null;
   limit?: number | null;
+  /**
+   * Explain unresolved records rather than attributing them to every inventory item.
+   */
+  unassigned?: boolean;
+  baseline?: UseReplayBaseline | null;
+  baselineRecords?: UseTraceRecord[] | null;
 }
 export interface Scope3 {
   allTime?: boolean | null;
@@ -539,6 +560,54 @@ export interface Scope3 {
   agentKind?: string | null;
   sourceInstanceId?: string | null;
   threadId?: string | null;
+}
+export interface UseReplayBaseline {
+  formatVersion: number;
+  methodVersion: number;
+  scope: Scope3;
+  roots: string[];
+  projectRoots: string[];
+  kind?: Kind2 | null;
+  itemId?: string | null;
+  unassigned: boolean;
+  /**
+   * Normalized input facts, not raw source bodies or a guarantee of native coverage.
+   */
+  inputRevision: string;
+  configurationRevision: string;
+  resultRevision: string;
+  counted: number;
+  totalRecords: number;
+  reasons: UseReasonCount[];
+}
+export interface UseReasonCount {
+  reason: UseReason;
+  records: number;
+}
+export interface UseTraceRecord {
+  operationId: string;
+  sourceInstanceId: string;
+  threadId: string;
+  turnId?: string | null;
+  itemId?: string | null;
+  timestamp?: string | null;
+  eventType: string;
+  outcome: string;
+  reason: UseReason;
+  /**
+   * None means the evidence cannot establish a numeric contribution.
+   */
+  countDelta?: number | null;
+  evidence?: EvidenceRef | null;
+  sourceObservationCount: number;
+  /**
+   * Up to three further source observations; phases are not independent uses.
+   */
+  additionalEvidence: EvidenceRef[];
+}
+export interface EvidenceRef {
+  file: string;
+  line: number;
 }
 export interface Request7 {
   action?: Action4 & string;

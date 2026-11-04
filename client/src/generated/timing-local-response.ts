@@ -128,7 +128,7 @@ export interface LocalUses {
   nextCursor?: Cursor | null;
 }
 export interface UseTotals {
-  methodVersion: number;
+  methodVersion: 4;
   sourceCoverage: UseSourceCoverage;
   objectCount: TimingMetricUint64;
   /**

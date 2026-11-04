@@ -15,7 +15,21 @@ pub(crate) fn prepare_observed(
     let sources = discovery.sources;
     let projects = scope::projects(r)?;
     let checked = Utc::now().to_rfc3339();
-    let mut inventory = scan::scan(&sources, &projects, &checked);
+    let selected_kind = |kind: &Kind| {
+        r.kind.as_ref().is_none_or(|selected| selected == kind)
+            && r.kinds
+                .as_ref()
+                .is_none_or(|selected| selected.contains(kind))
+    };
+    let kinds = [Kind::Rule, Kind::Skill, Kind::Mcp, Kind::Hook]
+        .into_iter()
+        .filter(&selected_kind)
+        .collect::<Vec<_>>();
+    let mut inventory = if kinds.is_empty() {
+        scan::Inventory::default()
+    } else {
+        scan::scan_selected(&sources, &projects, &checked, &kinds)
+    };
     inventory
         .issues
         .extend(discovery.issues.into_iter().map(|issue| {
@@ -27,8 +41,12 @@ pub(crate) fn prepare_observed(
                     .map(|source| source.root.clone()),
             }
         }));
-    scan::append_native_hooks(&mut inventory, native, &sources, &projects, &checked);
-    scan::append_native_skills(&mut inventory, native_skills, &sources, &projects, &checked);
+    if selected_kind(&Kind::Hook) {
+        scan::append_native_hooks(&mut inventory, native, &sources, &projects, &checked);
+    }
+    if selected_kind(&Kind::Skill) {
+        scan::append_native_skills(&mut inventory, native_skills, &sources, &projects, &checked);
+    }
     if let Some(code) = native_skills.and_then(|c| c.error_code.as_ref()) {
         inventory.issues.push(Issue {
             code: code.clone(),
@@ -44,27 +62,34 @@ pub(crate) fn prepare_observed(
         &inventory.issues,
         sources.iter().map(|source| source.root.clone()).collect(),
     );
-    let mut analysis = analysis::analyze_authorized(
-        &inventory.items,
-        &projects,
-        &inventory
-            .authorized_roots
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>(),
-    );
-    hook_targets::analyze(
-        &inventory.items,
-        &projects,
-        &inventory
-            .authorized_roots
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>(),
-        &hook_registry,
-        native,
-        &mut analysis,
-    );
+    let full_analysis = r.kind.is_none() && r.kinds.is_none();
+    let mut analysis = if full_analysis {
+        analysis::analyze_authorized(
+            &inventory.items,
+            &projects,
+            &inventory
+                .authorized_roots
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        analysis::Analysis::default()
+    };
+    if full_analysis {
+        hook_targets::analyze(
+            &inventory.items,
+            &projects,
+            &inventory
+                .authorized_roots
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+            &hook_registry,
+            native,
+            &mut analysis,
+        );
+    }
     inventory.issues.extend(analysis.issues.clone());
     let cache_key = crate::hash(serde_json::to_vec(&(
         sources.iter().map(|s| &s.id).collect::<Vec<_>>(),
@@ -87,6 +112,12 @@ pub(crate) fn prepare_observed(
             .collect::<BTreeSet<_>>();
         for mut item in prior {
             if ids.contains(&item.id) {
+                continue;
+            }
+            if !selected_kind(&item.kind) {
+                if inventory.items.len() < 20_000 {
+                    inventory.items.push(item);
+                }
                 continue;
             }
             item.stale = inventory.issues.iter().any(|issue| {
@@ -133,6 +164,7 @@ pub(crate) fn prepare_observed(
             path: None,
         });
     }
+    inventory.items.retain(|item| selected_kind(&item.kind));
     // Native inheritance augments only this view, after the safe inventory cache was written.
     if r.review || native_skills.is_some() {
         review::bind(&mut inventory.items, native_skills, &projects);

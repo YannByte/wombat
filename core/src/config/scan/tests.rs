@@ -6,6 +6,44 @@ fn source(root: &Path) -> SourceInstance {
         root: root.to_string_lossy().into_owned(),
     }
 }
+
+#[test]
+fn skill_queries_do_not_walk_unrelated_project_files_or_starve_known_skills() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dunce::canonicalize(dir.path()).unwrap();
+    let source_root = root.join("source");
+    let project = root.join("project");
+    fs::create_dir_all(&source_root).unwrap();
+    fs::create_dir_all(project.join(".agents/skills/known")).unwrap();
+    fs::write(
+        project.join(".agents/skills/known/SKILL.md"),
+        "---\nname: known\ndescription: Synthetic\n---\n",
+    )
+    .unwrap();
+    let clutter = project.join("unrelated");
+    fs::create_dir(&clutter).unwrap();
+    for i in 0..ENTRY_LIMIT + 1 {
+        fs::write(clutter.join(format!("{i}.txt")), "").unwrap();
+    }
+    let projects = vec![project.to_string_lossy().into_owned()];
+    let selected = scan_selected(&[source(&source_root)], &projects, "now", &[Kind::Skill]);
+    assert_eq!(selected.items.len(), 1);
+    assert!(selected.examined < 20);
+    assert!(selected.issues.is_empty());
+    let combined = scan(&[source(&source_root)], &projects, "now");
+    assert!(
+        combined
+            .items
+            .iter()
+            .any(|item| item.kind == Kind::Skill && item.name == "known")
+    );
+    assert!(
+        combined
+            .issues
+            .iter()
+            .any(|issue| issue.code == "resourceLimited")
+    );
+}
 #[test]
 fn hook_declarations_are_discovered_without_executing_or_claiming_effectiveness() {
     let dir = tempfile::tempdir().unwrap();

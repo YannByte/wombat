@@ -14,7 +14,7 @@ const repeatedBehavior=()=>({failureMethod:'same_operation_after_failure_v1' as 
 const category = () => ({ candidates: count(), closed: count(), unionMs: count(), sumMs: count() });
 const distribution = () => ({ samples: count(), median: count(), p90: count() });
 export const useTotals = () => ({
-  methodVersion: 3, sourceCoverage: 'unknown' as const, objectCount: count(), recordCount: count(),
+  methodVersion: 4 as const, sourceCoverage: 'unknown' as const, objectCount: count(), recordCount: count(),
   unboundTargetRecords: count(), unassignedSkillRecords: count(), unassignedMcpRecords: count(),
   coverage: { dispatchGaps: count(), identityGaps: count(), targetGaps: count(), timeGaps: count(), associatedTurnGaps: count() },
 });

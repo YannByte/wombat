@@ -3,6 +3,7 @@ use super::*;
 use crate::usage_observations::{self, Projection, TimeBasis};
 mod history;
 mod response;
+mod trace;
 
 pub(crate) fn execute(mut r: Request, id: String, view: &View) -> Result<Response> {
     validate(&r)?;
@@ -23,6 +24,12 @@ pub(crate) fn execute(mut r: Request, id: String, view: &View) -> Result<Respons
         return Ok(result);
     }
     let mut items = project_inventory(view, &scope);
+    if r.item_id
+        .as_ref()
+        .is_some_and(|id| !items.iter().any(|item| &item.id == id))
+    {
+        return Err(operation_error("NOT_FOUND", "未找到配置身份 itemId"));
+    }
     let history = history::project_history(&r, &scope, tz, view, &mut items, &mut result)?;
     response::publish_query(&r, &scope, view, items, result, history)
 }
@@ -57,6 +64,51 @@ fn query_response(r: &Request, id: String, scope: &Scope, view: &View) -> Respon
         view.history_status.clone()
     };
     result.coverage.issues = view.issues.clone();
+    result.coverage.history_read_complete = view.snapshot.as_ref().map(|snapshot| {
+        use crate::adapters::contract::{WatermarkIssue, WatermarkState};
+        let selected = |source: &str| {
+            scope
+                .source_instance_id
+                .as_ref()
+                .is_none_or(|id| id == source)
+                && scope.thread_id.as_ref().is_none_or(|id| {
+                    snapshot.manifest.threads.iter().any(|entry| {
+                        &entry.thread.id == id && entry.thread.source_instance_id == source
+                    })
+                })
+        };
+        snapshot
+            .manifest
+            .sources
+            .iter()
+            .filter(|report| selected(&report.source.id))
+            .all(|report| {
+                if report.status == "complete" {
+                    return true;
+                }
+                if report.status != "partial" {
+                    return false;
+                }
+                let mut watermarks = snapshot
+                    .manifest
+                    .watermarks
+                    .iter()
+                    .filter(|mark| mark.source_instance_id == report.source.id)
+                    .peekable();
+                watermarks.peek().is_some()
+                    && watermarks.all(|mark| {
+                        !matches!(mark.state, WatermarkState::Missing | WatermarkState::Failed)
+                            && mark.observed_bytes == Some(mark.committed_offset)
+                            && mark.issue_codes.iter().all(|code| {
+                                matches!(
+                                    code,
+                                    WatermarkIssue::InvalidSourceField
+                                        | WatermarkIssue::InvalidTimestamp
+                                )
+                            })
+                    })
+            })
+    });
     // Config precedence, explicit adoption and missing event types cannot prove absence.
     result.coverage.status = "partial".into();
     result.coverage.issues.push(Issue {

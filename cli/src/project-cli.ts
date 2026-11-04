@@ -1,10 +1,11 @@
 import {writeHelp} from './help.js';
 import path from 'node:path';
-import {CoreError,type ProjectResult, type ConfigRequest} from '@wombat/client';
+import {CoreError,validateConfigRequest,type ProjectResult, type ConfigRequest} from '@wombat/client';
 import {createNodeClient} from '@wombat/client/node';
 import {t} from '@wombat/client/locale';
 import {dateWindow} from './calendar.js';
-import {ask,canPrompt,invalidInput, pageNumber, parseOptions, projectDirectory, projectFilter, withCancellation} from './human-input.js';
+import {ask,canPrompt,commandLine,invalidInput, pageNumber, parseOptions, projectDirectory, projectFilter, withCancellation} from './human-input.js';
+import {readBaseline} from './read-baseline.js';
 import {formatConfigText} from './config-cli.js';
 import {formatOptimizeText,runVerificationCli} from './optimize-cli.js';
 import {formatArtifactsText} from './artifacts-cli.js';
@@ -35,13 +36,28 @@ export function formatProjectText(result:ProjectResult):string {
 export async function runProjectCli(argv:readonly string[]):Promise<number>{
   return withCancellation(async signal=>{
     if(argv[0]==='verify')return runVerificationCli([...argv]);
-    const p=parseOptions(argv,['--project','--root','--since','--until','--timezone','--source','--limit','--offset','--sort','--task','--turn','--agents-bytes','--description-characters'],[],['--root']);
+    const p=parseOptions(argv,['--project','--root','--since','--until','--timezone','--source','--limit','--offset','--sort','--task','--turn','--agents-bytes','--description-characters','--item','--baseline'],['--explain','--unassigned'],['--root']);
     if(p.help){writeHelp('check',argv);return 0;}
     if(p.positionals.length>1)invalidInput('check');
     const target=p.positionals[0];
     if(target&&!['skills','mcp','rules','hooks'].includes(target))invalidInput(target);
-    const window=dateWindow({since:p.get('--since'),until:p.get('--until'),timezone:p.get('--timezone')},'recent');
-    const roots=p.all('--root').map(r=>path.resolve(r)),client=createNodeClient({automaticPrices:false});
+    const explain=p.flags.has('--explain')||p.flags.has('--unassigned')||p.values.has('--item')||p.values.has('--baseline');
+    if(explain&&(!target||p.get('--task')))invalidInput('--explain');
+    if(p.flags.has('--unassigned')&&p.get('--item'))invalidInput('--unassigned');
+    let baseline:ConfigRequest['baseline'];
+    let baselineRecords:ConfigRequest['baselineRecords'];
+    if(p.get('--baseline')) {
+      const report=readBaseline(p.get('--baseline')!);
+      if(!report||typeof report!=='object'||!('explanation' in report))invalidInput('--baseline');
+      const explanation=report.explanation;
+      if(!explanation||typeof explanation!=='object'||!('baseline' in explanation))invalidInput('--baseline');
+      const candidate:unknown={action:'explain',baseline:explanation.baseline,baselineRecords:'records' in explanation?explanation.records:undefined};
+      if(!validateConfigRequest(candidate)||!candidate.baseline)invalidInput('--baseline');
+      baseline=candidate.baseline;
+      baselineRecords=candidate.baselineRecords;
+    }
+    const window=baseline?.scope.allTime&&!p.get('--since')&&!p.get('--until')?{allTime:true,since:undefined,until:undefined,timezone:p.get('--timezone')??baseline.scope.timezone??'UTC'}:dateWindow({since:p.get('--since')??baseline?.scope.since??undefined,until:p.get('--until')??baseline?.scope.until??undefined,timezone:p.get('--timezone')??baseline?.scope.timezone??undefined},'recent');
+    const roots=p.all('--root').length?p.all('--root').map(r=>path.resolve(r)):baseline?.roots??[],client=createNodeClient({automaticPrices:false});
     if(p.get('--task')) {
       if(target||['--agents-bytes','--description-characters','--sort','--offset','--limit','--since','--until','--timezone'].some(k=>p.values.has(k)))invalidInput('--task');
       const scope={allTime:true,...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),sourceInstanceId:p.get('--source')};
@@ -61,16 +77,20 @@ export async function runProjectCli(argv:readonly string[]):Promise<number>{
       process.stdout.write(p.json?JSON.stringify(result)+'\n':formatOptimizeText(result));return result.resultStatus==='partial'?2:0;
     }
     if(p.values.has('--turn'))invalidInput('--turn');
-    const project=await projectDirectory(p.get('--project'),argv,signal);
+    const project=await projectDirectory(p.get('--project')??baseline?.scope.project??undefined,argv,signal);
     if(target){
       if(['--agents-bytes','--description-characters'].some(k=>p.values.has(k)))invalidInput(target);
       const kind:ConfigRequest['kind']=target==='skills'?'skill':target==='rules'?'rule':target==='hooks'?'hook':'mcp';
       if(kind!=='skill'&&p.get('--sort')==='context_tokens')invalidInput('--sort');
       const sort=p.get('--sort')??'review';
       if(!['review','context_tokens','least_activity','recent','name'].includes(sort))invalidInput('--sort');
-      const request:ConfigRequest={action:'list',kind,review:kind==='skill'||kind==='mcp',roots,projectRoots:[project],scope:{...window,project,sourceInstanceId:p.get('--source')},limit:pageNumber(p.get('--limit'),20,1,200),offset:pageNumber(p.get('--offset'),0),sort:sort as ConfigRequest['sort']};
+      const request:ConfigRequest={action:explain?'explain':'list',kind,review:kind==='skill'||kind==='mcp',roots,projectRoots:[project],scope:{...baseline?.scope,...window,allTime:window.allTime??false,project,sourceInstanceId:p.get('--source')??baseline?.scope.sourceInstanceId},itemId:p.flags.has('--unassigned')?undefined:p.get('--item')??baseline?.itemId,unassigned:p.get('--item')?false:p.flags.has('--unassigned')||baseline?.unassigned,baseline,baselineRecords,limit:pageNumber(p.get('--limit'),20,1,200),offset:pageNumber(p.get('--offset'),0),sort:sort as ConfigRequest['sort']};
       const r=await client.config!(request,{signal});
-      process.stdout.write(p.json?JSON.stringify(r)+'\n':formatConfigText(r,request));
+      process.stdout.write(p.json?JSON.stringify(r)+'\n':formatConfigText(r,request,{explain:p.flags.has('--explain')}));
+      if(!p.json&&r.explanation?.page.nextOffset!=null) {
+        const next=argv.filter((arg,i)=>arg!=='--offset'&&!arg.startsWith('--offset=')&&argv[i-1]!=='--offset');
+        process.stdout.write(t('config.explainNext',{command:terminalText(commandLine(['check',...next,'--offset',String(r.explanation.page.nextOffset)]))})+'\n');
+      }
       return configExitCode(r);
     }
     if(['--limit','--offset','--sort'].some(k=>p.values.has(k)))invalidInput('check');

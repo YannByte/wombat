@@ -28,7 +28,7 @@
 
 CLI 提供耗时摘要、证据和能力查询。通过 `corepack pnpm verify:e2e` 验证所选平台的真实内核与 CLI。
 
-`UsageClient.config` 提供测量与使用证据，`optimize` 提供只读检查、原条件复查和显式用户决定；`preferences` 读取或保存 zh/en。配置对象的 `useBasis` 保留固定范围、方法、来源完整性及覆盖。locale 只解释事实，不重算或推断采用。版本与字段见[公共契约](../development/contracts.md)。
+`UsageClient.config` 提供测量、使用解释和同一输入的比较，`validateConfigRequest` 按生成契约校验不可信的基线输入。`optimize` 提供只读检查、原条件复查和显式用户决定；`preferences` 读取或保存 zh/en。配置对象的 `useBasis` 保留固定范围、方法、来源完整性及覆盖。locale 只解释事实，不重算或推断采用。版本与字段见[公共契约](../development/contracts.md)。
 
 `createNodeClient({automaticPrices:false})`只关闭客户端的自动补价装饰，显式prices操作仍可用。CLI实时查询默认保留原行为。
 

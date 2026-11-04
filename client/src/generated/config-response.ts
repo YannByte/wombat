@@ -1,5 +1,22 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
+export type Kind = "rule" | "skill" | "mcp" | "hook";
+export type UseReason =
+  | "counted"
+  | "identity_missing"
+  | "time_missing"
+  | "dispatch_unknown"
+  | "target_missing"
+  | "target_not_found"
+  | "target_ambiguous"
+  | "identity_conflict"
+  | "duplicate"
+  | "outside_window"
+  | "outside_project"
+  | "catalog_only"
+  | "instruction_load"
+  | "not_use";
+export type UseComparisonStatus = "unchanged" | "changed" | "input_changed" | "scope_changed" | "configuration_changed";
 export type UseBasisStatus = ("observed" | "unavailable") | "partial";
 export type UseUnit = "object_use" | "rule_read" | "rule_load_or_read";
 export type UseWindow =
@@ -14,8 +31,7 @@ export type UseWindow =
     };
 export type UseTimeBasis = "source_operation_time";
 export type UseSourceCompleteness = "complete" | "partial" | "unknown";
-export type Action = "list" | "detail" | "evidence" | "related_scopes" | "capabilities";
-export type Kind = "rule" | "skill" | "mcp" | "hook";
+export type Action = "list" | "detail" | "evidence" | "explain" | "related_scopes" | "capabilities";
 export type TokenAnalysisScope = "selected_canonical_measurements";
 export type Observation = "used" | "loaded_only" | "unknown";
 export type HookRegistryStatus = "unavailable" | "partial" | "observed";
@@ -23,6 +39,7 @@ export type HookTrust = "managed" | "untrusted" | "trusted" | "modified";
 export type HookHandler = "command" | "mcpTool" | "prompt" | "agent";
 
 export interface Response {
+  explanation?: UseExplanation | null;
   extensionReview?: ExtensionReview | null;
   extensionActivity?: ExtensionActivityStatistics | null;
   outputVersion: number;
@@ -45,6 +62,109 @@ export interface Response {
   page: Page;
   coverage: Coverage;
   hookRegistry: HookRegistry;
+}
+export interface UseExplanation {
+  baseline: UseReplayBaseline;
+  /**
+   * Counts and digests cover the whole selection; only this page is retained.
+   */
+  records: UseTraceRecord[];
+  page: Page;
+  comparison?: UseComparison | null;
+  /**
+   * Source-level diagnostics can extend beyond the selected dates. No raw messages.
+   */
+  sourceIssues: UseSourceIssue[];
+  sourceIssuesTotal: number;
+}
+export interface UseReplayBaseline {
+  formatVersion: number;
+  methodVersion: number;
+  scope: Scope;
+  roots: string[];
+  projectRoots: string[];
+  kind?: Kind | null;
+  itemId?: string | null;
+  unassigned: boolean;
+  /**
+   * Normalized input facts, not raw source bodies or a guarantee of native coverage.
+   */
+  inputRevision: string;
+  configurationRevision: string;
+  resultRevision: string;
+  counted: number;
+  totalRecords: number;
+  reasons: UseReasonCount[];
+}
+export interface Scope {
+  allTime?: boolean | null;
+  since?: string | null;
+  until?: string | null;
+  timezone?: string | null;
+  project?: string | null;
+  agentKind?: string | null;
+  sourceInstanceId?: string | null;
+  threadId?: string | null;
+}
+export interface UseReasonCount {
+  reason: UseReason;
+  records: number;
+}
+export interface UseTraceRecord {
+  operationId: string;
+  sourceInstanceId: string;
+  threadId: string;
+  turnId?: string | null;
+  itemId?: string | null;
+  timestamp?: string | null;
+  eventType: string;
+  outcome: string;
+  reason: UseReason;
+  /**
+   * None means the evidence cannot establish a numeric contribution.
+   */
+  countDelta?: number | null;
+  evidence?: EvidenceRef | null;
+  sourceObservationCount: number;
+  /**
+   * Up to three further source observations; phases are not independent uses.
+   */
+  additionalEvidence: EvidenceRef[];
+}
+export interface EvidenceRef {
+  file: string;
+  line: number;
+}
+export interface Page {
+  offset: number;
+  limit: number;
+  total: number;
+  nextOffset?: number | null;
+}
+export interface UseComparison {
+  status: UseComparisonStatus;
+  before: number;
+  after: number;
+  /**
+   * Available only when scope, normalized evidence and configuration are identical.
+   */
+  delta?: number | null;
+  changes: UseRecordChange[];
+  changesComplete: boolean;
+}
+export interface UseRecordChange {
+  operationId: string;
+  threadId: string;
+  itemId?: string | null;
+  before?: UseReason | null;
+  after?: UseReason | null;
+  beforeDelta?: number | null;
+  afterDelta?: number | null;
+}
+export interface UseSourceIssue {
+  code: string;
+  sourceInstanceId?: string | null;
+  evidence?: EvidenceRef | null;
 }
 export interface ExtensionReview {
   methodVersion: number;
@@ -69,16 +189,6 @@ export interface ExtensionActivityStatistics {
    * Same page as inventory items; summary counts are computed before pagination.
    */
   items: ExtensionActivity[];
-}
-export interface Scope {
-  allTime?: boolean | null;
-  since?: string | null;
-  until?: string | null;
-  timezone?: string | null;
-  project?: string | null;
-  agentKind?: string | null;
-  sourceInstanceId?: string | null;
-  threadId?: string | null;
 }
 export interface ExtensionActivity {
   itemId: string;
@@ -379,13 +489,11 @@ export interface RelatedScope {
   evidenceCount: number;
   usage?: UsageSummary | null;
 }
-export interface Page {
-  offset: number;
-  limit: number;
-  total: number;
-  nextOffset?: number | null;
-}
 export interface Coverage {
+  /**
+   * Whether selected source bytes were read completely; independent of attribution gaps.
+   */
+  historyReadComplete?: boolean | null;
   status: string;
   historyStatus: string;
   issues: Issue[];

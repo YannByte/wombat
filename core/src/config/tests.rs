@@ -1,4 +1,5 @@
 use super::*;
+mod trace;
 #[test]
 fn review_catalog_metadata_is_independent_from_body_and_never_confirms_visibility() {
     let mut v = use_view(vec![]);
@@ -319,7 +320,7 @@ fn inventory_and_recorded_paths_use_the_same_grammar_without_changing_display_id
                 .coverage
                 .issues
                 .iter()
-                .any(|issue| issue.code == "usageCountV3TargetUnknown"
+                .any(|issue| issue.code == "usageCountV4TargetUnknown"
                     && issue.path.as_ref() == Some(&item.path))
         );
     }
@@ -422,7 +423,7 @@ fn wrapper_literal_read_keeps_a_candidate_without_claiming_actual_dispatch() {
             .coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3DispatchUnknown"
+            .any(|issue| issue.code == "usageCountV4DispatchUnknown"
                 && issue.path.as_ref() == Some(&item.path))
     );
     let mut request = uses_request();
@@ -456,7 +457,7 @@ fn explicit_read_without_native_identity_is_used_with_a_partial_zero_count() {
             .coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3IdentityUnknown")
+            .any(|issue| issue.code == "usageCountV4IdentityUnknown")
     );
 }
 
@@ -498,7 +499,7 @@ fn mcp_calls_and_resource_reads_share_operation_counts_but_discovery_does_not() 
             .coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3TargetUnknown")
+            .any(|issue| issue.code == "usageCountV4TargetUnknown")
     );
 }
 
@@ -520,7 +521,7 @@ fn ambiguous_inventory_targets_keep_candidate_gaps_instead_of_picking_an_item() 
                 .coverage
                 .issues
                 .iter()
-                .any(|issue| issue.code == "usageCountV3TargetUnknown"
+                .any(|issue| issue.code == "usageCountV4TargetUnknown"
                     && issue.path.as_ref() == Some(&item.path))
         );
     }
@@ -551,7 +552,7 @@ fn missing_time_prevents_a_precise_date_window_count_without_creating_a_turn() {
             .coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3TimeUnknown")
+            .any(|issue| issue.code == "usageCountV4TimeUnknown")
     );
     let all = execute(uses_request(), "config:uses".into(), &v).unwrap();
     assert_eq!(all.items[0].usage_count, Some(2));
@@ -561,7 +562,7 @@ fn missing_time_prevents_a_precise_date_window_count_without_creating_a_turn() {
         all.coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3TurnUnknown")
+            .any(|issue| issue.code == "usageCountV4TurnUnknown")
     );
 }
 
@@ -583,7 +584,7 @@ fn thread_scope_retains_read_candidates_and_their_queryable_evidence() {
         list.coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3DispatchUnknown")
+            .any(|issue| issue.code == "usageCountV4DispatchUnknown")
     );
     request.action = Action::Evidence;
     request.item_id = Some("skill".into());
@@ -646,7 +647,7 @@ fn thread_scope_retains_missing_time_coverage_without_inventing_evidence_dates()
             .coverage
             .issues
             .iter()
-            .any(|issue| issue.code == "usageCountV3TimeUnknown")
+            .any(|issue| issue.code == "usageCountV4TimeUnknown")
     );
 }
 
@@ -664,7 +665,7 @@ fn unmatched_operation_from_another_project_does_not_pollute_selected_coverage()
     assert_eq!(result.items[0].observation, Observation::Unknown);
     assert!(!result.coverage.issues.iter().any(|issue| matches!(
         issue.code.as_str(),
-        "usageOperationTargetUnknown" | "usageCountV3TargetUnknown"
+        "usageOperationTargetUnknown" | "usageCountV4TargetUnknown"
     )));
 }
 
@@ -689,7 +690,7 @@ fn native_multiple_read_candidates_match_each_object_without_pretending_dispatch
                 .coverage
                 .issues
                 .iter()
-                .any(|issue| issue.code == "usageCountV3DispatchUnknown"
+                .any(|issue| issue.code == "usageCountV4DispatchUnknown"
                     && issue.path.as_deref() == Some(item.path.as_str()))
         );
     }
@@ -733,7 +734,7 @@ fn canonical_replay_target_conflicts_do_not_depend_on_input_order() {
                 .coverage
                 .issues
                 .iter()
-                .any(|issue| issue.code == "usageCountV3TargetUnknown")
+                .any(|issue| issue.code == "usageCountV4TargetUnknown")
         );
     }
 }
@@ -773,7 +774,7 @@ fn replay_missing_time_retains_the_observed_window_count_in_both_orders() {
             all.coverage
                 .issues
                 .iter()
-                .any(|issue| issue.code == "usageCountV3TimeUnknown")
+                .any(|issue| issue.code == "usageCountV4TimeUnknown")
         );
         let request = Request {
             scope: Scope {
@@ -809,7 +810,7 @@ fn public_use_basis_binds_observed_or_partial_scalars_to_fixed_scope() {
         let result = execute(request, "config:basis".into(), &v).unwrap();
         let item = &result.items[0];
         let basis = item.use_basis.as_ref().unwrap();
-        assert_eq!(basis.method_version, 3);
+        assert_eq!(basis.method_version, 4);
         assert_eq!(basis.status, expected);
         assert_eq!(basis.captured_at, v.checked);
         assert_eq!(basis.snapshot_id, result.usage_revision);

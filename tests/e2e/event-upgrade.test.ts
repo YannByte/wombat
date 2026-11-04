@@ -196,7 +196,7 @@ function counts(value: TimingLocalResult, appended = false) {
     assert.equal(value.work.nonemptyVisibleContentRecords.value, 1);
     assert.equal(value.work.unknownContentRecords.value, 0);
     assert.equal(value.work.missingContentTimeRecords.value, 0);
-    assert.equal(value.uses.totals.methodVersion, 3);
+    assert.equal(value.uses.totals.methodVersion, 4);
     assert.equal(value.uses.totals.objectCount.value, 2);
     assert.equal(value.uses.totals.recordCount.value, appended ? 5 : 4);
     const skill = value.uses.objects.find(object => object.kind === 'skill'), mcp = value.uses.objects.find(object => object.kind === 'mcp');

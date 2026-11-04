@@ -122,7 +122,17 @@ fn source_context(row: &Item, source_id: String) -> SourceContext {
         last_record_at: None,
     }
 }
+#[cfg(test)]
 pub(super) fn scan(sources: &[SourceInstance], projects: &[String], now: &str) -> Inventory {
+    scan_selected(sources, projects, now, &[])
+}
+pub(super) fn scan_selected(
+    sources: &[SourceInstance],
+    projects: &[String],
+    now: &str,
+    kinds: &[Kind],
+) -> Inventory {
+    let selected = |kind: Kind| kinds.is_empty() || kinds.contains(&kind);
     let mut out = Inventory::default();
     for source in sources {
         let root = match dunce::canonicalize(&source.root) {
@@ -132,24 +142,35 @@ pub(super) fn scan(sources: &[SourceInstance], projects: &[String], now: &str) -
                 continue;
             }
         };
-        out.text_item(
-            &root.join("AGENTS.md"),
-            &root,
-            source,
-            None,
-            Kind::Rule,
-            now,
-        );
-        out.mcp(&root.join("config.toml"), &root, source, None, now);
-        out.hooks(&root.join("hooks.json"), &root, source, None, now);
-        out.visited.clear();
-        for dir in [root.join("skills"), root.join(".agents/skills")] {
-            out.skills(&dir, &root, source, None, now, 0);
+        out.authorized_roots
+            .insert(root.to_string_lossy().into_owned());
+        if selected(Kind::Rule) {
+            out.text_item(
+                &root.join("AGENTS.md"),
+                &root,
+                source,
+                None,
+                Kind::Rule,
+                now,
+            );
         }
-        if dunce::canonicalize(crate::home().join(".codex"))
-            .ok()
-            .as_ref()
-            == Some(&root)
+        if selected(Kind::Mcp) || selected(Kind::Hook) {
+            out.mcp(&root.join("config.toml"), &root, source, None, now);
+        }
+        if selected(Kind::Hook) {
+            out.hooks(&root.join("hooks.json"), &root, source, None, now);
+        }
+        out.visited.clear();
+        if selected(Kind::Skill) {
+            for dir in [root.join("skills"), root.join(".agents/skills")] {
+                out.skills(&dir, &root, source, None, now, 0);
+            }
+        }
+        if selected(Kind::Skill)
+            && dunce::canonicalize(crate::home().join(".codex"))
+                .ok()
+                .as_ref()
+                == Some(&root)
         {
             let dir = crate::home().join(".agents/skills");
             if let Ok(allowed) = dunce::canonicalize(&dir) {
@@ -164,36 +185,58 @@ pub(super) fn scan(sources: &[SourceInstance], projects: &[String], now: &str) -
         for project in projects {
             let first = out.items.len();
             let root = Path::new(project);
+            out.authorized_roots.insert(project.clone());
             out.visited.clear();
-            out.agents(root, root, source, project, now, 0);
-            out.mcp(
-                &root.join(".codex/config.toml"),
-                root,
-                source,
-                Some(project),
-                now,
-            );
-            out.hooks(
-                &root.join(".codex/hooks.json"),
-                root,
-                source,
-                Some(project),
-                now,
-            );
+            if selected(Kind::Mcp) || selected(Kind::Hook) {
+                out.mcp(
+                    &root.join(".codex/config.toml"),
+                    root,
+                    source,
+                    Some(project),
+                    now,
+                );
+            }
+            if selected(Kind::Hook) {
+                out.hooks(
+                    &root.join(".codex/hooks.json"),
+                    root,
+                    source,
+                    Some(project),
+                    now,
+                );
+            }
             out.visited.clear();
-            out.skills(
-                &root.join(".agents/skills"),
-                root,
-                source,
-                Some(project),
-                now,
-                0,
-            );
+            if selected(Kind::Skill) {
+                out.skills(
+                    &root.join(".agents/skills"),
+                    root,
+                    source,
+                    Some(project),
+                    now,
+                    0,
+                );
+            }
             for row in &mut out.items[first..] {
                 row.source_contexts = sources
                     .iter()
                     .map(|s| source_context(row, s.id.clone()))
                     .collect();
+            }
+        }
+        // Explicit configuration locations precede the broad AGENTS walk, so a
+        // large project cannot consume the budget before known Skills are read.
+        if selected(Kind::Rule) {
+            for project in projects {
+                let first = out.items.len();
+                let root = Path::new(project);
+                out.visited.clear();
+                out.agents(root, root, source, project, now, 0);
+                for row in &mut out.items[first..] {
+                    row.source_contexts = sources
+                        .iter()
+                        .map(|source| source_context(row, source.id.clone()))
+                        .collect();
+                }
             }
         }
     }

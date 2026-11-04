@@ -16,22 +16,22 @@ fn historical_paths_use_recorded_grammar_on_every_host() {
         (
             r"C:\synthetic\a\..\skill\SKILL.md",
             None,
-            r"C:\synthetic\skill\SKILL.md",
+            r"c:\synthetic\skill\SKILL.md",
         ),
         (
             "C:/synthetic/skill/SKILL.md",
             None,
-            r"C:\synthetic\skill\SKILL.md",
+            r"c:\synthetic\skill\SKILL.md",
         ),
         (
             r"..\skill\SKILL.md",
             Some(r"C:\synthetic\project"),
-            r"C:\synthetic\skill\SKILL.md",
+            r"c:\synthetic\skill\SKILL.md",
         ),
         (
             "../skill/SKILL.md",
             Some(r"C:\synthetic\project"),
-            r"C:\synthetic\skill\SKILL.md",
+            r"c:\synthetic\skill\SKILL.md",
         ),
         (
             r"\\server\share\project\..\skill\SKILL.md",
@@ -459,7 +459,7 @@ fn partial_projection_preserves_observed_canonical_uses_and_known_zero() {
             None,
             false,
         );
-        assert_eq!(value.method_version, 3);
+        assert_eq!(value.method_version, 4);
         assert_eq!(value.status, UseBasisStatus::Partial);
         assert_eq!(serde_json::to_value(value).unwrap()["status"], "partial");
     }
