@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 pub(crate) const CHUNK_BYTES: usize = 8192;
-const MAX_CHUNKS: usize = 4096;
+pub(crate) const MAX_CHUNKS: usize = 4096;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TextChunk {

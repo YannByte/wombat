@@ -17,7 +17,7 @@ function verificationProblem(setup: unknown, name: string, requirements: Record<
   const fail = (value: string, reason: string, recovery = retry) => new PluginStageError(value, reason, recovery);
   if (!object(setup) || setup.outputVersion !== 1 || !object(setup.discovery) || !Array.isArray(setup.discovery.instances) || !Array.isArray(setup.runtimeChecks)) return fail('SETUP_INVALID_RESPONSE', 'The verification response is invalid.');
   const discovery = setup.discovery;
-  if (discovery.status !== 'available') {
+  if (discovery.status !== 'available' && discovery.errorCode!=='SKILL_PARSE_ERROR') {
     const failure = code(discovery.errorCode) ?? ({missing: 'PLUGIN_NOT_DISCOVERED', disabled: 'PLUGIN_DISABLED', ambiguous: 'PLUGIN_AMBIGUOUS'}[String(discovery.status)] ?? 'PLUGIN_DISCOVERY_UNAVAILABLE');
     const reasons: Record<string, string> = {
       LOCAL_ACCESS_DENIED: 'Local permissions prevented Codex plugin discovery. Run the check in a terminal allowed to access Codex.',
@@ -36,6 +36,7 @@ function verificationProblem(setup: unknown, name: string, requirements: Record<
   const instances: unknown[] = Array.isArray(discovery.instances) ? discovery.instances.filter(i => object(i) && i.enabled === true) : [];
   const selected = instances.length === 1 && object(instances[0]) ? instances[0] : null;
   if (!selected || selected.name !== name + ':wombat' || typeof selected.path !== 'string' || !path.isAbsolute(selected.path)) return fail('PLUGIN_SELECTION_MISMATCH', 'Codex selected a different or ambiguous Wombat Skill.', 'Select one intended Wombat plugin in Codex. ' + retry);
+  if(discovery.errorCode==='SKILL_PARSE_ERROR'&&Array.isArray(discovery.parseErrorPaths)&&discovery.parseErrorPaths.includes(selected.path))return fail('SKILL_PARSE_ERROR','Codex could not parse the selected Wombat Skill.');
   const matching = setup.runtimeChecks.filter(check => object(check) && check.path === selected.path);
   if (matching.length !== 1 || !object(matching[0])) {
     const timeout = Array.isArray(setup.errorCodes) && setup.errorCodes.some(c => ['SETUP_TIMEOUT', 'CANCELLED'].includes(String(c)));
@@ -59,7 +60,7 @@ function verificationFacts(setup: unknown): Record<string, unknown> {
   const clean = (value: unknown) => typeof value === 'string' && value.length <= 4096 && !/[\x00-\x1f\x7f]/.test(value) ? value : null;
   const discovery = object(setup.discovery) ? setup.discovery : {};
   return {
-    discovery: {status: statuses.has(String(discovery.status)) ? discovery.status : null, errorCode: code(discovery.errorCode) ?? null, instances: Array.isArray(discovery.instances) ? discovery.instances.slice(0, 32).filter(object).map(i => ({name: clean(i.name), path: clean(i.path), enabled: i.enabled === true})) : []},
+    discovery: {status: statuses.has(String(discovery.status)) ? discovery.status : null, errorCode: code(discovery.errorCode) ?? null, instances: Array.isArray(discovery.instances) ? discovery.instances.slice(0, 32).filter(object).map(i => ({name: clean(i.name), path: clean(i.path), enabled: i.enabled === true})) : [], parseErrorPaths: Array.isArray(discovery.parseErrorPaths) ? discovery.parseErrorPaths.slice(0,32).map(clean).filter(Boolean) : []},
     runtimeVersion: clean(setup.runtimeVersion),
     runtimeChecks: Array.isArray(setup.runtimeChecks) ? setup.runtimeChecks.slice(0, 32).filter(object).map(c => ({path: clean(c.path), status: statuses.has(String(c.status)) ? c.status : null, pluginVersion: clean(c.pluginVersion), skillContentHash: typeof c.skillContentHash === 'string' && /^[a-f0-9]{64}$/.test(c.skillContentHash) ? c.skillContentHash : null, missingCapabilities: Array.isArray(c.missingCapabilities) ? c.missingCapabilities.slice(0, 32).map(clean).filter(Boolean) : [], errorCode: code(c.errorCode) ?? null})) : [],
     errorCodes: Array.isArray(setup.errorCodes) ? setup.errorCodes.slice(0, 32).map(code).filter(Boolean) : [],
@@ -73,7 +74,7 @@ function catalog(directory: string): void {
   const plugins = value.plugins;
   if (plugins.length!==1 || !['wombat'].every(name => plugins.some((plugin: unknown) => object(plugin) && plugin.name === name && object(plugin.source) && plugin.source.source === 'local' && plugin.source.path === './plugin'))) throw new Error('Invalid bundled plugin marketplace.');
 }
-export async function installBundledPlugin(marketplace: string, options: {binary?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; signal?: AbortSignal} = {}): Promise<'wombat'> {
+export async function installBundledPlugin(marketplace: string, options: {binary?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; signal?: AbortSignal} = {}): Promise<{name:'wombat';discoveryVerified:boolean;warningPaths:string[]}> {
   const directory = path.resolve(marketplace);
   catalog(directory);
   const env = options.env ?? process.env, binary = options.binary ?? env.WOMBAT_CODEX_BIN ?? 'codex';
@@ -148,7 +149,8 @@ export async function installBundledPlugin(marketplace: string, options: {binary
     const problem = verificationProblem(setup, name, requirements);
     if (problem) throw problem;
     succeeded = true;
-    return name;
+    const observed=object(setup)&&object(setup.discovery)?setup.discovery:{};
+    return {name,discoveryVerified:observed.status==='available',warningPaths:Array.isArray(observed.parseErrorPaths)?observed.parseErrorPaths.filter((p):p is string=>typeof p==='string'&&p.length<=4096&&!/[\x00-\x1f\x7f]/.test(p)).slice(0,32):[]};
   } catch (error) {
     // Raw command output can contain unrelated configuration. Retain a private,
     // bounded diagnostic summary instead, including after the installer exits.
@@ -167,5 +169,8 @@ export async function installBundledPlugin(marketplace: string, options: {binary
 if (process.argv[1] === '-' || path.basename(process.argv[1] ?? '') === 'install-plugin-bootstrap.ts') {
   const marketplace = process.argv[2];
   if (!marketplace || process.argv.length !== 3) {console.error('A bundled plugin marketplace path is required.'); process.exitCode = 2;}
-  else void installBundledPlugin(marketplace).then(name => console.log(`Installed and verified ${name} through Codex for ${process.cwd()}. Start a new Codex project conversation and ask $${name}:wombat about your usage. Hook trust is optional for log queries.`), error => {console.error(error instanceof Error ? error.message : 'Plugin installation failed. Wombat is installed.'); process.exitCode = 1;});
+  else void installBundledPlugin(marketplace).then(result => {
+    if(result.discoveryVerified)console.log(`Installed and verified ${result.name} through Codex for ${process.cwd()}. Start a new Codex project conversation and ask $${result.name}:wombat about your usage. Hook trust is optional for log queries.`);
+    else console.log(`Wombat runtime and plugin files are installed; the discovered Wombat bundle passed compatibility checks. Codex project discovery remains incomplete [SKILL_PARSE_ERROR].${result.warningPaths.length?' Check: '+result.warningPaths.join(', '):' Check Skill parsing errors in Codex.'} Fix the reported Skill errors, then run wombat system doctor --json. Do not reinstall Wombat.`);
+  }, error => {console.error(error instanceof Error ? error.message : 'Plugin installation failed. Wombat is installed.'); process.exitCode = 1;});
 }

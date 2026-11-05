@@ -23,6 +23,7 @@ export type { TimingErrorOutput } from './generated/timing-error-output.js';
 export type {Request as AgentRequest} from './generated/agent-request.js';
 export type {Description as AgentDescription} from './generated/agent-description.js';
 export {validate as validateAgentRequest} from './generated/validate-agent-request.js';
+export {requestError as requestValidationError} from './request-error.js';
 export {schema as agentRequestSchema} from './generated/schema-agent-request.js';
 export {schemas as agentResultSchemas} from './generated/schema-agent-results.js';
 export type {ErrorOutput as AgentErrorOutput} from './generated/agent-error.js';

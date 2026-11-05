@@ -75,6 +75,16 @@ test('extension review joins native metadata and pinned use without changing the
     const restored = await client.config!(request);
     assert.equal(restored.extensionReview?.enabledItems, 1);
     assert.equal(restored.items.find(i => i.path === file)?.id, item.id);
+    const globalBaseline=await client.config!({action:'explain',kind:'skill',review:true,scope:{...scope,project:undefined}});
+    const globalFile=path.join(dir,'global-baseline.json');
+    await writeFile(globalFile,JSON.stringify(globalBaseline));
+    const replayGlobal=spawnSync(process.execPath,[path.resolve('dist/wombat.js'),'check','skills','--baseline',globalFile,'--json'],{env:{...process.env,WOMBAT_CODEX_BIN:native.binary},encoding:'utf8',timeout:15000});
+    assert.ok([0,2].includes(replayGlobal.status!),replayGlobal.stderr+replayGlobal.stdout);
+    const replayedGlobal=JSON.parse(replayGlobal.stdout);
+    assert.equal(replayedGlobal.scope.project,null);
+    assert.deepEqual(replayedGlobal.explanation.baseline.projectRoots,[project]);
+    assert.equal(replayedGlobal.explanation.comparison.status,'unchanged');
+    assert.equal(replayedGlobal.explanation.baseline.counted,1);
     const after = await client.live!({ query: { action: 'usage', scope  }, mode: 'cached' });
     assert.deepEqual(after.result.summary, usage.result.summary);
     assert.equal(after.result.summary.tokens.total, 110);

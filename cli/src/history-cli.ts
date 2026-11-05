@@ -43,8 +43,9 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
   return withCancellation(async signal=>{
     const args = [...argv], action = args[0] && !args[0].startsWith('-') ? args.shift()! : 'list';
     if (!['list','search','show','read'].includes(action)) invalidInput(action);
-    const p = parseOptions(args,['--project','--since','--until','--timezone','--source','--root','--limit','--offset','--turn','--find','--cursor','--event','--event-offset','--event-source','--event-turn','--max-bytes'],['--all-time'],['--root']);
+    const p = parseOptions(args,['--project','--since','--until','--timezone','--source','--root','--limit','--offset','--turn','--find','--cursor','--event','--event-offset','--event-source','--event-turn','--max-bytes'],['--all-time','--tools'],['--root']);
     if(p.help){writeHelp('history',argv);return 0;}
+    if(p.flags.has('--tools')&&action!=='read')invalidInput('--tools');
     if (p.positionals.length !== (action === 'list' ? 0 : 1)) invalidInput(action);
     if (action !== 'read' && ['--find','--event','--event-offset','--event-source','--event-turn','--max-bytes'].some(k=>p.values.has(k))) invalidInput(action);
     if(['list','search'].includes(action)&&p.values.has('--turn'))invalidInput('--turn');
@@ -76,7 +77,7 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
       process.stdout.write(p.json?JSON.stringify(r)+'\n':terminalText(chosen.thread.title ?? chosen.thread.id)+'\n'+r.items.map(i=>i.kind==='turn'?`${i.id}\t${i.ordinal ?? '—'}\t${i.startedAt ?? '—'}\t${i.status}`:i.kind==='operation'?`${i.id}\t${terminalText(i.name)}\t${i.status}`:'').filter(Boolean).join('\n')+'\n');
       return resultExitCode(r);
     }
-    const selected = {...selection(retainedScope),threads:[chosen.thread.id],turns:p.get('--turn')?[p.get('--turn')!]:[]};
+    const selected = {...selection(retainedScope),includeToolOutput:p.flags.has('--tools'),threads:[chosen.thread.id],turns:p.get('--turn')?[p.get('--turn')!]:[]};
     let evidence:NonNullable<ConversationRequest['targets']>[number]['evidence']|undefined, matchCursor:string|null|undefined, nextLocations:ConversationRequest|null=null;
     if (p.get('--event')) {
       if (!p.get('--event-source') || !p.values.has('--event-offset')) invalidInput('--event');
@@ -96,12 +97,13 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
         process.stdout.write(`${f.message.timestamp??'—'} · ${messageOriginText(f.message.origin)}\n${terminalBlock(f.text)}\n`+f.locations.map(l=>`${terminalText(l.file)}:${l.byteStart}-${l.byteEnd}`).join('\n')+'\n');
         if(f.nextCursor){
           const args=['history','read',chosen.thread.id,...scopeArgs(retainedScope,roots),'--event',f.evidence.eventId,'--event-source',f.evidence.sourceInstanceId,'--event-offset',String(f.evidence.eventOffset),'--cursor',f.nextCursor];
+          if(p.flags.has('--tools'))args.push('--tools');
           if(p.get('--turn'))args.push('--turn',p.get('--turn')!);
           if(f.evidence.turnId)args.push('--event-turn',f.evidence.turnId);
           process.stdout.write(commandLine(args)+'\n');
         }
       }
-      if(nextLocations){const args=['history','read',chosen.thread.id,...scopeArgs(retainedScope,roots),'--cursor',nextLocations.cursor!];if(p.get('--find'))args.push('--find',p.get('--find')!);if(p.get('--turn'))args.push('--turn',p.get('--turn')!);process.stdout.write(commandLine(args)+'\n');}
+      if(nextLocations){const args=['history','read',chosen.thread.id,...scopeArgs(retainedScope,roots),'--cursor',nextLocations.cursor!];if(p.flags.has('--tools'))args.push('--tools');if(p.get('--find'))args.push('--find',p.get('--find')!);if(p.get('--turn'))args.push('--turn',p.get('--turn')!);process.stdout.write(commandLine(args)+'\n');}
     }
     return r.partial?2:0;
   });

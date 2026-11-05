@@ -20,7 +20,7 @@ pub(super) fn query(
 ) -> Result<Response> {
     let key = crate::hash(serde_json::to_vec(&(binding(request)?, request.offset))?);
     let mut cursor = if let Some(cursor) = &request.cursor {
-        let value: Cursor = serde_json::from_str(cursor).map_err(|_| error("INVALID_ARGUMENT"))?;
+        let value: Cursor = serde_json::from_str(cursor).map_err(|_| cursor_error("/cursor"))?;
         if value.binding != key {
             return Err(error("INVALID_ARGUMENT"));
         }

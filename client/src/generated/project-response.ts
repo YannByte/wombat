@@ -81,6 +81,8 @@ export type RuleMeasurement =
 export type ComparisonStatus = "not_requested" | "comparable" | "incomparable" | "unknown";
 export type RuleOutcome = "hit" | "miss" | "insufficient" | "unsupported" | "error";
 export type RelationKind = "chain" | "copy";
+export type OperationDiagnosticReason =
+  "identity_conflict" | "time_conflict" | "kind_conflict" | "target_conflict" | "outcome_conflict";
 export type MetricStatus = "observed" | "derived" | "proxy" | "unavailable";
 export type Basis =
   | "native_record"
@@ -1184,6 +1186,7 @@ export interface RuleDefinition {
   basis: string;
 }
 export interface ActivityResult {
+  operationDiagnostics?: OperationDiagnostics | null;
   formatVersion: number;
   basis: ReadView;
   scope: LocalScope;
@@ -1208,6 +1211,65 @@ export interface ActivityResult {
     | [ActivityRule, ActivityRule, ActivityRule]
     | [ActivityRule, ActivityRule, ActivityRule, ActivityRule]
     | [ActivityRule, ActivityRule, ActivityRule, ActivityRule, ActivityRule];
+}
+export interface OperationDiagnostics {
+  total: number;
+  complete: boolean;
+  /**
+   * @maxItems 8
+   */
+  records:
+    | []
+    | [OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ];
+}
+export interface OperationDiagnostic {
+  operationId: string;
+  reasons: OperationDiagnosticReason[];
+  observationCount: number;
+  /**
+   * @maxItems 4
+   */
+  eventRefs: [] | [string] | [string, string] | [string, string, string] | [string, string, string, string];
+  /**
+   * @maxItems 4
+   */
+  evidence:
+    | []
+    | [EvidenceRef]
+    | [EvidenceRef, EvidenceRef]
+    | [EvidenceRef, EvidenceRef, EvidenceRef]
+    | [EvidenceRef, EvidenceRef, EvidenceRef, EvidenceRef];
 }
 export interface ReadView {
   snapshotId: string;
@@ -1939,6 +2001,10 @@ export interface ResolvedRecord {
   title?: string | null;
 }
 export interface Selection {
+  /**
+   * Read/search selected tool results on demand; bodies are never indexed.
+   */
+  includeToolOutput?: boolean;
   since?: string | null;
   until?: string | null;
   timezone?: string | null;

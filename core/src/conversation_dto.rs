@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Selection {
+    /// Read/search selected tool results on demand; bodies are never indexed.
+    #[serde(default)]
+    pub include_tool_output: bool,
     pub since: Option<String>,
     pub until: Option<String>,
     pub timezone: Option<String>,

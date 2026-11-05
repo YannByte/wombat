@@ -98,7 +98,7 @@ export type FindingKind = "fact" | "proxy" | "user_annotation";
 export interface ShareResponse {
   uses: UseTotals;
   basisCollections: ShareCollection[];
-  outputVersion: number;
+  outputVersion: 8;
   action: SummaryAction;
   methodVersion: string;
   profile: ShareProfile;

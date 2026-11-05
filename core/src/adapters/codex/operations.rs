@@ -128,6 +128,9 @@ pub(super) fn operation(
         .or(p.response_id.as_deref())
         .map(safe_text);
     op.status = match item.status.as_deref() {
+        // Response-item status describes generation of the request, not execution.
+        // Only its separately observed result can establish a tool outcome.
+        _ if matches!(kind, "function_call" | "custom_tool_call") => "running",
         Some("failed" | "error") => "failed",
         Some("interrupted" | "cancelled") => "interrupted",
         Some("declined") => "declined",
@@ -249,6 +252,39 @@ pub(super) fn operation(
         });
     }
     runtime_review::operation(item, &op, facts, report, &evidence);
+    // Keep source positions for explicit diagnostic reads, never output bodies.
+    // Request generation has no execution output; only result observations qualify.
+    if completed
+        && matches!(
+            op.status.as_ref(),
+            "failed" | "unknown" | "interrupted" | "declined"
+        )
+        && let Some(context) = facts.event_context.as_mut()
+        && let Some(row) = context.source_row
+    {
+        let mut content = crate::conversation_source::OriginalContent::default();
+        for raw in [item.aggregated_output, item.output].into_iter().flatten() {
+            let next = timing::tool_result_content(raw, row);
+            let remaining =
+                crate::conversation_source::MAX_CHUNKS.saturating_sub(content.chunks.len());
+            let part = content
+                .chunks
+                .last()
+                .map_or(0, |chunk| chunk.part.saturating_add(1));
+            content.partial |= next.partial || next.chunks.len() > remaining;
+            content
+                .chunks
+                .extend(next.chunks.into_iter().take(remaining).map(|mut chunk| {
+                    chunk.part = chunk.part.saturating_add(part);
+                    chunk
+                }));
+        }
+        content.chunks.sort_unstable_by_key(|chunk| chunk.offset);
+        content.chunks.dedup_by_key(|chunk| chunk.offset);
+        if !content.chunks.is_empty() {
+            context.original_content = Some(content);
+        }
+    }
     facts.operation(op, report);
 }
 

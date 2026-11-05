@@ -3684,6 +3684,16 @@
     "ActivityResult": {
       "type": "object",
       "properties": {
+        "operationDiagnostics": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OperationDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "formatVersion": {
           "type": "integer",
           "minimum": 3,
@@ -3735,6 +3745,83 @@
         "coverage",
         "checks",
         "advice"
+      ]
+    },
+    "OperationDiagnostics": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OperationDiagnostic"
+          },
+          "maxItems": 8
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "complete",
+        "records"
+      ]
+    },
+    "OperationDiagnostic": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OperationDiagnosticReason"
+          }
+        },
+        "observationCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "eventRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceRef"
+          },
+          "maxItems": 4
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "reasons",
+        "observationCount",
+        "eventRefs",
+        "evidence"
+      ]
+    },
+    "OperationDiagnosticReason": {
+      "type": "string",
+      "enum": [
+        "identity_conflict",
+        "time_conflict",
+        "kind_conflict",
+        "target_conflict",
+        "outcome_conflict"
       ]
     },
     "ReadView": {
@@ -7970,6 +8057,11 @@
     "Selection": {
       "type": "object",
       "properties": {
+        "includeToolOutput": {
+          "description": "Read/search selected tool results on demand; bodies are never indexed.",
+          "type": "boolean",
+          "default": false
+        },
         "since": {
           "type": [
             "string",

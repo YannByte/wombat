@@ -424,6 +424,10 @@ export interface Request3 {
   radius?: number | null;
 }
 export interface Selection {
+  /**
+   * Read/search selected tool results on demand; bodies are never indexed.
+   */
+  includeToolOutput?: boolean;
   since?: string | null;
   until?: string | null;
   timezone?: string | null;

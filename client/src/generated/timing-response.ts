@@ -2,6 +2,8 @@
 
 export type Response =
   LocalResponse | ShareResponse | EvidenceResponse | UseObjectsResponse | UseRecordsResponse | CapabilitiesResponse;
+export type OperationDiagnosticReason =
+  "identity_conflict" | "time_conflict" | "kind_conflict" | "target_conflict" | "outcome_conflict";
 export type UseSourceCoverage = "complete" | "partial" | "unknown";
 export type MetricStatus = "observed" | "derived" | "proxy" | "unavailable";
 export type Basis =
@@ -109,8 +111,9 @@ export type UseTimeBasis = "source_operation_time" | "unknown";
 export type CapabilitiesAction = "capabilities";
 
 export interface LocalResponse {
+  operationDiagnostics?: OperationDiagnostics | null;
   uses: LocalUses;
-  outputVersion: number;
+  outputVersion: 8;
   action: SummaryAction;
   methodVersion: string;
   profile: LocalProfile;
@@ -127,6 +130,69 @@ export interface LocalResponse {
   quality: Quality;
   freshness: QueryFreshness;
   evidence: EvidenceIndex;
+}
+export interface OperationDiagnostics {
+  total: number;
+  complete: boolean;
+  /**
+   * @maxItems 8
+   */
+  records:
+    | []
+    | [OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ];
+}
+export interface OperationDiagnostic {
+  operationId: string;
+  reasons: OperationDiagnosticReason[];
+  observationCount: number;
+  /**
+   * @maxItems 4
+   */
+  eventRefs: [] | [string] | [string, string] | [string, string, string] | [string, string, string, string];
+  /**
+   * @maxItems 4
+   */
+  evidence:
+    | []
+    | [EvidenceRef]
+    | [EvidenceRef, EvidenceRef]
+    | [EvidenceRef, EvidenceRef, EvidenceRef]
+    | [EvidenceRef, EvidenceRef, EvidenceRef, EvidenceRef];
+}
+export interface EvidenceRef {
+  file: string;
+  line: number;
 }
 export interface LocalUses {
   totals: UseTotals;
@@ -881,7 +947,7 @@ export interface EvidenceCollection {
 export interface ShareResponse {
   uses: UseTotals;
   basisCollections: ShareCollection[];
-  outputVersion: number;
+  outputVersion: 8;
   action: SummaryAction;
   methodVersion: string;
   profile: ShareProfile;
@@ -916,7 +982,7 @@ export interface ShareFreshness {
 }
 export interface EvidenceResponse {
   collection: EventPageKind;
-  outputVersion: number;
+  outputVersion: 8;
   action: EvidenceAction;
   methodVersion: string;
   profile: LocalProfile;
@@ -938,7 +1004,7 @@ export interface EvidenceRow {
   gapCodes: string[];
 }
 export interface UseObjectsResponse {
-  outputVersion: number;
+  outputVersion: 8;
   action: EvidenceAction;
   collection: UseObjectPageKind;
   methodVersion: string;
@@ -954,7 +1020,7 @@ export interface UseObjectsResponse {
   nextCursor?: Cursor | null;
 }
 export interface UseRecordsResponse {
-  outputVersion: number;
+  outputVersion: 8;
   action: EvidenceAction;
   collection: UseRecordPageKind;
   methodVersion: string;
@@ -990,7 +1056,7 @@ export interface UseRecord {
   gapCodes: string[];
 }
 export interface CapabilitiesResponse {
-  outputVersion: number;
+  outputVersion: 8;
   action: CapabilitiesAction;
   methodVersion: string;
   profile: PrivacyProfile;

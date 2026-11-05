@@ -163,7 +163,11 @@ impl Operation {
                     return Ok(());
                 };
                 anyhow::ensure!(
-                    m.receiver_owner.is_none() || *source == Some(CommandSource::Agent),
+                    m.receiver_owner.is_none()
+                        || matches!(
+                            source,
+                            Some(CommandSource::Agent | CommandSource::UnifiedExecStartup)
+                        ),
                     "matching receiver requires agent execution source"
                 );
                 anyhow::ensure!(

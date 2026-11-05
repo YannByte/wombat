@@ -135,5 +135,6 @@ pub(super) fn observe(
 
 mod items;
 mod messages;
+pub(super) use messages::tool_result_content;
 
 mod scopes;

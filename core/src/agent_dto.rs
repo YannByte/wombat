@@ -70,9 +70,26 @@ pub enum Recovery {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Error {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<InputErrorDetails>,
     pub code: String,
     pub message: String,
     pub recovery: Recovery,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InputErrorDetails {
+    #[schemars(length(max = 4))]
+    pub fields: Vec<InputErrorField>,
+    pub schema_command: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InputErrorField {
+    #[schemars(length(max = 256))]
+    pub path: String,
+    #[schemars(length(max = 160))]
+    pub reason: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

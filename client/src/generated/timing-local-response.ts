@@ -1,5 +1,7 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
+export type OperationDiagnosticReason =
+  "identity_conflict" | "time_conflict" | "kind_conflict" | "target_conflict" | "outcome_conflict";
 export type UseSourceCoverage = "complete" | "partial" | "unknown";
 export type MetricStatus = "observed" | "derived" | "proxy" | "unavailable";
 export type Basis =
@@ -98,8 +100,9 @@ export type CollectionKind =
   "turn_events" | "canonical_measurements" | "canonical_operations" | "source_controls" | "native_boundary_index";
 
 export interface LocalResponse {
+  operationDiagnostics?: OperationDiagnostics | null;
   uses: LocalUses;
-  outputVersion: number;
+  outputVersion: 8;
   action: SummaryAction;
   methodVersion: string;
   profile: LocalProfile;
@@ -116,6 +119,69 @@ export interface LocalResponse {
   quality: Quality;
   freshness: QueryFreshness;
   evidence: EvidenceIndex;
+}
+export interface OperationDiagnostics {
+  total: number;
+  complete: boolean;
+  /**
+   * @maxItems 8
+   */
+  records:
+    | []
+    | [OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic, OperationDiagnostic]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ]
+    | [
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic,
+        OperationDiagnostic
+      ];
+}
+export interface OperationDiagnostic {
+  operationId: string;
+  reasons: OperationDiagnosticReason[];
+  observationCount: number;
+  /**
+   * @maxItems 4
+   */
+  eventRefs: [] | [string] | [string, string] | [string, string, string] | [string, string, string, string];
+  /**
+   * @maxItems 4
+   */
+  evidence:
+    | []
+    | [EvidenceRef]
+    | [EvidenceRef, EvidenceRef]
+    | [EvidenceRef, EvidenceRef, EvidenceRef]
+    | [EvidenceRef, EvidenceRef, EvidenceRef, EvidenceRef];
+}
+export interface EvidenceRef {
+  file: string;
+  line: number;
 }
 export interface LocalUses {
   totals: UseTotals;

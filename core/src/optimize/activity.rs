@@ -267,6 +267,7 @@ pub(crate) fn evaluate(summary: &t::LocalResponse) -> ActivityResult {
         .map(|c| c.rule)
         .collect();
     ActivityResult {
+        operation_diagnostics: summary.operation_diagnostics.clone(),
         format_version: 3,
         read_view: summary.read_view.clone(),
         scope: summary.scope.clone(),

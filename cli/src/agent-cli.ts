@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import {
   CoreError,
   validateAgentRequest,
+  requestValidationError,
   type AgentRequest,
   type AgentErrorOutput,
   type UsageClient,
@@ -62,7 +63,14 @@ export function agentErrorOutput(
           : "cli.agent.failure",
     { code },
   );
-  return { outputVersion: 1, error: { code, message, recovery } };
+  let details:NonNullable<AgentErrorOutput['error']['details']>|undefined;
+  const data=error instanceof CoreError?error.details:undefined;
+  if(code==='INVALID_ARGUMENT'&&data&&typeof data==='object'&&'fields' in data&&Array.isArray(data.fields)) {
+    const fields=data.fields.slice(0,4).flatMap((field:unknown)=>field&&typeof field==='object'&&'path' in field&&typeof field.path==='string'&&field.path.startsWith('/')&&'reason' in field&&typeof field.reason==='string'?[{path:field.path.replace(/[\x00-\x1f\x7f]/g,'').slice(0,256),reason:field.reason.replace(/[\x00-\x1f\x7f]/g,'').slice(0,160)}]:[]);
+    const schemaCommand='schemaCommand' in data&&typeof data.schemaCommand==='string'&&/^wombat system api(?: timing| conversation)? --json$/.test(data.schemaCommand)?data.schemaCommand:'wombat system api --json';
+    if(fields[0])details={fields:[fields[0]],schemaCommand};
+  }
+  return { outputVersion: 1, error: { code, message:message+(details?.fields[0]?' '+details.fields[0].path+': '+details.fields[0].reason:''), recovery,...(details?{details}:{}) } };
 }
 interface AgentHost {
   stdin?: Readable;
@@ -259,7 +267,10 @@ export async function runAgentCli(
     }
     if (!host.stdin && process.stdin.isTTY) throw invalid();
     const request = await readRequest(host.stdin ?? process.stdin, signal);
-    if (!validateAgentRequest(request)) throw invalid();
+    if (!validateAgentRequest(request)) {
+      const method=request&&typeof request==='object'&&'method' in request&&(request.method==='timing'||request.method==='conversation')?request.method:'agent';
+      throw requestValidationError(method,validateAgentRequest.errors);
+    }
     const response = await call(
       request,
       host.createClient?.() ?? createNodeClient(),

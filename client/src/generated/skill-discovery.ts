@@ -3,6 +3,10 @@
 export type DiscoveryStatus = "available" | "ambiguous" | "disabled" | "missing" | "unavailable" | "selection_changed";
 
 export interface Discovery {
+  /**
+   * @maxItems 32
+   */
+  parseErrorPaths?: string[];
   status: DiscoveryStatus;
   instances: Instance[];
   errorCode?: string | null;

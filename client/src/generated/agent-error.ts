@@ -7,7 +7,24 @@ export interface ErrorOutput {
   error: Error;
 }
 export interface Error {
+  details?: InputErrorDetails | null;
   code: string;
   message: string;
   recovery: Recovery;
+}
+export interface InputErrorDetails {
+  /**
+   * @maxItems 4
+   */
+  fields:
+    | []
+    | [InputErrorField]
+    | [InputErrorField, InputErrorField]
+    | [InputErrorField, InputErrorField, InputErrorField]
+    | [InputErrorField, InputErrorField, InputErrorField, InputErrorField];
+  schemaCommand: string;
+}
+export interface InputErrorField {
+  path: string;
+  reason: string;
 }

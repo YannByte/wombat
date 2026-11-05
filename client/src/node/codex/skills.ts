@@ -26,7 +26,8 @@ export async function discoverWombatSkill(cwd:string,query:QueryOptions={},optio
       }
       const enabled=instances.filter(s=>s.enabled);
       // A parse failure may hide a competing instance. Never silently choose through errors.
-      return {status:entries[0].errors.length?'unavailable':enabled.length>1?'ambiguous':enabled.length===1?'available':instances.length?'disabled':'missing',instances,errorCode:entries[0].errors.length?'SKILL_PARSE_ERROR':null};
+      const parseErrorPaths=entries[0].errors.slice(0,32).flatMap(e=>object(e)&&typeof e.path==='string'&&e.path.length<=4096&&!/[\x00-\x1f\x7f]/.test(e.path)?[e.path]:[]);
+      return {status:entries[0].errors.length?'unavailable':enabled.length>1?'ambiguous':enabled.length===1?'available':instances.length?'disabled':'missing',instances,errorCode:entries[0].errors.length?'SKILL_PARSE_ERROR':null,parseErrorPaths};
     }finally{rpc.close();}
   }catch(error){
     if(error instanceof CoreError&&error.code==='CANCELLED')throw error;

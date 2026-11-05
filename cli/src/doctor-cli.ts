@@ -116,6 +116,7 @@ export async function runDoctorCli(argv:string[]):Promise<number>{
       process.stdout.write(t('setup.summary',{version:result.nativeVersion??'—',skill:t(`skill.${result.discovery.status==='selection_changed'?'unavailable':result.discovery.status}`)})+'\n');
       for(const check of result.runtimeChecks??[])process.stdout.write(t('setup.runtimeCheck',{version:check.pluginVersion??'—',status:t(`setup.runtime.${check.status}`)})+'\n');
       for(const code of result.errorCodes)process.stdout.write(t('setup.errorLine',{code})+'\n');
+      for(const file of result.discovery.parseErrorPaths??[])process.stdout.write('SKILL_PARSE_ERROR\t'+file.replace(/[\x00-\x1f\x7f]/g,'')+'\n');
     }
     return local.status==='fail'?1:local.status==='warning'?2:setupExitCode(result);
   });

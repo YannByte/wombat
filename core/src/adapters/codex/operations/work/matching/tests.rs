@@ -40,6 +40,24 @@ fn exact_requests_keep_only_matching_digests_and_historical_targets() {
     assert!(!encoded.contains("PRIVATE_SECRET_ARGUMENT"));
     value.validate().unwrap();
 }
+
+#[test]
+fn compound_and_multiline_request_equality_does_not_prove_reads_or_expected_failures() {
+    for script in ["cat a; test -e b", "python3 - <<'PY'\nprint('x')\nPY"] {
+        let argv = json!(["/bin/sh", "-lc", script]);
+        let a = observe_args(argv.clone(), "/hist", &["a"]);
+        assert_eq!(
+            a.request_fingerprint,
+            observe_args(argv, "/hist", &["a"]).request_fingerprint
+        );
+        assert!(a.request_fingerprint.is_some());
+        assert!(a.read_targets.is_empty());
+        assert!(!a.expected_nonzero);
+        assert!(!serde_json::to_string(&a).unwrap().contains(script));
+    }
+    let invalid = observe_args(json!(["/bin/sh", "-c", "x\0y"]), "/hist", &[]);
+    assert!(invalid.request_fingerprint.is_none());
+}
 #[test]
 fn literal_shell_requests_verify_reads_without_storing_scripts() {
     let value = observe_args(
@@ -65,9 +83,9 @@ fn literal_shell_requests_verify_reads_without_storing_scripts() {
         "cat {a,b}",
     ] {
         let value = observe_args(json!(["/bin/sh", "-c", script]), "/historical", &["a"]);
-        assert!(value.request_fingerprint.is_none(), "{script}");
+        assert!(value.request_fingerprint.is_some(), "{script}");
         assert!(value.read_targets.is_empty());
-        assert!(value.gaps.contains(&MatchGap::UnsupportedParameters));
+        assert!(value.gaps.contains(&MatchGap::UnconfirmedRead));
     }
 }
 #[test]
@@ -84,7 +102,7 @@ fn interpreter_aliases_cannot_bypass_determinate_shell_matching() {
         "ZSH",
     ] {
         let value = observe_args(json!([name, "-c", "cat $FILE"]), "C:/hist", &["a"]);
-        assert!(value.request_fingerprint.is_none(), "{name}");
+        assert!(value.request_fingerprint.is_some(), "{name}");
         assert!(value.read_targets.is_empty(), "{name}");
     }
     for script in [
@@ -95,7 +113,7 @@ fn interpreter_aliases_cannot_bypass_determinate_shell_matching() {
         "for a in b",
     ] {
         let value = observe_args(json!(["sh", "-c", script]), "/hist", &[]);
-        assert!(value.request_fingerprint.is_none(), "{script}");
+        assert!(value.request_fingerprint.is_some(), "{script}");
     }
     let value = observe_args(json!(["BASH.EXE", "-c", "cat a"]), "C:/hist", &["a"]);
     assert!(value.request_fingerprint.is_some());
@@ -200,6 +218,25 @@ fn missing_owner_and_user_shell_never_default_to_model_receiver() {
     assert!(value.request_fingerprint.is_none());
     assert!(value.gaps.contains(&MatchGap::MissingHistoricalCwd));
 }
+
+#[test]
+fn unified_startup_retains_only_an_explicit_locally_owned_receiver() {
+    let raw = serde_json::value::to_raw_value(&json!(["cat", "a"])).unwrap();
+    for owner in [Some("thread-owner"), None] {
+        let value = observe(
+            Some(&raw),
+            owner,
+            Some(&CommandSource::UnifiedExecStartup),
+            Some("/hist"),
+            None,
+        );
+        assert_eq!(value.receiver_owner.as_deref(), owner);
+        assert_eq!(
+            value.gaps.contains(&MatchGap::MissingReceiver),
+            owner.is_none()
+        );
+    }
+}
 #[test]
 fn no_match_search_commands_carry_expected_nonzero_evidence_separately() {
     for name in ["rg", "/usr/bin/grep", "diff", "cmp", "test"] {
@@ -215,7 +252,7 @@ fn malformed_and_oversized_parameters_produce_no_prefix_digest_or_read_targets()
         json!("cat a"),
         json!({"argv":["cat","a"]}),
         json!(["cat", 17]),
-        json!(["cat", "a\n"]),
+        json!(["cat", "a\0"]),
         json!([]),
     ] {
         let value = observe_args(args, "/hist", &["a"]);

@@ -41,6 +41,7 @@ test('configuration evidence shares the ledger, pins versions and enforces host 
         ...['m1', 'failed', 'retry'].map(id => event('event_msg', { type: 'item_completed', thread_id: 't', turn_id: 'u', item: { type: 'mcpToolCall', id, server: 'docs', tool: 'search', status: id === 'failed' ? 'failed' : 'completed' } })),
         event('response_item', { type: 'function_call', call_id: 'ambiguous', name: 'mcp__docs__search', arguments: '{}' }),
         event('response_item', { type: 'function_call', call_id: 'failed-read', name: 'read_file', status: 'failed', arguments: JSON.stringify({ path: failedSkill }) }),
+        event('response_item', { type: 'function_call_output', call_id: 'failed-read', output: { is_error: true } }),
         event('event_msg', { type: 'task_complete', turn_id: 'u' }),
     ];
     await writeFile(path.join(root, 'sessions/one.jsonl'), rows.map(r => JSON.stringify(r)).join('\n') + '\n');

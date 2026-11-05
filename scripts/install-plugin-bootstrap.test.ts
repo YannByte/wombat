@@ -22,11 +22,11 @@ function fixture(t: {after: (fn: () => void) => void}, scenario = 'fresh') {
 import {writeFileSync} from 'node:fs';
 writeFileSync(process.env.TRACE+'.verify',JSON.stringify({args:process.argv.slice(2),binary:process.env.WOMBAT_CODEX_BIN}));
 const scenario=process.env.SCENARIO,name='wombat',p=process.env.INSTALLED+'/skills/wombat/SKILL.md';
-const status={'verify-missing':'missing','verify-disabled':'disabled','verify-ambiguous':'ambiguous','verify-denied':'unavailable','verify-disconnected':'unavailable','verify-parse':'unavailable'}[scenario]||'available';
-const errorCode={'verify-denied':'LOCAL_ACCESS_DENIED','verify-disconnected':'CODEX_DISCONNECTED','verify-parse':'SKILL_PARSE_ERROR'}[scenario]||null;
+const status={'verify-missing':'missing','verify-disabled':'disabled','verify-ambiguous':'ambiguous','verify-denied':'unavailable','verify-disconnected':'unavailable','verify-parse':'unavailable','verify-own-parse':'unavailable'}[scenario]||'available';
+const errorCode={'verify-denied':'LOCAL_ACCESS_DENIED','verify-disconnected':'CODEX_DISCONNECTED','verify-parse':'SKILL_PARSE_ERROR','verify-own-parse':'SKILL_PARSE_ERROR'}[scenario]||null;
 const check={path:p,status:scenario==='verify-incompatible'?'incompatible':'compatible',pluginVersion:scenario==='verify-version'?'0.1.0':'1.2.3',skillContentHash:scenario==='verify-hash'?'b'.repeat(64):'a'.repeat(64)};
 if(scenario==='verify-invalid'){console.log('{PRIVATE_NATIVE_OUTPUT');process.exit(2);}
-console.log(JSON.stringify({outputVersion:1,discovery:{status,errorCode,instances:[{name:scenario==='verify-selection'?'wombat':name+':wombat',path:p,enabled:true}]},runtimeChecks:scenario==='verify-timeout'?[]:[check],hooks:{private:'PRIVATE_HOOK_COMMAND'},errorCodes:[scenario==='verify-timeout'||scenario==='slow-hooks'?'SETUP_TIMEOUT':'HOOK_UNAVAILABLE']}));process.exit(2);`);
+console.log(JSON.stringify({outputVersion:1,discovery:{status,errorCode,parseErrorPaths:scenario==='verify-own-parse'?[p]:['/synthetic/other/SKILL.md'],instances:[{name:scenario==='verify-selection'?'wombat':name+':wombat',path:p,enabled:true}]},runtimeChecks:scenario==='verify-timeout'?[]:[check],hooks:{private:'PRIVATE_HOOK_COMMAND'},errorCodes:[scenario==='verify-timeout'||scenario==='slow-hooks'?'SETUP_TIMEOUT':'HOOK_UNAVAILABLE']}));process.exit(2);`);
   writeFileSync(binary, `import{appendFileSync}from'node:fs';const args=process.argv.slice(2),scenario=process.env.SCENARIO;appendFileSync(process.env.TRACE,JSON.stringify(args)+'\\n');
 if(scenario==='timeout')setInterval(()=>{},1000);
 else if(scenario==='failure')process.exit(9);
@@ -86,7 +86,7 @@ test('installer notices reject missing files, directories and unreviewed license
 for (const scenario of ['fresh', 'upgrade', 'slow-hooks']) test('plugin installer uses native management: ' + scenario, async t => {
   const f = fixture(t, scenario);
   const name = 'wombat';
-  assert.equal(await installBundledPlugin(f.marketplace, f), name);
+  assert.deepEqual(await installBundledPlugin(f.marketplace, f), {name,discoveryVerified:true,warningPaths:['/synthetic/other/SKILL.md']});
   const trace = calls(f.trace);
   assert.deepEqual(trace[0], ['plugin', 'list', '--marketplace', 'wombat-local', '--json']);
   assert.deepEqual(trace[1], ['plugin', 'marketplace', 'list', '--json']);
@@ -95,6 +95,11 @@ for (const scenario of ['fresh', 'upgrade', 'slow-hooks']) test('plugin installe
   assert.deepEqual(trace.at(-1), ['plugin', 'add', name + '@wombat-local', '--json']);
   assert.equal(trace.some(args => args.includes('hooks') || args.includes('trust')), false);
   assert.deepEqual(JSON.parse(readFileSync(f.trace+'.verify', 'utf8')), {args: ["system", "doctor", '--project', process.cwd(), '--json'], binary: f.binary});
+});
+test('unrelated catalog parse errors preserve installed and compatible Wombat without claiming complete discovery',async t=>{
+ const f=fixture(t,'verify-parse');
+ const result=await installBundledPlugin(f.marketplace,f);
+ assert.deepEqual(result,{name:'wombat',discoveryVerified:false,warningPaths:['/synthetic/other/SKILL.md']});
 });
 for (const [scenario, message] of [['conflict', /Multiple Wombat/], ['foreign', /not local/], ['invalid', /Unrecognized/], ['failure', /Wombat is installed/], ['large', /Wombat is installed/], ['timeout', /Wombat is installed/]] as const) test('plugin installer stops on ' + scenario, async t => {
   const f = fixture(t, scenario);
@@ -136,7 +141,7 @@ test('failed upgrade restores the previous marketplace source', async t => {
 
 for(const [scenario, expected] of [
   ['verify-missing', 'PLUGIN_NOT_DISCOVERED'], ['verify-disabled', 'PLUGIN_DISABLED'], ['verify-ambiguous', 'PLUGIN_AMBIGUOUS'],
-  ['verify-denied', 'LOCAL_ACCESS_DENIED'], ['verify-disconnected', 'CODEX_DISCONNECTED'], ['verify-parse', 'SKILL_PARSE_ERROR'],
+  ['verify-denied', 'LOCAL_ACCESS_DENIED'], ['verify-disconnected', 'CODEX_DISCONNECTED'], ['verify-own-parse', 'SKILL_PARSE_ERROR'],
   ['verify-timeout', 'SETUP_TIMEOUT'], ['verify-incompatible', 'SKILL_RUNTIME_MISMATCH'], ['verify-hash', 'PLUGIN_CONTENT_MISMATCH'],
   ['verify-version', 'PLUGIN_VERSION_MISMATCH'], ['verify-selection', 'PLUGIN_SELECTION_MISMATCH'], ['verify-invalid', 'SETUP_INVALID_RESPONSE'],
 ]) test('post-install verification retains specific diagnostics without rolling back: '+scenario,async t=>{

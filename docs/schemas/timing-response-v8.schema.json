@@ -25,13 +25,24 @@
     "LocalResponse": {
       "type": "object",
       "properties": {
+        "operationDiagnostics": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OperationDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "uses": {
           "$ref": "#/definitions/LocalUses"
         },
         "outputVersion": {
           "type": "integer",
-          "minimum": 7,
-          "maximum": 7
+          "minimum": 0,
+          "const": 8,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/SummaryAction"
@@ -105,6 +116,100 @@
         "quality",
         "freshness",
         "evidence"
+      ]
+    },
+    "OperationDiagnostics": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OperationDiagnostic"
+          },
+          "maxItems": 8
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "complete",
+        "records"
+      ]
+    },
+    "OperationDiagnostic": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OperationDiagnosticReason"
+          }
+        },
+        "observationCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "eventRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceRef"
+          },
+          "maxItems": 4
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "reasons",
+        "observationCount",
+        "eventRefs",
+        "evidence"
+      ]
+    },
+    "OperationDiagnosticReason": {
+      "type": "string",
+      "enum": [
+        "identity_conflict",
+        "time_conflict",
+        "kind_conflict",
+        "target_conflict",
+        "outcome_conflict"
+      ]
+    },
+    "EvidenceRef": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "file",
+        "line"
       ]
     },
     "LocalUses": {
@@ -2424,8 +2529,9 @@
         },
         "outputVersion": {
           "type": "integer",
-          "minimum": 7,
-          "maximum": 7
+          "minimum": 0,
+          "const": 8,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/SummaryAction"
@@ -2578,8 +2684,9 @@
         },
         "outputVersion": {
           "type": "integer",
-          "minimum": 7,
-          "maximum": 7
+          "minimum": 0,
+          "const": 8,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/EvidenceAction"
@@ -2711,8 +2818,9 @@
       "properties": {
         "outputVersion": {
           "type": "integer",
-          "minimum": 7,
-          "maximum": 7
+          "minimum": 0,
+          "const": 8,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/EvidenceAction"
@@ -2781,8 +2889,9 @@
       "properties": {
         "outputVersion": {
           "type": "integer",
-          "minimum": 7,
-          "maximum": 7
+          "minimum": 0,
+          "const": 8,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/EvidenceAction"
@@ -2980,8 +3089,9 @@
       "properties": {
         "outputVersion": {
           "type": "integer",
-          "minimum": 7,
-          "maximum": 7
+          "minimum": 0,
+          "const": 8,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/CapabilitiesAction"

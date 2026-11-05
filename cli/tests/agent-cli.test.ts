@@ -7,6 +7,16 @@ import { runAgentCli, agentErrorOutput } from '../src/agent-cli.js';
 import { describeAgentApi } from '../src/agent-description.js';
 import { local, capabilityResult } from './timing-fixtures.js';
 
+test('invalid continuation names its nested field without echoing request values',async()=>{
+ const out:string[]=[];
+ const request={method:'timing',params:{action:'evidence',threadId:'task',turnId:'turn',cursor:{token:{private:'DO_NOT_ECHO_THIS_VALUE'}}}};
+ const status=await runAgentCli('call',[],{stdin:Readable.from([JSON.stringify(request)]),stdout:text=>out.push(text),createClient:()=>{throw new Error('Must not dispatch invalid input');}});
+ assert.equal(status,1);const error=JSON.parse(out[0]).error;
+ assert.ok(error.details.fields.some((f:{path:string})=>f.path.includes('/cursor/token')));
+ assert.match(error.details.schemaCommand,/wombat system api/);
+ assert.doesNotMatch(out[0],/DO_NOT_ECHO_THIS_VALUE|Must not dispatch/);
+});
+
 const requests = [
   {method:'project',params:{projectRoot:'/synthetic',since:'2026-10-01',until:'2026-11-01',timezone:'UTC'}},
   { method: "artifacts", params: { action: "inspect", projectRoot: "/synthetic" } },

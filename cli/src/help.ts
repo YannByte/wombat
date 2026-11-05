@@ -6,7 +6,7 @@ type Topic='root'|'history'|'usage'|'check'|'clean'|'system'|'alerts';
 const helpKeys={root:'cli.usage-app-cli.help',history:'cli.history.help',usage:'cli.usage.help',check:'cli.project.help',clean:'artifacts.help',system:'cli.system.help',alerts:'cli.alerts.help'} as const;
 const examples={
   root:[['history','wombat history search "release"'],['usage','wombat usage week'],['check','wombat check'],['clean','wombat clean'],['system','wombat system doctor']],
-  history:[['history','wombat history search "release"'],['read','wombat history read RECORD --find "validation"'],['details','wombat history show RECORD']],
+  history:[['history','wombat history search "release"'],['read','wombat history read RECORD --find "validation"'],['read','wombat history read RECORD --turn TURN --tools --find "error"'],['details','wombat history show RECORD']],
   usage:[['usage','wombat usage week'],['top','wombat usage top week'],['compare','wombat usage compare'],['stats','wombat usage stats']],
   check:[['check','wombat check --project PATH'],['skills','wombat check skills --project PATH'],['task','wombat check --task RECORD --turn TURN'],['verify','wombat check verify --baseline check.json --suggestion ID']],
   clean:[['clean','wombat clean --project PATH'],['codex','wombat clean --codex'],['apply','wombat clean --codex --apply'],['verify','wombat clean verify --plan cleanup.json']],

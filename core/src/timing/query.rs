@@ -37,7 +37,7 @@ pub fn validate(request: &Request) -> Result<()> {
             ..
         } => {
             if snapshot_id.is_some() && *mode == Mode::Fresh {
-                return invalid();
+                return invalid_field("/mode", "fresh cannot be combined with a fixed snapshot");
             }
             (thread_id, turn_id, snapshot_id.as_deref(), roots, scope)
         }
@@ -53,24 +53,46 @@ pub fn validate(request: &Request) -> Result<()> {
             collection,
             object_ref,
         } => {
-            if *privacy_profile != PrivacyProfile::Local
-                || *limit == 0
-                || *limit > 200
-                || cursor
-                    .as_ref()
-                    .is_some_and(|c| c.token.len() > MAX_CURSOR_BYTES)
-                || (object_ref.is_some() && *collection != EvidenceSet::UseRecords)
-                || object_ref.as_ref().is_some_and(|id| {
-                    !id.starts_with("use:")
-                        || id.len() != 68
-                        || !id.as_bytes()[4..].iter().all(u8::is_ascii_hexdigit)
-                })
+            if *privacy_profile != PrivacyProfile::Local {
+                return invalid_field("/privacyProfile", "evidence requires local");
+            }
+            if *limit == 0 || *limit > 200 {
+                return invalid_field("/limit", "must be between 1 and 200");
+            }
+            if cursor
+                .as_ref()
+                .is_some_and(|c| c.token.len() > MAX_CURSOR_BYTES)
             {
-                return invalid();
+                return invalid_field("/cursor/token", "exceeds the 8192-byte limit");
+            }
+            if object_ref.is_some() && *collection != EvidenceSet::UseRecords {
+                return invalid_field(
+                    "/objectRef",
+                    "only use_records accepts objectRef; retain the original collection when continuing",
+                );
+            }
+            if object_ref.as_ref().is_some_and(|id| {
+                !id.starts_with("use:")
+                    || id.len() != 68
+                    || !id.as_bytes()[4..].iter().all(u8::is_ascii_hexdigit)
+            }) {
+                return invalid_field(
+                    "/objectRef",
+                    "must be use: followed by 64 hexadecimal digits",
+                );
             }
             (thread_id, turn_id, Some(snapshot_id.as_str()), roots, scope)
         }
     };
+    for (field, id) in [
+        ("/threadId", Some(thread.as_str())),
+        ("/turnId", Some(turn.as_str())),
+        ("/snapshotId", snapshot),
+    ] {
+        if id.is_some_and(|id| id.is_empty() || id.len() > MAX_LOCATOR_BYTES) {
+            return invalid_field(field, "must be a nonempty identifier of at most 4096 bytes");
+        }
+    }
     if [Some(thread.as_str()), Some(turn.as_str()), snapshot]
         .into_iter()
         .flatten()
@@ -98,6 +120,13 @@ fn invalid<T>() -> Result<T> {
     Err(operation_error(
         "INVALID_ARGUMENT",
         "Invalid timing request",
+    ))
+}
+pub(super) fn invalid_field<T>(field: &str, expected: &str) -> Result<T> {
+    Err(crate::dto::operation_error_with_details(
+        "INVALID_ARGUMENT",
+        format!("Invalid timing request at {field}: {expected}"),
+        serde_json::json!({"fields":[{"path":field,"reason":expected}],"schemaCommand":"wombat system api timing --json"}),
     ))
 }
 fn check(cancelled: &AtomicBool) -> Result<()> {
@@ -236,7 +265,7 @@ fn query_impl(
                 .is_some_and(|id| id != thread.source_instance_id)
         })
     {
-        return invalid();
+        return invalid_field("/scope", "does not match the selected thread source");
     }
     let source = snapshot
         .manifest
@@ -775,6 +804,12 @@ fn query_impl(
         time.native_ttft_ms.evidence_refs = vec!["collection:native_boundary_index".into()];
     }
     let mut local = LocalResponse {
+        operation_diagnostics: a.operation_coverage.computed.then(|| OperationDiagnostics {
+            total: a.operation_coverage.diagnostic_total,
+            complete: a.operation_coverage.diagnostic_total
+                == a.operation_coverage.diagnostics.len(),
+            records: a.operation_coverage.diagnostics.clone(),
+        }),
         uses: object_uses,
         output_version: OUTPUT_VERSION,
         action: SummaryAction::Summary,
@@ -873,6 +908,12 @@ fn query_impl(
         },
     };
     check(cancelled)?;
+    if !fits(&local)?
+        && let Some(diagnostics) = &mut local.operation_diagnostics
+    {
+        diagnostics.records.clear();
+        diagnostics.complete = false;
+    }
     if !fits(&local)? && !local.evidence.repeat_pages.entries.is_empty() {
         // Local proof navigation must not evict independent aggregate facts.
         repeats::omit(&mut local.evidence.repeat_pages, Basis::ResourceLimit);
@@ -1097,7 +1138,10 @@ fn decode_cursor(cursor: &Cursor) -> Result<EventCursor> {
         || !cursor.token.len().is_multiple_of(2)
         || !cursor.token.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
-        return invalid();
+        return invalid_field(
+            "/cursor/token",
+            "use the unmodified hexadecimal token from nextCursor.token",
+        );
     }
     let bytes = cursor
         .token
@@ -1108,7 +1152,7 @@ fn decode_cursor(cursor: &Cursor) -> Result<EventCursor> {
         .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
         .collect::<Vec<_>>();
     serde_json::from_slice(&bytes)
-        .map_err(|_| operation_error("INVALID_ARGUMENT", "Invalid timing evidence cursor"))
+        .map_err(|_| crate::dto::operation_error_with_details("INVALID_ARGUMENT", "Invalid timing request at /cursor/token: malformed cursor payload",serde_json::json!({"fields":[{"path":"/cursor/token","reason":"malformed cursor payload"}],"schemaCommand":"wombat system api timing --json"})))
 }
 fn enum_code<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_value(value)
@@ -1284,6 +1328,32 @@ fn safe_error(error: anyhow::Error) -> anyhow::Error {
         "CORE_ERROR" => "CORE_ERROR",
         _ => "SOURCE_UNREADABLE",
     };
+    if code == "INVALID_ARGUMENT"
+        && let Some(details) = error.chain().find_map(|cause| {
+            cause
+                .downcast_ref::<crate::dto::OperationError>()
+                .and_then(|cause| cause.details.clone())
+        })
+        && let Ok(details) = serde_json::from_value::<crate::agent_dto::InputErrorDetails>(details)
+        && details.fields.len() <= 4
+        && details.schema_command == "wombat system api timing --json"
+        && details.fields.iter().all(|field| {
+            field.path.starts_with('/')
+                && field.path.len() <= 256
+                && field.reason.len() <= 160
+                && !field
+                    .path
+                    .chars()
+                    .chain(field.reason.chars())
+                    .any(char::is_control)
+        })
+    {
+        return crate::dto::operation_error_with_details(
+            code,
+            output.error.message,
+            serde_json::to_value(details).expect("typed input details"),
+        );
+    }
     operation_error(code, output.error.message)
 }
 

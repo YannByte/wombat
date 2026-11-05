@@ -532,6 +532,8 @@ pub struct ActivityCheck {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivityResult {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_diagnostics: Option<crate::timing_dto::OperationDiagnostics>,
     #[schemars(range(min = 3, max = 3))]
     pub format_version: u32,
     #[serde(rename = "basis")]

@@ -87,6 +87,13 @@
     "Discovery": {
       "type": "object",
       "properties": {
+        "parseErrorPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32
+        },
         "status": {
           "$ref": "#/definitions/DiscoveryStatus"
         },

@@ -25,6 +25,10 @@ export interface Response {
   installationChecks?: InstallationCheck[];
 }
 export interface Discovery {
+  /**
+   * @maxItems 32
+   */
+  parseErrorPaths?: string[];
   status: DiscoveryStatus;
   instances: Instance[];
   errorCode?: string | null;

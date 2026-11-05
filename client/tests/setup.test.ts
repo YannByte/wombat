@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, readFile, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -26,6 +26,14 @@ let buffer='';process.stdin.on('data',chunk=>{buffer+=chunk;let end;while((end=b
   assert.equal(basic.hooks,null);
   assert.equal(basic.discovery.status,'available');
   assert.ok(!basic.errorCodes.includes('SETUP_TIMEOUT'));
+  const parseNative=path.join(root,'parse-native.cjs');
+  await writeFile(parseNative,(await readFile(native,'utf8')).replace('errors:[]','errors:[{path:"/synthetic/other/SKILL.md",message:"PRIVATE_PARSE_MESSAGE"}]'));
+  const partial=await checkSetup({project:root},{},{codexBinaryPath:parseNative,binaryPath:path.join(root,'MUST_NOT_START_CORE')});
+  assert.equal(partial.discovery.status,'unavailable');
+  assert.deepEqual(partial.discovery.parseErrorPaths,['/synthetic/other/SKILL.md']);
+  assert.equal(partial.runtimeChecks[0].status,'compatible');
+  assert.ok(partial.errorCodes.includes('SKILL_PARSE_ERROR'));
+  assert.ok(!JSON.stringify(partial).includes('PRIVATE_PARSE_MESSAGE'));
   const result = await checkSetup({project: root, includeHooks: true}, {}, {codexBinaryPath: native, binaryPath: core});
   assert.equal(result.discovery.status, 'available');
   assert.equal(result.runtimeChecks.length, 1);

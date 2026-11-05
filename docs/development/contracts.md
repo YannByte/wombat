@@ -37,11 +37,14 @@ Rust 的 `core/src/usage_app_dto.rs` 定义请求与响应，`adapters/contract.
 
 Node价表传输只下载固定官方HTTPS文档；内核`prices`操作的宿主请求在update时携带document，status不接受document。原始文档不出现在公共请求或响应类型中；Rust解析及发布，其他宿主需实现同一固定来源获取流程。
 
-## 整轮耗时契约 v7
+## 整轮耗时契约 v8
 
-`core/src/timing_dto.rs` 定义类型化 `timing` 操作。生成契约包括[请求](../schemas/timing-request-v2.schema.json)、[响应联合](../schemas/timing-response-v7.schema.json)、[本地](../schemas/timing-local-response-v7.schema.json)与[分享](../schemas/timing-share-response-v7.schema.json)投影，以及[安全错误](../schemas/timing-error-output-v1.schema.json)。客户端导出 `TimingRequest` 和 `TimingResult`；字段以 Rust DTO 和生成 Schema 为准，不在此重复维护字段清单。
+`core/src/timing_dto.rs` 定义类型化 `timing` 操作。生成契约包括[请求](../schemas/timing-request-v2.schema.json)、[响应联合](../schemas/timing-response-v8.schema.json)、[本地](../schemas/timing-local-response-v8.schema.json)与[分享](../schemas/timing-share-response-v8.schema.json)投影，以及[安全错误](../schemas/timing-error-output-v1.schema.json)。客户端导出 `TimingRequest` 和 `TimingResult`；字段以 Rust DTO 和生成 Schema 为准，不在此重复维护字段清单。
 
-请求操作为 `summary`、`evidence` 和 `capabilities`。摘要要求完整任务与轮次身份，接受显式来源根、来源范围、`auto`/`fresh`/`cached` 模式及 `local`/`share-v1` 隐私配置。证据页要求相同目标和范围；`turn_events`、`use_objects` 与 `use_records` 使用绑定来源证据和范围的不透明游标。capabilities 不扫描来源。摘要使用 `outputVersion=7` 和分析方法 `safe_event_turn_v7`；操作起止归并方法单独版本化，旧响应版本明确拒绝。本地结果可含本地身份与路径，`share-v1` 是单独的白名单投影，不包含这些信息。耗时查询不触发价表下载、配置扫描、Hook 或账户观察。命令及错误处理见 [CLI 指南](../guides/cli.md)。
+请求操作为 `summary`、`evidence` 和 `capabilities`。摘要要求完整任务与轮次身份，接受显式来源根、来源范围、`auto`/`fresh`/`cached` 模式及 `local`/`share-v1` 隐私配置。证据页要求相同目标和范围；`turn_events`、`use_objects` 与 `use_records` 使用绑定来源证据和范围的不透明游标。capabilities 不扫描来源。摘要使用 `outputVersion=8` 和分析方法 `safe_event_turn_v7`；操作起止归并方法单独版本化，旧响应版本明确拒绝。本地结果可含本地身份与路径，`share-v1` 是单独的白名单投影，不包含这些信息。耗时查询不触发价表下载、配置扫描、Hook 或账户观察。命令及错误处理见 [CLI 指南](../guides/cli.md)。
+
+
+选定轮次的本地摘要包含来自起止归并器的有界操作冲突解释：原因码、操作身份和抽样原始证据位置。这些信息不另行计数，也不直接判定重试；分享结果不包含本地诊断。参数错误提供有界字段路径和固定校验原因，不回显被拒绝的值。
 
 ## 只读配置契约 v3
 

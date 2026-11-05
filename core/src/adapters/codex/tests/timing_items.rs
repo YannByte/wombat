@@ -6,6 +6,109 @@ fn item(phase: &str, kind: &str, id: &str) -> Value {
 }
 
 #[test]
+fn diagnostic_output_keeps_only_source_locators_and_success_does_not_expand_the_text_index() {
+    let root = tempfile::tempdir().unwrap();
+    let mut failed = item("item_completed", "CommandExecution", "failed");
+    failed["payload"]["item"]["status"] = json!("failed");
+    failed["payload"]["item"]["exit_code"] = json!(1);
+    failed["payload"]["item"]["aggregated_output"] = json!("PRIVATE_SYNTHETIC_TOOL_ERROR");
+    let mut success = item("item_completed", "CommandExecution", "success");
+    success["payload"]["item"]["aggregated_output"] = json!("PRIVATE_SYNTHETIC_TOOL_OK");
+    write(
+        root.path(),
+        "sessions/tool.jsonl",
+        &[
+            meta("t"),
+            context("a", "gpt-5.4", "high"),
+            failed,
+            success,
+            json!({"type":"response_item","timestamp":"2026-10-04T01:00:01Z","payload":{"type":"function_call","status":"completed","call_id":"opaque","name":"synthetic_tool","arguments":"{}"}}),
+            json!({"type":"response_item","timestamp":"2026-10-04T01:00:02Z","payload":{"type":"function_call_output","call_id":"opaque","output":"PRIVATE_SYNTHETIC_TOOL_RESULT_WITHOUT_OUTCOME"}}),
+        ],
+    );
+    let facts = collect(root.path());
+    assert!(
+        !serde_json::to_string(&facts.events)
+            .unwrap()
+            .contains("PRIVATE_SYNTHETIC_TOOL")
+    );
+    let located = facts
+        .events
+        .iter()
+        .filter(|event| event.original_content().is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(located.len(), 2);
+    for status in ["failed", "unknown"] {
+        let event = located.iter().find(|event| matches!(event.payload(), SafePayload::Operation {value,..} if value.status.as_ref() == status)).unwrap();
+        assert!(!event.original_content().unwrap().chunks.is_empty());
+    }
+    let opaque = facts
+        .operations
+        .iter()
+        .find(|operation| operation.call_id.as_deref() == Some("opaque"))
+        .unwrap();
+    assert_eq!(opaque.status.as_ref(), "unknown");
+    assert!(opaque.text_result.is_some());
+    assert!(!opaque.outcome_conflict);
+}
+
+#[test]
+fn generated_request_completion_never_replaces_execution_dispatch_or_conflicts_with_result() {
+    use std::sync::atomic::AtomicBool;
+    for kind in ["function_call", "custom_tool_call"] {
+        let root = tempfile::tempdir().unwrap();
+        let output_kind = if kind == "function_call" {
+            "function_call_output"
+        } else {
+            "custom_tool_call_output"
+        };
+        write(
+            root.path(),
+            "sessions/request.jsonl",
+            &[
+                meta("t"),
+                context("u", "gpt-5.4", "high"),
+                json!({"type":"response_item","timestamp":"2026-10-04T01:00:00Z","payload":{"type":kind,"status":"completed","call_id":"c","name":"synthetic_tool","arguments":"{}","input":"synthetic"}}),
+                json!({"type":"response_item","timestamp":"2026-10-04T01:00:02Z","payload":{"type":output_kind,"call_id":"c","output":{"exit_code":1}}}),
+            ],
+        );
+        let facts = collect(root.path());
+        let phases = facts
+            .events
+            .iter()
+            .filter_map(|event| match event.payload() {
+                SafePayload::Operation { value, phase } => Some((value, phase)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            phases
+                .iter()
+                .any(|(op, phase)| op.status.as_ref() == "running" && **phase == Phase::Started)
+        );
+        assert!(
+            phases
+                .iter()
+                .any(|(op, phase)| op.status.as_ref() == "failed" && **phase == Phase::Failed)
+        );
+        assert_eq!(facts.operations.len(), 1);
+        assert_eq!(facts.operations[0].status.as_ref(), "failed");
+        assert!(!facts.operations[0].outcome_conflict);
+        let cancel = AtomicBool::new(false);
+        let resolution = crate::operation_association::resolve(
+            facts.events.iter().map(std::sync::Arc::as_ref),
+            &cancel,
+        )
+        .unwrap();
+        let endpoints =
+            crate::operation_association::endpoints::reduce(&resolution.phases, &cancel).unwrap();
+        assert_eq!(endpoints.groups.len(), 1);
+        assert!(!endpoints.groups[0].time_conflict);
+        assert!(endpoints.groups[0].start_ms < endpoints.groups[0].end_ms);
+    }
+}
+
+#[test]
 fn operation_events_keep_both_observations_while_the_projection_merges_one_call() {
     let root = tempfile::tempdir().unwrap();
     let mut start = item("item_started", "CommandExecution", "cmd");

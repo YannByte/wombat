@@ -173,6 +173,50 @@ fn local(response: Response) -> LocalResponse {
         _ => panic!(),
     }
 }
+
+#[test]
+fn operation_conflicts_expose_bounded_original_evidence_without_leaking_into_share() {
+    let mut events = vec![
+        boundary(0, Some(0), Phase::Started, None, None),
+        boundary(100, Some(10000), Phase::Completed, None, None),
+    ];
+    for n in 0..10 {
+        for (k, phase, status) in [
+            (0, Phase::Started, "running"),
+            (1, Phase::Completed, "completed"),
+            (2, Phase::Completed, "completed"),
+        ] {
+            let e = mcp_operation_event(
+                1 + n * 3 + k,
+                100 + n as i64 * 10 + k as i64,
+                &format!("call-{n}"),
+                "docs",
+                phase,
+                status,
+            );
+            let mut json = serde_json::to_value(e).unwrap();
+            json["payload"]["value"]["evidence"] =
+                serde_json::json!([{"file":"/synthetic/conflict.jsonl","line":1+n*3+k}]);
+            events.push(Arc::new(serde_json::from_value(json).unwrap()));
+        }
+    }
+    let snapshot = make_snapshot(events);
+    let report = local(query(&snapshot, &request(PrivacyProfile::Local)));
+    let diagnostics = report.operation_diagnostics.unwrap();
+    assert_eq!(diagnostics.total, 10);
+    assert_eq!(diagnostics.records.len(), 8);
+    assert!(!diagnostics.complete);
+    for record in diagnostics.records {
+        assert_eq!(record.reasons, [OperationDiagnosticReason::TimeConflict]);
+        assert!(!record.event_refs.is_empty());
+        assert!(!record.evidence.is_empty());
+        assert_eq!(record.observation_count, 3);
+    }
+    let share =
+        serde_json::to_string(&query(&snapshot, &request(PrivacyProfile::ShareV1))).unwrap();
+    assert!(!share.contains("operationDiagnostics"));
+    assert!(!share.contains("conflict.jsonl"));
+}
 fn error_code(error: anyhow::Error) -> String {
     error
         .downcast_ref::<crate::dto::OperationError>()
@@ -1687,7 +1731,7 @@ fn operation_residual_is_distinct_from_category_gaps_and_share_is_private() {
         boundary(5, Some(30000), Phase::Completed, Some(31000), None),
     ]);
     let l = local(query(&snapshot, &request(PrivacyProfile::Local)));
-    assert_eq!(l.output_version, 7);
+    assert_eq!(l.output_version, crate::timing_dto::OUTPUT_VERSION);
     assert_eq!(l.time.native_wall_clock_ms.value, Some(31000));
     assert_eq!(l.time.unclassified_ms.value, Some(10000));
     let c = &l.time.operation_coverage;

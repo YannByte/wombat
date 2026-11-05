@@ -23,6 +23,9 @@ pub enum DiscoveryStatus {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Discovery {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(max = 32))]
+    pub parse_error_paths: Vec<String>,
     pub status: DiscoveryStatus,
     pub instances: Vec<Instance>,
     pub error_code: Option<String>,

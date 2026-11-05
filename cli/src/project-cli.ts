@@ -77,14 +77,14 @@ export async function runProjectCli(argv:readonly string[]):Promise<number>{
       process.stdout.write(p.json?JSON.stringify(result)+'\n':formatOptimizeText(result));return result.resultStatus==='partial'?2:0;
     }
     if(p.values.has('--turn'))invalidInput('--turn');
-    const project=await projectDirectory(p.get('--project')??baseline?.scope.project??undefined,argv,signal);
+    const project=baseline&&!p.values.has('--project')?baseline.scope.project??undefined:await projectDirectory(p.get('--project'),argv,signal);
     if(target){
       if(['--agents-bytes','--description-characters'].some(k=>p.values.has(k)))invalidInput(target);
       const kind:ConfigRequest['kind']=target==='skills'?'skill':target==='rules'?'rule':target==='hooks'?'hook':'mcp';
       if(kind!=='skill'&&p.get('--sort')==='context_tokens')invalidInput('--sort');
       const sort=p.get('--sort')??'review';
       if(!['review','context_tokens','least_activity','recent','name'].includes(sort))invalidInput('--sort');
-      const request:ConfigRequest={action:explain?'explain':'list',kind,review:kind==='skill'||kind==='mcp',roots,projectRoots:[project],scope:{...baseline?.scope,...window,allTime:window.allTime??false,project,sourceInstanceId:p.get('--source')??baseline?.scope.sourceInstanceId},itemId:p.flags.has('--unassigned')?undefined:p.get('--item')??baseline?.itemId,unassigned:p.get('--item')?false:p.flags.has('--unassigned')||baseline?.unassigned,baseline,baselineRecords,limit:pageNumber(p.get('--limit'),20,1,200),offset:pageNumber(p.get('--offset'),0),sort:sort as ConfigRequest['sort']};
+      const request:ConfigRequest={action:explain?'explain':'list',kind,review:kind==='skill'||kind==='mcp',roots,projectRoots:baseline&&!p.values.has('--project')?baseline.projectRoots:project?[project]:[],scope:{...baseline?.scope,...window,allTime:baseline&&!p.values.has('--since')&&!p.values.has('--until')?baseline.scope.allTime:window.allTime??false,project,sourceInstanceId:p.get('--source')??baseline?.scope.sourceInstanceId},itemId:p.flags.has('--unassigned')?undefined:p.get('--item')??baseline?.itemId,unassigned:p.get('--item')?false:p.flags.has('--unassigned')||baseline?.unassigned,baseline,baselineRecords,limit:pageNumber(p.get('--limit'),20,1,200),offset:pageNumber(p.get('--offset'),0),sort:sort as ConfigRequest['sort']};
       const r=await client.config!(request,{signal});
       process.stdout.write(p.json?JSON.stringify(r)+'\n':formatConfigText(r,request,{explain:p.flags.has('--explain')}));
       if(!p.json&&r.explanation?.page.nextOffset!=null) {
@@ -94,6 +94,7 @@ export async function runProjectCli(argv:readonly string[]):Promise<number>{
       return configExitCode(r);
     }
     if(['--limit','--offset','--sort'].some(k=>p.values.has(k)))invalidInput('check');
+    if(!project)invalidInput('--project');
     const ruleOverrides=p.values.has('--agents-bytes')||p.values.has('--description-characters')?{agentsBytes:pageNumber(p.get('--agents-bytes'),16384,1),descriptionCharacters:pageNumber(p.get('--description-characters'),500,0,1024)}:undefined;
     const r=await client.project!({projectRoot:project,roots,since:window.since!,until:window.until!,timezone:window.timezone,sourceInstanceId:p.get('--source'),ruleOverrides},{signal});
     process.stdout.write(p.json?JSON.stringify(r)+'\n':formatProjectText(r));return r.partial?2:0;

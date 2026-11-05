@@ -498,7 +498,10 @@ impl Event {
     ) -> Result<()> {
         content.validate()?;
         ensure!(
-            matches!(self.payload(), Payload::Message { .. }),
+            matches!(
+                self.payload(),
+                Payload::Message { .. } | Payload::Operation { .. }
+            ),
             "content outside a message"
         );
         self.0.original_content = Some(Arc::new(content));
@@ -557,7 +560,10 @@ impl Event {
     fn validate_fields(value: StoredEvent) -> Result<Self> {
         if let Some(content) = &value.original_content {
             ensure!(
-                matches!(value.payload, Payload::Message { .. }),
+                matches!(
+                    value.payload,
+                    Payload::Message { .. } | Payload::Operation { .. }
+                ),
                 "content outside a message"
             );
             content.validate()?;

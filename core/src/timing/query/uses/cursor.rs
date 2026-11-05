@@ -64,7 +64,10 @@ pub(super) fn offset(
         || !bytes.len().is_multiple_of(2)
         || !bytes.iter().all(u8::is_ascii_hexdigit)
     {
-        return super::super::invalid();
+        return super::super::invalid_field(
+            "/cursor/token",
+            "use the unmodified token from nextCursor.token",
+        );
     }
     let bytes = bytes
         .as_chunks::<2>()
@@ -75,7 +78,10 @@ pub(super) fn offset(
     let decoded: Binding = serde_json::from_slice(&bytes)
         .map_err(|_| operation_error("INVALID_ARGUMENT", "Invalid use evidence cursor"))?;
     if decoded != binding(snapshot, target, collection, object, decoded.offset) {
-        return super::super::invalid();
+        return super::super::invalid_field(
+            "/cursor",
+            "does not match the original snapshot, source, thread, turn, collection or objectRef",
+        );
     }
     Ok(decoded.offset)
 }

@@ -48,6 +48,7 @@ export function formatOptimizeText(result:OptimizeResult):string {
     const activity=result.activity;
     return [t('activity.title'),...activity.advice.flatMap(rule=>{const check=activity.checks.find(check=>check.rule===rule)!;return [activityFindingTitle(check),activityAdviceText(rule),...(check.partial?[t('activity.partial')]:[])];}),
       t('activity.checks'),...activity.checks.map(check=>`${activityRuleTitle(check.rule)}: ${activityCheckText(check)}`),
+      ...(activity.operationDiagnostics?.total?[t('activity.diagnostics.summary',{count:activity.operationDiagnostics.total}),...activity.operationDiagnostics.records.flatMap(record=>[record.reasons.map(reason=>t(`activity.diagnostics.${reason}`)).join(' · '),...record.evidence.map(e=>`${e.file}:${e.line}`)])]:[]),
       t('activity.note'),`${activity.basis.snapshotId} · ${activity.scope.threadId} · ${activity.scope.turnId}`,
       activity.analysisMethod].map(terminalText).join('\n')+'\n';
   }

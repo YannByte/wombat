@@ -20,6 +20,16 @@
     "Error": {
       "type": "object",
       "properties": {
+        "details": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputErrorDetails"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "code": {
           "type": "string"
         },
@@ -34,6 +44,44 @@
         "code",
         "message",
         "recovery"
+      ]
+    },
+    "InputErrorDetails": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/InputErrorField"
+          },
+          "maxItems": 4
+        },
+        "schemaCommand": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fields",
+        "schemaCommand"
+      ]
+    },
+    "InputErrorField": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 160
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason"
       ]
     },
     "Recovery": {

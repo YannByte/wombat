@@ -148,6 +148,26 @@ impl<'de> serde::de::DeserializeSeed<'de> for SourceParts {
     }
 }
 
+/// Tool returns use either a scalar string or the same typed text parts as messages.
+/// Borrow text tokens from the original row; never decode or store their bodies.
+pub(in crate::adapters::codex) fn tool_result_content(
+    raw: &RawValue,
+    row: (usize, usize),
+) -> crate::conversation_source::OriginalContent {
+    use serde::de::DeserializeSeed;
+    if raw.get().starts_with('"') {
+        let mut content = crate::conversation_source::OriginalContent::default();
+        content.text(raw, row, 0);
+        return content;
+    }
+    SourceParts { native: false, row }
+        .deserialize(&mut serde_json::Deserializer::from_str(raw.get()))
+        .unwrap_or(crate::conversation_source::OriginalContent {
+            chunks: vec![],
+            partial: true,
+        })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn observe(
     p: &Payload<'_>,

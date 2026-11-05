@@ -1,5 +1,11 @@
 // Product copy. Keep keys stable; add complete messages with parameters.
 export const zh = {
+  "activity.diagnostics.summary": "{count} 条操作需要核对归并，原因和原始位置：",
+  "activity.diagnostics.time_conflict": "执行时间冲突",
+  "activity.diagnostics.identity_conflict": "操作身份冲突",
+  "activity.diagnostics.kind_conflict": "操作类型冲突",
+  "activity.diagnostics.target_conflict": "操作目标冲突",
+  "activity.diagnostics.outcome_conflict": "执行结果冲突",
   "cli.baseline.invalid": "请使用不超过 2 MiB 的普通 JSON 报告文件。",
   "cli.baseline.changed": "报告在打开期间发生变化，请保留原始报告后重试。",
   "cli.baseline.json": "报告不是有效的 UTF-8 JSON。请将原检查或清理结果导出为 JSON。",
@@ -67,7 +73,7 @@ export const zh = {
   "cli.human.inputTimeout": "输入超时，未提交选择。",
   "cli.alerts.help": "检查已保存的预算计划；默认持续监视，--once 只检查一次。\nwombat usage alerts [--once] [--id PLAN_ID] [--root PATH] [--interval 5..3600] [--json]\n",
   "cli.project.help": "只读诊断项目，或查看所选 AI 配置。--task 检查完整轮次，不接受日期筛选。\nwombat check [skills|mcp|rules|hooks] [--project PATH] [--json]\n  --since DATE --until DATE --timezone ZONE --root PATH --source ID\n  skills/mcp：--sort review|least_activity|recent|name --limit 1..200 --offset N\n  skills：--sort context_tokens\n  skills/mcp/rules/hooks：--explain [--item ID | --unassigned]\n  --baseline explanation.json 复算并比较原报告\n  --task RECORD [--turn TURN]\n  verify --baseline check.json [--suggestion ID]\n  --agents-bytes N --description-characters N --no-input --help\n",
-  "cli.history.help": "查找工作记录和原文；原文续读需保留视图、消息位置和游标。\nwombat history [search QUERY | show RECORD | read RECORD]\n  --project PATH --since DATE --until DATE --timezone ZONE --all-time\n  --root PATH --source ID --limit 1..200 --offset N --turn TURN\n  read：--find TEXT --max-bytes 1..65536\n  --event ID --event-source SOURCE --event-offset N --event-turn TURN --cursor CURSOR\n  --json --no-input --help\n",
+  "cli.history.help": "查找工作记录和原文；原文续读需保留原范围、消息位置和游标。\nwombat history [search QUERY | show RECORD | read RECORD]\n  --project PATH --since DATE --until DATE --timezone ZONE --all-time\n  --root PATH --source ID --limit 1..200 --offset N --turn TURN\n  read：--find TEXT --max-bytes 1..65536 --tools（包含失败或结果未定等诊断工具输出）\n  --event ID --event-source SOURCE --event-offset N --event-turn TURN --cursor CURSOR\n  --json --no-input --help\n",
   "artifacts.codexNote": "Codex apply 会在最终检查后永久删除明确选择的候选。会话、状态和凭据保持受保护；原位置不存在不证明空间已释放。",
   "artifacts.currentRelease": "当前运行版本：{value}",
   "artifacts.pendingRelease": "待更新版本：{value}",

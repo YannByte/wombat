@@ -127,6 +127,8 @@ pub struct Analysis {
 /// A zero paired count means no intervals were subtracted, never model waiting.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct OperationCoverage {
+    pub diagnostic_total: usize,
+    pub diagnostics: Vec<crate::timing_dto::OperationDiagnostic>,
     pub method_version: u32,
     pub endpoint_method_version: u32,
     /// Canonical groups with an eligible operation; paired is their usable endpoint subset.
@@ -753,7 +755,7 @@ fn analyze_impl(input: AnalyzeInput<'_>, cancelled: &AtomicBool) -> anyhow::Resu
         let mut categories = BTreeSet::new();
         let mut target_conflict = false;
         let mut is_operation = false;
-        for index in endpoint.indices {
+        for &index in &endpoint.indices {
             is_operation |= phase_operation(observations[index].kind);
             let observation = &observations[index];
             if let Some(category) = phase_category(observation.kind) {
@@ -763,6 +765,58 @@ fn analyze_impl(input: AnalyzeInput<'_>, cancelled: &AtomicBool) -> anyhow::Resu
         }
         let kind_conflict = endpoint.kind_conflict
             || (is_operation && (categories.contains(&1) || categories.contains(&2)));
+        if is_operation {
+            use crate::timing_dto::OperationDiagnosticReason as Reason;
+            let mut reasons = Vec::new();
+            if endpoint.identity_conflict {
+                reasons.push(Reason::IdentityConflict);
+            }
+            if endpoint.time_conflict {
+                reasons.push(Reason::TimeConflict);
+            }
+            if kind_conflict || categories.len() > 1 {
+                reasons.push(Reason::KindConflict);
+            }
+            if target_conflict {
+                reasons.push(Reason::TargetConflict);
+            }
+            if endpoint.terminal.state == TerminalState::Conflicting {
+                reasons.push(Reason::OutcomeConflict);
+            }
+            if !reasons.is_empty() {
+                result.operation_coverage.diagnostic_total += 1;
+                if result.operation_coverage.diagnostics.len() < 8 {
+                    let indices = endpoint
+                        .indices
+                        .iter()
+                        .take(2)
+                        .chain(endpoint.indices.iter().rev().take(2))
+                        .copied()
+                        .collect::<BTreeSet<_>>();
+                    let mut event_refs = Vec::new();
+                    let mut evidence = Vec::new();
+                    for index in indices {
+                        let e = observations[index].event;
+                        event_refs.push(format!("event:{}", e.id()));
+                        if let Payload::Operation { value, .. } = e.payload()
+                            && let Some(position) = value.evidence.first()
+                            && !evidence.contains(position)
+                        {
+                            evidence.push(position.clone());
+                        }
+                    }
+                    result.operation_coverage.diagnostics.push(
+                        crate::timing_dto::OperationDiagnostic {
+                            operation_id: endpoint.identity.clone(),
+                            reasons,
+                            observation_count: endpoint.indices.len(),
+                            event_refs,
+                            evidence,
+                        },
+                    );
+                }
+            }
+        }
         let identity = intervals::Identity {
             source: endpoint.scope.source.to_owned(),
             task: input.thread.to_owned(),

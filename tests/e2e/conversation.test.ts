@@ -4,7 +4,49 @@ import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import type { ConversationRequest, ConversationResult } from '@wombat/client';
+import {spawnSync} from 'node:child_process';
 import { withLocalProduct, row } from '../helpers/local-product.js';
+
+test('diagnostic tool text is a bounded source read and an opaque result never proves success or failure', {timeout:60000}, async()=>{
+ await withLocalProduct(async f=>{
+  const error='PRIVATE_SYNTHETIC_FAILURE '+ '中文错误 '.repeat(3000);
+  await f.write('task',[
+   row('session_meta',{id:'task',cwd:f.project},'2026-10-14T00:00:00Z'),
+   row('turn_context',{turn_id:'turn',cwd:f.project},'2026-10-14T00:00:01Z'),
+   row('response_item',{type:'message',role:'user',content:[{type:'input_text',text:'Investigate the failure'}]},'2026-10-14T00:00:02Z'),
+   row('event_msg',{type:'item_completed',turn_id:'turn',item:{type:'CommandExecution',id:'failed',command:['false'],cwd:f.project,source:'unified_exec_startup',status:'failed',exit_code:1,aggregated_output:error}},'2026-10-14T00:00:03Z'),
+   row('response_item',{type:'function_call',status:'completed',call_id:'opaque',name:'synthetic_tool',arguments:'{}'},'2026-10-14T00:00:04Z'),
+   row('response_item',{type:'function_call_output',call_id:'opaque',output:[{type:'input_text',text:'PRIVATE_SYNTHETIC_OPAQUE_RESULT'},{type:'input_image',image_url:'PRIVATE_SYNTHETIC_NOT_TEXT'},{type:'output_text',text:'second result part'}]},'2026-10-14T00:00:05Z'),
+  ]);
+  const usage=await f.client.live!({mode:'fresh',query:{action:'usage',roots:[f.root],scope:{allTime:true}}});
+  const req:ConversationRequest={action:'search',roots:[f.root],selection:{projects:[f.project]},query:'PRIVATE_SYNTHETIC_FAILURE'};
+  assert.equal((await f.client.conversation!(req)).items.length,0);
+  const selected={...req.selection,includeToolOutput:true};
+  const found=await f.client.conversation!({...req,selection:selected});
+  assert.equal(found.items.length,1);assert.ok(found.items[0].operationId);assert.ok(found.items[0].hasTextLocator);
+  const target={evidence:found.items[0].evidence,maxBytes:256};
+  const read=await f.client.conversation!({action:'read',roots:[f.root],selection:selected,targets:[target]});
+  assert.match(read.fragments[0].text,/PRIVATE_SYNTHETIC_FAILURE/);
+  assert.ok(Buffer.byteLength(read.fragments[0].text)<=256);assert.ok(read.fragments[0].nextCursor);
+  await assert.rejects(f.client.conversation!({action:'read',roots:[f.root],selection:req.selection,targets:[target]}),{code:'CONTENT_UNAVAILABLE'});
+  const thread=found.items[0].evidence.threadId!;
+  const opaque=await f.client.conversation!({...req,selection:selected,query:'PRIVATE_SYNTHETIC_OPAQUE_RESULT'});
+  assert.equal(opaque.items.length,1);assert.ok(opaque.items[0].operationId);
+  const opaqueRead=await f.client.conversation!({action:'read',roots:[f.root],selection:selected,targets:[{evidence:opaque.items[0].evidence,maxBytes:256}]});
+  assert.equal(opaqueRead.fragments[0].text,'PRIVATE_SYNTHETIC_OPAQUE_RESULT\nsecond result part');
+  assert.equal(opaqueRead.fragments[0].message.contentPartial,true);
+  assert.doesNotMatch(JSON.stringify(opaqueRead),/PRIVATE_SYNTHETIC_NOT_TEXT/);
+  assert.equal((await f.client.conversation!({...req,query:'PRIVATE_SYNTHETIC_OPAQUE_RESULT'})).items.length,0);
+  const timing=await f.client.timing!({action:'summary',roots:[f.root],threadId:thread,turnId:found.items[0].evidence.turnId!,mode:'cached'});
+  assert.equal(timing.action,'summary');if(timing.action!=='summary'||timing.profile!=='local')throw new Error('Expected local summary');
+  assert.equal(timing.work.outcomes.failed.value,1);assert.equal(timing.work.outcomes.succeeded.value,0);assert.equal(timing.work.outcomes.indeterminate.value,1);
+  const cli=spawnSync(process.execPath,[f.entry,'history','read',thread,'--root',f.root,'--tools','--find','PRIVATE_SYNTHETIC_FAILURE','--max-bytes','256','--json'],{env:process.env,encoding:'utf8',timeout:15000});
+  assert.ok([0,2].includes(cli.status!),cli.stderr+cli.stdout);
+  const text=JSON.parse(cli.stdout);assert.match(text.result.fragments[0].text,/PRIVATE_SYNTHETIC_FAILURE/);
+  const after=await f.client.live!({mode:'cached',query:{action:'usage',roots:[f.root],scope:{allTime:true}}});
+  assert.deepEqual(after.result.summary,usage.result.summary);
+ });
+});
 
 test('message reads skip control facts and hide only declared interface context without changing usage', { timeout: 120_000 }, async () => {
   await withLocalProduct(async f => {

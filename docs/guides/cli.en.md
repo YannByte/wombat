@@ -113,7 +113,7 @@ Select a record with its full ID or a title query within the current scope. One 
 
 Scripts should use full IDs. An ambiguous title returns an error and candidates instead of reading the first result. Returned continuation commands bind the selected record and original view, so later reads cannot silently select a different title match.
 
-After explicitly selecting a record without date bounds, you can inspect its complete available history beyond the discovery list's default 30-day window. Explicit dates, sources and projects always remain in force; `show` and `read` cannot silently broaden them. Source text returns in fragments with continuation instructions instead of dumping a long conversation. `--turn` selects an exact turn. Finer positions, surrounding context and cursor controls remain in the automation interface.
+After explicitly selecting a record without date bounds, you can inspect its complete available history beyond the discovery list's default 30-day window. Explicit dates, sources and projects always remain in force; `show` and `read` cannot silently broaden them. Source text returns in fragments with continuation instructions instead of dumping a long conversation. `--turn` selects an exact turn. Add `--tools` to `history read` to search and read original tool output for failed, interrupted, declined or unknown outcomes in that selection. For example: `wombat history read RECORD --turn TURN --tools --find "error"`. Ordinary chat reads remain unchanged. Results contain operation identity and source positions; continuation retains the flag and scope. Only source locators and checksums are indexed, and bodies are read on demand under the existing byte budget. Finer positions, surrounding context and cursor controls remain in the automation interface.
 
 ### Resume work or prepare a report
 
@@ -249,7 +249,7 @@ Skill catalog estimates encode reference names, descriptions and locators. On-de
 wombat check --task "发布失败"
 ```
 
-Select the target record, then inspect evidenced leads such as retries after failure, repeated reads or requests and input changes. Select a turn when prompted or use `--turn` for an exact target. CLI supplies positions and evidence. The Skill uses project code to propose a specific change and verification method.
+Select the target record, then inspect evidenced leads such as retries after failure, repeated reads or requests and input changes. Select a turn when prompted or use `--turn` for an exact target. CLI supplies positions and evidence. Conflicting operations now include bounded reason codes and sampled source positions in the selected task report. Invalid structured continuations identify the failing field and include a runnable schema-discovery command; preserve the original selection rather than guessing another cursor. The Skill uses project code to propose a specific change and verification method.
 
 Expected negative tests, required validation, reasonable retries or long waits do not automatically establish defects. Missing times, outcomes or target identities retain gaps instead of invented complete durations or causality.
 

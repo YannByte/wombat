@@ -206,9 +206,9 @@ fn fields<'a>(
                         out.invalid |= known(&mut cwd, new_cwd.as_deref());
                         out.invalid |= known(&mut source, new_source.as_ref());
                         out.invalid |= known(&mut parsed, new_parsed.as_deref());
-                        out.rejected_receiver |= new_source
-                            .as_ref()
-                            .is_some_and(|s| *s != CommandSource::Agent);
+                        out.rejected_receiver |= new_source.as_ref().is_some_and(|s| {
+                            !matches!(s, CommandSource::Agent | CommandSource::UnifiedExecStartup)
+                        });
                     }
                 }
                 let Some(matching) = &op.matching else {

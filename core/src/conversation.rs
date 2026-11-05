@@ -52,6 +52,15 @@ struct FragmentCursor {
 fn error(code: &'static str) -> anyhow::Error {
     operation_error(code, code)
 }
+fn cursor_error(path: &str) -> anyhow::Error {
+    crate::dto::operation_error_with_details(
+        "INVALID_ARGUMENT",
+        format!(
+            "Invalid conversation request at {path}: malformed cursor; retain the original selection and use the returned cursor unchanged"
+        ),
+        serde_json::json!({"fields":[{"path":path,"reason":"malformed cursor; use the returned cursor unchanged with its original selection"}],"schemaCommand":"wombat system api conversation --json"}),
+    )
+}
 fn check(cancelled: &AtomicBool) -> Result<()> {
     if cancelled.load(Ordering::Relaxed) {
         Err(error("CANCELLED"))
@@ -440,12 +449,18 @@ fn fragment(
     let content = event
         .original_content()
         .ok_or_else(|| error("CONTENT_UNAVAILABLE"))?;
+    if matches!(event.payload(), Payload::Operation { .. })
+        && !request.selection.include_tool_output
+    {
+        return Err(error("CONTENT_UNAVAILABLE"));
+    }
     if content.chunks.is_empty() {
         return Err(error("CONTENT_UNAVAILABLE"));
     }
     let key = crate::hash(serde_json::to_vec(&(&request.selection, &target.evidence))?);
     let mut state = if let Some(cursor) = &target.cursor {
-        serde_json::from_str::<FragmentCursor>(cursor).map_err(|_| error("INVALID_ARGUMENT"))?
+        serde_json::from_str::<FragmentCursor>(cursor)
+            .map_err(|_| cursor_error("/targets/cursor"))?
     } else {
         FragmentCursor {
             binding: key.clone(),
@@ -725,7 +740,7 @@ fn query_with_scan_budget(
         let mut state = request
             .cursor
             .as_ref()
-            .map(|s| serde_json::from_str::<ScanCursor>(s).map_err(|_| error("INVALID_ARGUMENT")))
+            .map(|s| serde_json::from_str::<ScanCursor>(s).map_err(|_| cursor_error("/cursor")))
             .transpose()?
             .unwrap_or(ScanCursor {
                 binding: key.clone(),
@@ -794,6 +809,7 @@ fn query_with_scan_budget(
         let excluded = |partition: &crate::usage_store::EventPartition| {
             let t = &partition.target;
             (matches!(request.action, Action::Locate | Action::Search)
+                && !request.selection.include_tool_output
                 && partition.native_boundary.message_count == 0)
                 || (!request.selection.threads.is_empty()
                     && t.thread_id
@@ -837,7 +853,8 @@ fn query_with_scan_budget(
                 state.chunk = 0;
                 continue;
             }
-            let messages_only = matches!(request.action, Action::Locate | Action::Search);
+            let messages_only = matches!(request.action, Action::Locate | Action::Search)
+                && !request.selection.include_tool_output;
             let (events, next_offset) = if messages_only {
                 let number = partition
                     .chunks
@@ -897,7 +914,10 @@ fn query_with_scan_budget(
                     event_offset: *offset,
                 });
                 let offset = state.offset;
-                let is_message = matches!(e.payload(), Payload::Message { .. });
+                let is_message = matches!(e.payload(), Payload::Message { .. })
+                    || request.selection.include_tool_output
+                        && matches!(e.payload(), Payload::Operation { .. })
+                        && e.original_content().is_some();
                 let change = old.as_ref().and_then(|old| {
                     let p = e.position();
                     match old.get(&(p.source_instance_id.as_ref(), p.file_id.as_ref())) {

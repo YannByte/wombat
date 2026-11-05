@@ -14,8 +14,9 @@
     },
     "outputVersion": {
       "type": "integer",
-      "minimum": 7,
-      "maximum": 7
+      "minimum": 0,
+      "const": 8,
+      "maximum": 4294967295
     },
     "action": {
       "$ref": "#/definitions/SummaryAction"

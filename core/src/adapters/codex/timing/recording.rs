@@ -9,8 +9,9 @@ pub(in crate::adapters::codex) struct Context {
     gaps: Vec<Gap>,
     phase: Phase,
     pub(super) history_origin: Option<crate::session_events::MessageOrigin>,
-    pub(super) source_row: Option<(usize, usize)>,
-    pub(super) original_content: Option<crate::conversation_source::OriginalContent>,
+    pub(in crate::adapters::codex) source_row: Option<(usize, usize)>,
+    pub(in crate::adapters::codex) original_content:
+        Option<crate::conversation_source::OriginalContent>,
 }
 impl Context {
     pub(in crate::adapters::codex) fn locally_owned(&self) -> bool {
@@ -148,8 +149,10 @@ pub(in crate::adapters::codex) fn record(
         collected_at,
     ) {
         Ok(mut event) => {
-            if matches!(event.payload(), SafePayload::Message { .. })
-                && let Some(content) = context.original_content.take()
+            if matches!(
+                event.payload(),
+                SafePayload::Message { .. } | SafePayload::Operation { .. }
+            ) && let Some(content) = context.original_content.take()
                 && event.set_original_content(content).is_err()
             {
                 issue(

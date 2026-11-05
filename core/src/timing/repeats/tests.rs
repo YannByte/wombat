@@ -171,6 +171,36 @@ fn alter(value: &Arc<Event>, change: impl FnOnce(&mut serde_json::Value)) -> Arc
     change(&mut serialized);
     Arc::new(serde_json::from_value(serialized).unwrap())
 }
+
+#[test]
+fn unified_startup_uses_the_same_verified_chain_as_agent_but_interaction_does_not() {
+    let mut events = call(1, "a", 2000, 5000, "failed", "same", &[]);
+    events.extend(call(3, "b", 8000, 12000, "completed", "same", &[]));
+    for (source, eligible) in [
+        ("unified_exec_startup", true),
+        ("unified_exec_interaction", false),
+        ("user_shell", false),
+    ] {
+        let changed = events
+            .iter()
+            .map(|event| {
+                alter(event, |value| {
+                    value["payload"]["value"]["work"]["data"]["source"] = json!(source);
+                    if !eligible {
+                        value["payload"]["value"]["matching"]["receiverOwner"] =
+                            serde_json::Value::Null;
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        let result = project_events(&changed);
+        assert_eq!(
+            result.coverage.eligible_commands,
+            if eligible { 2 } else { 0 }
+        );
+        assert_eq!(result.after_failure.count, Some(usize::from(eligible)));
+    }
+}
 fn matching(value: &mut serde_json::Value) -> &mut serde_json::Value {
     &mut value["payload"]["value"]["matching"]
 }

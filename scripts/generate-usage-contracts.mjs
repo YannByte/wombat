@@ -14,6 +14,7 @@ function contractVersion(name,schema) {
   const request=schema.$comment?.match(/^Wombat request protocol (\d+)$/);
   if(request)return Number(request[1]);
   const direct=schema.properties?.outputVersion;
+  if(Number.isInteger(direct?.const))return direct.const;
   if(direct?.minimum===direct?.maximum && Number.isInteger(direct?.minimum))return direct.minimum;
   if(name==='timing-response')return contractVersion(name,schema.definitions.LocalResponse);
   return 1;
@@ -61,7 +62,7 @@ for (const [op, name] of [["schema_cli_history_read","cli-history-read"],["schem
     outputs[`client/src/generated/schema-${name}.js`] = '/* Generated from Rust. Run pnpm contracts:generate. */\nexport const schema = '+JSON.stringify(schema)+';\n';
     outputs[`client/src/generated/schema-${name}.d.ts`] = 'export const schema: Readonly<Record<string, unknown>>;\n';
   }
-  outputs[`client/src/generated/validate-${name}.d.ts`] = `import type { ${rootType} } from './${name}.js';\nexport function validate(value: unknown): value is ${rootType};\n`;
+  outputs[`client/src/generated/validate-${name}.d.ts`] = `import type { ${rootType} } from './${name}.js';\nexport function validate(value: unknown): value is ${rootType};\nexport namespace validate { let errors: readonly {instancePath:string;schemaPath:string;keyword:string;params:Record<string,unknown>;message?:string}[] | null; }\n`;
   for (const [file, content] of Object.entries(outputs)) {
     if (process.argv.includes("--check")) {
       if ((await readFile(file, "utf8")) !== content)

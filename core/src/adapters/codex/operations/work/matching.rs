@@ -98,7 +98,7 @@ impl<'de> Visitor<'de> for ArgsVisitor {
                 continue;
             }
             match serde_json::from_str::<String>(raw.get()) {
-                Ok(value) if !value.chars().any(char::is_control) => result.values.push(value),
+                Ok(value) if !value.contains('\0') => result.values.push(value),
                 _ => {
                     result.invalid = true;
                     result.values.clear();
@@ -371,7 +371,10 @@ pub(super) fn observe(
         expected_nonzero: false,
         gaps: vec![],
     };
-    if source == Some(&CommandSource::Agent) {
+    if matches!(
+        source,
+        Some(CommandSource::Agent | CommandSource::UnifiedExecStartup)
+    ) {
         out.receiver_owner = receiver.filter(|v| !v.is_empty()).map(str::to_owned);
     }
     if out.receiver_owner.is_none() {
@@ -396,19 +399,23 @@ pub(super) fn observe(
         add(&mut out.gaps, MatchGap::ResourceLimit);
         return out;
     }
-    if args.invalid {
+    if args.invalid || args.values.first().is_none_or(String::is_empty) {
         add(&mut out.gaps, MatchGap::UnsupportedParameters);
         return out;
     }
-    let Some(invocation) = literal_invocation(&args.values) else {
-        add(&mut out.gaps, MatchGap::UnsupportedParameters);
-        return out;
-    };
     // Full original argv, including a literal shell request, remains part of the digest.
     // Equal digests do not establish equal binary versions, PATH, input files or effects.
     out.request_fingerprint = Some(crate::hash(
         serde_json::to_vec(&("native_command_request_v1", cwd, &args.values)).unwrap(),
     ));
+    // Equality of the recorded argv does not require interpreting a script.
+    // Only read-target and expected-exit classification require literal parsing.
+    let Some(invocation) = literal_invocation(&args.values) else {
+        if parsed.is_some_and(|p| p.iter().any(|c| matches!(c, ParsedCommand::Read { .. }))) {
+            add(&mut out.gaps, MatchGap::UnconfirmedRead);
+        }
+        return out;
+    };
     out.expected_nonzero = matches!(
         basename(&invocation[0]),
         "rg" | "grep" | "egrep" | "fgrep" | "diff" | "cmp" | "test" | "["

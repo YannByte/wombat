@@ -192,6 +192,11 @@
     "Selection": {
       "type": "object",
       "properties": {
+        "includeToolOutput": {
+          "description": "Read/search selected tool results on demand; bodies are never indexed.",
+          "type": "boolean",
+          "default": false
+        },
         "since": {
           "type": [
             "string",
@@ -788,6 +793,7 @@
         },
         "selection": {
           "default": {
+            "includeToolOutput": false,
             "since": null,
             "until": null,
             "timezone": null,

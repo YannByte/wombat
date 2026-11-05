@@ -2,8 +2,8 @@
   "version": 2,
   "sections": {
     "/install-and-update-wombat": {
-      "zh": "060b140a1187d38f8d4fd6bd37840e08387ba4fea4867a46e2f00f77fdbf18af",
-      "en": "a2dbf8433cbdfd0e5d439080cd7e91bc192b5129524277b2f442450097f2e735"
+      "zh": "29ed65144dda4e26dabcf259e2d9981bcb473e682b965f392c2b5f78c1f57f3e",
+      "en": "494e46badac1020288c8f0636df76ad2fa027ba26cecbda8c01b4c7ea6a5b5fc"
     },
     "/install-and-update-wombat/install-the-runtime-and-plugin": {
       "zh": "c10b20d4c4be411e5282cb248764e100feefbc8e36ccedecafc2cb8125231821",
@@ -14,8 +14,8 @@
       "en": "39793812ee220de033c85bbe76fbb2e71cc7e28280186f1ee15077b9a4e28358"
     },
     "/install-and-update-wombat/install-a-specific-version": {
-      "zh": "81b1846f8616b75981663c55f2e8dcfd9c9ce6459e99e3089ab0c1b8ed77e7a8",
-      "en": "c9b7373abcccf8860a74704665457154d9c76526f85553482a09925b41d4bac9"
+      "zh": "79f0c904a0969c7bdc7591d9c4c8d5ed3c32ce127e31bcc07ac783a55636a9ff",
+      "en": "f45777f190778dcdd1862e3e044a5783266fc0510ba63646a84f7e3a1c5cb55d"
     }
   }
 }

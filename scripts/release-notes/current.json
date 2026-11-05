@@ -1,18 +1,18 @@
 {
-  "summary": "Skill usage is easier to check and explain. Wombat recognizes verified native Skill reads, shows concise activity summaries, and can trace or recompute a selected count without a background service.",
+  "summary": "Investigate development problems with original execution evidence. Wombat now separates generated tool requests from execution outcomes, reads diagnostic tool returns on demand, and makes continuation and installation problems easier to resolve.",
   "highlights": [
-    "See whether a Skill was used in the selected period, with short default reports and detailed counting evidence available on demand.",
-    "Inspect included and excluded records with check skills --explain, select one item, or locate unassigned operations. Explanations include original conversation positions and actual counting contributions.",
-    "Save an explanation and pass it back with --baseline to recompute the same selection. Comparisons distinguish result changes from changed evidence, configuration or scope; paginated differences disclose their coverage.",
-    "Count verified native terminal reads of SKILL.md while keeping catalog listings, declined executions, user-shell commands and unverified shell classifications separate. Failed dispatched reads still count.",
-    "Preserve committed usage counts on cached queries and unrelated configuration metadata during category-specific discovery.",
-    "Read requested configuration categories first, so a large project instruction walk cannot exhaust discovery before known Skills are found.",
-    "Filter stored ledger groups and unrelated operation frames before decoding, reuse turn associations and borrow existing facts. Token and pricing accounting are unchanged."
+    "Read original failed, interrupted, declined or unknown tool returns with history read --tools. Scalar strings and typed text-part arrays use bounded fragments and continuation; returned bodies are not stored in the index.",
+    "Inspect operation conflicts with reason codes and sampled original positions instead of stopping at an unexplained insufficient result.",
+    "Keep generated function/custom-tool requests as dispatch observations. Execution outcomes come from result evidence, preventing false endpoint conflicts and fabricated successes.",
+    "Include explicitly locally owned unified-exec startup commands in predecessor analysis. Compare recorded argv without interpreting arbitrary shell; verified reads and expected failures retain separate checks.",
+    "Continue development investigations through the request, original error, later handling and final state before proposing a specific change and recheck.",
+    "Recompute configuration explanations using the baseline's original global or project scope unless explicitly overridden. Token and pricing accounting remain unchanged.",
+    "Receive field-specific continuation errors and a matching schema command. Installation distinguishes a compatible Wombat bundle from unrelated Codex Skill parsing warnings, avoiding repeated reinstallation."
   ],
   "knownLimitations": [
-    "Detailed explanations use bounded pages; unresolved targets remain available for investigation rather than being assigned to arbitrary Skills.",
-    "Recomputation uses current rules over normalized local facts. It does not execute recorded commands, call models, or run historical parser versions.",
-    "The configuration protocol is now v3 and use-counting method v4. Update the CLI, plugin and integrations together; previous protocol results are rejected without compatibility aliases.",
-    "Local CLI analysis does not upload conversations. Selected Skill evidence enters the current Codex conversation. Codex artifact cleanup remains limited to supported macOS layouts."
+    "A returned tool body does not by itself prove success or failure. Known outcomes remain available separately from results that need interpretation; failures and repeated calls are not automatically classified as waste.",
+    "Conflict details are bounded samples and disclose completeness. Diagnostic text excludes unsupported non-text parts and reports partial content.",
+    "Timing responses now use protocol v8; the analysis method remains safe_event_turn_v7. Update the CLI, plugin and integrations together. Previous response versions are rejected without compatibility aliases.",
+    "Cross-turn task interpretation and recommendations remain Codex work over selected evidence. Current configuration alone cannot establish historical execution conditions."
   ]
 }

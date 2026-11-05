@@ -1,4 +1,5 @@
 import type {Request as ProjectRequest} from './generated/project-request.js';
+import {requestError} from './request-error.js';
 import type {Response as ProjectResult} from './generated/project-response.js';
 export type {Request as ProjectRequest} from './generated/project-request.js';
 export type {Response as ProjectResult} from './generated/project-response.js';
@@ -259,7 +260,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
       async conversation(request: ConversationRequest, options: QueryOptions = {}): Promise<ConversationResult> {
         const [{validate: input}, {validate: output}] = await Promise.all([import('./generated/validate-conversation-request.js'), import('./generated/validate-conversation-response.js')]);
         throwIfCancelled(options);
-        if (!input(request)) throw new CoreError('INVALID_ARGUMENT', 'Invalid conversation request');
+        if (!input(request)) throw requestError('conversation',input.errors);
         const result = await transports.conversation!(request, options);
         throwIfCancelled(options);
         if (!output(result) || !matchesConversationSelection(request, result) || result.outputVersion !== 2 || result.action !== request.action || !result.snapshotId || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
@@ -274,15 +275,17 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
               import('./generated/validate-timing-response.js'),
             ]);
             throwIfCancelled(options);
-            if (
-              !input(request) ||
-              (request.action === 'evidence' &&
-                (request.privacyProfile === 'share-v1' ||
-                  (request.objectRef != null &&
-                    (request.collection !== 'use_records' ||
-                      !/^use:[0-9a-fA-F]{64}$/.test(request.objectRef)))))
-            )
-              throw new CoreError('INVALID_ARGUMENT', 'Invalid timing request');
+            if(!input(request))throw requestError('timing',input.errors);
+            if (request.action === 'evidence') {
+              const field = request.privacyProfile === 'share-v1'
+                ? {path:'/privacyProfile',reason:'evidence requires local'}
+                : request.objectRef != null && request.collection !== 'use_records'
+                  ? {path:'/collection',reason:'objectRef requires use_records'}
+                  : request.objectRef != null && !/^use:[0-9a-fA-F]{64}$/.test(request.objectRef)
+                    ? {path:'/objectRef',reason:'must be use: followed by 64 hexadecimal digits'}
+                    : null;
+              if(field)throw new CoreError('INVALID_ARGUMENT',`Invalid timing request at ${field.path}: ${field.reason}`,{fields:[field],schemaCommand:'wombat system api timing --json'});
+            }
             const result = await transports.timing!(request, options);
             throwIfCancelled(options);
             if (!output(result) || !matchesTiming(request, result))
@@ -499,7 +502,6 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
 function matchesTiming(request: TimingRequest, result: TimingResult): boolean {
   const profile = request.privacyProfile ?? 'local';
   if (
-    result.outputVersion !== 7 ||
     result.action !== request.action ||
     result.profile !== profile ||
     result.methodVersion !== 'safe_event_turn_v7'

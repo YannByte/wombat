@@ -36,7 +36,7 @@ pub enum ShareProfile {
     ShareV1,
 }
 pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
-pub const OUTPUT_VERSION: u32 = 7;
+pub const OUTPUT_VERSION: u32 = 8;
 pub const METHOD_VERSION: &str = "safe_event_turn_v7";
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -646,8 +646,10 @@ pub struct EvidenceIndex {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_diagnostics: Option<OperationDiagnostics>,
     pub uses: LocalUses,
-    #[schemars(range(min = 7, max = 7))]
+    #[schemars(extend("const" = OUTPUT_VERSION))]
     pub output_version: u32,
     pub action: SummaryAction,
     pub method_version: String,
@@ -667,12 +669,41 @@ pub struct LocalResponse {
     pub freshness: QueryFreshness,
     pub evidence: EvidenceIndex,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationDiagnosticReason {
+    IdentityConflict,
+    TimeConflict,
+    KindConflict,
+    TargetConflict,
+    OutcomeConflict,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OperationDiagnostic {
+    pub operation_id: String,
+    pub reasons: Vec<OperationDiagnosticReason>,
+    pub observation_count: usize,
+    #[schemars(length(max = 4))]
+    pub event_refs: Vec<String>,
+    #[schemars(length(max = 4))]
+    pub evidence: Vec<crate::adapters::contract::EvidenceRef>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OperationDiagnostics {
+    pub total: usize,
+    pub complete: bool,
+    #[schemars(length(max = 8))]
+    pub records: Vec<OperationDiagnostic>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ShareResponse {
     pub uses: UseTotals,
     pub basis_collections: Vec<ShareCollection>,
-    #[schemars(range(min = 7, max = 7))]
+    #[schemars(extend("const" = OUTPUT_VERSION))]
     pub output_version: u32,
     pub action: SummaryAction,
     pub method_version: String,
@@ -706,7 +737,7 @@ pub struct EvidenceRow {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EvidenceResponse {
     pub collection: EventPageKind,
-    #[schemars(range(min = 7, max = 7))]
+    #[schemars(extend("const" = OUTPUT_VERSION))]
     pub output_version: u32,
     pub action: EvidenceAction,
     pub method_version: String,
@@ -720,7 +751,7 @@ pub struct EvidenceResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CapabilitiesResponse {
-    #[schemars(range(min = 7, max = 7))]
+    #[schemars(extend("const" = OUTPUT_VERSION))]
     pub output_version: u32,
     pub action: CapabilitiesAction,
     pub method_version: String,
