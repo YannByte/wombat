@@ -19,8 +19,9 @@ test('local resource checks retain fixed evidence, expose independent outcomes a
     await writeFile(path.join(project, 'AGENTS.md'), 'Synthetic project instruction.\n');
     const body = '---\nname: resources\ndescription: Synthetic resources\n---\n[Forms](references/forms.md#fields)\n';
     await writeFile(skill, body);
-    const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
+    const saved = { WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    // Static rule truth must not depend on the user's installed native Skill catalog.
+    Object.assign(process.env, { WOMBAT_CODEX_BIN: path.join(dir, 'native-not-installed'), WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
 
     let nativeEntry: UsageClient | undefined;
@@ -49,8 +50,8 @@ test('local resource checks retain fixed evidence, expose independent outcomes a
         const fixed = await nativeApi.optimize!({ action: 'recheck',baseline:suggestion,baselineId:suggestion.baselineId }), fixedReferenceCheck = fixed.checks.find(c => c.rule === 'localReference')!;
         assert.equal(fixed.pending, 0);
         assert.equal(fixedReferenceCheck.outcome, 'miss');
-        assert.equal(fixedReferenceCheck.comparison.status, 'unknown');
-        assert.equal(fixedReferenceCheck.comparison.reason, 'problemIdentityUnavailable');
+        assert.equal(fixedReferenceCheck.comparison.status, 'comparable');
+        assert.equal(fixedReferenceCheck.comparison.reason, null);
         assert.equal((await nativeApi.optimize!({ action: 'checks', itemId: suggestion.item.id })).checks?.find(c => c.rule === 'localReference')?.outcome, 'miss', 'a new call checks the current target');
         await rm(path.join(path.dirname(skill), 'references/forms.md'));
         const again = await nativeApi.optimize!({ action: 'list' });
@@ -87,8 +88,9 @@ test('exact blocks, explicit copies, decision fingerprints and unavailable reche
     await writeFile(copy, '当前副本不同。\n');
     const manifest = JSON.stringify({ version: 1, copies: [{ id: 'user-copy', source: 'AGENTS.md', copy: 'copy/AGENTS.md', transform: 'identity-v1' }] });
     await writeFile(declaration, manifest);
-    const previous = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
+    const previous = { WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    // Static rule truth must not depend on the user's installed native Skill catalog.
+    Object.assign(process.env, { WOMBAT_CODEX_BIN: path.join(dir, 'native-not-installed'), WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
 
 
@@ -168,8 +170,9 @@ test('relation rechecks fail closed across heading changes and identical manifes
         await writeFile(path.join(project, p), body);
     await writeFile(path.join(other, 'AGENTS.md'), 'Independent synthetic instruction one.\n');
     await writeFile(path.join(other, 'child/AGENTS.md'), 'Independent synthetic instruction two.\n');
-    const previous = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
+    const previous = { WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    // Static rule truth must not depend on the user's installed native Skill catalog.
+    Object.assign(process.env, { WOMBAT_CODEX_BIN: path.join(dir, 'native-not-installed'), WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
 
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), [root], [project, other, nested]);
@@ -225,8 +228,9 @@ test('two sources share one physical configuration and one review while keeping 
         const rows = [event('session_meta', { id: 'same-upstream-id', cwd: project }), event('turn_context', { turn_id: 'same-turn-id', model: 'gpt-5.4', cwd: project }), event('event_msg', { type: 'task_started', turn_id: 'same-turn-id' }), event('event_msg', { type: 'token_usage_record', response_id: 'same-response-id', turn_id: 'same-turn-id', usage: { input_tokens: 100 * (n + 1), cached_input_tokens: 20 * (n + 1), output_tokens: 10 * (n + 1), total_tokens: 110 * (n + 1) } }), ...['read-one', 'read-two'].flatMap(call_id => [event('response_item', { type: 'function_call', call_id, name: 'read_file', arguments: JSON.stringify({ path: skill }) }), event('response_item', { type: 'function_call_output', call_id, output: 'Synthetic content' })])];
         await writeFile(path.join(root, 'sessions/log.jsonl'), rows.map(r => JSON.stringify(r)).join('\n') + '\n');
     }
-    const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: roots[0], WOMBAT_AUTO_PRICES: '0' });
+    const saved = { WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    // Static rule truth must not depend on the user's installed native Skill catalog.
+    Object.assign(process.env, { WOMBAT_CODEX_BIN: path.join(dir, 'native-not-installed'), WOMBAT_DATA_HOME: path.join(dir, 'data'), CODEX_HOME: roots[0], WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
 
     const nativeEntry = projectTestClient(createNodeClient({ binaryPath: binary, automaticPrices: false }), roots, [project]);

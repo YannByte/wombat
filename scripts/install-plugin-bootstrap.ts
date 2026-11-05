@@ -15,6 +15,7 @@ const quote = (value: string): string => "'" + value.replaceAll("'", process.pla
 function verificationProblem(setup: unknown, name: string, requirements: Record<string, unknown>): PluginStageError | undefined {
   const retry = `Run only the read-only check: wombat system doctor --project ${quote(process.cwd())} --json. Do not reinstall the runtime.`;
   const fail = (value: string, reason: string, recovery = retry) => new PluginStageError(value, reason, recovery);
+  if(object(setup)&&object(setup.error)&&code(setup.error.code))return fail(code(setup.error.code)!,'The installed CLI reported a verification error ['+code(setup.error.code)+'].');
   if (!object(setup) || setup.outputVersion !== 1 || !object(setup.discovery) || !Array.isArray(setup.discovery.instances) || !Array.isArray(setup.runtimeChecks)) return fail('SETUP_INVALID_RESPONSE', 'The verification response is invalid.');
   const discovery = setup.discovery;
   if (discovery.status !== 'available' && discovery.errorCode!=='SKILL_PARSE_ERROR') {
@@ -52,6 +53,11 @@ function verificationProblem(setup: unknown, name: string, requirements: Record<
     return fail('PLUGIN_VERSION_MISMATCH', `Expected plugin ${requirements.version}; Codex discovered ${observed}.`, 'Refresh only the plugin with --plugin-only (PowerShell: -PluginOnly); keep any custom prefix. Do not reinstall the runtime.');
   }
   if (check.skillContentHash !== requirements.skillContentHash) return fail('PLUGIN_CONTENT_MISMATCH', 'The discovered Skill content differs from the installed runtime bundle.', 'Repair only the plugin with --plugin-only (PowerShell: -PluginOnly); keep any custom prefix. Do not reinstall the runtime.');
+  const installation = verificationFacts(setup).installationChecks;
+  if(Array.isArray(installation)){
+    const failed=installation.filter(c=>object(c)&&c.status==='fail').map(c=>object(c)?c.id:'').filter(Boolean);
+    if(failed.length)return fail('INSTALLATION_CHECK_FAILED','The discovered Wombat bundle is compatible; local installation checks failed: '+failed.join(', ')+'.');
+  }
 }
 /** Keep only bounded verification facts, never native stdout, Hook commands or configuration. */
 function verificationFacts(setup: unknown): Record<string, unknown> {
@@ -62,6 +68,7 @@ function verificationFacts(setup: unknown): Record<string, unknown> {
   return {
     discovery: {status: statuses.has(String(discovery.status)) ? discovery.status : null, errorCode: code(discovery.errorCode) ?? null, instances: Array.isArray(discovery.instances) ? discovery.instances.slice(0, 32).filter(object).map(i => ({name: clean(i.name), path: clean(i.path), enabled: i.enabled === true})) : [], parseErrorPaths: Array.isArray(discovery.parseErrorPaths) ? discovery.parseErrorPaths.slice(0,32).map(clean).filter(Boolean) : []},
     runtimeVersion: clean(setup.runtimeVersion),
+    installationChecks:Array.isArray(setup.installationChecks)?setup.installationChecks.slice(0,16).filter(object).filter(c=>['installation','path','runtime','core','codex-source'].includes(String(c.id))&&['pass','warning','fail'].includes(String(c.status))).map(c=>({id:c.id,status:c.status})):[],
     runtimeChecks: Array.isArray(setup.runtimeChecks) ? setup.runtimeChecks.slice(0, 32).filter(object).map(c => ({path: clean(c.path), status: statuses.has(String(c.status)) ? c.status : null, pluginVersion: clean(c.pluginVersion), skillContentHash: typeof c.skillContentHash === 'string' && /^[a-f0-9]{64}$/.test(c.skillContentHash) ? c.skillContentHash : null, missingCapabilities: Array.isArray(c.missingCapabilities) ? c.missingCapabilities.slice(0, 32).map(clean).filter(Boolean) : [], errorCode: code(c.errorCode) ?? null})) : [],
     errorCodes: Array.isArray(setup.errorCodes) ? setup.errorCodes.slice(0, 32).map(code).filter(Boolean) : [],
   };
@@ -84,12 +91,14 @@ export async function installBundledPlugin(marketplace: string, options: {binary
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
   let stage = 'list', succeeded = false;
   let facts: Record<string, unknown> = {};
+  let verifyExit: number | null = null;
   process.once('SIGINT', abort); process.once('SIGTERM', abort);
   try {
     const run = async (nextStage: string, args: string[], executable=prefix, accepted=[0]) => {
       stage = nextStage;
       const log = path.join(temporary, stage + '.log');
       const result = await runBoundedCommand({command: [...executable, ...args], cwd: process.cwd(), env: {...env, WOMBAT_CODEX_BIN: binary}, logFile: log, timeoutMs: options.timeoutMs ?? 20000, maxBytes: 1024 * 1024, signal});
+      if(nextStage==='verify'){verifyExit=result.exitCode;facts={...facts,verificationExitCode:result.exitCode};}
       if (result.exitCode === null || !accepted.includes(result.exitCode) || result.timedOut || result.outputLimit || result.interrupted || result.closeTimedOut || result.spawnError || result.logError) {
         const reason=result.spawnError?'executable unavailable':result.timedOut?'timeout':result.outputLimit?'output limit':result.interrupted?'cancelled':result.closeTimedOut?'cleanup incomplete':result.logError?'log write failed':'exit '+result.exitCode;
         const failure = result.spawnError ? ('code' in result.spawnError ? code(result.spawnError.code) : undefined) ?? 'EXECUTABLE_UNAVAILABLE' : result.timedOut ? 'TIMEOUT' : result.outputLimit ? 'OUTPUT_LIMIT' : result.interrupted ? 'CANCELLED' : result.closeTimedOut ? 'CLEANUP_INCOMPLETE' : result.logError ? 'LOG_WRITE_FAILED' : 'COMMAND_FAILED';
@@ -143,11 +152,12 @@ export async function installBundledPlugin(marketplace: string, options: {binary
     // Installation and native discovery are separate stages. Verification never rolls
     // back a successful installation or treats unrelated Hook gaps as a query failure.
     let setup: unknown;
-    const output = await run('verify',["system", "doctor",'--project',process.cwd(),'--json'],[process.execPath,path.resolve(directory,'../wombat.js')],[0,2]);
+    const output = await run('verify',["system", "doctor",'--project',process.cwd(),'--json'],[process.execPath,path.resolve(directory,'../wombat.js')],[0,1,2]);
     try {setup = JSON.parse(output);} catch {throw new PluginStageError('SETUP_INVALID_RESPONSE', 'The verification response is not valid JSON.', 'Run wombat system doctor --json to check the installed runtime. Do not reinstall the runtime.');}
     facts = {...facts, ...verificationFacts(setup)};
     const problem = verificationProblem(setup, name, requirements);
     if (problem) throw problem;
+    if(verifyExit===1)throw new PluginStageError('VERIFY_COMMAND_FAILED','Verification exited with status 1; the returned checks do not explain the failure.','Run wombat system doctor --project '+quote(process.cwd())+' --json to inspect this state. Do not reinstall the runtime.');
     succeeded = true;
     const observed=object(setup)&&object(setup.discovery)?setup.discovery:{};
     return {name,discoveryVerified:observed.status==='available',warningPaths:Array.isArray(observed.parseErrorPaths)?observed.parseErrorPaths.filter((p):p is string=>typeof p==='string'&&p.length<=4096&&!/[\x00-\x1f\x7f]/.test(p)).slice(0,32):[]};
@@ -160,7 +170,11 @@ export async function installBundledPlugin(marketplace: string, options: {binary
     const diagnostic = {outputVersion: 1, stage, code: failure.code, project: process.cwd(), checkedAt: new Date().toISOString(), ...facts};
     let retained = false;
     try {writeFileSync(report, JSON.stringify(diagnostic, null, 2) + '\n', {mode: 0o600}); retained = true;} catch { /* The original failure remains actionable if diagnostics cannot be saved. */ }
-    throw new Error(`Wombat is installed. Plugin ${stage} failed [${failure.code}]: ${failure.message} ${failure.recovery} Installed files and data are retained.${retained ? ' Diagnostic summary: ' + report : ' Diagnostic summary could not be saved.'}`);
+    const safe=facts.runtimeChecks;
+    const compatibility=failure.code!=='INSTALLATION_CHECK_FAILED'&&Array.isArray(safe)&&safe.some(c=>object(c)&&c.status==='compatible')?' Wombat bundle compatibility passed.':'';
+    const discovery=object(facts.discovery)?facts.discovery:{};
+    const parsing=discovery.errorCode==='SKILL_PARSE_ERROR'&&Array.isArray(discovery.parseErrorPaths)&&discovery.parseErrorPaths.length?' Skill parsing paths: '+discovery.parseErrorPaths.join(', ')+'.':'';
+    throw new Error(`Wombat is installed. Plugin ${stage} failed [${failure.code}]: ${failure.message}${compatibility}${parsing} ${failure.recovery} Installed files and data are retained.${retained ? ' Diagnostic summary: ' + report : ' Diagnostic summary could not be saved.'}`);
   } finally {
     process.off('SIGINT', abort); process.off('SIGTERM', abort);
     if (succeeded) rmSync(temporary, {recursive: true, force: true});

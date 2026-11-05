@@ -15,8 +15,9 @@
     },
     "outputVersion": {
       "type": "integer",
-      "minimum": 2,
-      "maximum": 2
+      "minimum": 0,
+      "const": 3,
+      "maximum": 4294967295
     },
     "action": {
       "$ref": "#/definitions/Action"
@@ -163,6 +164,13 @@
     "Selection": {
       "type": "object",
       "properties": {
+        "operationId": {
+          "description": "One canonical operation inside an explicitly selected thread and turn.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "includeToolOutput": {
           "description": "Read/search selected tool results on demand; bodies are never indexed.",
           "type": "boolean",

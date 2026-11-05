@@ -21,7 +21,7 @@ export type ProjectLoadState = "pending" | "loading" | "ready";
 
 export interface Response {
   record?: ResolvedRecord | null;
-  outputVersion: number;
+  outputVersion: 3;
   action: Action;
   snapshotId: string;
   selection: Selection;
@@ -50,6 +50,10 @@ export interface ResolvedRecord {
   title?: string | null;
 }
 export interface Selection {
+  /**
+   * One canonical operation inside an explicitly selected thread and turn.
+   */
+  operationId?: string | null;
   /**
    * Read/search selected tool results on demand; bodies are never indexed.
    */

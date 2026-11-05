@@ -215,6 +215,7 @@ pub(super) fn decide(path: &Path, r: &Request, s: &Suggestion) -> Result<()> {
     let category = match s.category {
         Category::Repair => "repair",
         Category::Trim => "trim",
+        Category::Review => "review",
     };
     let status = if r.action == Action::Keep {
         "kept"

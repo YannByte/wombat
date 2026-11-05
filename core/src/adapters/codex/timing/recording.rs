@@ -149,6 +149,14 @@ pub(in crate::adapters::codex) fn record(
         collected_at,
     ) {
         Ok(mut event) => {
+            if context.history_origin == Some(crate::session_events::MessageOrigin::Inherited)
+                && matches!(
+                    event.payload(),
+                    SafePayload::Operation { .. } | SafePayload::Item { .. }
+                )
+            {
+                event.mark_inherited();
+            }
             if matches!(
                 event.payload(),
                 SafePayload::Message { .. } | SafePayload::Operation { .. }

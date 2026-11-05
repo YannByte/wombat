@@ -7,7 +7,7 @@ use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub const EVENT_VERSION: u32 = 5;
+pub const EVENT_VERSION: u32 = 6;
 mod review;
 pub use review::{ReviewObservation, SafetyLabel};
 pub mod title_observations;
@@ -283,6 +283,8 @@ pub enum Payload {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StoredEvent {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    inherited: bool,
     version: u32,
     id: Arc<str>,
     position: Position,
@@ -474,6 +476,7 @@ impl Event {
     ) -> Result<Self> {
         let id = position.event_id()?;
         Self::validate_fields(StoredEvent {
+            inherited: false,
             version: EVENT_VERSION,
             id: id.into(),
             position,
@@ -488,6 +491,12 @@ impl Event {
     }
     pub fn id(&self) -> &str {
         &self.0.id
+    }
+    pub fn inherited(&self) -> bool {
+        self.0.inherited
+    }
+    pub(crate) fn mark_inherited(&mut self) {
+        self.0.inherited = true;
     }
     pub fn original_content(&self) -> Option<&crate::conversation_source::OriginalContent> {
         self.0.original_content.as_deref()
@@ -558,6 +567,14 @@ impl Event {
     // Constructors compute the identity once; persisted envelopes verify it before
     // entering the same semantic validation path.
     fn validate_fields(value: StoredEvent) -> Result<Self> {
+        ensure!(
+            !value.inherited
+                || matches!(
+                    value.payload,
+                    Payload::Operation { .. } | Payload::Item { .. }
+                ),
+            "inherited execution marker outside an operation or item"
+        );
         if let Some(content) = &value.original_content {
             ensure!(
                 matches!(

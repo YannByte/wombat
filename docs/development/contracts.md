@@ -82,9 +82,11 @@ currentItems 不计明确缺失的路径，清单仍公开缺失行；显式读�
 
 ## 优化与偏好契约
 
-Rust 的 `optimize_dto.rs` 生成[请求](../schemas/optimize-request-v2.schema.json)与[响应 v5](../schemas/optimize-response-v6.schema.json)。支持 list/detail/checks/capabilities、显式 keep/not_applicable 和 recheck，以及固定轮次 activity。目录仅列十项已实现的静态规则；`partial` 来自实际范围或检查证据缺口，即使没有命中也保留缺口。
+Rust 的 `optimize_dto.rs` 生成[请求](../schemas/optimize-request-v2.schema.json)与[响应 v7](../schemas/optimize-response-v7.schema.json)。支持 list/detail/checks/capabilities、显式 keep/not_applicable 和 recheck，以及固定轮次 activity。仅命名偏差的 Skill 发现标为 `advisory`，归入 `review`，不证明运行故障；原生项目适用范围与文件的项目／全局归属分别保留。目录仅列十项已实现的静态规则；`partial` 来自实际范围或检查证据缺口，即使没有命中也保留缺口。
 
-检查与复查只读，不创建自动观察或采用历史。基线 ID 绑定传回的原始发现、来源和项目范围及规则。复查校验该范围，检查当前配置并比较独立检查。范围或规则变化时拒绝；对象缺失或规则不适用表示证据不足，不能当作修复。检查结论与比较状态分别表达。
+项目检查与复查会把目录别名解析为同一规范身份，但不会增加授权；外层项目报告回显提交的范围，内部检查使用规范身份。两条入口使用同样的新鲜宿主 Skill 发现信息，保留观测到的项目关联。本地资源的问题身份绑定来源对象和所需资源目标，不依赖可变内容哈希、错误状态或行号。
+
+检查与复查只读，不创建自动观察或采用历史。基线 ID 绑定传回的原始发现、来源和项目范围及规则。复查校验该范围，检查当前配置并比较独立检查。范围或规则变化时拒绝；对象缺失或规则不适用表示证据不足，不能当作修复。部分覆盖的轮次检查可以通过 `observedSubset` 单独说明可分析命令子集的未命中结果，不替代整个轮次的证据不足判断。检查结论与比较状态分别表达。
 
 只有显式用户决定写入独立用户存储。现行决定存储格式保持为 4，以保留有效决定与身份；只读检查不追加事件或修改文件。不迁移未知版本，不删除原数据。索引重建不能改变用户决定。历史处理展示、自动记录、采纳对比、重新显示和发送任务已移除。
 
@@ -106,3 +108,5 @@ resetCredits保留来源availableCount，不以明细数量替代；credits=null
 只交付 `wombat:wombat` 插件主 Skill。Rust 生成发现 DTO；Node 使用有界只读 app-server stdio 查询原生 Skills、Hooks 和账户，不提供任务发送或队列方法。`wombat-runtime.json` 绑定资源哈希与能力；缺失、修改或不支持分别报告。没有独立 Skill 安装契约或采集插件包。
 
 setup 版本 1 默认只检查插件发现与运行时。`includeHooks` 默认为 false；显式请求后独立查询 Hook 注册。可选探测失败不掩盖已完成的发现和兼容性结果。CLI 对应 `setup --hooks`，具体步骤见 [CLI 指南](../guides/cli.md)。
+
+对话请求／结果版本 3 增加绑定单个聊天和轮次的精确操作筛选，复用规范调用／条目别名，并保留原日期、来源和项目限制。工具请求与结果都提供有界原文定位，包括成功结果；正文不进入索引，必须显式请求工具文本。CLI 一次读取最多四个有定位的片段并保留续查；操作身份和执行成功都不证明任务已经解决。

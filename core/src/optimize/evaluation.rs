@@ -231,13 +231,18 @@ fn assess_prepared(rule: Rule, input: RuleInput<'_>) -> Result<Assessment, Evalu
         RuleInput::Format {
             status: Some("invalid"),
             issues,
-        } => Assessment::Hit(vec![finding(
-            rule,
-            "fieldFormat",
-            None,
-            None,
-            issues.to_vec(),
-        )]),
+        } => {
+            let mut f = finding(rule, "fieldFormat", None, None, issues.to_vec());
+            if !issues.is_empty()
+                && issues
+                    .iter()
+                    .all(|issue| matches!(issue.as_str(), "nameInvalid" | "nameDirectoryMismatch"))
+            {
+                f.status = "advisory".into();
+                f.basis = Some("agentSkillsSpecification".into());
+            }
+            Assessment::Hit(vec![f])
+        }
         RuleInput::Format {
             status: Some("parsed"),
             ..

@@ -388,10 +388,23 @@ fn native_command_matching_is_retained_in_safe_events_and_excludes_inherited_rec
         .find(|op| op.item_id.as_deref() == Some("read"))
         .unwrap();
     let copy = out
-        .operations
+        .events
         .iter()
-        .find(|op| op.item_id.as_deref() == Some("inherited"))
+        .find_map(|event| match event.payload() {
+            crate::session_events::Payload::Operation { value, .. }
+                if value.item_id.as_deref() == Some("inherited") =>
+            {
+                assert!(event.inherited());
+                Some(value.as_ref())
+            }
+            _ => None,
+        })
         .unwrap();
+    assert!(
+        !out.operations
+            .iter()
+            .any(|operation| operation.item_id.as_deref() == Some("inherited"))
+    );
     assert!(matching(copy).receiver_owner.is_none());
     assert!(matching(op).request_fingerprint.is_some());
     assert_eq!(

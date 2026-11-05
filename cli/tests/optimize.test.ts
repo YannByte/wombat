@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { OptimizeResult, OptimizeSuggestion } from '@wombat/client';
-import { locale, t } from '@wombat/client/locale';
+import { locale, t,reviewPresentation } from '@wombat/client/locale';
 import { formatOptimizeText } from '../src/optimize-cli.js';
 import {activityResult} from '../../tests/fixtures/activity.js';
 
@@ -30,7 +30,7 @@ function check(outcome: OptimizeSuggestion['checks'][number]['outcome'] = 'hit',
 function result(): OptimizeResult {
   const current = check();
   return {
-    outputVersion: 6, action: 'detail', capabilities: { staticChecks: true, manualEditReview: true, decisions: true, exactInstructionBlocks: true, declaredCopyDrift: true,
+    outputVersion: 7, action: 'detail', capabilities: { staticChecks: true, manualEditReview: true, decisions: true, exactInstructionBlocks: true, declaredCopyDrift: true,
       hookSupport: { effectiveRegistry: false, status: 'no_verified_adapter' } },
     configRevision: 'synthetic-config', usageRevision: null, decisionRevision: 'synthetic-decision', checkedAt: at,
     suggestions: [{ reviewFormatVersion: 1, id: 'synthetic-suggestion', item: structuredClone(item), category: 'trim',
@@ -68,3 +68,13 @@ test('check text preserves outcomes, comparison gaps, exact zero and source-text
 }));
 test('formatting changes language while preserving facts and the opaque recheck baseline',()=>{const fixture=result(),before=JSON.stringify(fixture),saved=locale.getLocale();try{locale.setLocale('en');const en=formatOptimizeText(fixture);locale.setLocale('zh');const zh=formatOptimizeText(fixture);assert.notEqual(en,zh);assert.match(en,/synthetic-suggestion/);assert.match(zh,/synthetic-suggestion/);assert.equal(JSON.stringify(fixture),before);}finally{locale.setLocale(saved);}});
 test('rechecks require an original report file; removed lifecycle actions reject',async()=>{const {parseVerificationArgs}=await import('../src/optimize-cli.js');for(const a of [['verify'],['verify','--read-view','view'],['history'],['redisplay'],['handoff']])assert.throws(()=>parseVerificationArgs(a));});
+
+
+test('real repair evidence leads ahead of naming reminders without changing either finding',()=>bilingual(()=>{
+ const fixture=result(),s=fixture.suggestions[0];s.category='repair';
+ const base={identity:{version:1,findingId:'synthetic-problem'},observed:1,evidenceCodes:[],evidence:null};
+ s.findings=[{...base,rule:'skillFormat',status:'advisory',basis:'agentSkillsSpecification',evidenceCodes:['nameInvalid']},{...base,rule:'localReference',status:'failed',basis:'authorizedMarkdownResources'}];
+ const p=reviewPresentation(s);assert.equal(p.title,t('optimize.referenceTitle',{name:s.item.name}));
+ s.findings.pop();s.category='review';assert.equal(reviewPresentation(s).title,t('optimize.formatAdvisoryTitle',{name:s.item.name}));
+ assert.ok(formatOptimizeText(fixture).includes(t('optimize.formatAdvisoryNote')));
+}));

@@ -179,10 +179,7 @@ pub(super) fn finding(input: &Input<'_>, finding: &Finding) -> FindingIdentity {
         Some("objectIdentityUnavailable")
     } else if !scope.complete {
         Some("scopeIdentityBudgetExceeded")
-    } else if matches!(
-        finding.rule.as_str(),
-        "localReference" | "exactInstructionBlocks"
-    ) {
+    } else if finding.rule == "exactInstructionBlocks" {
         Some("problemLocationContextUnavailable")
     } else {
         None
@@ -195,6 +192,40 @@ pub(super) fn finding(input: &Input<'_>, finding: &Finding) -> FindingIdentity {
         };
     }
     let key = match finding.rule.as_str() {
+        "localReference" => finding.evidence.as_ref().and_then(|evidence| {
+            if evidence.references.is_empty()
+                || !evidence.versions.iter().any(|version| {
+                    version.item_id == input.item.id && version.path == input.item.path
+                })
+            {
+                return None;
+            }
+            // The problem is the owner's resource requirement, independent of file hashes,
+            // error status, repeated occurrences and line shifts in the owning document.
+            let mut targets = evidence
+                .references
+                .iter()
+                .map(|reference| {
+                    (
+                        reference.base_directory.as_str(),
+                        reference.target.as_str(),
+                        reference.expected_type.as_deref(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            if targets
+                .iter()
+                .any(|(base, target, _)| base.is_empty() || target.is_empty())
+            {
+                return None;
+            }
+            targets.sort_unstable();
+            targets.dedup();
+            cache::key(
+                &("reference-finding-v1", &input.item.id, &scope, targets),
+                128 * 1024,
+            )
+        }),
         "declaredCopyDrift" => finding.evidence.as_ref().and_then(|e| {
             let relation = e.relation.as_ref()?;
             if [
@@ -253,9 +284,14 @@ pub(super) fn finding(input: &Input<'_>, finding: &Finding) -> FindingIdentity {
     };
     FindingIdentity {
         version: VERSION,
-        gap: key
-            .is_none()
-            .then(|| "reliableProblemIdentityUnavailable".into()),
+        gap: key.is_none().then(|| {
+            if finding.rule == "localReference" {
+                "problemLocationContextUnavailable"
+            } else {
+                "reliableProblemIdentityUnavailable"
+            }
+            .into()
+        }),
         finding_id: key,
     }
 }

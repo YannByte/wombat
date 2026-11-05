@@ -1,5 +1,6 @@
 //! Source operation identities, safe metadata and native MCP evidence.
 use super::*;
+mod content;
 mod matching;
 mod mcp;
 mod merge;
@@ -252,35 +253,12 @@ pub(super) fn operation(
         });
     }
     runtime_review::operation(item, &op, facts, report, &evidence);
-    // Keep source positions for explicit diagnostic reads, never output bodies.
-    // Request generation has no execution output; only result observations qualify.
-    if completed
-        && matches!(
-            op.status.as_ref(),
-            "failed" | "unknown" | "interrupted" | "declined"
-        )
-        && let Some(context) = facts.event_context.as_mut()
+    // Requests and successful recovery results are needed to explain a failure chain.
+    // Only verified source locators cross into the index; text remains opt-in.
+    if let Some(context) = facts.event_context.as_mut()
         && let Some(row) = context.source_row
     {
-        let mut content = crate::conversation_source::OriginalContent::default();
-        for raw in [item.aggregated_output, item.output].into_iter().flatten() {
-            let next = timing::tool_result_content(raw, row);
-            let remaining =
-                crate::conversation_source::MAX_CHUNKS.saturating_sub(content.chunks.len());
-            let part = content
-                .chunks
-                .last()
-                .map_or(0, |chunk| chunk.part.saturating_add(1));
-            content.partial |= next.partial || next.chunks.len() > remaining;
-            content
-                .chunks
-                .extend(next.chunks.into_iter().take(remaining).map(|mut chunk| {
-                    chunk.part = chunk.part.saturating_add(part);
-                    chunk
-                }));
-        }
-        content.chunks.sort_unstable_by_key(|chunk| chunk.offset);
-        content.chunks.dedup_by_key(|chunk| chunk.offset);
+        let content = content::capture(item, completed, row);
         if !content.chunks.is_empty() {
             context.original_content = Some(content);
         }

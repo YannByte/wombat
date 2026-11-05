@@ -263,7 +263,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
         if (!input(request)) throw requestError('conversation',input.errors);
         const result = await transports.conversation!(request, options);
         throwIfCancelled(options);
-        if (!output(result) || !matchesConversationSelection(request, result) || result.outputVersion !== 2 || result.action !== request.action || !result.snapshotId || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
+        if (!output(result) || !matchesConversationSelection(request, result) || result.action !== request.action || !result.snapshotId || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
         return result;
       },
     } : {}),
@@ -394,7 +394,6 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
             throwIfCancelled(options);
             if (
               !validateOptimizeResult(result) ||
-              result.outputVersion !== 6 ||
               result.action !== (request.action ?? 'list') ||
               !matchesActivity(request, result)
             )
@@ -1157,13 +1156,13 @@ function matchesStatistics(request: Request, result: Response): boolean {
 }
 
 function matchesConversationSelection(request: ConversationRequest, result: ConversationResult): boolean {
-  const defaults = { since: null, until: null, timezone: null, includeUndated: false, sources: [], projects: [], threads: [], turns: [], origins: [], phases: [], recordKinds: [] };
+  const defaults = { operationId: null, includeToolOutput: false, since: null, until: null, timezone: null, includeUndated: false, sources: [], projects: [], threads: [], turns: [], origins: [], phases: [], recordKinds: [] };
   if (!Object.entries(defaults).every(([key, fallback]) => JSON.stringify((request.selection ?? {})[key as keyof NonNullable<ConversationRequest['selection']>] ?? fallback) === JSON.stringify(result.selection[key as keyof typeof result.selection] ?? fallback))) return false;
   if (Boolean(request.anchor) !== Boolean(result.window)) return false;
   if (request.anchor && result.window && (!sameConversationEvidence(request.anchor,result.window.anchor) || result.window.radius !== (request.radius ?? 20))) return false;
   const s=request.selection ?? {}, has=(values: readonly string[] | undefined, value: string | null | undefined) => !values?.length || (value != null && values.includes(value));
-  if (!result.items.every(i=>has(s.sources,i.evidence.sourceInstanceId) && has(s.projects,i.project) && has(s.threads,i.evidence.threadId) && has(s.turns,i.evidence.turnId) && has(s.origins,i.origin) && has(s.phases,i.phase) && has(s.recordKinds,i.recordKind))) return false;
-  if (request.action === 'read' && (result.fragments.length !== request.targets?.length || !result.fragments.every((f,i)=>sameConversationEvidence(f.evidence,request.targets![i].evidence)&&sameConversationEvidence(f.message.evidence,f.evidence)))) return false;
+  if (!result.items.every(i=>(!s.operationId || i.operationId===s.operationId) && has(s.sources,i.evidence.sourceInstanceId) && has(s.projects,i.project) && has(s.threads,i.evidence.threadId) && has(s.turns,i.evidence.turnId) && has(s.origins,i.origin) && has(s.phases,i.phase) && has(s.recordKinds,i.recordKind))) return false;
+  if (request.action === 'read' && (result.fragments.length !== request.targets?.length || !result.fragments.every((f,i)=>sameConversationEvidence(f.evidence,request.targets![i].evidence)&&sameConversationEvidence(f.message.evidence,f.evidence)&&(!s.operationId || f.message.operationId===s.operationId)))) return false;
   return !result.fragments.some(f=>f.partial) || result.partial;
 }
 function sameConversationEvidence(a: NonNullable<ConversationRequest['targets']>[number]['evidence'], b: NonNullable<ConversationRequest['targets']>[number]['evidence']): boolean {

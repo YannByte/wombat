@@ -25,7 +25,9 @@ const MAX_EVENTS: usize = 2000;
 // This is cooperative: a frame or source read can exceed the time slice.
 const SCAN_MILLIS: u128 = 20;
 const MAX_CURSOR: usize = 32768;
+mod operations;
 mod records;
+use operations::OperationSelection;
 mod source;
 #[cfg(test)]
 mod tests;
@@ -79,6 +81,24 @@ fn binding(request: &Request) -> Result<String> {
     ))?))
 }
 pub(crate) fn validate(request: &Request) -> Result<()> {
+    if let Some(id) = &request.selection.operation_id
+        && (id.is_empty()
+            || id.len() > 4096
+            || request.selection.threads.len() != 1
+            || request.selection.turns.len() != 1
+            || !request.selection.include_tool_output
+            || matches!(
+                request.action,
+                Action::Records | Action::Resolve | Action::Changes
+            )
+            || request.anchor.is_some())
+    {
+        return Err(crate::dto::operation_error_with_details(
+            "INVALID_ARGUMENT",
+            "Operation reads require tool text and one exact thread and turn",
+            serde_json::json!({"fields":[{"path":"/selection/operationId","reason":"use a canonical operation ID with includeToolOutput=true and one thread and turn"}],"schemaCommand":"wombat system api conversation --json"}),
+        ));
+    }
     if request.offset.is_some() && request.action != Action::Records {
         return Err(error("INVALID_ARGUMENT"));
     }
@@ -270,13 +290,15 @@ impl Calendar {
         })
     }
     fn matches_chunk(&self, selection: &Selection, chunk: &crate::usage_store::EventChunk) -> bool {
+        self.matches_range(selection, &chunk.message_time)
+    }
+    fn matches_range(&self, selection: &Selection, time: &crate::usage_store::TimeRange) -> bool {
         if selection.since.is_none() && selection.until.is_none()
-            || chunk.message_time.undated && selection.include_undated
+            || time.undated && selection.include_undated
         {
             return true;
         }
-        let (Some(first), Some(last)) = (&chunk.message_time.first, &chunk.message_time.last)
-        else {
+        let (Some(first), Some(last)) = (&time.first, &time.last) else {
             return false;
         };
         !self.first.as_ref().is_some_and(|since| last < since)
@@ -288,7 +310,11 @@ fn selected(
     selection: &Selection,
     projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
     calendar: &Calendar,
+    operation: Option<&OperationSelection>,
 ) -> Result<bool> {
+    if operation.is_some_and(|operation| !operation.matches(event)) {
+        return Ok(false);
+    }
     let has = |values: &[String], value: Option<&str>| {
         values.is_empty() || value.is_some_and(|v| values.iter().any(|x| x == v))
     };
@@ -363,6 +389,7 @@ fn activity(
     offset: usize,
     projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
     change: Option<Change>,
+    operation: Option<&OperationSelection>,
 ) -> Activity {
     let thread = event.thread_id().and_then(|id| projects.get(id));
     let (kind, origin, phase, native_id, name, status) = match event.payload() {
@@ -381,7 +408,7 @@ fn activity(
         ),
         Payload::Operation { value, .. } => (
             "operation",
-            None,
+            event.inherited().then_some(MessageOrigin::Inherited),
             None,
             None,
             Some(value.name.to_string()),
@@ -421,7 +448,9 @@ fn activity(
         },
         name,
         operation_id: match event.payload() {
-            Payload::Operation { value, .. } => Some(value.id.to_string()),
+            Payload::Operation { value, .. } => {
+                Some(operation.map_or_else(|| value.id.to_string(), OperationSelection::id))
+            }
             _ => None,
         },
         status,
@@ -441,9 +470,10 @@ fn fragment(
     reader: &mut Reader<'_>,
     cancelled: &AtomicBool,
     calendar: &Calendar,
+    operation: Option<&OperationSelection>,
 ) -> Result<Fragment> {
     let event = event(snapshot, &target.evidence, cancelled)?;
-    if !selected(&event, &request.selection, projects, calendar)? {
+    if !selected(&event, &request.selection, projects, calendar, operation)? {
         return Err(error("NOT_FOUND"));
     }
     let content = event
@@ -545,15 +575,21 @@ fn fragment(
         for (index, event) in page.events.iter().enumerate() {
             let offset = start + index;
             if offset != target.evidence.event_offset
-                && selected(event, &request.selection, projects, calendar)?
+                && selected(event, &request.selection, projects, calendar, operation)?
             {
-                context.push(activity(event, offset, projects, None));
+                context.push(activity(event, offset, projects, None, operation));
             }
         }
     }
     Ok(Fragment {
         evidence: target.evidence.clone(),
-        message: activity(&event, target.evidence.event_offset, projects, None),
+        message: activity(
+            &event,
+            target.evidence.event_offset,
+            projects,
+            None,
+            operation,
+        ),
         text,
         next_cursor,
         locations,
@@ -616,7 +652,7 @@ fn query_with_scan_budget(
         }
         return Ok(Response {
             record,
-            output_version: 2,
+            output_version: OUTPUT_VERSION,
             action: request.action,
             snapshot_id: request.snapshot_id.clone(),
             baseline_snapshot_id: None,
@@ -657,10 +693,12 @@ fn query_with_scan_budget(
         }
         projects.insert(thread.thread.id.as_str(), thread.as_ref());
     }
+    let operation = OperationSelection::resolve(snapshot, &request.selection, &projects)?;
+    let operation = operation.as_ref();
     let mut reader = Reader::new(snapshot, request.max_scan_bytes.unwrap_or(8 * 1024 * 1024));
     let mut response = Response {
         record: None,
-        output_version: 2,
+        output_version: OUTPUT_VERSION,
         action: request.action,
         snapshot_id: request.snapshot_id.clone(),
         baseline_snapshot_id: request.baseline_snapshot_id.clone(),
@@ -692,7 +730,7 @@ fn query_with_scan_budget(
         };
         owner.phases.clear();
         owner.record_kinds.clear();
-        if !selected(&anchor_event, &owner, &projects, &calendar)? {
+        if !selected(&anchor_event, &owner, &projects, &calendar, operation)? {
             return Err(error("NOT_FOUND"));
         }
         let radius = request.radius.unwrap_or(20);
@@ -712,11 +750,11 @@ fn query_with_scan_budget(
         response.scanned_events = page.events.len();
         for (index, e) in page.events.iter().enumerate() {
             if matches!(e.payload(), Payload::Message { .. })
-                && selected(e, &request.selection, &projects, &calendar)?
+                && selected(e, &request.selection, &projects, &calendar, operation)?
             {
                 response
                     .items
-                    .push(activity(e, start + index, &projects, None));
+                    .push(activity(e, start + index, &projects, None, operation));
             }
         }
         response.window = Some(ContextWindow {
@@ -733,6 +771,7 @@ fn query_with_scan_budget(
                 &mut reader,
                 cancelled,
                 &calendar,
+                operation,
             )?);
         }
     } else {
@@ -855,6 +894,17 @@ fn query_with_scan_budget(
             }
             let messages_only = matches!(request.action, Action::Locate | Action::Search)
                 && !request.selection.include_tool_output;
+            // Every event frame already carries a complete time range. Prune dated
+            // activity/record scans too, without losing work that has no chat message.
+            let number = partition
+                .chunks
+                .partition_point(|chunk| chunk.offset + chunk.count <= state.offset);
+            let chunk = &partition.chunks[number];
+            if !calendar.matches_range(&request.selection, &chunk.inspection.time) {
+                state.offset = chunk.offset + chunk.count;
+                state.chunk = 0;
+                continue;
+            }
             let (events, next_offset) = if messages_only {
                 let number = partition
                     .chunks
@@ -929,7 +979,7 @@ fn query_with_scan_budget(
                         _ => None,
                     }
                 });
-                if selected(e, &request.selection, &projects, &calendar)?
+                if selected(e, &request.selection, &projects, &calendar, operation)?
                     && (!matches!(request.action, Action::Locate | Action::Search) || is_message)
                     && (request.action != Action::Changes || change.is_some())
                 {
@@ -946,7 +996,8 @@ fn query_with_scan_budget(
                                 cancelled,
                             ) {
                                 Ok(Some((chunk, byte))) => {
-                                    let mut item = activity(e, offset, &projects, change);
+                                    let mut item =
+                                        activity(e, offset, &projects, change, operation);
                                     let key = crate::hash(serde_json::to_vec(&(
                                         &request.selection,
                                         &item.evidence,
@@ -980,7 +1031,9 @@ fn query_with_scan_budget(
                             response.limits.push("content_unavailable".into());
                         }
                     } else {
-                        response.items.push(activity(e, offset, &projects, change));
+                        response
+                            .items
+                            .push(activity(e, offset, &projects, change, operation));
                     }
                 }
                 state.offset += 1;

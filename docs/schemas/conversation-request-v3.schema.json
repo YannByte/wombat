@@ -128,6 +128,13 @@
     "Selection": {
       "type": "object",
       "properties": {
+        "operationId": {
+          "description": "One canonical operation inside an explicitly selected thread and turn.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "includeToolOutput": {
           "description": "Read/search selected tool results on demand; bodies are never indexed.",
           "type": "boolean",
@@ -314,5 +321,5 @@
       ]
     }
   },
-  "$comment": "Wombat request protocol 2"
+  "$comment": "Wombat request protocol 3"
 }

@@ -1,5 +1,9 @@
 import type { zh } from './zh.js';
 export const en = {
+  "activity.subset": "Within the {count} eligible recorded commands, no match for this rule was observed. Excluded records do not establish absence across the whole turn.",
+  "optimize.formatAdvisoryTitle": "Review naming conventions for {name}",
+  "optimize.formatAdvisoryNote": "This is a specification reminder, not evidence of a runtime failure. Check the provider's conventions; do not patch a managed plugin cache.",
+  "optimize.sharedOwner": "Shared or global file: applicability to this project does not imply project ownership. Confirm the owner and effects on other projects before editing.",
   "activity.diagnostics.summary": "{count} operations need association checks; reasons and source positions:",
   "activity.diagnostics.time_conflict": "Conflicting execution times",
   "activity.diagnostics.identity_conflict": "Conflicting operation identities",
@@ -73,7 +77,7 @@ export const en = {
   "cli.human.inputTimeout": "Input timed out; no choice was submitted.",
   "cli.alerts.help": "wombat usage alerts [--once] [--id PLAN_ID] [--root PATH] [--interval 5..3600] [--json]\n",
   "cli.project.help": "wombat check [skills|mcp|rules|hooks] [--project PATH] [--json]\n  --since DATE --until DATE --timezone ZONE --root PATH --source ID\n  skills/mcp: --sort review|least_activity|recent|name --limit 1..200 --offset N\n  skills: --sort context_tokens\n  skills/mcp/rules/hooks: --explain [--item ID | --unassigned]\n  --baseline explanation.json recomputes and compares the original report\n  --task RECORD [--turn TURN]\n  verify --baseline check.json [--suggestion ID]\n  --agents-bytes N --description-characters N --no-input --help\n",
-  "cli.history.help": "wombat history [search QUERY | show RECORD | read RECORD]\n  --project PATH --since DATE --until DATE --timezone ZONE --all-time\n  --root PATH --source ID --limit 1..200 --offset N --turn TURN\n  read: --find TEXT --max-bytes 1..65536 --tools (include diagnostic tool output)\n  --event ID --event-source SOURCE --event-offset N --event-turn TURN --cursor CURSOR\n  --json --no-input --help\n",
+  "cli.history.help": "wombat history [search QUERY | show RECORD | read RECORD]\n  --project PATH --since DATE --until DATE --timezone ZONE --all-time\n  --root PATH --source ID --limit 1..200 --offset N --turn TURN\n  read: --find TEXT --max-bytes 1..65536 --tools (include tool requests and results) --operation ID (requires --turn)\n  --event ID --event-source SOURCE --event-offset N --event-turn TURN --cursor CURSOR\n  --json --no-input --help\n",
   "artifacts.codexNote": "Codex apply permanently removes only explicitly selected candidates after final checks. Sessions, state and credentials stay protected. Absence does not prove freed space.",
   "artifacts.currentRelease": "Current release: {value}",
   "artifacts.pendingRelease": "Pending release: {value}",

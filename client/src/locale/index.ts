@@ -79,13 +79,14 @@ export function bytesLabel(value: number | null | undefined): string {
 }
 /** One finding supplies the headline and key metric; all findings remain in the detail. */
 export function reviewPresentation(s: import('../generated/optimize-response.js').Suggestion): {title:string;value:string;metric:number|null|undefined;label:string;metricText?:string} {
-  const finding = ['skillFormat','hookTarget','localReference','descriptionStandard','declaredCopyDrift','exactInstructionBlocks','descriptionSize','bodyTokens','fileSize','missingInstruction']
-    .map(rule => s.findings.find(f => f.rule === rule)).find(Boolean);
+  const ordered = ['skillFormat','hookTarget','localReference','descriptionStandard','declaredCopyDrift','exactInstructionBlocks','descriptionSize','bodyTokens','fileSize','missingInstruction'];
+  const finding = ordered.map(rule => s.findings.find(f => f.rule === rule && f.status !== 'advisory')).find(Boolean)
+    ?? ordered.map(rule => s.findings.find(f => f.rule === rule)).find(Boolean);
   const name = s.item.name;
   switch (finding?.rule) {
     case 'missingInstruction':return {title:t('optimize.missingInstruction'),value:t('optimize.missingValue'),metric:undefined,label:t('webui.unknown')};
     case 'descriptionStandard': case 'descriptionSize': return {title:t('optimize.descriptionTitle',{name}),value:t(finding.rule==='descriptionStandard'?'optimize.standardValue':'optimize.descriptionValue'),metric:finding.observed,label:t('config.descriptionCharacters')};
-    case 'skillFormat': return {title:t('optimize.formatTitle',{name}),value:t('optimize.formatValue'),metric:finding.evidenceCodes.length || undefined,label:t('optimize.formatErrors'),metricText:finding.evidenceCodes.length?t('optimize.formatCountFull',{count:finding.evidenceCodes.length}):undefined};
+    case 'skillFormat': return {title:t(finding.status==='advisory'?'optimize.formatAdvisoryTitle':'optimize.formatTitle',{name}),value:t(finding.status==='advisory'?'optimize.formatAdvisoryNote':'optimize.formatValue'),metric:finding.evidenceCodes.length || undefined,label:t('optimize.formatErrors'),metricText:finding.evidenceCodes.length?t('optimize.formatCountFull',{count:finding.evidenceCodes.length}):undefined};
     case 'localReference':return {title:t('optimize.referenceTitle',{name}),value:t('optimize.referenceValue'),metric:finding.observed,label:t('optimize.referenceCount'),metricText:finding.observed==null?undefined:t('optimize.referenceCountFull',{count:finding.observed})};
     case 'bodyTokens': return {title:t('optimize.bodyTitle',{name}),value:t('optimize.bodyValue'),metric:finding.observed,label:t('config.bodyTokens')};
     case 'declaredCopyDrift': {const count=s.findings.filter(f=>f.rule==='declaredCopyDrift').length;return {title:t('optimize.copyTitle',{name}),value:t('optimize.copyValue'),metric:count,label:t('optimize.copyDrift'),metricText:t('optimize.copyCountFull',{count})};}

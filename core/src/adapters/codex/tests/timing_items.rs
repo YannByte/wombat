@@ -6,7 +6,7 @@ fn item(phase: &str, kind: &str, id: &str) -> Value {
 }
 
 #[test]
-fn diagnostic_output_keeps_only_source_locators_and_success_does_not_expand_the_text_index() {
+fn diagnostic_requests_and_results_keep_only_source_locators_without_storing_bodies() {
     let root = tempfile::tempdir().unwrap();
     let mut failed = item("item_completed", "CommandExecution", "failed");
     failed["payload"]["item"]["status"] = json!("failed");
@@ -37,8 +37,8 @@ fn diagnostic_output_keeps_only_source_locators_and_success_does_not_expand_the_
         .iter()
         .filter(|event| event.original_content().is_some())
         .collect::<Vec<_>>();
-    assert_eq!(located.len(), 2);
-    for status in ["failed", "unknown"] {
+    assert_eq!(located.len(), 4);
+    for status in ["failed", "unknown", "running", "completed"] {
         let event = located.iter().find(|event| matches!(event.payload(), SafePayload::Operation {value,..} if value.status.as_ref() == status)).unwrap();
         assert!(!event.original_content().unwrap().chunks.is_empty());
     }

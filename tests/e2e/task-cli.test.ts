@@ -66,7 +66,7 @@ test('five task entries join project evidence, preserve totals, read bounded his
       await writeFile(path.join(f.project,'AGENTS.md'),shortRules);
       const baselineFile=path.join(f.dir,'check.json');await writeFile(baselineFile,JSON.stringify(report));
       const verified:OptimizeResult=invoke(['check','verify','--baseline',baselineFile,'--suggestion',baseline!.id,'--json']);
-      assert.ok(verified.checks.some(c=>c.rule==='localReference'&&c.outcome==='miss'&&c.comparison.status==='unknown'));
+      assert.ok(verified.checks.some(c=>c.rule==='localReference'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
       assert.ok(verified.checks.some(c=>c.rule==='fileSize'&&c.outcome==='miss'&&c.comparison.status==='comparable'));
       for(const args of [['api'],['call'],['check','inventory'],['check','cleanup'],['system','watch'],['clean','--codex','--apply','--no-input']])assert.equal(invoke([...args,'--json'],1).error.code,'INVALID_ARGUMENT');
       const after:UsageResult=invoke(['usage','--project',f.project,...dates,'--json']);assert.deepEqual(after.summary,before.summary);

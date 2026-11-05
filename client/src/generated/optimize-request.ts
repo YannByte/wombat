@@ -18,7 +18,7 @@ export type UseWindow =
 export type UseTimeBasis = "source_operation_time";
 export type UseSourceCompleteness = "complete" | "partial" | "unknown";
 export type TokenAnalysisScope = "selected_canonical_measurements";
-export type Category = "repair" | "trim";
+export type Category = "repair" | "trim" | "review";
 /**
  * Captured before the first persisted observation; never replaced by later checks.
  * Missing problem location permits only the exact complete suggestion/content version.

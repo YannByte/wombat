@@ -4,6 +4,19 @@ use rusqlite::{Connection, params};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
+/// Canonical directory identity does not grant access; callers retain explicit roots/grants.
+pub(crate) fn canonical_project(path: &str) -> Result<String> {
+    let canonical = dunce::canonicalize(path).map_err(|_| {
+        crate::dto::operation_error("INVALID_ARGUMENT", "Project directory is inaccessible")
+    })?;
+    if !canonical.is_dir() {
+        return Err(crate::dto::operation_error(
+            "INVALID_ARGUMENT",
+            "Project root must be a directory",
+        ));
+    }
+    Ok(canonical.to_string_lossy().into_owned())
+}
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {

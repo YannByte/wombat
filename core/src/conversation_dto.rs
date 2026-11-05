@@ -1,5 +1,6 @@
 //! Public conversation access contract. Source bodies require explicit read/search.
-pub const REQUEST_VERSION: u32 = 2;
+pub const REQUEST_VERSION: u32 = 3;
+pub const OUTPUT_VERSION: u32 = 3;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Selection {
+    /// One canonical operation inside an explicitly selected thread and turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_id: Option<String>,
     /// Read/search selected tool results on demand; bodies are never indexed.
     #[serde(default)]
     pub include_tool_output: bool,
@@ -162,7 +166,7 @@ pub struct ResolvedRecord {
 pub struct Response {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub record: Option<ResolvedRecord>,
-    #[schemars(range(min = 2, max = 2))]
+    #[schemars(extend("const" = OUTPUT_VERSION))]
     pub output_version: u32,
     pub action: Action,
     pub snapshot_id: String,

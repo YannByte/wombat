@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CoreError,type ConversationResult,type ConversationRequest} from '@wombat/client';
 import {resolveRecord} from '../src/history-cli.js';
-const response=(request:ConversationRequest):ConversationResult=>({outputVersion:2,action:request.action,snapshotId:'fixed',selection:request.selection??{},items:[],fragments:[],scanComplete:true,partial:false,limits:[],scannedEvents:0,sourceBytesRead:0});
+const response=(request:ConversationRequest):ConversationResult=>({outputVersion:3,action:request.action,snapshotId:'fixed',selection:request.selection??{},items:[],fragments:[],scanComplete:true,partial:false,limits:[],scannedEvents:0,sourceBytesRead:0});
 test('exact task identity skips activity and preserves the requested date scope',async()=>{
  const calls:ConversationRequest[]=[];
  const scope={since:'2026-10-26',until:'2026-11-02',timezone:'Asia/Shanghai'};

@@ -2521,8 +2521,9 @@
       "properties": {
         "outputVersion": {
           "type": "integer",
-          "minimum": 6,
-          "maximum": 6
+          "minimum": 0,
+          "const": 7,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/Action2"
@@ -2776,7 +2777,8 @@
       "type": "string",
       "enum": [
         "repair",
-        "trim"
+        "trim",
+        "review"
       ]
     },
     "UserDecision": {
@@ -4113,6 +4115,17 @@
     "ActivityCheck": {
       "type": "object",
       "properties": {
+        "observedSubset": {
+          "description": "A bounded local conclusion never replaces the whole-selection outcome.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActivitySubset"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "inputChange": {
           "anyOf": [
             {
@@ -4192,6 +4205,55 @@
         "outcome",
         "observed",
         "partial"
+      ]
+    },
+    "ActivitySubset": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/ActivitySubsetScope"
+        },
+        "outcome": {
+          "$ref": "#/definitions/ActivitySubsetOutcome"
+        },
+        "eligibleCommands": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "otherCandidates": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "coverageReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RepeatCoverageReason"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "outcome",
+        "eligibleCommands",
+        "coverageReasons"
+      ]
+    },
+    "ActivitySubsetScope": {
+      "type": "string",
+      "enum": [
+        "eligible_recorded_commands"
+      ]
+    },
+    "ActivitySubsetOutcome": {
+      "type": "string",
+      "enum": [
+        "miss"
       ]
     },
     "InputChange": {
@@ -7909,8 +7971,9 @@
         },
         "outputVersion": {
           "type": "integer",
-          "minimum": 2,
-          "maximum": 2
+          "minimum": 0,
+          "const": 3,
+          "maximum": 4294967295
         },
         "action": {
           "$ref": "#/definitions/Action4"
@@ -8057,6 +8120,13 @@
     "Selection": {
       "type": "object",
       "properties": {
+        "operationId": {
+          "description": "One canonical operation inside an explicitly selected thread and turn.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "includeToolOutput": {
           "description": "Read/search selected tool results on demand; bodies are never indexed.",
           "type": "boolean",

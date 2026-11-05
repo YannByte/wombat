@@ -131,6 +131,9 @@ fn outcome(phase: &Phase) -> Option<TerminalOutcome> {
     }
 }
 fn observation(event: &Event) -> Option<Observation<'_>> {
+    if event.inherited() {
+        return None;
+    }
     let (kind, aliases, phase, native_start, native_end, terminal) = match event.payload() {
         Payload::Item {
             item_kind,
@@ -193,6 +196,9 @@ fn observation(event: &Event) -> Option<Observation<'_>> {
 /// Domain operation recovery needs operations and explicit item links. Anonymous
 /// message/reasoning phases cannot link an operation; timing still reads them.
 pub(crate) fn is_projection_input(event: &Event) -> bool {
+    if event.inherited() {
+        return false;
+    }
     match event.payload() {
         Payload::Operation { .. } => true,
         Payload::Item { native_id, .. }

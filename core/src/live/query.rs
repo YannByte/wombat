@@ -136,6 +136,19 @@ pub(crate) fn cleanup_rebuild(request_id: &str) -> Result<usize> {
     };
     super::generation::cleanup_pending(&root, None)
 }
+fn normalize_projects(roots: &mut Option<Vec<String>>, project: &mut Option<String>) -> Result<()> {
+    if let Some(roots) = roots {
+        for root in roots.iter_mut() {
+            *root = crate::directories::canonical_project(root)?;
+        }
+        roots.sort_unstable();
+        roots.dedup();
+    }
+    if let Some(project) = project {
+        *project = crate::directories::canonical_project(project)?;
+    }
+    Ok(())
+}
 fn config_read(
     request: &crate::config_dto::Request,
     hooks: Option<&crate::config::hooks::Capture>,
@@ -304,6 +317,7 @@ struct ConfigMessage {
 struct OptimizeMessage {
     optimize: crate::optimize_dto::Request,
     native_hooks: Option<crate::config::hooks::Capture>,
+    native_skills: Option<crate::config::review::Capture>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -364,8 +378,7 @@ pub fn dispatch(value: Value) -> Result<Value> {
     let message: Message = serde_json::from_value(value.clone())
         .map_err(|e| operation_error("INVALID_ARGUMENT", format!("Invalid local request: {e}")))?;
     let allowed = match &message {
-        Message::Config(_) | Message::Project(_) => 3,
-        Message::Optimize(_) => 2,
+        Message::Config(_) | Message::Project(_) | Message::Optimize(_) => 3,
         Message::Usage(_) => usize::MAX,
         _ => 1,
     };
@@ -406,10 +419,11 @@ pub fn dispatch(value: Value) -> Result<Value> {
             artifacts,
             &|| false,
         )?)?),
-        Message::Config(m) => {
+        Message::Config(mut m) => {
             if m.config.action == crate::config_dto::Action::Capabilities {
                 return Ok(serde_json::to_value(crate::config::capabilities())?);
             }
+            normalize_projects(&mut m.config.project_roots, &mut m.config.scope.project)?;
             let view = config_read(&m.config, m.native_hooks.as_ref(), m.native_skills.as_ref())?;
             Ok(serde_json::to_value(crate::config::execute(
                 m.config,
@@ -417,7 +431,7 @@ pub fn dispatch(value: Value) -> Result<Value> {
                 &view,
             )?)?)
         }
-        Message::Optimize(m) => {
+        Message::Optimize(mut m) => {
             crate::optimize::activity::validate(&m.optimize)?;
             if m.optimize.action == crate::optimize_dto::Action::Capabilities {
                 let mut out = crate::optimize::capabilities();
@@ -429,12 +443,13 @@ pub fn dispatch(value: Value) -> Result<Value> {
                     timing(crate::optimize::activity::timing_request(&m.optimize)?)?,
                 )?)?);
             }
+            normalize_projects(&mut m.optimize.project_roots, &mut m.optimize.project)?;
             let cfg = crate::config_dto::Request {
                 roots: m.optimize.roots.clone(),
                 project_roots: m.optimize.project_roots.clone(),
                 ..Default::default()
             };
-            let view = config_read(&cfg, m.native_hooks.as_ref(), None)?;
+            let view = config_read(&cfg, m.native_hooks.as_ref(), m.native_skills.as_ref())?;
             Ok(serde_json::to_value(crate::optimize::execute(
                 m.optimize,
                 String::new(),

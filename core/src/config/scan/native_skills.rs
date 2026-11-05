@@ -34,6 +34,12 @@ pub(super) fn append(
         }
         for skill in &context.skills {
             let path = Path::new(&skill.path);
+            // Visibility in a project does not make a global managed file project-owned.
+            let owner = projects
+                .iter()
+                .filter(|project| path.starts_with(project))
+                .max_by_key(|project| project.len())
+                .map(String::as_str);
             if path.file_name().and_then(|s| s.to_str()) != Some("SKILL.md")
                 || !seen.insert(path.to_owned())
             {
@@ -64,7 +70,7 @@ pub(super) fn append(
                 let mut row = item(
                     path,
                     source,
-                    Some(&context.cwd),
+                    owner,
                     Kind::Skill,
                     skill.name.clone(),
                     None,
@@ -97,7 +103,7 @@ pub(super) fn append(
                 continue;
             }
             let first = out.items.len();
-            out.text_item(path, allowed, source, Some(&context.cwd), Kind::Skill, now);
+            out.text_item(path, allowed, source, owner, Kind::Skill, now);
             for item in &mut out.items[first..] {
                 item.authorized_projects = capture
                     .contexts

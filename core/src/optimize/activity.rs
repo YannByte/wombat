@@ -79,6 +79,7 @@ fn check(rule: ActivityRule, observed: &t::Count, partial: bool) -> ActivityChec
         )
     };
     ActivityCheck {
+        observed_subset: None,
         input_change: None,
         input_policy: None,
         outcomes: None,
@@ -139,6 +140,7 @@ fn failure_share(observed: &t::OutcomeStatistics) -> ActivityCheck {
         },
     };
     ActivityCheck {
+        observed_subset: None,
         input_change: None,
         input_policy: None,
         rule,
@@ -198,6 +200,7 @@ fn input_change(observed: &t::InputChange, source_status: &str) -> ActivityCheck
         }
     };
     ActivityCheck {
+        observed_subset: None,
         rule,
         version: definition.version,
         method: definition.method.into(),
@@ -245,7 +248,7 @@ pub(crate) fn evaluate(summary: &t::LocalResponse) -> ActivityResult {
                     );
                 }
             };
-            check(
+            let mut checked = check(
                 rule,
                 observed,
                 count_gap(
@@ -253,7 +256,26 @@ pub(crate) fn evaluate(summary: &t::LocalResponse) -> ActivityResult {
                     &summary.coverage.source_status,
                     rule,
                 ),
-            )
+            );
+            if checked.partial
+                && observed.value == Some(0)
+                && observed.status == t::MetricStatus::Derived
+                && observed.basis == rule.definition().basis
+                && let Some(eligible) = repeats.coverage.eligible_commands.value.filter(|n| *n > 0)
+            {
+                checked.observed_subset = Some(ActivitySubset {
+                    scope: ActivitySubsetScope::EligibleRecordedCommands,
+                    outcome: ActivitySubsetOutcome::Miss,
+                    eligible_commands: eligible,
+                    other_candidates: repeats
+                        .coverage
+                        .candidate_operations
+                        .value
+                        .map(|n| n.saturating_sub(eligible)),
+                    coverage_reasons: repeats.coverage.reason_codes.clone(),
+                });
+            }
+            checked
         })
         .collect();
     // Keep check facts independent. The broader request hint adds no advice when a confirmed link is available.

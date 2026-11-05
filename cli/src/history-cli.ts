@@ -43,15 +43,16 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
   return withCancellation(async signal=>{
     const args = [...argv], action = args[0] && !args[0].startsWith('-') ? args.shift()! : 'list';
     if (!['list','search','show','read'].includes(action)) invalidInput(action);
-    const p = parseOptions(args,['--project','--since','--until','--timezone','--source','--root','--limit','--offset','--turn','--find','--cursor','--event','--event-offset','--event-source','--event-turn','--max-bytes'],['--all-time','--tools'],['--root']);
+    const p = parseOptions(args,['--project','--since','--until','--timezone','--source','--root','--limit','--offset','--turn','--find','--cursor','--event','--event-offset','--event-source','--event-turn','--max-bytes','--operation'],['--all-time','--tools'],['--root']);
     if(p.help){writeHelp('history',argv);return 0;}
     if(p.flags.has('--tools')&&action!=='read')invalidInput('--tools');
     if (p.positionals.length !== (action === 'list' ? 0 : 1)) invalidInput(action);
-    if (action !== 'read' && ['--find','--event','--event-offset','--event-source','--event-turn','--max-bytes'].some(k=>p.values.has(k))) invalidInput(action);
+    if (action !== 'read' && ['--find','--event','--event-offset','--event-source','--event-turn','--max-bytes','--operation'].some(k=>p.values.has(k))) invalidInput(action);
     if(['list','search'].includes(action)&&p.values.has('--turn'))invalidInput('--turn');
     if(action==='show'&&p.values.has('--cursor'))invalidInput('--cursor');
     if(p.values.has('--event')&&p.values.has('--find')||!p.values.has('--event')&&['--event-source','--event-turn','--event-offset'].some(k=>p.values.has(k)))invalidInput('read selection');
     if (action !== 'list' && p.values.has('--offset')) invalidInput('--offset');
+    if(p.values.has('--operation')&&!p.get('--turn'))invalidInput('--operation requires --turn');
     if (action === 'read' && p.values.has('--limit')) invalidInput('--limit');
     const explicitDates = p.values.has('--since') || p.values.has('--until') || p.flags.has('--all-time');
     const scope: UsageScope = {...dateWindow({since:p.get('--since'),until:p.get('--until'),timezone:p.get('--timezone'),allTime:p.flags.has('--all-time') || undefined},'recent'),...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),...(p.get('--source')?{sourceInstanceId:p.get('--source')}: {})};
@@ -77,19 +78,21 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
       process.stdout.write(p.json?JSON.stringify(r)+'\n':terminalText(chosen.thread.title ?? chosen.thread.id)+'\n'+r.items.map(i=>i.kind==='turn'?`${i.id}\t${i.ordinal ?? '—'}\t${i.startedAt ?? '—'}\t${i.status}`:i.kind==='operation'?`${i.id}\t${terminalText(i.name)}\t${i.status}`:'').filter(Boolean).join('\n')+'\n');
       return resultExitCode(r);
     }
-    const selected = {...selection(retainedScope),includeToolOutput:p.flags.has('--tools'),threads:[chosen.thread.id],turns:p.get('--turn')?[p.get('--turn')!]:[]};
-    let evidence:NonNullable<ConversationRequest['targets']>[number]['evidence']|undefined, matchCursor:string|null|undefined, nextLocations:ConversationRequest|null=null;
+    const selected = {...selection(retainedScope),operationId:p.get('--operation'),includeToolOutput:p.flags.has('--tools')||p.values.has('--operation'),threads:[chosen.thread.id],turns:p.get('--turn')?[p.get('--turn')!]:[]};
+    let evidence:NonNullable<ConversationRequest['targets']>[number]['evidence']|undefined, nextLocations:ConversationRequest|null=null;
+    let located:NonNullable<ConversationRequest['targets']>=[];
     if (p.get('--event')) {
       if (!p.get('--event-source') || !p.values.has('--event-offset')) invalidInput('--event');
       evidence = {eventId:p.get('--event')!,sourceInstanceId:p.get('--event-source')!,threadId:chosen.thread.id,turnId:p.get('--event-turn'),eventOffset:pageNumber(p.get('--event-offset'),0)};
     } else {
-      const locationQuery:ConversationRequest={action:p.get('--find')?'search':'locate',roots,selection:selected,query:p.get('--find'),limit:1,cursor:p.get('--cursor')};
+      const locationQuery:ConversationRequest={action:p.get('--find')?'search':'locate',roots,selection:selected,query:p.get('--find'),limit:p.get('--operation')?4:1,cursor:p.get('--cursor')};
       const locations=await client.conversation!(locationQuery,options);
-      const item=locations.items.find(i=>i.hasTextLocator);evidence=item?.evidence;matchCursor=item?.readCursor;
+      located=locations.items.filter(i=>i.hasTextLocator).map(i=>({evidence:i.evidence,cursor:i.readCursor}));
+      const item=locations.items.find(i=>i.hasTextLocator);evidence=item?.evidence;
       if(locations.nextCursor)nextLocations={...locationQuery,cursor:locations.nextCursor};
       if (!evidence) {process.stdout.write(p.json?JSON.stringify({outputVersion:2,result:locations,nextLocations} satisfies HistoryRead)+'\n':t('cli.history.noText')+'\n');return locations.partial?2:0;}
     }
-    const r = await client.conversation!({action:'read',roots,selection:selected,targets:[{evidence,cursor:p.get('--event')?p.get('--cursor'):matchCursor,maxBytes:pageNumber(p.get('--max-bytes'),8192,1,65536),before:1,after:1}]},options);
+    const r = await client.conversation!({action:'read',roots,selection:selected,targets:(p.get('--event')?[{evidence,cursor:p.get('--cursor')}]:located).map(target=>({...target,maxBytes:pageNumber(p.get('--max-bytes'),8192,1,65536),before:1,after:1}))},options);
     const output:HistoryRead={outputVersion:2,result:r,nextLocations};
     if(p.json)process.stdout.write(JSON.stringify(output)+'\n');
     else{
@@ -97,13 +100,13 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
         process.stdout.write(`${f.message.timestamp??'—'} · ${messageOriginText(f.message.origin)}\n${terminalBlock(f.text)}\n`+f.locations.map(l=>`${terminalText(l.file)}:${l.byteStart}-${l.byteEnd}`).join('\n')+'\n');
         if(f.nextCursor){
           const args=['history','read',chosen.thread.id,...scopeArgs(retainedScope,roots),'--event',f.evidence.eventId,'--event-source',f.evidence.sourceInstanceId,'--event-offset',String(f.evidence.eventOffset),'--cursor',f.nextCursor];
-          if(p.flags.has('--tools'))args.push('--tools');
+          if(p.flags.has('--tools'))args.push('--tools');if(p.get('--operation'))args.push('--operation',p.get('--operation')!);
           if(p.get('--turn'))args.push('--turn',p.get('--turn')!);
           if(f.evidence.turnId)args.push('--event-turn',f.evidence.turnId);
           process.stdout.write(commandLine(args)+'\n');
         }
       }
-      if(nextLocations){const args=['history','read',chosen.thread.id,...scopeArgs(retainedScope,roots),'--cursor',nextLocations.cursor!];if(p.flags.has('--tools'))args.push('--tools');if(p.get('--find'))args.push('--find',p.get('--find')!);if(p.get('--turn'))args.push('--turn',p.get('--turn')!);process.stdout.write(commandLine(args)+'\n');}
+      if(nextLocations){const args=['history','read',chosen.thread.id,...scopeArgs(retainedScope,roots),'--cursor',nextLocations.cursor!];if(p.flags.has('--tools'))args.push('--tools');if(p.get('--operation'))args.push('--operation',p.get('--operation')!);if(p.get('--find'))args.push('--find',p.get('--find')!);if(p.get('--turn'))args.push('--turn',p.get('--turn')!);process.stdout.write(commandLine(args)+'\n');}
     }
     return r.partial?2:0;
   });

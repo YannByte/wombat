@@ -2,7 +2,7 @@
 
 中文 | [English](installation.en.md)
 
-Wombat `v0.6.3` 支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。安装内容已包含运行所需组件，无需开发工具或 API Key。
+Wombat `v0.6.4` 支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。安装内容已包含运行所需组件，无需开发工具或 API Key。
 
 ## 安装运行时与插件
 
@@ -50,3 +50,5 @@ wombat system update
 如需修改安装目录，macOS 或 Linux 使用 `--prefix PATH`，Windows 使用 `-Prefix PATH`。
 
 Wombat 文件已安装且程序包兼容性检查通过时，其他 Codex Skill 的解析错误会标记为项目发现尚未完成。安装器保留成功的安装结果，并列出已报告的错误路径。修复对应 Skill 后运行 `wombat system doctor --json`，无需重装 Wombat。若解析错误指向选中的 Wombat Skill，或 Wombat 自身兼容性检查失败，安装验证仍明确失败。
+
+验证命令以错误状态退出时，安装摘要保留退出码和结构化失败检查；插件兼容性、本机安装检查与 Skill 解析问题分别报告。没有结构化证据的命令失败，不归因于其他 Skill。按提示运行只读 doctor 检查，不重复安装。

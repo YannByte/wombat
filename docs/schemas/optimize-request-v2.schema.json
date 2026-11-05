@@ -1403,7 +1403,8 @@
       "type": "string",
       "enum": [
         "repair",
-        "trim"
+        "trim",
+        "review"
       ]
     },
     "UserDecision": {

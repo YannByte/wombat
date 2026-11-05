@@ -31,11 +31,18 @@ export async function queryLocal(request: ProductRequest, options: QueryOptions,
       ),
     };
   }
-  if (fresh && (("project" in request) || ("config" in request && request.config.review &&
-    (!request.config.kind || request.config.kind === "skill") &&
-    (!request.config.kinds || request.config.kinds.includes("skill"))))) {
+  const skillRequest = "project" in request
+    ? {roots:request.project.roots,projectRoots:[request.project.projectRoot]}
+    : "config" in request && request.config.review &&
+      (!request.config.kind || request.config.kind === "skill") &&
+      (!request.config.kinds || request.config.kinds.includes("skill"))
+      ? request.config
+      : "optimize" in request && (!request.optimize.baseline || request.optimize.baseline.item.kind === 'skill')
+        ? {roots:request.optimize.roots,projectRoots:request.optimize.projectRoots}
+        : undefined;
+  if (fresh && skillRequest) {
     const { captureSkills } = await import("./codex/skill-review.js");
-    observed = { ...observed, nativeSkills: await captureSkills("project" in request ? {roots:request.project.roots,projectRoots:[request.project.projectRoot],scope:{project:request.project.projectRoot}} : (request as {config:ConfigRequest}).config, options, config) };
+    observed = { ...observed, nativeSkills: await captureSkills(skillRequest, options, config) };
   }
   return invokeOperation('local_query', {...observed}, options, config);
 }

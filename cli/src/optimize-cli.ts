@@ -47,7 +47,7 @@ export function formatOptimizeText(result:OptimizeResult):string {
   if(result.action==='activity'&&result.activity){
     const activity=result.activity;
     return [t('activity.title'),...activity.advice.flatMap(rule=>{const check=activity.checks.find(check=>check.rule===rule)!;return [activityFindingTitle(check),activityAdviceText(rule),...(check.partial?[t('activity.partial')]:[])];}),
-      t('activity.checks'),...activity.checks.map(check=>`${activityRuleTitle(check.rule)}: ${activityCheckText(check)}`),
+      t('activity.checks'),...activity.checks.flatMap(check=>[`${activityRuleTitle(check.rule)}: ${activityCheckText(check)}`,...(check.observedSubset?[t('activity.subset',{count:check.observedSubset.eligibleCommands})]:[])]),
       ...(activity.operationDiagnostics?.total?[t('activity.diagnostics.summary',{count:activity.operationDiagnostics.total}),...activity.operationDiagnostics.records.flatMap(record=>[record.reasons.map(reason=>t(`activity.diagnostics.${reason}`)).join(' · '),...record.evidence.map(e=>`${e.file}:${e.line}`)])]:[]),
       t('activity.note'),`${activity.basis.snapshotId} · ${activity.scope.threadId} · ${activity.scope.turnId}`,
       activity.analysisMethod].map(terminalText).join('\n')+'\n';
@@ -56,7 +56,8 @@ export function formatOptimizeText(result:OptimizeResult):string {
  const lines=[t('optimize.summaryCount',{pending:result.pending})];
  for(const s of result.suggestions){
   const p=reviewPresentation(s);lines.push(s.id+'\t'+p.title+'\t'+s.item.path);
-  for(const f of s.findings)lines.push('  '+(reviewFindingCount(f)??reviewFindingLabel(f.rule)), '  '+reviewFindingNote(f.rule,s.item.project??undefined));
+  if(!s.item.project&&s.scopeProject)lines.push('  '+t('optimize.sharedOwner'));
+  for(const f of s.findings)lines.push('  '+(reviewFindingCount(f)??reviewFindingLabel(f.rule)), '  '+(f.status==='advisory'?t('optimize.formatAdvisoryNote'):reviewFindingNote(f.rule,s.item.project??undefined)));
 
  }
  if(result.checks.length)lines.push(t('optimize.checks'));

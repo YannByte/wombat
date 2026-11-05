@@ -35,6 +35,10 @@ export interface Request {
 }
 export interface Selection {
   /**
+   * One canonical operation inside an explicitly selected thread and turn.
+   */
+  operationId?: string | null;
+  /**
    * Read/search selected tool results on demand; bodies are never indexed.
    */
   includeToolOutput?: boolean;

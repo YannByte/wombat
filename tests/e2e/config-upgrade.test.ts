@@ -26,8 +26,9 @@ test('static configuration reviews, manual recheck, all dates and preferences sh
     rows.push(...['read-skill-1', 'read-skill-2'].flatMap(call_id => [row('response_item', { type: 'function_call', call_id, name: 'read_file', arguments: JSON.stringify({ path: skill }) }, '2026-09-29T00:00:00Z'), row('response_item', { type: 'function_call_output', call_id, output: 'Synthetic content' }, '2026-09-29T00:00:00Z')]));
     rows.push(row('session_meta', { id: 'nested-reader', cwd: path.join(project, 'nested') }, '2026-09-29T00:00:00Z'), row('response_item', { type: 'function_call', call_id: 'nested-read', name: 'read_file', arguments: JSON.stringify({ path: path.join(project, 'AGENTS.md') }) }, '2026-09-29T00:00:00Z'));
     await writeFile(path.join(root, 'sessions/log.jsonl'), rows.map(r => JSON.stringify(r)).join('\n') + '\n');
-    const saved = { WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
-    Object.assign(process.env, { WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
+    const saved = { WOMBAT_CODEX_BIN: process.env.WOMBAT_CODEX_BIN, WOMBAT_DATA_HOME: process.env.WOMBAT_DATA_HOME, CODEX_HOME: process.env.CODEX_HOME, WOMBAT_AUTO_PRICES: process.env.WOMBAT_AUTO_PRICES };
+    // Static rule truth must not depend on the user's installed native Skill catalog.
+    Object.assign(process.env, { WOMBAT_CODEX_BIN: path.join(dir, 'native-not-installed'), WOMBAT_DATA_HOME: data, CODEX_HOME: root, WOMBAT_AUTO_PRICES: '0' });
     const binary = path.resolve('dist', process.platform === 'win32' ? 'wombat-core.exe' : 'wombat-core');
 
     const client = createNodeClient({ binaryPath: binary }), nativeEntry = projectTestClient(client, [root], [project]);

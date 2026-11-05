@@ -47,7 +47,10 @@ impl Rule {
             Self::HookTarget => (Evidence::HostTargets, "trusted-enabled-hook-target-v1"),
         };
         Dependencies {
-            semantics_version: if matches!(evidence, Evidence::FileMeasurement) {
+            semantics_version: if matches!(
+                evidence,
+                Evidence::FileMeasurement | Evidence::References
+            ) {
                 2
             } else {
                 1

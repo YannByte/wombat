@@ -18,11 +18,18 @@ pub(super) fn query(
     mut response: Response,
     scan_millis: u128,
 ) -> Result<Response> {
-    let key = crate::hash(serde_json::to_vec(&(binding(request)?, request.offset))?);
+    let key = crate::hash(serde_json::to_vec(&(
+        binding(request)?,
+        request.offset.unwrap_or(0),
+    ))?);
     let mut cursor = if let Some(cursor) = &request.cursor {
         let value: Cursor = serde_json::from_str(cursor).map_err(|_| cursor_error("/cursor"))?;
         if value.binding != key {
-            return Err(error("INVALID_ARGUMENT"));
+            return Err(crate::dto::operation_error_with_details(
+                "CURSOR_MISMATCH",
+                "Conversation record cursor does not match the original selection or offset",
+                serde_json::json!({"fields":[{"path":"/cursor","reason":"retain the original selection, query and offset; omitted offset means zero"}],"schemaCommand":"wombat system api conversation --json"}),
+            ));
         }
         value
     } else {

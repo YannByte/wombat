@@ -230,7 +230,7 @@ export type UseWindow =
 export type UseTimeBasis = "source_operation_time";
 export type UseSourceCompleteness = "complete" | "partial" | "unknown";
 export type TokenAnalysisScope = "selected_canonical_measurements";
-export type Category = "repair" | "trim";
+export type Category = "repair" | "trim" | "review";
 /**
  * Captured before the first persisted observation; never replaced by later checks.
  * Missing problem location permits only the exact complete suggestion/content version.
@@ -424,6 +424,10 @@ export interface Request3 {
   radius?: number | null;
 }
 export interface Selection {
+  /**
+   * One canonical operation inside an explicitly selected thread and turn.
+   */
+  operationId?: string | null;
   /**
    * Read/search selected tool results on demand; bodies are never indexed.
    */

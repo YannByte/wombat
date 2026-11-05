@@ -90,15 +90,18 @@ pub(super) fn inspect_for(
             if findings.is_empty() {
                 return None;
             }
-            let category = if findings.iter().any(|f| {
-                matches!(
-                    f.rule.as_str(),
-                    "skillFormat"
-                        | "localReference"
-                        | "descriptionStandard"
-                        | "declaredCopyDrift"
-                        | "hookTarget"
-                )
+            let category = if findings.iter().all(|finding| finding.status == "advisory") {
+                Category::Review
+            } else if findings.iter().any(|f| {
+                f.status != "advisory"
+                    && matches!(
+                        f.rule.as_str(),
+                        "skillFormat"
+                            | "localReference"
+                            | "descriptionStandard"
+                            | "declaredCopyDrift"
+                            | "hookTarget"
+                    )
             }) {
                 Category::Repair
             } else {
@@ -143,10 +146,11 @@ pub(super) fn inspect_for(
     suggestions.sort_by(|a, b| {
         let priority = |s: &Suggestion| {
             if s.findings.iter().any(|f| {
-                matches!(
-                    f.rule.as_str(),
-                    "skillFormat" | "hookTarget" | "localReference"
-                )
+                f.status != "advisory"
+                    && matches!(
+                        f.rule.as_str(),
+                        "skillFormat" | "hookTarget" | "localReference"
+                    )
             }) {
                 0
             } else if s.findings.iter().any(|f| f.rule == "descriptionStandard") {

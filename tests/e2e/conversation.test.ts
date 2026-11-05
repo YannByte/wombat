@@ -24,7 +24,7 @@ test('diagnostic tool text is a bounded source read and an opaque result never p
   const selected={...req.selection,includeToolOutput:true};
   const found=await f.client.conversation!({...req,selection:selected});
   assert.equal(found.items.length,1);assert.ok(found.items[0].operationId);assert.ok(found.items[0].hasTextLocator);
-  const target={evidence:found.items[0].evidence,maxBytes:256};
+  const target={evidence:found.items[0].evidence,cursor:found.items[0].readCursor,maxBytes:256};
   const read=await f.client.conversation!({action:'read',roots:[f.root],selection:selected,targets:[target]});
   assert.match(read.fragments[0].text,/PRIVATE_SYNTHETIC_FAILURE/);
   assert.ok(Buffer.byteLength(read.fragments[0].text)<=256);assert.ok(read.fragments[0].nextCursor);

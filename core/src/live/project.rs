@@ -34,7 +34,7 @@ fn unavailable<T>(error: &anyhow::Error) -> Result<T> {
     ))
 }
 pub(super) fn execute(
-    request: crate::project_dto::Request,
+    mut request: crate::project_dto::Request,
     hooks: Option<&crate::config::hooks::Capture>,
     skills: Option<&crate::config::review::Capture>,
 ) -> Result<crate::project_dto::Response> {
@@ -56,6 +56,9 @@ pub(super) fn execute(
             "Project requires an existing absolute directory, valid dates and timezone",
         ));
     }
+    // Echo the submitted scope for transport binding; component facts use physical identity.
+    let requested_scope = request.clone();
+    request.project_root = crate::directories::canonical_project(&request.project_root)?;
     let scope = usage_app_dto::Scope {
         project: Some(request.project_root.clone()),
         since: Some(request.since.clone()),
@@ -197,7 +200,7 @@ pub(super) fn execute(
     .any(|s| !matches!(s, State::Complete));
     let result = crate::project_dto::Response {
         output_version: 2,
-        scope: request,
+        scope: requested_scope,
         partial,
         configuration,
         checks,

@@ -19,7 +19,7 @@ export type UseWindow =
 export type UseTimeBasis = "source_operation_time";
 export type UseSourceCompleteness = "complete" | "partial" | "unknown";
 export type TokenAnalysisScope = "selected_canonical_measurements";
-export type Category = "repair" | "trim";
+export type Category = "repair" | "trim" | "review";
 /**
  * Captured before the first persisted observation; never replaced by later checks.
  * Missing problem location permits only the exact complete suggestion/content version.
@@ -129,6 +129,8 @@ export type RepeatCoverageReason =
   | "source_partial"
   | "resource_limit"
   | "numeric_range";
+export type ActivitySubsetScope = "eligible_recorded_commands";
+export type ActivitySubsetOutcome = "miss";
 export type InputChangeMethod = "request_input_observation_change_v1";
 export type Support = "supported" | "partial" | "unavailable";
 export type OutcomeMethod = "terminal_success_failure_subset_v1";
@@ -142,7 +144,7 @@ export type ActivityReason =
   "activityMeasureUnavailable" | "activityCoverageIncomplete" | "activityBasisUnsupported" | "activitySampleTooSmall";
 
 export interface Response {
-  outputVersion: number;
+  outputVersion: 7;
   action: Action;
   capabilities: Capabilities;
   configRevision: string;
@@ -756,6 +758,10 @@ export interface TimingMetricUint64 {
   evidenceRefs: string[];
 }
 export interface ActivityCheck {
+  /**
+   * A bounded local conclusion never replaces the whole-selection outcome.
+   */
+  observedSubset?: ActivitySubset | null;
   inputChange?: InputChange | null;
   inputPolicy?: InputChangePolicy | null;
   outcomes?: OutcomeStatistics | null;
@@ -767,6 +773,13 @@ export interface ActivityCheck {
   observed: TimingMetricUint64;
   partial: boolean;
   reason?: ActivityReason | null;
+}
+export interface ActivitySubset {
+  scope: ActivitySubsetScope;
+  outcome: ActivitySubsetOutcome;
+  eligibleCommands: number;
+  otherCandidates?: number | null;
+  coverageReasons: RepeatCoverageReason[];
 }
 export interface InputChange {
   method: InputChangeMethod;

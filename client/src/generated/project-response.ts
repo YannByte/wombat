@@ -41,7 +41,7 @@ export type HookHandler = "command" | "mcpTool" | "prompt" | "agent";
 export type Action2 =
   "list" | "detail" | "keep" | "not_applicable" | "recheck" | "capabilities" | "checks" | "activity";
 export type HookSupportStatus = "no_verified_adapter" | "registry_observed" | "registry_partial";
-export type Category = "repair" | "trim";
+export type Category = "repair" | "trim" | "review";
 /**
  * Captured before the first persisted observation; never replaced by later checks.
  * Missing problem location permits only the exact complete suggestion/content version.
@@ -150,6 +150,8 @@ export type RepeatCoverageReason =
   | "source_partial"
   | "resource_limit"
   | "numeric_range";
+export type ActivitySubsetScope = "eligible_recorded_commands";
+export type ActivitySubsetOutcome = "miss";
 export type InputChangeMethod = "request_input_observation_change_v1";
 export type Support = "supported" | "partial" | "unavailable";
 export type OutcomeMethod = "terminal_success_failure_subset_v1";
@@ -976,7 +978,7 @@ export interface Section2 {
   error?: Failure | null;
 }
 export interface Response2 {
-  outputVersion: number;
+  outputVersion: 7;
   action: Action2;
   capabilities: Capabilities2;
   configRevision: string;
@@ -1319,6 +1321,10 @@ export interface TimingMetricUint64 {
   evidenceRefs: string[];
 }
 export interface ActivityCheck {
+  /**
+   * A bounded local conclusion never replaces the whole-selection outcome.
+   */
+  observedSubset?: ActivitySubset | null;
   inputChange?: InputChange | null;
   inputPolicy?: InputChangePolicy | null;
   outcomes?: OutcomeStatistics | null;
@@ -1330,6 +1336,13 @@ export interface ActivityCheck {
   observed: TimingMetricUint64;
   partial: boolean;
   reason?: ActivityReason | null;
+}
+export interface ActivitySubset {
+  scope: ActivitySubsetScope;
+  outcome: ActivitySubsetOutcome;
+  eligibleCommands: number;
+  otherCandidates?: number | null;
+  coverageReasons: RepeatCoverageReason[];
 }
 export interface InputChange {
   method: InputChangeMethod;
@@ -1972,7 +1985,7 @@ export interface Section4 {
 }
 export interface Response5 {
   record?: ResolvedRecord | null;
-  outputVersion: number;
+  outputVersion: 3;
   action: Action4;
   snapshotId: string;
   selection: Selection;
@@ -2001,6 +2014,10 @@ export interface ResolvedRecord {
   title?: string | null;
 }
 export interface Selection {
+  /**
+   * One canonical operation inside an explicitly selected thread and turn.
+   */
+  operationId?: string | null;
   /**
    * Read/search selected tool results on demand; bodies are never indexed.
    */

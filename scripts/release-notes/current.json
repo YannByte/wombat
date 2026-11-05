@@ -1,18 +1,18 @@
 {
-  "summary": "Investigate development problems with original execution evidence. Wombat now separates generated tool requests from execution outcomes, reads diagnostic tool returns on demand, and makes continuation and installation problems easier to resolve.",
+  "summary": "Recheck the original problem with consistent scope and follow an operation from its request to its result. Wombat improves Skill repair verification, historical evidence retrieval and installation diagnostics without changing Token or pricing accounting.",
   "highlights": [
-    "Read original failed, interrupted, declined or unknown tool returns with history read --tools. Scalar strings and typed text-part arrays use bounded fragments and continuation; returned bodies are not stored in the index.",
-    "Inspect operation conflicts with reason codes and sampled original positions instead of stopping at an unexplained insufficient result.",
-    "Keep generated function/custom-tool requests as dispatch observations. Execution outcomes come from result evidence, preventing false endpoint conflicts and fabricated successes.",
-    "Include explicitly locally owned unified-exec startup commands in predecessor analysis. Compare recorded argv without interpreting arbitrary shell; verified reads and expected failures retain separate checks.",
-    "Continue development investigations through the request, original error, later handling and final state before proposing a specific change and recheck.",
-    "Recompute configuration explanations using the baseline's original global or project scope unless explicitly overridden. Token and pricing accounting remain unchanged.",
-    "Receive field-specific continuation errors and a matching schema command. Installation distinguishes a compatible Wombat bundle from unrelated Codex Skill parsing warnings, avoiding repeated reinstallation."
+    "Recheck global Skills with fresh native discovery and the original project scope. Local missing references keep a stable problem identity through missing, repaired and restored states.",
+    "Read located requests and results with history read RECORD --turn TURN --operation OPERATION. Successful recovery results and commands embedded in completion-only records are available; long text retains bounded continuation.",
+    "Retrieve dated history using existing frame time ranges. Continuation treats an omitted zero offset consistently and reports actionable cursor mismatch details.",
+    "Keep explicitly inherited operation records as source evidence without treating them as fresh execution endpoints. Partial activity checks can report reliable eligible-command subset results.",
+    "Distinguish naming-only Skill specification reminders from runtime faults, and keep project applicability separate from ownership of global or managed files.",
+    "Preserve compatible-bundle facts and specific installation failures even when verification exits with status 1. Parsing warnings remain separate from the actual failure cause.",
+    "Use the Skill workflow to recover original requirements, expected negative tests, failures, later handling and verified outcomes before proposing a repair."
   ],
   "knownLimitations": [
-    "A returned tool body does not by itself prove success or failure. Known outcomes remain available separately from results that need interpretation; failures and repeated calls are not automatically classified as waste.",
-    "Conflict details are bounded samples and disclose completeness. Diagnostic text excludes unsupported non-text parts and reports partial content.",
-    "Timing responses now use protocol v8; the analysis method remains safe_event_turn_v7. Update the CLI, plugin and integrations together. Previous response versions are rejected without compatibility aliases.",
-    "Cross-turn task interpretation and recommendations remain Codex work over selected evidence. Current configuration alone cannot establish historical execution conditions."
+    "One operation ID identifies one invocation, not a causal chain of later attempts. Codex still interprets cross-turn tasks and verifies business resolution; outer tool success does not prove every inner command succeeded.",
+    "Unsupported tool text forms and incomplete source coverage retain explicit gaps. Partial zero use observations alone do not justify disabling or deleting a Skill.",
+    "Conversation request/results use protocol v3 and optimize responses use v7. Update the CLI, plugin and integrations together; older response formats are rejected without compatibility handling.",
+    "Environment configuration does not prove live MCP connectivity, actual Hook execution or model adoption. No automatic rollback or savings claim is added."
   ]
 }

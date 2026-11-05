@@ -25,8 +25,9 @@ const scenario=process.env.SCENARIO,name='wombat',p=process.env.INSTALLED+'/skil
 const status={'verify-missing':'missing','verify-disabled':'disabled','verify-ambiguous':'ambiguous','verify-denied':'unavailable','verify-disconnected':'unavailable','verify-parse':'unavailable','verify-own-parse':'unavailable'}[scenario]||'available';
 const errorCode={'verify-denied':'LOCAL_ACCESS_DENIED','verify-disconnected':'CODEX_DISCONNECTED','verify-parse':'SKILL_PARSE_ERROR','verify-own-parse':'SKILL_PARSE_ERROR'}[scenario]||null;
 const check={path:p,status:scenario==='verify-incompatible'?'incompatible':'compatible',pluginVersion:scenario==='verify-version'?'0.1.0':'1.2.3',skillContentHash:scenario==='verify-hash'?'b'.repeat(64):'a'.repeat(64)};
+if(scenario==='verify-core-error'){console.log(JSON.stringify({outputVersion:1,error:{code:'LOCAL_ACCESS_DENIED',message:'PRIVATE_VERIFY_ERROR'}}));process.exit(1);}
 if(scenario==='verify-invalid'){console.log('{PRIVATE_NATIVE_OUTPUT');process.exit(2);}
-console.log(JSON.stringify({outputVersion:1,discovery:{status,errorCode,parseErrorPaths:scenario==='verify-own-parse'?[p]:['/synthetic/other/SKILL.md'],instances:[{name:scenario==='verify-selection'?'wombat':name+':wombat',path:p,enabled:true}]},runtimeChecks:scenario==='verify-timeout'?[]:[check],hooks:{private:'PRIVATE_HOOK_COMMAND'},errorCodes:[scenario==='verify-timeout'||scenario==='slow-hooks'?'SETUP_TIMEOUT':'HOOK_UNAVAILABLE']}));process.exit(2);`);
+console.log(JSON.stringify({outputVersion:1,discovery:{status,errorCode,parseErrorPaths:scenario==='verify-own-parse'?[p]:['/synthetic/other/SKILL.md'],instances:[{name:scenario==='verify-selection'?'wombat':name+':wombat',path:p,enabled:true}]},runtimeChecks:scenario==='verify-timeout'?[]:[check],installationChecks:scenario==='verify-installation'?[{id:'path',status:'fail',message:'PRIVATE_PATH_MESSAGE'}]:[],hooks:{private:'PRIVATE_HOOK_COMMAND'},errorCodes:[scenario==='verify-timeout'||scenario==='slow-hooks'?'SETUP_TIMEOUT':'HOOK_UNAVAILABLE']}));process.exit(scenario==='verify-installation'?1:2);`);
   writeFileSync(binary, `import{appendFileSync}from'node:fs';const args=process.argv.slice(2),scenario=process.env.SCENARIO;appendFileSync(process.env.TRACE,JSON.stringify(args)+'\\n');
 if(scenario==='timeout')setInterval(()=>{},1000);
 else if(scenario==='failure')process.exit(9);
@@ -100,6 +101,21 @@ test('unrelated catalog parse errors preserve installed and compatible Wombat wi
  const f=fixture(t,'verify-parse');
  const result=await installBundledPlugin(f.marketplace,f);
  assert.deepEqual(result,{name:'wombat',discoveryVerified:false,warningPaths:['/synthetic/other/SKILL.md']});
+});
+test('a nonzero doctor result preserves compatible plugin and the actual installation failure',async t=>{
+ const f=fixture(t,'verify-installation');
+ const result=await failure(t,installBundledPlugin(f.marketplace,f));
+ assert.equal(result.report.code,'INSTALLATION_CHECK_FAILED');
+ assert.equal(result.report.verificationExitCode,1);
+ assert.deepEqual(result.report.installationChecks,[{id:'path',status:'fail'}]);
+ assert.match(result.message,/bundle is compatible/);assert.match(result.message,/checks failed: path/);
+ assert.doesNotMatch(result.message,/PRIVATE_PATH_MESSAGE|PRIVATE_HOOK_COMMAND|Skill parsing paths/);
+});
+test('structured verification errors retain their code without echoing private native errors',async t=>{
+ const f=fixture(t,'verify-core-error');
+ const result=await failure(t,installBundledPlugin(f.marketplace,f));
+ assert.equal(result.report.code,'LOCAL_ACCESS_DENIED');assert.equal(result.report.verificationExitCode,1);
+ assert.doesNotMatch(result.message,/PRIVATE_VERIFY_ERROR|reinstall the runtime\.$/);
 });
 for (const [scenario, message] of [['conflict', /Multiple Wombat/], ['foreign', /not local/], ['invalid', /Unrecognized/], ['failure', /Wombat is installed/], ['large', /Wombat is installed/], ['timeout', /Wombat is installed/]] as const) test('plugin installer stops on ' + scenario, async t => {
   const f = fixture(t, scenario);

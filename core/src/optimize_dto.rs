@@ -5,7 +5,7 @@ use crate::config_dto::{Issue, Item};
 use crate::usage_app_dto::Page;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-pub const OUTPUT_VERSION: u32 = 6;
+pub const OUTPUT_VERSION: u32 = 7;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
@@ -78,6 +78,7 @@ impl Default for RuleParameters {
 pub enum Category {
     Repair,
     Trim,
+    Review,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -429,7 +430,7 @@ impl Default for Capabilities {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Response {
-    #[schemars(range(min = 6, max = 6))]
+    #[schemars(extend("const" = OUTPUT_VERSION))]
     pub output_version: u32,
     pub action: Action,
     pub capabilities: Capabilities,
@@ -516,6 +517,9 @@ impl Default for InputChangePolicy {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivityCheck {
+    /// A bounded local conclusion never replaces the whole-selection outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_subset: Option<ActivitySubset>,
     pub input_change: Option<crate::timing_dto::InputChange>,
     pub input_policy: Option<InputChangePolicy>,
     pub outcomes: Option<crate::timing_dto::OutcomeStatistics>,
@@ -528,6 +532,26 @@ pub struct ActivityCheck {
     pub observed: crate::timing_dto::Count,
     pub partial: bool,
     pub reason: Option<ActivityReason>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivitySubsetScope {
+    EligibleRecordedCommands,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivitySubsetOutcome {
+    Miss,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActivitySubset {
+    pub scope: ActivitySubsetScope,
+    pub outcome: ActivitySubsetOutcome,
+    #[schemars(range(min = 1, max = 100000))]
+    pub eligible_commands: u64,
+    pub other_candidates: Option<u64>,
+    pub coverage_reasons: Vec<crate::timing_dto::RepeatCoverageReason>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
