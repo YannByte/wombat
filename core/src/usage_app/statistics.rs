@@ -107,7 +107,7 @@ pub(super) fn execute(mut request: Request, snapshot: &Snapshot) -> Result<Respo
         request.scope.since = Some(default_report_start(today, &Group::Day)?.to_string());
         request.scope.until = today.succ_opt().map(|d| d.to_string());
     }
-    if snapshot.has_stored_ledger() {
+    if snapshot.has_ledger_projection() {
         return stored::execute(request, snapshot, tz);
     }
     let live = snapshot.live_scope_ledger(&request.scope);

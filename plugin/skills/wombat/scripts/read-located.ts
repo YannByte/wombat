@@ -34,6 +34,7 @@ export async function readLocated(
     && !locations.scanComplete && locations.nextCursor; page++) {
     const cursor = locations.nextCursor;
     locations = await call({method:"conversation",params:{...request,
+      ...(locations.sourceScope ? {sourceScope:locations.sourceScope} : {}),
       limit:Math.min(request.limit ?? maxTargets,maxTargets),cursor}});
     if(!locations.scanComplete && locations.nextCursor===cursor)throw new Error("Location cursor made no progress");
   }
@@ -48,6 +49,7 @@ export async function readLocated(
       action: "read",
       roots: request.roots,
       selection: request.selection,
+      ...(locations.sourceScope ? {sourceScope:locations.sourceScope} : {}),
       maxScanBytes: request.maxScanBytes,
       targets,
     },

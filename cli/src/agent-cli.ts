@@ -22,7 +22,8 @@ import {
   collectionExitCode,
 } from "./exit-codes.js";
 
-import { INPUT_BYTES, INPUT_TIMEOUT_MS, OUTPUT_BYTES } from "./agent-limits.js";
+import { OUTPUT_BYTES } from "./agent-limits.js";
+import { readJsonInput } from "./json-input.js";
 const invalid = () =>
   new CoreError("INVALID_ARGUMENT", "Invalid Agent request");
 export function agentErrorOutput(
@@ -77,60 +78,6 @@ interface AgentHost {
   stdout?: (text: string) => void;
   signal?: AbortSignal;
   createClient?: () => Partial<UsageClient>;
-}
-function readRequest(input: Readable, signal: AbortSignal): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let bytes = 0,
-      finished = false;
-    const finish = (error?: unknown) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      input.off("data", data);
-      input.off("end", end);
-      input.off("error", fail);
-      input.pause();
-      signal.removeEventListener("abort", abort);
-      if (error) {
-        reject(error);
-        return;
-      }
-      try {
-        resolve(
-          JSON.parse(
-            new TextDecoder("utf-8", { fatal: true }).decode(
-              Buffer.concat(chunks),
-            ),
-          ),
-        );
-      } catch {
-        reject(invalid());
-      }
-    };
-    const data = (chunk: Buffer | string) => {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      bytes += buffer.length;
-      if (bytes > INPUT_BYTES) {
-        finish(new CoreError("RESOURCE_LIMIT", "Agent input budget exceeded"));
-        return;
-      }
-      chunks.push(buffer);
-    };
-    const end = () => finish(),
-      fail = () =>
-        finish(new CoreError("TRANSPORT_ERROR", "Agent input unavailable"));
-    const abort = () => finish(new CoreError("CANCELLED", "Cancelled"));
-    const timer = setTimeout(
-      () => finish(new CoreError("TIMEOUT", "Agent input timeout")),
-      INPUT_TIMEOUT_MS,
-    );
-    input.on("data", data);
-    input.once("end", end);
-    input.once("error", fail);
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) abort();
-  });
 }
 async function call(
   request: AgentRequest,
@@ -266,7 +213,7 @@ export async function runAgentCli(
       return 0;
     }
     if (!host.stdin && process.stdin.isTTY) throw invalid();
-    const request = await readRequest(host.stdin ?? process.stdin, signal);
+    const request = await readJsonInput(host.stdin ?? process.stdin, signal);
     if (!validateAgentRequest(request)) {
       const method=request&&typeof request==='object'&&'method' in request&&(request.method==='timing'||request.method==='conversation')?request.method:'agent';
       throw requestValidationError(method,validateAgentRequest.errors);

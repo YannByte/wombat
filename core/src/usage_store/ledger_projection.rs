@@ -655,6 +655,10 @@ impl Snapshot {
     pub(crate) fn has_stored_ledger(&self) -> bool {
         self.cold_events.is_some() && self.is_live()
     }
+    pub(crate) fn has_ledger_projection(&self) -> bool {
+        self.direct_ledger || self.has_stored_ledger()
+    }
+
     pub(crate) fn visit_ledger_groups(
         &self,
         tz: Tz,
@@ -688,6 +692,66 @@ impl Snapshot {
         scan: Scan<'_>,
         mut consume: impl FnMut(&LedgerGroup, &dyn Fn() -> Result<Vec<PricedMeasurement>>) -> Result<()>,
     ) -> Result<()> {
+        if self.direct_ledger {
+            let empty = Aggregate::new(&[])?;
+            // Match the persisted ledger's grouping before folding a report.
+            // Its SQL predicates prune candidates; the shared reducers apply
+            // the exact scope, including calendar boundaries.
+            let mut groups = BTreeMap::<GroupKey, Vec<&PricedMeasurement>>::new();
+            for row in self.live_rows.iter().flat_map(|rows| rows.iter()) {
+                if thread.is_some_and(|id| row.fact.thread_id.as_deref() != Some(id))
+                    || turn
+                        .is_some_and(|id| row.fact.turn_id.as_deref().unwrap_or("unassigned") != id)
+                {
+                    continue;
+                }
+                groups.entry(LedgerGroup::key(row)).or_default().push(row);
+            }
+            for (key, rows) in groups {
+                let mut earliest = None;
+                let mut latest = None;
+                for row in &rows {
+                    if let Some(time) = row
+                        .fact
+                        .timestamp
+                        .as_deref()
+                        .and_then(|t| DateTime::parse_from_rfc3339(t).ok())
+                        .map(|t| t.timestamp())
+                    {
+                        earliest = Some(earliest.map_or(time, |t: i64| t.min(time)));
+                        latest = Some(latest.map_or(time, |t: i64| t.max(time)));
+                    }
+                }
+                let mut group = LedgerGroup {
+                    key,
+                    aggregate: empty.clone(),
+                    slots: vec![],
+                    members: vec![],
+                    earliest,
+                    latest,
+                    latest_text: rows
+                        .iter()
+                        .filter_map(|r| r.fact.timestamp.as_deref())
+                        .max()
+                        .map(str::to_owned),
+                };
+                if scan.select.is_none_or(|select| select(&group)) {
+                    group.aggregate = Aggregate::new(&rows)?;
+                    let turns = rows
+                        .iter()
+                        .map(|r| r.fact.turn_id.as_deref())
+                        .collect::<std::collections::BTreeSet<_>>();
+                    group.members = turns
+                        .into_iter()
+                        .map(|id| (id.map(str::to_owned), vec![]))
+                        .collect();
+                }
+                consume(&group, &|| {
+                    Ok(rows.iter().map(|row| (*row).clone()).collect())
+                })?;
+            }
+            return Ok(());
+        }
         let ready: std::collections::HashSet<_> = self
             .manifest
             .threads

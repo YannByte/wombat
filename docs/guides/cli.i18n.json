@@ -18,8 +18,8 @@
       "en": "72ffe95ec157ad5d90b365519ab3f99427ec0d606b444cae0cf57bde4e3124e6"
     },
     "/complete-wombat-cli-guide/quick-start/understand-a-result": {
-      "zh": "f58e82d6a403c708d8f9a0276c328851feb5cf30fa246285c93c6875f4d48848",
-      "en": "0280820fe87116e9b7373b5fe6a4c948f07c3adc73f210598c033c0ba30d09f0"
+      "zh": "4b3f55658dd1d7b917dc0c0d7e87b22c5690a5ddda2bd47d57452c87efa86e7d",
+      "en": "fadf8d2dc1fb267d3fb80cb3515e2079fdf203c8669052aa908fee82fa293692"
     },
     "/complete-wombat-cli-guide/quick-start/select-a-project": {
       "zh": "168614a0cf23c3da8a509bba43755555434820dd111a4dd499f9d0442562b887",
@@ -38,12 +38,12 @@
       "en": "5174ac478f9acdaf96cd3c818d941fd6185bc43b1719e3fbce12309067c6a44f"
     },
     "/complete-wombat-cli-guide/find-work-records-history/search-earlier-discussions": {
-      "zh": "ef9c4fa02910227a69003ea6fb0793c30959c33c6b66f2a7d5d0e53c416f5c19",
-      "en": "82e110ce160e556f19ed9b2b9005bc4e9b9933a29b0366eb52626a6e6b00f368"
+      "zh": "f959e3792932bea2bef7c7326a0ae8abc22f4ce247b50dd757e9a429cc4df135",
+      "en": "1b8e47faff31f7751c211ed6a0a825f9a5eb410cf944298e7e3ee20dadd16eea"
     },
     "/complete-wombat-cli-guide/find-work-records-history/inspect-a-record": {
-      "zh": "8a51844f8f3b9f8bff91dc16e9bb0183a3f7b64029d1343300cc6b1a5598cc3b",
-      "en": "760b3d981cf91428ce9943b0fac7ef0a8b3ec41e04b103ef42406557acb7dd7d"
+      "zh": "c59a1d4cba43a057627e9f06adb21264ed0309d2ff4db3029c9d29dd8a69e30f",
+      "en": "4c9aee010ec59ee12ac5c949298fe856dab5bf4b6e8cde2fa915d118c46f17d9"
     },
     "/complete-wombat-cli-guide/find-work-records-history/resume-work-or-prepare-a-report": {
       "zh": "715a0d951a4d4fb796247c41b61efd3c14f4ead9c547ded843b77e130f3f438e",
@@ -62,8 +62,8 @@
       "en": "d3fc4bcbbf6858aaee3072750d320c871f45d5f1bef2f4efb2a8dad6d76cede6"
     },
     "/complete-wombat-cli-guide/inspect-usage-usage/compare-changes": {
-      "zh": "04e965e00b8bf8806d9489987f9a9285dd5f805629b4121242362b2d0a54a239",
-      "en": "e9a206677c68662fa1d9e86cfb0b944b6218ca2a5757d6b0352898832c45d1a6"
+      "zh": "e85e85581a85312276f273affa95d732c29cfdc3e4096afc7b0df5a9bee19a7b",
+      "en": "6b3ace00f40cec8228efe2d767bdb7a7c9b36c975b8490a539d2316e6efc6c23"
     },
     "/complete-wombat-cli-guide/inspect-usage-usage/view-budget-alerts": {
       "zh": "29af6d8caebb5a8b818c893a5db8edd306ec5d6f2e389b9fc82037f634cccd92",
@@ -126,12 +126,12 @@
       "en": "f73fd45f6f7c5e7b46f64b9baad5dd5d9dc40bcee294a0bc73bb83fe45a77c7c"
     },
     "/complete-wombat-cli-guide/advanced-options/shared-conventions": {
-      "zh": "09c26285ba4edbab1f71f947236a4ce851c27a8c6b0ec9098b10e917132cb566",
-      "en": "1817769796423cd1f57c9c2a3125c04093f548a12f9a1551c6fc10cb56233340"
+      "zh": "c2289cfcdb8d67956f602325b8f6633ba8f18f7b4e752767521315c1c372a82e",
+      "en": "d711fa1945ea16c7b94e66b25d7947df42c869128ea1124e6c8c41fca514b3ab"
     },
     "/complete-wombat-cli-guide/advanced-options/dates-scope-and-paging": {
-      "zh": "bba58e41e873ecedcaeba6c42a6bd8315c4916cd853415587d1e954c829722bd",
-      "en": "e254bd439dece7e1dbda4dfef7bf4013adb2852b3bc46446849c32c2a70aa3d5"
+      "zh": "9bd860060d22c7ed17acd5c144882069ec4759073a30feed7ea1025ff74af693",
+      "en": "4bcb8b41eeddcd704b14695d5bb459218dcb16186bc1d02cfc3ee25749d0786c"
     },
     "/complete-wombat-cli-guide/advanced-options/usage-filters-and-comparisons": {
       "zh": "27ba716e83017f1f76b5ed7168be78db11e39229bc52a8965f91e71982a950ea",
@@ -158,8 +158,8 @@
       "en": "c2b434d0e10e0cd04c47a37552b3f2db04b18f89529a6a6ab575e939f1adc1e2"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/complete-method-scope": {
-      "zh": "91d5d8ba2f1144815da80410b1f593c8428ebccd3ccc32853873ef87261a90f2",
-      "en": "bfeb2648775386dcb94dc3ebaf42159fb93aab189fab31ed3ee08683dba10d2b"
+      "zh": "a33b47628b91dccc69a4255de1ae877ff6d6210e30676cd346498474ba77b11d",
+      "en": "4a204741156915c4b173032de9195e2104cc2397ccefdd4ead34df7329d81c65"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/retain-scope-and-handle-failures": {
       "zh": "4cc3f789fa9371d60290c8d5bae7240d06a178e363477ad64340a2e34077d096",

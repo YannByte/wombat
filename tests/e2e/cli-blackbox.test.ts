@@ -173,7 +173,7 @@ test('real CLI filters, timezones, grouping and pagination retain the full match
     const first = f.run({"method":"usage","params":{"query":{"action":"threads","sort":"tokens","limit":1},"mode":"auto"}}).value;
     const ids = [first.items[0].id];
     for (const offset of [1, 2]) {
-      const page = f.run(queryInvocation({action:'threads',sort:'tokens',limit:1,offset},{mode:'cached'})).value;
+      const page = f.run(queryInvocation({action:'threads',sort:'tokens',limit:1,offset},{mode:'auto'})).value;
       assert.deepEqual(page.summary, first.summary);
       ids.push(page.items[0].id);
     }
@@ -218,11 +218,11 @@ test('real CLI rejects invalid requests and reports missing detail without scann
 test('real CLI partial sources, failed refresh and corrupted snapshot have explicit outcomes', async () => {
   const f = await fixture();
   try {
-    const partial = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source,path.join(f.root, 'missing')]},"mode":"auto"}});
+    const partial = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source,path.join(f.root, 'missing')]},"mode":"fresh"}});
     assert.equal(partial.code, 2);
     assert.equal(partial.value.quality.status, 'partial');
     assert.equal(partial.value.summary.tokens.total, 491_210);
-    const failed = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[path.join(f.root, 'missing')]},"mode":"auto"}});
+    const failed = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[path.join(f.root, 'missing')]},"mode":"fresh"}});
     assert.equal(failed.code, 1);
     assert.equal(failed.value.error.code, 'SOURCE_UNREADABLE');
     const retained = f.run(queryInvocation({"action":"threads","roots":[f.source,path.join(f.root,"missing")]}, {mode:"cached"}));
@@ -238,7 +238,7 @@ test('real CLI partial sources, failed refresh and corrupted snapshot have expli
 test('language changes presentation while real core data and source titles stay unchanged', async () => {
   const f = await fixture();
   try {
-    // The first live query may contain only preview metadata while scanning.
+    // Each automatic report owns its source read and observation timestamp.
     const refresh = f.run({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
     assert.equal(refresh.code, 0, refresh.stdout);
     assert.ok(['current','stale'].includes(refresh.value.freshness.status));
@@ -249,7 +249,7 @@ test('language changes presentation while real core data and source titles stay 
     const zh = f.run([...args, '--lang=zh']);
     const en = f.run(['--lang', 'en', ...args]);
     assert.equal(zh.code, en.code);
-    for (const field of ['summary', 'items', 'scope', 'page', 'snapshotRef', 'quality']) assert.deepEqual(en.value[field], zh.value[field]);
+    for (const field of ['summary', 'items', 'scope', 'page', 'quality']) assert.deepEqual(en.value[field], zh.value[field]);
     assert.equal(en.value.items[0], zh.value.items[0]);
     const plain = f.run(['usage', ...dates, '--by', 'model', '--lang=en'], false);
     assert.match(plain.stdout, /Wombat · Usage/);

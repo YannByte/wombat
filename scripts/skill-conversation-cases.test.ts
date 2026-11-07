@@ -7,7 +7,7 @@ const scope={snapshotId:'fixed-synthetic-view',project:'/synthetic/project',thre
 const usage={outputVersion:5,action:'usage',snapshotRef:{snapshotId:scope.snapshotId},scope:{project:scope.project,allTime:true},summary:{tokens:{total:1100000}}};
 const values:Record<FocusedScenario,Record<string,unknown>[]>={
   'daily-review':[usage,{...usage,action:'threads',items:[{kind:'thread',id:scope.threadId}]}],
-  'task-retro':[{...usage,scope:{...usage.scope,threadId:scope.threadId},inspection:{}},{outputVersion:1,snapshotId:scope.snapshotId,selection:{projects:[scope.project],threads:[scope.threadId]},items:[],fragments:[{text:'SYNTHETIC_WORK_EVIDENCE'}]}],
+  'task-retro':[{...usage,scope:{...usage.scope,threadId:scope.threadId},inspection:{}},{outputVersion:7,snapshotId:scope.snapshotId,selection:{projects:[scope.project],threads:[scope.threadId]},items:[],fragments:[{text:'SYNTHETIC_WORK_EVIDENCE'}]}],
   'config-review':[{action:'list',suggestions:[{id:'original',item:{path:path.join(scope.project,'.agents/skills/sample/SKILL.md')},findings:[{rule:'descriptionSize'}]}]}],
   usage:[usage],
   pricing:[{...usage,summary:{tokens:{total:1101000},price:{cost:null,knownCost:'7.25'}}}],

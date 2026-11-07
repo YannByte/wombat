@@ -22,8 +22,8 @@
       "en": "1826738a7c8cccbafb5b431552ad185c5f1401ab0222f5b94b638aa55e199e1d"
     },
     "/rust-core/foreground-queries-and-internal-storage": {
-      "zh": "b0328d721f04b3e716bb1b1aa8dc766c2ea97519a4e5a9dbd59a8187638ec146",
-      "en": "5d09a75a2323ba7792928e964f707e3dd7e981d82d1cad6d71012432e0d64c4f"
+      "zh": "5d7c38a8160042bfef31a6f3c465920a6ba9242ad162f11abc225e621b0ad0d9",
+      "en": "0adf6298e635af367aebfb0be29017ce027edc2029737f07ee778a20f2c2bdf2"
     },
     "/rust-core/runtime-collection": {
       "zh": "1682a7a522f79ea35e1e54ec89701c25a4e13adedece3302a9b13ffd18ee087d",
@@ -34,8 +34,8 @@
       "en": "736edc4b6ec1d0771205260d0230229cd70bfe1269abbbdefe673e06fe1e85f9"
     },
     "/rust-core/conversation-evidence": {
-      "zh": "ebd0e09e2fd8db7291764bd4149ce79b24e2f766516bb27c88e9c950b295dd66",
-      "en": "2059ad1d26b4052fca3332e5b2b16b14871e672056f8714f8ae84925d0fe7b95"
+      "zh": "961add298a0b1e889e51e4e9b100bf458eb97520bee407f582d02b6b24c301cb",
+      "en": "d124dcf85f20adc1d7b90ca133190b69b6641cd4bb54564056fd84e159b80fbf"
     }
   }
 }

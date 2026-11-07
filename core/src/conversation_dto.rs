@@ -1,6 +1,9 @@
 //! Public conversation access contract. Source bodies require explicit read/search.
-pub const REQUEST_VERSION: u32 = 3;
-pub const OUTPUT_VERSION: u32 = 3;
+pub const REQUEST_VERSION: u32 = 7;
+pub const OUTPUT_VERSION: u32 = 7;
+pub(crate) const MAX_READ_TARGETS: usize = 200;
+pub(crate) const MAX_SEARCH_TERMS: usize = 16;
+pub(crate) const MAX_TERM_BYTES: usize = 4096;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -45,6 +48,8 @@ pub enum Action {
     Locate,
     Read,
     Search,
+    /// Search visible Codex source text and return excerpts without an index.
+    SourceSearch,
     #[schemars(skip)]
     Changes,
 }
@@ -85,12 +90,28 @@ pub struct Request {
     pub offset: Option<usize>,
     pub cursor: Option<String>,
     pub query: Option<String>,
+    /// Search only. Match any of 1–16 literal terms. Supply this or query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terms: Option<Vec<String>>,
     #[serde(default, skip_serializing)]
     #[schemars(skip)]
     pub baseline_snapshot_id: Option<String>,
     #[serde(default)]
     pub targets: Vec<ReadTarget>,
     pub max_scan_bytes: Option<u64>,
+    /// Use the extended foreground scan budget for search or location.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub complete: bool,
+    /// Read this many visible messages on either side of each read target or direct source hit.
+    pub context_messages: Option<usize>,
+    /// Maximum UTF-8 bytes per direct source hit.
+    pub excerpt_bytes: Option<usize>,
+    /// Pin an evidence scan to its first observed source scope.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fixed_scope: bool,
+    /// Use the scope returned by the initial scan when reading export evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_scope: Option<String>,
     pub anchor: Option<Evidence>,
     pub radius: Option<usize>,
 }
@@ -102,6 +123,9 @@ pub struct Activity {
     /// Read-target cursor at a source search match; bound to snapshot, selection and evidence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_cursor: Option<String>,
+    /// The literal at the returned read cursor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_term: Option<String>,
     pub evidence: Evidence,
     pub timestamp: Option<String>,
     pub collected_at: String,
@@ -144,13 +168,115 @@ pub struct ContentLocation {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Fragment {
+    /// Zero-based request target indices served by this occurrence.
+    pub target_indices: Vec<usize>,
     pub evidence: Evidence,
     pub message: Activity,
     pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_range: Option<MatchRange>,
     pub next_cursor: Option<String>,
     pub locations: Vec<ContentLocation>,
     pub context: Vec<Activity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible_context: Option<VisibleContext>,
     pub partial: bool,
+    /// Other read targets whose returned text is exactly equal to this text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also_at: Vec<FragmentOccurrence>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FragmentOccurrence {
+    pub target_indices: Vec<usize>,
+    pub evidence: Evidence,
+    pub message: Activity,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_range: Option<MatchRange>,
+    pub next_cursor: Option<String>,
+    pub locations: Vec<ContentLocation>,
+    pub context: Vec<Activity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible_context: Option<VisibleContext>,
+    pub partial: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VisibleContext {
+    /// Event IDs into the response's shared neighbor bodies, in source order.
+    pub before: Vec<String>,
+    pub after: Vec<String>,
+    pub partial: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Neighbor {
+    pub message: Activity,
+    pub text: String,
+    pub locations: Vec<ContentLocation>,
+    pub partial: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceSearchFile {
+    pub source_instance_id: String,
+    pub thread_id: String,
+    pub upstream_id: String,
+    pub project: Option<String>,
+    pub file: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceHit {
+    /// Zero-based index into this response's source files.
+    pub file_index: usize,
+    pub timestamp: Option<String>,
+    pub origin: crate::session_events::MessageOrigin,
+    pub byte_start: u64,
+    pub byte_end: u64,
+    /// Digest of the complete original JSONL record.
+    pub sha256: String,
+    pub matched_term: String,
+    pub match_range: MatchRange,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<SourceContext>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceContext {
+    /// Indices into the response's shared source neighbors, in file order.
+    pub before: Vec<usize>,
+    pub after: Vec<usize>,
+    pub partial: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceNeighbor {
+    pub file_index: usize,
+    pub timestamp: Option<String>,
+    pub origin: crate::session_events::MessageOrigin,
+    pub byte_start: u64,
+    pub byte_end: u64,
+    pub sha256: String,
+    pub text: String,
+    pub partial: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MatchRange {
+    /// Start and exclusive end in UTF-8 bytes within the returned text.
+    pub start: usize,
+    pub end: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadIssue {
+    pub target_indices: Vec<usize>,
+    pub event_id: String,
+    pub code: String,
+    /// Retry these original targets in a separate batch.
+    pub deferred: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -174,8 +300,25 @@ pub struct Response {
     #[schemars(skip)]
     pub baseline_snapshot_id: Option<String>,
     pub selection: Selection,
+    /// Explicit roots used for this query, for a search-to-read handoff.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roots: Vec<String>,
     pub items: Vec<Activity>,
     pub fragments: Vec<Fragment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub neighbors: Vec<Neighbor>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_hits: Vec<SourceHit>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_files: Vec<SourceSearchFile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_neighbors: Vec<SourceNeighbor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_search: Option<Request>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub read_issues: Vec<ReadIssue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_scope: Option<String>,
     pub next_cursor: Option<String>,
     /// All matching indexed positions were visited; source completeness is separate.
     pub scan_complete: bool,

@@ -19,7 +19,7 @@ const request: ConversationRequest = {
 };
 function result(): ConversationResult {
   return {
-    outputVersion: 3,
+    outputVersion: 7,
     action: "locate",
     snapshotId: "fixed",
     selection: request.selection!,
@@ -54,6 +54,7 @@ test("evidence composition preserves both responses, original filters and separa
     action: "read" as const,
     fragments: [
       {
+        targetIndices: [0],
         evidence: locations.items[1].evidence,
         message: locations.items[1],
         text: "needle",

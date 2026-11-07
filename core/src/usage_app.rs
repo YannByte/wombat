@@ -210,7 +210,8 @@ fn execute_uncached(mut request: Request, snapshot: &Snapshot) -> Result<Respons
         }
         request.scope.thread_id = Some(id.clone());
     }
-    if snapshot.has_stored_ledger() && matches!(request.action, Action::Usage | Action::Threads) {
+    if snapshot.has_ledger_projection() && matches!(request.action, Action::Usage | Action::Threads)
+    {
         return stored::execute(request, snapshot);
     }
     let tz = timezone(&request.scope)?;

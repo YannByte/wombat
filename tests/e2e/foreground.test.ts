@@ -1,10 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {readFile,readdir,writeFile} from 'node:fs/promises';
+import {access,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {withLocalProduct,row,measurement} from '../helpers/local-product.js';
-import type {ConversationResult} from '@wombat/client';
+import type {ConversationResult,LiveRequest} from '@wombat/client';
+
+test('automatic reports read appends without a ledger index and preserve unknown price states', async()=>{
+ await withLocalProduct(async f=>{
+  const at='2026-10-14T00:00:00Z';
+  const unknown=()=>row('turn_context',{turn_id:'turn',model:'synthetic-unpriced'},at);
+  await f.write('task',[row('session_meta',{id:'task',cwd:f.project},at),unknown(),
+    measurement('task','one',110,at),measurement('task','two',220,at)]);
+  const scope={allTime:true,timezone:'UTC'};
+  const query={action:'usage' as const,roots:[f.root],scope,compact:true};
+  const also:NonNullable<LiveRequest['also']>=[{action:'statistics',scope,compact:true},{action:'threads',scope,compact:true}];
+  const first=await f.client.live!({query,also});
+  assert.equal(first.result.summary.tokens.total,330);
+  assert.equal(first.result.summary.price.status,'partial');
+  await assert.rejects(access(f.data),{code:'ENOENT'});
+  await f.append('task',[measurement('task','three',440,at)]);
+  const appended=await f.client.live!({query,also});
+  assert.equal(appended.result.summary.tokens.total,770);
+  await assert.rejects(access(f.data),{code:'ENOENT'});
+  const indexed=await f.client.live!({query,also,mode:'fresh'});
+  const business=(r:typeof appended)=>[r.result,...r.additional ?? []].map(({summary,items,statistics,page,scope})=>
+   ({summary,items,statistics,page,scope}));
+  assert.deepEqual(business(appended),business(indexed));
+ });
+});
 
 test('fresh tool calls need no service or view and preserve scoped continuation after unrelated updates',{timeout:60000},async()=>{
  await withLocalProduct(async f=>{

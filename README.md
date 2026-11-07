@@ -50,7 +50,7 @@ Keep source files, configuration, final test reports and the installation packag
 
 ## Install Wombat for Codex
 
-**Stable: [`v0.6.4`](https://github.com/YannByte/wombat/releases/tag/v0.6.4).**
+**Stable: [`v0.7.0`](https://github.com/YannByte/wombat/releases/tag/v0.7.0).**
 
 Install a version of Codex that supports native plugins, with the `codex` command available locally. Wombat's local analysis needs no separate API key or development tools.
 

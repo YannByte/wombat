@@ -1,6 +1,7 @@
 //! Independent Codex rollout adapter. Only explicit identities merge facts.
 use crate::session_relations;
 mod context;
+pub(crate) mod direct_search;
 mod event_projection;
 pub(crate) mod incremental;
 mod instructions;
@@ -13,6 +14,7 @@ mod skills;
 #[cfg(test)]
 mod tests;
 mod timing;
+pub(crate) mod usage_input;
 pub(crate) use operations::review_target;
 #[cfg(test)]
 mod watermark_tests;
@@ -134,7 +136,7 @@ impl AgentAdapter for CodexAdapter {
     fn collect(
         &self,
         source: &SourceInstance,
-        _: &ReadPlan,
+        plan: &ReadPlan,
         context: &RunContext,
         sink: &mut dyn FactSink,
     ) -> SourceReport {
@@ -166,7 +168,37 @@ impl AgentAdapter for CodexAdapter {
                 &mut report,
             );
         }
-        let mut facts = Facts::default();
+        let files = if plan.recent_only {
+            match incremental::recent::select(&files, &BTreeMap::new()) {
+                Ok(selected) => {
+                    if selected.len() != files.len() {
+                        issue(
+                            &mut report,
+                            "historyDeferred",
+                            "Older source files are outside this recent read; use an all-time query for complete history",
+                            None,
+                        );
+                    }
+                    selected
+                }
+                Err(_) => {
+                    issue(
+                        &mut report,
+                        "sourceUnreadable",
+                        "无法确定最近日志的范围",
+                        None,
+                    );
+                    report.status = "failed".into();
+                    return report;
+                }
+            }
+        } else {
+            files
+        };
+        let mut facts = Facts {
+            usage_only: plan.usage_only,
+            ..Facts::default()
+        };
         let mut attempted = 0;
         for file in files {
             if context.is_cancelled() {
@@ -210,6 +242,7 @@ fn finish_facts(
         return;
     }
     read_titles(root, &mut facts, report);
+    let usage_only = facts.usage_only;
     let mut facts = match finish_projection(facts, report, cancelled) {
         Ok(facts) => facts,
         Err(_) => {
@@ -227,6 +260,10 @@ fn finish_facts(
             return;
         }
     };
+    if usage_only {
+        facts.events.clear();
+        facts.operations.clear();
+    }
     titles::apply_titles(&mut facts.metadata);
     if crate::operation_association::check(cancelled).is_err() {
         report.status = "cancelled".into();

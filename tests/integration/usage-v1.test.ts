@@ -304,7 +304,7 @@ test('日期按真实时区跨夏令时和年份分组，不以固定24小时切
 test('无 TTY CLI 与 Rust 查询一致，JSON stdout 只有最终结果', async () => {
   const f = await fixture();
   try {
-    const refreshed = f.invokeCli({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"auto"}});
+    const refreshed = f.invokeCli({"method":"usage","params":{"query":{scope:{allTime:true},"action":'usage',"roots":[f.source]},"mode":"fresh"}});
     assert.equal(refreshed.status, 0, refreshed.stderr);
     assert.equal(refreshed.stdout.trim().split('\n').length,1);
     const snapshotId = refreshed.value.snapshotRef.snapshotId;

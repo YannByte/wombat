@@ -5,11 +5,15 @@
 | Today's total or another period | `usage [today\|yesterday\|week\|last-week\|month] --json` | Answer from complete-scope core totals and coverage; no mandatory ranking or diagnosis |
 | Largest tasks | `usage top [PERIOD] --json` | Locate selected records; high usage alone is not waste |
 | Task distribution or change | `usage stats --json`, `usage compare --json` | Explain task counts, per-task changes and comparable dates |
-| Find earlier work | `history --json`, `history search QUERY --json` | Retain the record, selection and continuation cursors |
+| Find earlier work | `history --json`, `history search QUERY --json` | Use matching excerpts and source positions |
 | Recover a decision or resume | `history show RECORD --json`, `history read RECORD --find TEXT --json` | Read key turns and source positions rather than the whole conversation |
 | Requested budget notices | `usage alerts --once --json` | Uses saved plans; do not create a recurring task without authorization |
 
 Use `--project PATH` when requested. Dates resolve once in the user's timezone; custom `--since DATE --until DATE` uses inclusive start and exclusive end. History defaults to 30 local calendar days. Preserve explicit bounds during follow-ups. The default comparison uses two completed weeks; unfinished periods need a comparable requested window.
+
+For historical decisions, search likely phrases or aliases together. Use `history search "keep SQLite" "保留 SQLite" --project . --speaker user --complete --json`. Quote from `sourceHits` and retain the chat from `sourceFiles[fileIndex]` and the original byte range. Follow `nextSearch` only when more evidence is needed. If the scope changes, restart before combining pages. For adjacent messages across turns, add `--context 2` to the same search. Each hit references shared `sourceNeighbors` in source order.
+
+Pipe a search page to `wombat history read --from - --json` to keep its filters and batch its hits. Add `--context 2` when a short reply depends on earlier messages or a later correction. Read the relevant IDs in `visibleContext` from the shared `neighbors` list. Verify the user's confirmation before treating a hit as a decision. Keep usable fragments when `readIssues` reports a failure. Continue `nextLocations` or `retryRead` as needed. Cite the relevant occurrence, including those in `alsoAt`, and treat unresolved evidence as an export gap.
 
 Human CLI JSON defaults to compact coverage and calendar totals. `--limit` and `--offset` page periods; `--by model` or `--by project` requests a distribution. Generated `usage` requests retain explicit `compact` and `presentation` controls for full detail. Read `page.nextOffset` before treating a page as the whole requested period. `quality.issueScope=index` and `queryImpact=unknown` describe global warnings without proven impact on the selected window; use the selected summary's field coverage separately.
 

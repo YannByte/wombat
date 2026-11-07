@@ -34,7 +34,7 @@ test('five task entries join project evidence, preserve totals, read bounded his
       const foreign:ConversationResult=invoke(['history','--project',foreignProject,...dates,'--json']);
       assert.equal(foreign.items.length,1);assert.equal(foreign.items[0].project,foreignProject);
       const selected=history.items.find(i=>i.record?.upstreamId==='alpha');assert.ok(selected?.evidence.threadId);if(!selected?.evidence.threadId)assert.fail('Missing alpha');
-      const found:ConversationResult=invoke(['history','search','Unique release evidence','--project',f.project,...dates,'--json']);assert.ok(found.items.length>0);assert.ok(found.items.every(i=>i.project===f.project));
+      const found:ConversationResult=invoke(['history','search','Unique release evidence','--project',f.project,...dates,'--json']);assert.ok(found.sourceHits?.length);assert.ok(found.sourceHits.every(i=>found.sourceFiles?.[i.fileIndex].project===f.project));
       const read:HistoryRead=invoke(['history','read',selected.evidence.threadId,'--find','Unique release evidence','--project',f.project,...dates,'--json']);
       const text=read.result;
       assert.ok(text.fragments.some(f=>f.text.includes('Unique release evidence')));assert.ok(text.sourceBytesRead<100000);assert.ok(text.fragments[0].nextCursor,'Long original content must expose continuation');

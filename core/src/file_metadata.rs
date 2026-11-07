@@ -57,6 +57,48 @@ impl FileMetadata {
         self.metadata.is_file()
     }
 
+    /// Capture the change time from the same file observation used for reuse.
+    #[cfg(unix)]
+    pub(crate) fn read_for_reuse(path: &Path) -> io::Result<(Self, (i64, i64))> {
+        use std::os::unix::fs::MetadataExt;
+        let meta = Self::read(path)?;
+        let change = (meta.metadata.ctime(), meta.metadata.ctime_nsec());
+        Ok((meta, change))
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn read_for_reuse(path: &Path) -> io::Result<(Self, (i64, i64))> {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_BASIC_INFO, FileBasicInfo, GetFileInformationByHandleEx,
+        };
+        let handle = winapi_util::Handle::from_path_any(path)?;
+        let file = handle.as_file();
+        let meta = Self::from_file(file)?;
+        let mut info = FILE_BASIC_INFO::default();
+        // SAFETY: the live file handle and correctly sized buffer match FileBasicInfo.
+        let ok = unsafe {
+            GetFileInformationByHandleEx(
+                file.as_raw_handle(),
+                FileBasicInfo,
+                (&mut info as *mut FILE_BASIC_INFO).cast(),
+                std::mem::size_of::<FILE_BASIC_INFO>() as u32,
+            )
+        };
+        if ok == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if info.ChangeTime <= 0 {
+            return Err(io::ErrorKind::Unsupported.into());
+        }
+        Ok((meta, (info.ChangeTime, 0)))
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    pub(crate) fn read_for_reuse(_path: &Path) -> io::Result<(Self, (i64, i64))> {
+        Err(io::ErrorKind::Unsupported.into())
+    }
+
     pub(crate) fn modified(&self) -> io::Result<SystemTime> {
         self.metadata.modified()
     }

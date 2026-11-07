@@ -44,7 +44,7 @@ Results state the project, dates, timezone and data status first. They then show
 
 No matching records means none were found in the completed scope. Data not ready or unreadable records mean a complete conclusion is not yet available. Unavailable metrics stay unknown instead of becoming zero. A partial page states whether more content remains and supplies a command to continue.
 
-An ordinary usage query can first return the prepared portion of the data. Use `--fresh` to wait for this update. If waiting times out, check the data status rather than treating provisional output as final statistics.
+An ordinary usage query reads current source records or reuses accounting data checked against the current files. On a qualifying repeated historical query, Wombat can prepare a reusable ledger after returning the result. Use `--fresh` to explicitly synchronize the full index or `--cached` to read its last committed data.
 
 ### Select a project
 
@@ -91,29 +91,35 @@ The default lists work records active within the last 30 local calendar days inc
 ### Search earlier discussions
 
 ```sh
-wombat history search "发布失败"
-wombat history search "验收" --project "/path/to/project"
+wombat history search "发布失败" "release failure" "上传超时"
+wombat history search "验收" --project "/path/to/project" --fixed --json
 ```
 
-Query text is a search term, not an instruction to execute. Results show matching records, source positions and read cursors to help identify the target. Search uses the same default 30-day window. Specify dates or `--all-time` for older content.
+Pass up to 16 literal terms. Search reads Codex logs directly and returns a visible message excerpt with its source file and byte range. Quote phrases that contain spaces. Search defaults to the last 30 days. For older content, set dates or use `--all-time`.
 
-An unfinished scan states the visited scope and how to continue. It cannot establish that no other matches exist. Keep the original filters and returned cursor. Unrelated updates do not invalidate the selected source position; changed evidence can require restarting the same query without that cursor.
+Use `--speaker user` for decisions stated by the user and `--max-bytes` to bound each excerpt. The default page holds 20 hits. Use `--complete` for up to 200. If the scan has more pages, keep the same filters and follow `nextSearch` in JSON or the continuation command in text. If the log inventory changes between pages, restart from the first page.
+
+Add `--context 1..5` to read visible messages before and after each hit, including across turns in the same source log. Both speakers can appear in the context. The CLI reads the original logs and shares repeated neighboring messages within a page. Use `--locate` when an automation specifically needs indexed event IDs.
+
+```sh
+wombat history search "保留" "删除" --project . --speaker user --complete --context 2 --json
+```
 
 ### Inspect a record
 
 ```sh
 wombat history show "发布流程"
 wombat history read "发布流程"
-wombat history read "发布流程" --find "验收"
+wombat history read "发布流程" --find "验收" --find "validation" --limit 6
 ```
 
-`show` has the help description “Show record details” and returns record information, turns, recorded operations and available evidence. These do not establish verified delivery. `read` has the help description “Read conversation text” and returns source text with speaker, time and neighboring context. `--find` locates relevant fragments in the selected record, which is useful for long conversations.
+`show` returns record information, turns, operations and available evidence. `read` returns source text with speaker and time. A search read includes original text before and after the match within the byte limit. Repeat `--find` to match any term in the selected record. Use `--limit` to select up to 20 locations in one batch. Equal excerpts share one text body and keep each source position and continuation. Use `--context 1..5` to read that many visible messages on each side within the same source file and chat. It can include both speakers and span turns unless the original selection names an exact turn. For hits across records, send their evidence and read cursors in one `conversation` read through `system call`.
 
 Select a record with its full ID or a title query within the current scope. One match opens that record. Multiple matches first show time, project and topic. An interactive terminal lets you choose one before reading. Choice numbers exist only within that invocation and are not saved as cross-command shortcuts.
 
 Scripts should use full IDs. An ambiguous title returns an error and candidates instead of reading the first result. Returned continuation commands bind the selected record and original view, so later reads cannot silently select a different title match.
 
-After explicitly selecting a record without date bounds, you can inspect its complete available history beyond the discovery list's default 30-day window. Explicit dates, sources and projects always remain in force; `show` and `read` cannot silently broaden them. Source text returns in fragments with continuation instructions instead of dumping a long conversation. `--turn` selects an exact turn. Add `--tools` to `history read` to search and read original tool requests and results, including successful recovery results, in that selection. For example: `wombat history read RECORD --turn TURN --tools --find "error"`. Use `history show RECORD --turn TURN --json` to obtain canonical operation IDs. `history read RECORD --turn TURN --operation OPERATION --json` reads up to four located request/result fragments for one invocation and implies tool text. Continue `nextLocations` or fragment cursors when present; this does not join later invocations or prove business resolution. Ordinary chat reads remain unchanged. Results contain operation identity and source positions; continuation retains the flag and scope. Only source locators and checksums are indexed, and bodies are read on demand under the existing byte budget. Finer positions, surrounding context and cursor controls remain in the automation interface.
+After explicitly selecting a record without date bounds, you can inspect its complete available history beyond the discovery list's default 30-day window. Explicit dates, sources and projects always remain in force; `show` and `read` cannot silently broaden them. Source text returns in fragments with continuation instructions instead of dumping a long conversation. `--turn` selects an exact turn. Add `--tools` to `history read` to search and read original tool requests and results, including successful recovery results, in that selection. For example: `wombat history read RECORD --turn TURN --tools --find "error"`. Use `history show RECORD --turn TURN --json` to obtain canonical operation IDs. `history read RECORD --turn TURN --operation OPERATION --json` reads up to four located request/result fragments for one invocation and implies tool text. Continue `nextLocations` or fragment cursors when present; this does not join later invocations or prove business resolution. Results contain operation identity and source positions; continuation retains the flag and scope. Only source locators and checksums are indexed, and bodies are read on demand under the existing byte budget. Finer positions, surrounding context and cursor controls remain in the automation interface.
 
 ### Resume work or prepare a report
 
@@ -168,6 +174,8 @@ Use advanced options or automation to filter by project, model, reasoning effort
 ```sh
 wombat usage compare
 ```
+
+Comparison reads the last committed full index by default. Use `wombat usage compare --fresh` to prepare it or compare current records.
 
 The default compares the two most recent completed calendar weeks rather than an unfinished current week against a complete previous week. Results state both date ranges, timezone, totals and distribution changes. Supply both sets of boundaries to compare current-week progress or other windows.
 
@@ -363,7 +371,7 @@ Options are accepted only where applicable. Unsupported options, repeated single
 | `--root PATH` | Repeatable record-source directory, defaulting to `CODEX_HOME` or `~/.codex`, distinct from a project folder |
 | `--source ID` | Explicit source-instance filter in supported queries |
 | `--limit N --offset N` | List paging without changing complete-scope totals |
-| `--fresh`, `--cached` | Wait for a usage update or read only prepared data; mutually exclusive |
+| `--fresh`, `--cached` | Synchronize the full index or read its last committed data. Choose one. |
 
 Uppercase terms such as `DATE`, `PATH`, `RECORD`, `VERSION` and `PLAN_ID` are placeholders, not literal input. Prefer complete next-step commands from actual results. The Skill retains the target of requests such as “that earlier item”; independent CLI invocations do not depend on hidden last-result state.
 
@@ -377,7 +385,7 @@ wombat usage top week --limit 10
 
 Explicit time words cannot combine with `--since`, `--until` or `--all-time`. Without a time word, paired custom dates replace the command's default window. Missing bounds, invalid dates and reversed ranges fail. Dates resolve once at invocation in the selected timezone and remain fixed when paging across midnight.
 
-Ordinary lists default to 20 entries; task rankings default to five. `--limit` accepts 1..200 and `--offset` is a nonnegative integer. Source reads retain byte boundaries rather than using entry counts. Text fragments and position lists each keep their own continuation cursors. Continue through returned complete commands or structured cursors, preserving scope and view.
+Ordinary lists default to 20 entries. Task rankings default to five. For lists, `--limit` accepts 1..200 and `--offset` is a nonnegative integer. Source reads apply separate limits to locations and text bytes. Continue with the returned commands or structured cursors and keep the same scope.
 
 Full IDs and opaque cursors remain bound to the selected sources and filters. Source replacement can invalidate a position. Restart that query with the same scope and no cursor rather than reconstructing old evidence.
 
@@ -469,7 +477,7 @@ Exact IDs resolve metadata without scanning activity; date filters still apply t
 
 ### Complete method scope
 
-`history read` JSON contains `result` with bounded text, speaker, time and fragment cursors, plus `nextLocations`, a generated request for the next location page. Retain the two cursor types separately. Continue the latter through method `conversation` with `system call`; text paging never changes complete usage.
+`history read` JSON contains `result` with bounded text, speaker, time and fragment cursors. Check `alsoAt` for other locations that share the same excerpt. `nextLocations` is a request for the next page of locations. Use it with the `conversation` method of `system call`. To continue a text excerpt, use its cursor and evidence. Check `readIssues` for failed or deferred targets. Find shared context bodies in `neighbors`. Each occurrence lists their IDs in `visibleContext`. Pass the optional `retryRead` through `system call` for the targets deferred by the response limit.
 
 | Method | Actions | Purpose and boundary |
 |---|---|---|

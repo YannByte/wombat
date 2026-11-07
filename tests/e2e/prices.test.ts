@@ -124,7 +124,7 @@ test('missing model prices trigger one official fetch across processes, preserve
       assert.ifError(p.error); assert.ok(p.status === 0 || p.status === 2, p.stdout + p.stderr);
       return JSON.parse(p.stdout);
     };
-    const saved = run({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true}},"mode":"auto"}}, { WOMBAT_AUTO_PRICES: '0' });
+    const saved = run({"method":"usage","params":{"query":{"action":"usage","scope":{"allTime":true}},"mode":"fresh"}}, { WOMBAT_AUTO_PRICES: '0' });
     assert.equal(saved.summary.price.cost, null);
     const query = ['usage', '--since', '2026-09-29', '--until', '2026-09-30'];
     assert.equal(run([...query, '--cached']).priceUpdate, undefined);

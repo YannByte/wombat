@@ -88,6 +88,7 @@ pub struct Snapshot {
     pub(crate) timing_cache: Mutex<crate::timing::cache::Cache>,
     pub(crate) query_cache: Mutex<crate::query_cache::QueryCache>,
     pub(crate) query_work: Arc<Mutex<()>>,
+    direct_ledger: bool,
     live_rows: Option<Arc<Vec<Arc<PricedMeasurement>>>>,
     project_rows: Option<Arc<BTreeMap<Option<String>, Vec<usize>>>>,
     live_events: Option<events::EventBuckets>,
@@ -160,7 +161,7 @@ use files::{bounded_read, corrupt, file_ref, safe_file};
 use files::{load_at, private_dir, save_at};
 #[cfg(test)]
 pub(crate) use memory::memory;
-pub(crate) use memory::memory_cold_operations;
+pub(crate) use memory::{memory_cold_operations, memory_usage};
 
 #[cfg(test)]
 mod observation_tests;

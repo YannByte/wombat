@@ -121,8 +121,11 @@ pub struct HelpExample {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HistoryRead {
-    #[schemars(range(min = 2, max = 2))]
+    #[schemars(range(min = 3, max = 3))]
     pub output_version: u32,
     pub result: crate::conversation_dto::Response,
     pub next_locations: Option<crate::conversation_dto::Request>,
+    /// Original read targets deferred by the response budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_read: Option<crate::conversation_dto::Request>,
 }

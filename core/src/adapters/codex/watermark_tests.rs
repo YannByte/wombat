@@ -102,7 +102,12 @@ fn direct_reader_retains_valid_unclosed_fact_but_only_covers_newlines() {
         .write_all(row("unclosed").as_bytes())
         .unwrap();
     let mut facts = Collected::default();
-    let report = CodexAdapter.collect(&source, &ReadPlan, &RunContext::default(), &mut facts);
+    let report = CodexAdapter.collect(
+        &source,
+        &ReadPlan::default(),
+        &RunContext::default(),
+        &mut facts,
+    );
     assert_eq!(report.status, "partial");
     assert_eq!(
         report
@@ -122,7 +127,12 @@ fn direct_reader_retains_valid_unclosed_fact_but_only_covers_newlines() {
     );
     fs::write(path, b"").unwrap();
     let mut empty = Collected::default();
-    CodexAdapter.collect(&source, &ReadPlan, &RunContext::default(), &mut empty);
+    CodexAdapter.collect(
+        &source,
+        &ReadPlan::default(),
+        &RunContext::default(),
+        &mut empty,
+    );
     assert_eq!(empty.watermarks[0].generation, None);
     assert_eq!(empty.watermarks[0].state, WatermarkState::Complete);
     drop(root);

@@ -14,6 +14,11 @@ import type { Response as ConversationResult } from './generated/conversation-re
 export type { Request as ConversationRequest } from './generated/conversation-request.js';
 export type { Response as ConversationResult } from './generated/conversation-response.js';
 export type ConversationTransport = (request: ConversationRequest, options: QueryOptions) => Promise<unknown>;
+export async function parseConversationResult(value: unknown): Promise<ConversationResult> {
+  const {validate} = await import('./generated/validate-conversation-response.js');
+  if (!validate(value)) throw new CoreError('INVALID_ARGUMENT', 'Expected JSON from wombat history search --json');
+  return value;
+}
 import type { Request as MonitorRequest } from './generated/monitor-request.js';
 import type { Response as MonitorResult } from './generated/monitor-response.js';
 export type { Request as MonitorRequest } from './generated/monitor-request.js';
@@ -1158,12 +1163,115 @@ function matchesStatistics(request: Request, result: Response): boolean {
 function matchesConversationSelection(request: ConversationRequest, result: ConversationResult): boolean {
   const defaults = { operationId: null, includeToolOutput: false, since: null, until: null, timezone: null, includeUndated: false, sources: [], projects: [], threads: [], turns: [], origins: [], phases: [], recordKinds: [] };
   if (!Object.entries(defaults).every(([key, fallback]) => JSON.stringify((request.selection ?? {})[key as keyof NonNullable<ConversationRequest['selection']>] ?? fallback) === JSON.stringify(result.selection[key as keyof typeof result.selection] ?? fallback))) return false;
+  if (JSON.stringify(request.roots ?? []) !== JSON.stringify(result.roots ?? [])) return false;
   if (Boolean(request.anchor) !== Boolean(result.window)) return false;
   if (request.anchor && result.window && (!sameConversationEvidence(request.anchor,result.window.anchor) || result.window.radius !== (request.radius ?? 20))) return false;
+  const direct = request.action === 'source_search';
+  const fixed = direct || Boolean(request.fixedScope || request.sourceScope);
+  if (fixed !== (result.sourceScope != null) ||
+      (result.sourceScope != null && !/^[a-f0-9]{64}$/.test(result.sourceScope)) ||
+      (request.sourceScope != null && request.sourceScope !== result.sourceScope)) return false;
+  if (request.action !== 'read' && (result.readIssues?.length || result.neighbors?.length)) return false;
+  const next = result.nextSearch;
+  if (Boolean(next) !== ((direct || request.action === 'search') && !result.scanComplete)) return false;
+  if (next && (next.action !== request.action || (next.contextMessages ?? null) !== (request.contextMessages ?? null) || (next.excerptBytes ?? null) !== (request.excerptBytes ?? null) || next.cursor !== result.nextCursor ||
+      (next.sourceScope ?? null) !== (result.sourceScope ?? null) ||
+      JSON.stringify(next.roots ?? []) !== JSON.stringify(result.roots ?? []) ||
+      JSON.stringify(next.selection) !== JSON.stringify(result.selection) ||
+      (next.query ?? null) !== (request.query ?? null) ||
+      JSON.stringify(next.terms ?? []) !== JSON.stringify(request.terms ?? []))) return false;
   const s=request.selection ?? {}, has=(values: readonly string[] | undefined, value: string | null | undefined) => !values?.length || (value != null && values.includes(value));
-  if (!result.items.every(i=>(!s.operationId || i.operationId===s.operationId) && has(s.sources,i.evidence.sourceInstanceId) && has(s.projects,i.project) && has(s.threads,i.evidence.threadId) && has(s.turns,i.evidence.turnId) && has(s.origins,i.origin) && has(s.phases,i.phase) && has(s.recordKinds,i.recordKind))) return false;
-  if (request.action === 'read' && (result.fragments.length !== request.targets?.length || !result.fragments.every((f,i)=>sameConversationEvidence(f.evidence,request.targets![i].evidence)&&sameConversationEvidence(f.message.evidence,f.evidence)&&(!s.operationId || f.message.operationId===s.operationId)))) return false;
-  return !result.fragments.some(f=>f.partial) || result.partial;
+  if (direct) {
+    const terms = new Set(request.terms ?? [request.query]);
+    const encoder = new TextEncoder(), decoder = new TextDecoder("utf-8", {ignoreBOM:true});
+    const hits = result.sourceHits ?? [], files = result.sourceFiles ?? [];
+    if (new Set(hits.map(i => i.fileIndex)).size !== files.length ||
+        files.some(f => !f.file || !has(s.sources,f.sourceInstanceId) || !has(s.projects,f.project) || !has(s.threads,f.threadId))) return false;
+    const neighbors = result.sourceNeighbors ?? [], seen = new Set<number>();
+    const count = request.contextMessages ?? 0;
+    const validPosition = (i: {fileIndex:number;byteStart:number;byteEnd:number;sha256:string}) =>
+      Boolean(files[i.fileIndex]) && i.byteStart >= 0 && i.byteStart < i.byteEnd && /^[a-f0-9]{64}$/.test(i.sha256);
+    if (result.items.length || result.fragments.length || hits.length > (request.limit ?? 200) ||
+        neighbors.length > 128 || neighbors.some(i => !validPosition(i) ||
+          !['user_unclassified','assistant_visible'].includes(i.origin) || encoder.encode(i.text).length > 1024)) return false;
+    for (const i of hits) {
+      const bytes = encoder.encode(i.text), {start,end} = i.matchRange;
+      if (!validPosition(i) || !has(s.origins,i.origin) || !terms.has(i.matchedTerm) ||
+          bytes.length > (request.excerptBytes ?? 8192) || start < 0 || start >= end || end > bytes.length ||
+          decoder.decode(bytes.subarray(start,end)) !== i.matchedTerm) return false;
+      const context = i.context;
+      if (!context) {
+        if (count && !result.partial) return false;
+        continue;
+      }
+      if (!count || context.before.length > count || context.after.length > count ||
+          context.partial && !result.partial) return false;
+      const refs = [...context.before,...context.after];
+      if (new Set(refs).size !== refs.length) return false;
+      for (const [n,index] of refs.entries()) {
+        const neighbor = neighbors[index];
+        if (!neighbor || neighbor.fileIndex !== i.fileIndex ||
+            (n < context.before.length ? neighbor.byteEnd > i.byteStart : neighbor.byteStart < i.byteEnd)) return false;
+        seen.add(index);
+      }
+    }
+    return seen.size === neighbors.length;
+  }
+  if (result.sourceHits?.length || result.sourceFiles?.length || result.sourceNeighbors?.length) return false;
+  const inScope = (i: ConversationResult['items'][number], matchOrigin = true) =>
+    (!s.operationId || i.operationId===s.operationId) && has(s.sources,i.evidence.sourceInstanceId) && has(s.projects,i.project) && has(s.threads,i.evidence.threadId) && has(s.turns,i.evidence.turnId) && (!matchOrigin || has(s.origins,i.origin)) && has(s.phases,i.phase) && has(s.recordKinds,i.recordKind);
+  if (!result.items.every(i=>inScope(i))) return false;
+  if (request.action === 'search') {
+    const terms = new Set(request.terms ?? [request.query]);
+    return result.items.every(i=>i.readCursor && i.matchedTerm && terms.has(i.matchedTerm));
+  }
+  if (request.action !== 'read') return true;
+  const targets = request.targets ?? [], seen = new Set<number>();
+  const neighbors = new Map<string, ConversationResult['items'][number]>();
+  const referenced = new Set<string>();
+  for (const {message} of result.neighbors ?? []) {
+    if (!request.contextMessages || message.kind !== 'message' || !inScope(message,false) ||
+        !['user_input','user_unclassified','assistant_visible'].includes(message.origin ?? '') ||
+        neighbors.has(message.evidence.eventId)) return false;
+    neighbors.set(message.evidence.eventId,message);
+  }
+  for (const fragment of result.fragments) {
+    const textBytes = new TextEncoder().encode(fragment.text);
+    const boundary = (offset: number) => offset === textBytes.length ||
+      (offset < textBytes.length && (textBytes[offset] & 0xc0) !== 0x80);
+    for (const occurrence of [fragment, ...fragment.alsoAt ?? []]) {
+      if (!occurrence.targetIndices.length || !sameConversationEvidence(occurrence.message.evidence,occurrence.evidence) ||
+          !inScope(occurrence.message) || (occurrence.partial && !result.partial)) return false;
+      const range = occurrence.matchRange;
+      if (range && (range.start >= range.end || !boundary(range.start) || !boundary(range.end))) return false;
+      const context = occurrence.visibleContext;
+      if (context) {
+        if (!request.contextMessages || context.before.length > request.contextMessages ||
+            context.after.length > request.contextMessages || (context.partial && !result.partial)) return false;
+        const ids = [...context.before,...context.after];
+        if (new Set(ids).size !== ids.length) return false;
+        for (const id of ids) {
+          const neighbor = neighbors.get(id)?.evidence;
+          if (!neighbor || id === occurrence.evidence.eventId || neighbor.threadId !== occurrence.evidence.threadId ||
+              neighbor.sourceInstanceId !== occurrence.evidence.sourceInstanceId) return false;
+          referenced.add(id);
+        }
+      } else if (request.contextMessages && !result.partial) return false;
+      for (const index of occurrence.targetIndices) {
+        const target = targets[index];
+        if (!target || seen.has(index) || !sameConversationEvidence(occurrence.evidence,target.evidence)) return false;
+        seen.add(index);
+      }
+    }
+  }
+  for (const issue of result.readIssues ?? []) {
+    if (!result.partial || !issue.targetIndices.length || issue.deferred !== (issue.code === 'OUTPUT_LIMIT')) return false;
+    for (const index of issue.targetIndices) {
+      if (seen.has(index) || targets[index]?.evidence.eventId !== issue.eventId) return false;
+      seen.add(index);
+    }
+  }
+  return seen.size === targets.length && referenced.size === neighbors.size;
 }
 function sameConversationEvidence(a: NonNullable<ConversationRequest['targets']>[number]['evidence'], b: NonNullable<ConversationRequest['targets']>[number]['evidence']): boolean {
  return a.eventId===b.eventId && a.sourceInstanceId===b.sourceInstanceId && (a.threadId??null)===(b.threadId??null) && (a.turnId??null)===(b.turnId??null) && a.eventOffset===b.eventOffset;

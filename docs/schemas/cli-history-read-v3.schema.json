@@ -6,13 +6,24 @@
   "properties": {
     "outputVersion": {
       "type": "integer",
-      "minimum": 2,
-      "maximum": 2
+      "minimum": 3,
+      "maximum": 3
     },
     "result": {
       "$ref": "#/definitions/Response"
     },
     "nextLocations": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Request"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "retryRead": {
+      "description": "Original read targets deferred by the response budget.",
       "anyOf": [
         {
           "$ref": "#/definitions/Request"
@@ -45,7 +56,7 @@
         "outputVersion": {
           "type": "integer",
           "minimum": 0,
-          "const": 3,
+          "const": 7,
           "maximum": 4294967295
         },
         "action": {
@@ -56,6 +67,13 @@
         },
         "selection": {
           "$ref": "#/definitions/Selection"
+        },
+        "roots": {
+          "description": "Explicit roots used for this query, for a search-to-read handoff.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "items": {
           "type": "array",
@@ -68,6 +86,52 @@
           "items": {
             "$ref": "#/definitions/Fragment"
           }
+        },
+        "neighbors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Neighbor"
+          }
+        },
+        "sourceHits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceHit"
+          }
+        },
+        "sourceFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceSearchFile"
+          }
+        },
+        "sourceNeighbors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceNeighbor"
+          }
+        },
+        "nextSearch": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Request"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readIssues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReadIssue"
+          }
+        },
+        "sourceScope": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "nextCursor": {
           "type": [
@@ -187,6 +251,11 @@
           "description": "Resolve an exact canonical or upstream identity without scanning activity or text.",
           "type": "string",
           "const": "resolve"
+        },
+        {
+          "description": "Search visible Codex source text and return excerpts without an index.",
+          "type": "string",
+          "const": "source_search"
         }
       ]
     },
@@ -327,6 +396,13 @@
         },
         "readCursor": {
           "description": "Read-target cursor at a source search match; bound to snapshot, selection and evidence.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "matchedTerm": {
+          "description": "The literal at the returned read cursor.",
           "type": [
             "string",
             "null"
@@ -509,6 +585,15 @@
     "Fragment": {
       "type": "object",
       "properties": {
+        "targetIndices": {
+          "description": "Zero-based request target indices served by this occurrence.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
         "evidence": {
           "$ref": "#/definitions/Evidence"
         },
@@ -517,6 +602,16 @@
         },
         "text": {
           "type": "string"
+        },
+        "matchRange": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MatchRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "nextCursor": {
           "type": [
@@ -536,18 +631,57 @@
             "$ref": "#/definitions/Activity"
           }
         },
+        "visibleContext": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/VisibleContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "partial": {
           "type": "boolean"
+        },
+        "alsoAt": {
+          "description": "Other read targets whose returned text is exactly equal to this text.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FragmentOccurrence"
+          }
         }
       },
       "additionalProperties": false,
       "required": [
+        "targetIndices",
         "evidence",
         "message",
         "text",
         "locations",
         "context",
         "partial"
+      ]
+    },
+    "MatchRange": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "description": "Start and exclusive end in UTF-8 bytes within the returned text.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end"
       ]
     },
     "ContentLocation": {
@@ -578,6 +712,515 @@
         "byteStart",
         "byteEnd",
         "part"
+      ]
+    },
+    "VisibleContext": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "description": "Event IDs into the response's shared neighbor bodies, in source order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "after": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "before",
+        "after",
+        "partial"
+      ]
+    },
+    "FragmentOccurrence": {
+      "type": "object",
+      "properties": {
+        "targetIndices": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "message": {
+          "$ref": "#/definitions/Activity"
+        },
+        "matchRange": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MatchRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentLocation"
+          }
+        },
+        "context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Activity"
+          }
+        },
+        "visibleContext": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/VisibleContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "targetIndices",
+        "evidence",
+        "message",
+        "locations",
+        "context",
+        "partial"
+      ]
+    },
+    "Neighbor": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/Activity"
+        },
+        "text": {
+          "type": "string"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentLocation"
+          }
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "message",
+        "text",
+        "locations",
+        "partial"
+      ]
+    },
+    "SourceHit": {
+      "type": "object",
+      "properties": {
+        "fileIndex": {
+          "description": "Zero-based index into this response's source files.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "$ref": "#/definitions/MessageOrigin"
+        },
+        "byteStart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "byteEnd": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "description": "Digest of the complete original JSONL record.",
+          "type": "string"
+        },
+        "matchedTerm": {
+          "type": "string"
+        },
+        "matchRange": {
+          "$ref": "#/definitions/MatchRange"
+        },
+        "text": {
+          "type": "string"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SourceContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fileIndex",
+        "origin",
+        "byteStart",
+        "byteEnd",
+        "sha256",
+        "matchedTerm",
+        "matchRange",
+        "text"
+      ]
+    },
+    "SourceContext": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "description": "Indices into the response's shared source neighbors, in file order.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "after": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "before",
+        "after",
+        "partial"
+      ]
+    },
+    "SourceSearchFile": {
+      "type": "object",
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "upstreamId": {
+          "type": "string"
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "threadId",
+        "upstreamId",
+        "file"
+      ]
+    },
+    "SourceNeighbor": {
+      "type": "object",
+      "properties": {
+        "fileIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "$ref": "#/definitions/MessageOrigin"
+        },
+        "byteStart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "byteEnd": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fileIndex",
+        "origin",
+        "byteStart",
+        "byteEnd",
+        "sha256",
+        "text",
+        "partial"
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/Action"
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "selection": {
+          "default": {
+            "includeToolOutput": false,
+            "since": null,
+            "until": null,
+            "timezone": null,
+            "includeUndated": false,
+            "sources": [],
+            "projects": [],
+            "threads": [],
+            "turns": [],
+            "origins": [],
+            "phases": [],
+            "recordKinds": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Selection"
+            }
+          ]
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "offset": {
+          "description": "Skip matching conversations in Records; other actions use bound cursors.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "terms": {
+          "description": "Search only. Match any of 1–16 literal terms. Supply this or query.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReadTarget"
+          },
+          "default": []
+        },
+        "maxScanBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "complete": {
+          "description": "Use the extended foreground scan budget for search or location.",
+          "type": "boolean"
+        },
+        "contextMessages": {
+          "description": "Read this many visible messages on either side of each read target or direct source hit.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "excerptBytes": {
+          "description": "Maximum UTF-8 bytes per direct source hit.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "fixedScope": {
+          "description": "Pin an evidence scan to its first observed source scope.",
+          "type": "boolean"
+        },
+        "sourceScope": {
+          "description": "Use the scope returned by the initial scan when reading export evidence.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "radius": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ]
+    },
+    "ReadTarget": {
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "before": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "maximum": 9007199254740991
+        },
+        "after": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidence"
+      ]
+    },
+    "ReadIssue": {
+      "type": "object",
+      "properties": {
+        "targetIndices": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "deferred": {
+          "description": "Retry these original targets in a separate batch.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "targetIndices",
+        "eventId",
+        "code",
+        "deferred"
       ]
     },
     "Freshness": {
@@ -784,146 +1427,6 @@
       "required": [
         "anchor",
         "radius"
-      ]
-    },
-    "Request": {
-      "type": "object",
-      "properties": {
-        "action": {
-          "$ref": "#/definitions/Action"
-        },
-        "roots": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": []
-        },
-        "selection": {
-          "default": {
-            "includeToolOutput": false,
-            "since": null,
-            "until": null,
-            "timezone": null,
-            "includeUndated": false,
-            "sources": [],
-            "projects": [],
-            "threads": [],
-            "turns": [],
-            "origins": [],
-            "phases": [],
-            "recordKinds": []
-          },
-          "allOf": [
-            {
-              "$ref": "#/definitions/Selection"
-            }
-          ]
-        },
-        "limit": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "offset": {
-          "description": "Skip matching conversations in Records; other actions use bound cursors.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "cursor": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "query": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "targets": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ReadTarget"
-          },
-          "default": []
-        },
-        "maxScanBytes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "anchor": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Evidence"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "radius": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "action"
-      ]
-    },
-    "ReadTarget": {
-      "type": "object",
-      "properties": {
-        "evidence": {
-          "$ref": "#/definitions/Evidence"
-        },
-        "cursor": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "maxBytes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "before": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 0,
-          "maximum": 9007199254740991
-        },
-        "after": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "evidence"
       ]
     }
   }

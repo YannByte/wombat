@@ -173,6 +173,11 @@ pub(in crate::adapters::codex) fn record(
             }
             facts.event_strings.share(&mut event);
             crate::adapters::codex::event_projection::apply(facts, &event, report);
+            if facts.usage_only
+                && !crate::adapters::codex::event_projection::association_input(&event)
+            {
+                return;
+            }
             let id = event.shared_id();
             if !facts.full_event_write && !facts.streaming {
                 facts.dirty_events.insert(id.clone());

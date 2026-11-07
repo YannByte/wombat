@@ -108,7 +108,7 @@ export async function runUsageCli(argv = process.argv.slice(2)): Promise<number>
       for (;;) {
         const queryOptions = {signal:controller.signal};
         const result = (await client.live!({ query: invocation.request, mode: invocation.mode, rebuild:invocation.rebuild, includeHistory:invocation.includeHistory }, queryOptions)).result;
-        const revision = JSON.stringify([result.snapshotRef.snapshotId, result.scope, result.freshness?.status, result.quality]);
+        const revision = invocation.watch ? JSON.stringify([result.scope, result.freshness?.status, result.quality, result.summary, result.items]) : '';
         if (!invocation.watch || revision !== lastRevision) {
           if (!invocation.json && result.freshness && !['current', 'fixed'].includes(result.freshness.status)) process.stderr.write(`Wombat · ${result.freshness.status === 'failed' && result.freshness.error ? result.freshness.error : result.freshness.projectLoads?.length ? t('webui.projectsProgress',{ready:result.freshness.projectLoads.filter(p=>p.state==='ready').length,total:result.freshness.projectLoads.length}) : result.freshness.initialScan ? t('webui.initialTasks') : result.freshness.status === 'syncing' ? t("cli.usage-app-cli.syncing_showing_committed_data") : result.freshness.error ?? t("cli.usage-app-cli.showing_cached_data")}\n`);
           process.stdout.write(invocation.json ? JSON.stringify(result) + '\n' : (await import('./format.js')).renderUsageResult(result, process.stdout.columns ?? 120, invocation.request.group ?? undefined) + '\n');

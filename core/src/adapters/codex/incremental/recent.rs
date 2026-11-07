@@ -18,7 +18,7 @@ struct HeaderPayload {
     forked_from_id: Option<String>,
 }
 
-pub(super) fn select(
+pub(in crate::adapters::codex) fn select(
     files: &BTreeSet<PathBuf>,
     checkpoints: &BTreeMap<String, Checkpoint>,
 ) -> Result<BTreeSet<PathBuf>> {

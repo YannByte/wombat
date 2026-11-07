@@ -21,7 +21,7 @@ test('built CLI and native share period drivers, family totals and durable refre
  try{
   await delay(100);
   // Establish a completed fixture publication; these assertions are not latency checks.
-  const first=run(['usage','--all-time'],undefined,25_000);
+  const first=run(['usage','--fresh','--all-time'],undefined,25_000);
   assert.notEqual(first.freshness?.initialScan,true);
   const args=["usage", "compare",'--since','2026-09-08','--until','2026-09-15','--baseline-since','2026-09-01','--baseline-until','2026-09-08','--by','project','--limit','1'];
   const compared=run(args);assert.equal(compared.snapshotRef.snapshotId,first.snapshotRef.snapshotId);assert.equal(compared.comparison.delta.tokens,40);assert.equal(compared.page.total,3);assert.equal(compared.comparison.drivers[0].delta.tokens+compared.comparison.remaining.tokens,40);
@@ -34,7 +34,7 @@ test('built CLI and native share period drivers, family totals and durable refre
   const emptyHistory=run({"method":"account","params":{"action":"history"}});assert.equal(emptyHistory.history.totalObservations,0,'history must work without a native Codex executable');
   await appendFile(path.join(root,'sessions','parent.jsonl'),jsonl([usage('parent','new',10,'2026-09-10')]));
   assert.equal(run(args).snapshotRef.snapshotId,first.snapshotRef.snapshotId,'compare must not refresh');
-  const refreshed=run(['usage','--all-time'],undefined,25_000);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
+  const refreshed=run(['usage','--fresh','--all-time'],undefined,25_000);assert.equal(refreshed.freshness.publicationChange.measurementsAdded,1);assert.equal(refreshed.freshness.publicationChange.delta.tokens,10);
   const fixed=run([...args,]);assert.equal(fixed.comparison.delta.tokens,50);
   await delay(100);
   let restored=run(['usage','--cached','--all-time']);const restoredBy=Date.now()+5000;

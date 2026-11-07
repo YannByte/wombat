@@ -1,6 +1,6 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve";
+export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -21,12 +21,23 @@ export type ProjectLoadState = "pending" | "loading" | "ready";
 
 export interface Response {
   record?: ResolvedRecord | null;
-  outputVersion: 3;
+  outputVersion: 7;
   action: Action;
   snapshotId: string;
   selection: Selection;
+  /**
+   * Explicit roots used for this query, for a search-to-read handoff.
+   */
+  roots?: string[];
   items: Activity[];
   fragments: Fragment[];
+  neighbors?: Neighbor[];
+  sourceHits?: SourceHit[];
+  sourceFiles?: SourceSearchFile[];
+  sourceNeighbors?: SourceNeighbor[];
+  nextSearch?: Request | null;
+  readIssues?: ReadIssue[];
+  sourceScope?: string | null;
   nextCursor?: string | null;
   /**
    * All matching indexed positions were visited; source completeness is separate.
@@ -76,6 +87,10 @@ export interface Activity {
    * Read-target cursor at a source search match; bound to snapshot, selection and evidence.
    */
   readCursor?: string | null;
+  /**
+   * The literal at the returned read cursor.
+   */
+  matchedTerm?: string | null;
   evidence: Evidence;
   timestamp?: string | null;
   collectedAt: string;
@@ -109,19 +124,160 @@ export interface Evidence {
   eventOffset: number;
 }
 export interface Fragment {
+  /**
+   * Zero-based request target indices served by this occurrence.
+   */
+  targetIndices: number[];
   evidence: Evidence;
   message: Activity;
   text: string;
+  matchRange?: MatchRange | null;
   nextCursor?: string | null;
   locations: ContentLocation[];
   context: Activity[];
+  visibleContext?: VisibleContext | null;
   partial: boolean;
+  /**
+   * Other read targets whose returned text is exactly equal to this text.
+   */
+  alsoAt?: FragmentOccurrence[];
+}
+export interface MatchRange {
+  /**
+   * Start and exclusive end in UTF-8 bytes within the returned text.
+   */
+  start: number;
+  end: number;
 }
 export interface ContentLocation {
   file: string;
   byteStart: number;
   byteEnd: number;
   part: number;
+}
+export interface VisibleContext {
+  /**
+   * Event IDs into the response's shared neighbor bodies, in source order.
+   */
+  before: string[];
+  after: string[];
+  partial: boolean;
+}
+export interface FragmentOccurrence {
+  targetIndices: number[];
+  evidence: Evidence;
+  message: Activity;
+  matchRange?: MatchRange | null;
+  nextCursor?: string | null;
+  locations: ContentLocation[];
+  context: Activity[];
+  visibleContext?: VisibleContext | null;
+  partial: boolean;
+}
+export interface Neighbor {
+  message: Activity;
+  text: string;
+  locations: ContentLocation[];
+  partial: boolean;
+}
+export interface SourceHit {
+  /**
+   * Zero-based index into this response's source files.
+   */
+  fileIndex: number;
+  timestamp?: string | null;
+  origin: MessageOrigin;
+  byteStart: number;
+  byteEnd: number;
+  /**
+   * Digest of the complete original JSONL record.
+   */
+  sha256: string;
+  matchedTerm: string;
+  matchRange: MatchRange;
+  text: string;
+  context?: SourceContext | null;
+}
+export interface SourceContext {
+  /**
+   * Indices into the response's shared source neighbors, in file order.
+   */
+  before: number[];
+  after: number[];
+  partial: boolean;
+}
+export interface SourceSearchFile {
+  sourceInstanceId: string;
+  threadId: string;
+  upstreamId: string;
+  project?: string | null;
+  file: string;
+}
+export interface SourceNeighbor {
+  fileIndex: number;
+  timestamp?: string | null;
+  origin: MessageOrigin;
+  byteStart: number;
+  byteEnd: number;
+  sha256: string;
+  text: string;
+  partial: boolean;
+}
+export interface Request {
+  action: Action;
+  roots?: string[];
+  selection?: Selection;
+  limit?: number | null;
+  /**
+   * Skip matching conversations in Records; other actions use bound cursors.
+   */
+  offset?: number | null;
+  cursor?: string | null;
+  query?: string | null;
+  /**
+   * Search only. Match any of 1–16 literal terms. Supply this or query.
+   */
+  terms?: string[] | null;
+  targets?: ReadTarget[];
+  maxScanBytes?: number | null;
+  /**
+   * Use the extended foreground scan budget for search or location.
+   */
+  complete?: boolean;
+  /**
+   * Read this many visible messages on either side of each read target or direct source hit.
+   */
+  contextMessages?: number | null;
+  /**
+   * Maximum UTF-8 bytes per direct source hit.
+   */
+  excerptBytes?: number | null;
+  /**
+   * Pin an evidence scan to its first observed source scope.
+   */
+  fixedScope?: boolean;
+  /**
+   * Use the scope returned by the initial scan when reading export evidence.
+   */
+  sourceScope?: string | null;
+  anchor?: Evidence | null;
+  radius?: number | null;
+}
+export interface ReadTarget {
+  evidence: Evidence;
+  cursor?: string | null;
+  maxBytes?: number | null;
+  before?: number;
+  after?: number;
+}
+export interface ReadIssue {
+  targetIndices: number[];
+  eventId: string;
+  code: string;
+  /**
+   * Retry these original targets in a separate batch.
+   */
+  deferred: boolean;
 }
 export interface Freshness {
   publicationChange?: PublicationChange | null;

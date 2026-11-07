@@ -99,7 +99,7 @@ fn records_include_unmetered_work_without_reading_source_bodies() {
 }
 
 #[test]
-fn search_cursor_reads_the_match_in_a_long_message_without_the_prefix() {
+fn search_cursor_reads_a_bounded_window_in_a_long_message() {
     let text = "x".repeat(80000) + "关键证据：验证失败后必须保留交付文件。";
     let (_root, snapshot, _path) = fixture(&text);
     let mut search = request(&snapshot, Action::Search);
@@ -111,7 +111,10 @@ fn search_cursor_reads_the_match_in_a_long_message_without_the_prefix() {
     read.selection = search.selection;
     read.targets[0].cursor = found.items[0].read_cursor.clone();
     let excerpt = query(&snapshot, None, &read, &AtomicBool::new(false)).unwrap();
-    assert!(excerpt.fragments[0].text.starts_with("关键证据"));
+    let item = &excerpt.fragments[0];
+    let range = item.match_range.as_ref().unwrap();
+    assert_eq!(&item.text[range.start..range.end], "关键证据");
+    assert!(item.text.starts_with('x'));
     assert!(excerpt.source_bytes_read < 40000);
 }
 
@@ -234,7 +237,11 @@ fn search_crosses_chunk_boundaries_and_resumes_with_adjustable_budget() {
     let evidence = locate(&snapshot);
     let mut r = request(&snapshot, Action::Search);
     r.selection.threads = vec![evidence.thread_id.clone().unwrap()];
-    r.query = Some("needle_cross中文".into());
+    r.terms = Some(vec![
+        "missing".into(),
+        "needle_cross中文".into(),
+        "中文".into(),
+    ]);
     r.max_scan_bytes = Some(8192);
     let first = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap();
     assert!(!first.scan_complete);
@@ -244,9 +251,29 @@ fn search_crosses_chunk_boundaries_and_resumes_with_adjustable_budget() {
     r.max_scan_bytes = Some(32768);
     let second = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap();
     assert_eq!(second.items.len(), 1);
+    assert_eq!(
+        second.items[0].matched_term.as_deref(),
+        Some("needle_cross中文")
+    );
     assert!(second.scan_complete);
-    r.query = Some("different".into());
-    assert!(query(&snapshot, None, &r, &AtomicBool::new(false)).is_err());
+    let mut read = read_request(&snapshot, evidence, 128);
+    read.selection = r.selection.clone();
+    read.targets[0].cursor = second.items[0].read_cursor.clone();
+    let read = query(&snapshot, None, &read, &AtomicBool::new(false)).unwrap();
+    let fragment = &read.fragments[0];
+    let range = fragment.match_range.as_ref().unwrap();
+    assert_eq!(&fragment.text[range.start..range.end], "needle_cross中文");
+    assert!(fragment.text.starts_with('x'));
+    assert_eq!(fragment.locations.len(), 2);
+    r.terms.as_mut().unwrap().reverse();
+    let error = query(&snapshot, None, &r, &AtomicBool::new(false)).unwrap_err();
+    assert_eq!(
+        error
+            .downcast_ref::<crate::dto::OperationError>()
+            .unwrap()
+            .code,
+        "CURSOR_MISMATCH"
+    );
 }
 #[test]
 fn reads_fail_on_replacement_rewrite_truncation_and_missing_source() {

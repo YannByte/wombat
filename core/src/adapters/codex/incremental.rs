@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use crate::file_metadata::FileMetadata;
 use std::time::UNIX_EPOCH;
 mod external;
-mod recent;
+pub(super) mod recent;
 #[cfg(test)]
 mod reduction;
 #[cfg(test)]

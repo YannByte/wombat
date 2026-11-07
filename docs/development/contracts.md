@@ -109,4 +109,12 @@ resetCredits保留来源availableCount，不以明细数量替代；credits=null
 
 setup 版本 1 默认只检查插件发现与运行时。`includeHooks` 默认为 false；显式请求后独立查询 Hook 注册。可选探测失败不掩盖已完成的发现和兼容性结果。CLI 对应 `setup --hooks`，具体步骤见 [CLI 指南](../guides/cli.md)。
 
-对话请求／结果版本 3 增加绑定单个聊天和轮次的精确操作筛选，复用规范调用／条目别名，并保留原日期、来源和项目限制。工具请求与结果都提供有界原文定位，包括成功结果；正文不进入索引，必须显式请求工具文本。CLI 一次读取最多四个有定位的片段并保留续查；操作身份和执行成功都不证明任务已经解决。
+对话请求和结果版本 7 新增 `source_search`。其 `sourceHits` 返回原文片段、UTF-8 命中范围、原始 JSONL 字节范围及该行摘要。各条命中通过 `fileIndex` 引用共享的 `sourceFiles` 条目。续页时，`sourceScope` 绑定日志清单。直搜设置 `contextMessages` 后，各命中的 `context` 按来源顺序引用共享的 `sourceNeighbors`。每条相邻消息保留自己的原始记录范围和摘要。索引查询 `search` 对每个命中的事件返回一条结果。搜索接受单个 `query` 或 `terms` 数组。续页时保留词及其顺序。用 `readCursor` 回读命中，片段带回原文上下文和 `matchRange`。该范围按返回文本内的 UTF-8 字节计算。
+
+用 `complete` 采用扩展扫描预算。搜索结果保留原 `roots` 和 `selection`，扫描未完成时通过 `nextSearch` 返回完整续查请求。读取时可用 `contextMessages` 请求可见消息窗口。各位置按事件 ID 引用共享的 `neighbors`。
+
+每个读取目标通过从零开始的 `targetIndices` 映射到一个原文位置或一个 `readIssues` 条目。相同文本可以共享一份正文，各个 `alsoAt` 位置和游标分别保留。推迟条目对应原读取目标。`history read` 封装版本 3 通过 `retryRead` 提供推迟目标的读取请求，通过 `nextLocations` 提供下一页位置请求。
+
+在活动、定位或搜索扫描中设置 `fixedScope`，获取 `sourceScope`。扫描游标带有相同的范围。回读导出证据时，传入这个 `sourceScope`，并保留相同的来源根目录和筛选条件。范围变化时，核心返回 `SOURCE_CHANGED`，调用方应从第一页重新开始导出。
+
+精确操作筛选绑定单个聊天和轮次，使用规范调用／条目别名，并保留原日期、来源和项目限制。工具请求与结果都有原文定位，读取工具文本需显式选择。正文保留规则及读取上限见 [核心参考](../reference/core.md)。

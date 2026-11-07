@@ -90,7 +90,7 @@ function resultKind(value:ObjectValue):string|null {
   if(value.outputVersion===6&&object(value.time))return 'timing';
   if(Array.isArray(value.suggestions))return 'optimize';
   if(typeof value.readView==='string'&&Array.isArray(value.items))return 'config';
-  if(value.outputVersion===1&&typeof value.snapshotId==='string'&&Array.isArray(value.fragments)&&Array.isArray(value.items))return 'conversation';
+  if(value.outputVersion===7&&typeof value.snapshotId==='string'&&Array.isArray(value.fragments)&&Array.isArray(value.items))return 'conversation';
   if(object(value.catalog))return 'prices';
   if(object(value.discovery))return 'setup';
   return null;

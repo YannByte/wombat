@@ -13,6 +13,18 @@ struct Request {
 fn main() {
     wombat_core::configure_allocator();
     let arguments: Vec<_> = std::env::args_os().collect();
+    if arguments
+        .get(1)
+        .is_some_and(|arg| arg == "--usage-reuse-worker")
+    {
+        let status = match arguments.as_slice() {
+            [_, _, ticket] => ticket
+                .to_str()
+                .is_some_and(|ticket| wombat_core::live::run_usage_reuse_worker(ticket).is_ok()),
+            _ => false,
+        };
+        std::process::exit(i32::from(!status));
+    }
     if std::env::args().any(|arg| arg == "--version") {
         println!("wombat-core {}", env!("CARGO_PKG_VERSION"));
         return;
@@ -41,6 +53,7 @@ fn main() {
         }
         wombat_core::dispatch(&request.op, &request.args)
     })();
+    let success = result.is_ok();
     let response = match result {
         Ok(value) => json!({"ok":true,"value":value}),
         Err(error) => {
@@ -66,7 +79,13 @@ fn main() {
         }
     };
     let mut output = io::BufWriter::new(io::stdout().lock());
-    if serde_json::to_writer(&mut output, &response).is_err() || output.write_all(b"\n").is_err() {
+    if serde_json::to_writer(&mut output, &response).is_err()
+        || output.write_all(b"\n").is_err()
+        || output.flush().is_err()
+    {
         std::process::exit(1);
+    }
+    if success {
+        wombat_core::live::start_usage_reuse_worker();
     }
 }

@@ -186,6 +186,84 @@ fn config_read(
     }
     Ok(inventory)
 }
+fn direct_report(request: &Request) -> bool {
+    fn ledger(action: &usage_app_dto::Action) -> bool {
+        use usage_app_dto::Action::*;
+        matches!(action, Usage | Statistics | Threads)
+    }
+    request.mode == Mode::Auto
+        && !request.verify
+        && !request.rebuild
+        && ledger(&request.query.action)
+        && request.also.iter().all(|q| ledger(&q.action))
+}
+
+struct ObservedUsage {
+    roots: Vec<String>,
+    input: crate::adapters::codex::usage_input::Inventory,
+    elapsed: Duration,
+}
+
+fn direct_usage(roots: &[String], recent_only: bool) -> Result<(Read, Option<ObservedUsage>)> {
+    use super::usage_cache;
+    let prices = crate::pricing_sync::current()?;
+    let input = usage_cache::candidate(roots, recent_only);
+    let current = |input: &crate::adapters::codex::usage_input::Inventory| {
+        usage_cache::candidate(roots, recent_only)
+            .is_some_and(|i| i.fingerprint == input.fingerprint)
+    };
+    let snapshot_id = |input: Option<&crate::adapters::codex::usage_input::Inventory>| {
+        let data = input.map_or_else(
+            || uuid::Uuid::new_v4().to_string(),
+            |i| i.fingerprint.clone(),
+        );
+        format!(
+            "source-usage:{}",
+            crate::adapters::stable_id(&[&data, &prices.catalog_hash])
+        )
+    };
+    let ready = input.as_ref().and_then(|i| {
+        let collected = usage_cache::load(i)?;
+        let snapshot =
+            crate::usage_store::memory_usage(collected, snapshot_id(Some(i)), prices.clone())
+                .ok()?;
+        current(i).then_some(snapshot)
+    });
+    let (snapshot, observed) = if let Some(snapshot) = ready {
+        (snapshot, None)
+    } else {
+        let start = Instant::now();
+        let collected = super::usage_source::collect(roots, recent_only, &RunContext::default())?;
+        let elapsed = start.elapsed();
+        let input = input.filter(current);
+        let snapshot =
+            crate::usage_store::memory_usage(collected, snapshot_id(input.as_ref()), prices)?;
+        let observed = input.map(|input| ObservedUsage {
+            roots: roots.to_vec(),
+            input,
+            elapsed,
+        });
+        (snapshot, observed)
+    };
+    let freshness = Freshness {
+        publication_change: None,
+        project_loads: vec![],
+        initial_scan: false,
+        status: "current".into(),
+        checked_at: Some(chrono::Utc::now().to_rfc3339()),
+        revision: snapshot.manifest.snapshot_ref.snapshot_id.clone(),
+        error: None,
+        error_code: None,
+    };
+    Ok((
+        Read {
+            snapshot: Arc::new(snapshot),
+            freshness,
+        },
+        observed,
+    ))
+}
+
 fn usage(request: Request) -> Result<Response> {
     if request.also.len() > 8 || (request.verify || request.rebuild) && request.mode != Mode::Fresh
     {
@@ -229,17 +307,26 @@ fn usage(request: Request) -> Result<Response> {
             || q.scope.until.as_ref().is_some_and(|v| v <= &cutoff)
             || matches!(&q.comparison,Some(usage_app_dto::ComparisonRequest::Periods{baseline_since,..}) if baseline_since<&cutoff)
     };
-    let selected = read(
-        request.query.roots.as_deref().unwrap_or_default(),
-        request.mode,
-        request.verify,
-        request.rebuild,
-        !(request.include_history
-            || request.verify
-            || request.rebuild
-            || historical(&request.query)
-            || request.also.iter().any(historical)),
-    )?;
+    let roots = request.query.roots.as_deref().unwrap_or_default();
+    let recent_only = !(request.include_history
+        || request.verify
+        || request.rebuild
+        || historical(&request.query)
+        || request.also.iter().any(historical));
+    let (selected, observed) = if direct_report(&request) {
+        direct_usage(roots, recent_only)?
+    } else {
+        (
+            read(
+                roots,
+                request.mode,
+                request.verify,
+                request.rebuild,
+                recent_only,
+            )?,
+            None,
+        )
+    };
     let execute = |mut q: usage_app_dto::Request| -> Result<usage_app_dto::Response> {
         q.roots = None;
         q.snapshot_id = None;
@@ -264,6 +351,10 @@ fn usage(request: Request) -> Result<Response> {
             "RESOURCE_LIMIT",
             "Usage batch exceeds response budget",
         ));
+    }
+    if let Some(observed) = observed {
+        // Reuse is optional. A failed admission never changes the report.
+        let _ = super::usage_cache::observed(&observed.roots, &observed.input, observed.elapsed);
     }
     Ok(response)
 }
@@ -389,7 +480,11 @@ pub fn dispatch(value: Value) -> Result<Value> {
         ));
     }
     let needs_index = match &message {
-        Message::Usage(_) | Message::Conversation { .. } | Message::Project(_) => true,
+        Message::Usage(request) => !direct_report(request),
+        Message::Project(_) => true,
+        Message::Conversation { conversation } => {
+            conversation.action != crate::conversation_dto::Action::SourceSearch
+        }
         Message::Config(m) => m.config.action != crate::config_dto::Action::Capabilities,
         Message::Optimize(m) => m.optimize.action != crate::optimize_dto::Action::Capabilities,
         Message::Timing { timing } => {
@@ -458,6 +553,11 @@ pub fn dispatch(value: Value) -> Result<Value> {
             )?)?)
         }
         Message::Conversation { mut conversation } => {
+            if conversation.action == crate::conversation_dto::Action::SourceSearch {
+                return Ok(serde_json::to_value(
+                    crate::adapters::codex::direct_search::query(&conversation)?,
+                )?);
+            }
             let selected = read(&conversation.roots, Mode::Auto, false, false, false)?;
             conversation.snapshot_id = selected.freshness.revision.clone();
             let mut result = crate::conversation::query(

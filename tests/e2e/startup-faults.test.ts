@@ -28,7 +28,9 @@ test('index initialization faults return actual errors, retain unsupported recor
     const client = createNodeClient({ binaryPath: binary, automaticPrices: false });
     const nativeEntry = projectTestClient(client, [root], [project]);
     try {
-        await assert.rejects(client.live!({ query: { action: 'usage', roots: [root] }, mode: 'auto' }), { code: 'INDEX_UNSUPPORTED_VERSION' });
+        await assert.rejects(client.live!({ query: { action: 'usage', roots: [root] }, mode: 'fresh' }), { code: 'INDEX_UNSUPPORTED_VERSION' });
+        const direct = await client.live!({query:{action:'usage',roots:[root]}});
+        assert.equal(direct.result.summary.measurementCount,0);
 
         const nativeApi = nativeEntry;
         const inventory = await nativeApi.config!({});

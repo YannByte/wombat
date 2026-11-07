@@ -174,7 +174,12 @@ pub(super) fn read_file_flushing(
         issue(report, "sourceUnreadable", "无法定位日志增量", None);
         return Ok(());
     }
-    let mut reader = BufReader::new(file.take(length.saturating_sub(offset)));
+    let file = file.take(length.saturating_sub(offset));
+    let mut reader = if facts.usage_only {
+        BufReader::with_capacity(256 * 1024, file)
+    } else {
+        BufReader::new(file)
+    };
     let event_source: Arc<str> = source.id.as_str().into();
     let event_file: Arc<str> = file_id.as_str().into();
     let mut buffer = Vec::new();
@@ -333,17 +338,19 @@ pub(super) fn read_file_flushing(
             byte_offset: consumed - row.bytes().len() as u64,
             ordinal: 0,
         };
-        facts.event_context = Some(
-            timing::Context::new(
-                position,
-                record.timestamp,
-                record.kind,
-                payload.kind.as_deref(),
-                &evidence,
-                record.metadata,
-            )
-            .source_row(row.bytes()),
+        let context = timing::Context::new(
+            position,
+            record.timestamp,
+            record.kind,
+            payload.kind.as_deref(),
+            &evidence,
+            record.metadata,
         );
+        facts.event_context = Some(if facts.usage_only {
+            context
+        } else {
+            context.source_row(row.bytes())
+        });
         process(
             record.kind,
             payload,

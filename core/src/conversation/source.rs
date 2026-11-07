@@ -166,14 +166,77 @@ fn suffix(text: &str, bytes: usize) -> &str {
     }
     &text[start..]
 }
-pub(super) fn search(
+
+pub(super) fn match_prefix(
     reader: &mut Reader<'_>,
     event: &Event,
     content: &OriginalContent,
-    needle: &str,
+    chunk: usize,
+    prefix: &str,
+    budget: usize,
+    cancelled: &AtomicBool,
+) -> Result<(String, Vec<ContentLocation>)> {
+    let mut chunks = VecDeque::new();
+    let mut locations = Vec::new();
+    let current = suffix(prefix, budget);
+    let mut remaining = budget - current.len();
+    if current.len() == prefix.len() {
+        for preceding in content.chunks[..chunk].iter().rev() {
+            if remaining == 0 || preceding.part != content.chunks[chunk].part {
+                break;
+            }
+            let (decoded, location) = reader.chunk(event, preceding, cancelled)?;
+            let tail = suffix(&decoded, remaining);
+            chunks.push_front(tail.to_owned());
+            if !tail.is_empty() {
+                locations.push(location);
+            }
+            remaining -= tail.len();
+            if tail.len() != decoded.len() {
+                break;
+            }
+        }
+    }
+    let mut text = String::with_capacity(budget - remaining);
+    for chunk in chunks {
+        text.push_str(&chunk);
+    }
+    text.push_str(current);
+    locations.reverse();
+    Ok((text, locations))
+}
+pub(super) struct SearchTerms<'a> {
+    finders: Vec<(&'a str, memchr::memmem::Finder<'a>)>,
+    longest: usize,
+}
+impl<'a> SearchTerms<'a> {
+    pub fn new(terms: impl Iterator<Item = &'a str>) -> Self {
+        let mut finders = vec![];
+        let mut longest = 0;
+        for term in terms {
+            if !finders.iter().any(|(existing, _)| *existing == term) {
+                finders.push((term, memchr::memmem::Finder::new(term.as_bytes())));
+                longest = longest.max(term.len());
+            }
+        }
+        Self { finders, longest }
+    }
+
+    fn find(&self, text: &str) -> Option<(usize, &'a str)> {
+        self.finders
+            .iter()
+            .filter_map(|(term, finder)| Some((finder.find(text.as_bytes())?, *term)))
+            .min_by_key(|(at, _)| *at)
+    }
+}
+pub(super) fn search<'a>(
+    reader: &mut Reader<'_>,
+    event: &Event,
+    content: &OriginalContent,
+    terms: &SearchTerms<'a>,
     next: &mut usize,
     cancelled: &AtomicBool,
-) -> Result<Option<(usize, usize)>> {
+) -> Result<Option<(usize, usize, &'a str)>> {
     if *next > content.chunks.len() {
         return Err(error("INVALID_ARGUMENT"));
     }
@@ -182,7 +245,7 @@ pub(super) fn search(
     while start > 0
         && start < content.chunks.len()
         && content.chunks[start - 1].part == content.chunks[*next].part
-        && raw < needle.len() * 6 + 16
+        && raw < terms.longest * 6 + 16
     {
         start -= 1;
         raw += content.chunks[start].bytes as usize;
@@ -206,17 +269,17 @@ pub(super) fn search(
         part = Some(chunk.part);
         if index >= *next {
             *next = index + 1;
-            if let Some(mut matched) = tail.find(needle) {
+            if let Some((mut matched, term)) = terms.find(&tail) {
                 for (chunk, offset, length) in &positions {
                     if matched < *length {
-                        return Ok(Some((*chunk, offset + matched)));
+                        return Ok(Some((*chunk, offset + matched, term)));
                     }
                     matched -= length;
                 }
                 return Err(error("CONTENT_UNAVAILABLE"));
             }
         }
-        let retained = suffix(&tail, needle.len().saturating_sub(1));
+        let retained = suffix(&tail, terms.longest.saturating_sub(1));
         let mut drop = tail.len() - retained.len();
         while let Some((_, offset, length)) = positions.front_mut() {
             if drop < *length {

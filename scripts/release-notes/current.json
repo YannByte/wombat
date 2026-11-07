@@ -1,18 +1,13 @@
 {
-  "summary": "Recheck the original problem with consistent scope and follow an operation from its request to its result. Wombat improves Skill repair verification, historical evidence retrieval and installation diagnostics without changing Token or pricing accounting.",
+  "summary": "Find and quote past Codex decisions with fewer steps, and get current Token usage without waiting for a full index. This stable release is for Codex users who review project history and usage on their own machine.",
   "highlights": [
-    "Recheck global Skills with fresh native discovery and the original project scope. Local missing references keep a stable problem identity through missing, repaired and restored states.",
-    "Read located requests and results with history read RECORD --turn TURN --operation OPERATION. Successful recovery results and commands embedded in completion-only records are available; long text retains bounded continuation.",
-    "Retrieve dated history using existing frame time ranges. Continuation treats an omitted zero offset consistently and reports actionable cursor mismatch details.",
-    "Keep explicitly inherited operation records as source evidence without treating them as fresh execution endpoints. Partial activity checks can report reliable eligible-command subset results.",
-    "Distinguish naming-only Skill specification reminders from runtime faults, and keep project applicability separate from ownership of global or managed files.",
-    "Preserve compatible-bundle facts and specific installation failures even when verification exits with status 1. Parsing warnings remain separate from the actual failure cause.",
-    "Use the Skill workflow to recover original requirements, expected negative tests, failures, later handling and verified outcomes before proposing a repair."
+    "Search original conversation logs with several alternative terms in one command. Request surrounding messages to read the discussion across turns, and keep the original location for each quote.",
+    "Read multiple located excerpts in one request. Repeated text shares one copy while retaining its source locations, and an unreadable item does not stop the remaining items. Continue through long searches while keeping the original source scope.",
+    "Get ordinary usage results directly from current logs on the first query and after logs grow. Repeated slow queries over stable historical logs can reuse a compact accounting cache prepared in the background on macOS, Linux, and Windows. The worker exits after the attempt. Token totals and pricing rules are unchanged."
   ],
   "knownLimitations": [
-    "One operation ID identifies one invocation, not a causal chain of later attempts. Codex still interprets cross-turn tasks and verifies business resolution; outer tool success does not prove every inner command succeeded.",
-    "Unsupported tool text forms and incomplete source coverage retain explicit gaps. Partial zero use observations alone do not justify disabling or deleting a Skill.",
-    "Conversation request/results use protocol v3 and optimize responses use v7. Update the CLI, plugin and integrations together; older response formats are rejected without compatibility handling.",
-    "Environment configuration does not prove live MCP connectivity, actual Hook execution or model adoption. No automatic rollback or savings claim is added."
+    "Direct history search covers visible messages. Use indexed lookup for operation IDs and tool evidence.",
+    "Usage comparison uses the last committed full index by default. Add --fresh when comparing current records.",
+    "Conversation automation uses request and response protocol v7, and structured CLI history read output uses v3. Update integrations alongside the CLI and plugin."
   ]
 }

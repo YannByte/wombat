@@ -29,6 +29,15 @@ pub fn collect_with(
     request: &DiscoveryRequest,
     context: &RunContext,
 ) -> Collected {
+    collect_planned(adapters, request, context, &ReadPlan::default())
+}
+
+pub(crate) fn collect_planned(
+    adapters: &[Box<dyn AgentAdapter>],
+    request: &DiscoveryRequest,
+    context: &RunContext,
+    plan: &ReadPlan,
+) -> Collected {
     let mut result = Collected::default();
     for adapter in adapters {
         let discovered = adapter.discover(request);
@@ -43,7 +52,7 @@ pub fn collect_with(
                 result.events.len(),
                 result.operations.len(),
             );
-            let report = adapter.collect(&source, &ReadPlan, context, &mut result);
+            let report = adapter.collect(&source, plan, context, &mut result);
             // Streaming sinks can already have received a prefix when cancellation
             // arrives. A cancelled source does not publish that prefix as new facts.
             if report.status == "cancelled" {

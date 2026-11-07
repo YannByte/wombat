@@ -269,7 +269,10 @@ pub struct DiscoveryReport {
     pub issues: Vec<Issue>,
 }
 #[derive(Clone, Debug, Default)]
-pub struct ReadPlan;
+pub struct ReadPlan {
+    pub(crate) recent_only: bool,
+    pub(crate) usage_only: bool,
+}
 
 #[derive(Clone, Debug)]
 pub struct RunContext {

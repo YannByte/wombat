@@ -97,7 +97,13 @@ mod generation;
 mod project;
 mod query;
 mod resources;
+mod usage_cache;
+mod usage_source;
 pub(crate) use collection::load_collected_except;
 use collection::{source_key, sync};
 pub(crate) use query::cleanup_rebuild;
 pub use query::dispatch;
+#[doc(hidden)]
+pub use usage_cache::{
+    run_worker as run_usage_reuse_worker, start_queued as start_usage_reuse_worker,
+};

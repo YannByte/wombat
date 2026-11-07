@@ -23,6 +23,8 @@ pub(super) struct Facts {
     #[serde(skip)]
     pub(super) streaming: bool,
     #[serde(skip)]
+    pub(super) usage_only: bool,
+    #[serde(skip)]
     pub(super) external: bool,
     #[serde(skip)]
     pub(super) pending_events: Vec<Arc<crate::session_events::Event>>,

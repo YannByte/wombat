@@ -8,6 +8,28 @@ pub(crate) fn memory(
 ) -> Result<Snapshot> {
     memory_inner(collected, id, prices, prior, None, None)
 }
+pub(crate) fn memory_usage(
+    collected: Collected,
+    id: String,
+    prices: crate::pricing_sync::Response,
+) -> Result<Snapshot> {
+    let mut snapshot = memory_inner(
+        collected,
+        id,
+        prices,
+        None,
+        Some((
+            EventIndex {
+                version: super::events::EVENT_INDEX_VERSION,
+                partitions: vec![],
+            },
+            None,
+        )),
+        None,
+    )?;
+    snapshot.direct_ledger = true;
+    Ok(snapshot)
+}
 pub(crate) fn memory_cold_operations(
     collected: Collected,
     id: String,
@@ -232,6 +254,7 @@ fn memory_inner(
         query_work: Arc::default(),
         manifest,
         directory: PathBuf::new(),
+        direct_ledger: false,
         live_rows: Some(Arc::new(rows)),
         live_events,
         cold_events: None,

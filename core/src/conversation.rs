@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, VecDeque},
     fs::File,
@@ -24,7 +25,10 @@ const MAX_EVENTS: usize = 2000;
 // Leave room for CLI/HTTP transport and other readers between scan slices.
 // This is cooperative: a frame or source read can exceed the time slice.
 const SCAN_MILLIS: u128 = 20;
+const COMPLETE_SCAN_MILLIS: u128 = 5_000;
 const MAX_CURSOR: usize = 32768;
+const READ_DEFAULT_BYTES: usize = 8192;
+mod neighbors;
 mod operations;
 mod records;
 use operations::OperationSelection;
@@ -42,6 +46,8 @@ struct ScanCursor {
     anchor: Option<Evidence>,
     offset: usize,
     chunk: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_scope: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -50,6 +56,8 @@ struct FragmentCursor {
     chunk: usize,
     offset: usize,
     separator: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    match_bytes: Option<usize>,
 }
 fn error(code: &'static str) -> anyhow::Error {
     operation_error(code, code)
@@ -78,9 +86,42 @@ fn binding(request: &Request) -> Result<String> {
         &request.selection,
         &request.query,
         &request.baseline_snapshot_id,
+        &request.terms,
+        request.fixed_scope,
     ))?))
 }
 pub(crate) fn validate(request: &Request) -> Result<()> {
+    if request.excerpt_bytes.is_some() && request.action != Action::SourceSearch {
+        return Err(error("INVALID_ARGUMENT"));
+    }
+    if request.complete
+        && (!matches!(request.action, Action::Search | Action::Locate) || request.anchor.is_some())
+        || request.context_messages.is_some_and(|n| {
+            request.action != Action::Read
+                || n == 0
+                || n > 5
+                || request.selection.operation_id.is_some()
+        })
+    {
+        return Err(error("INVALID_ARGUMENT"));
+    }
+    if request.fixed_scope
+        && !matches!(
+            request.action,
+            Action::Activity | Action::Locate | Action::Search
+        )
+        || request.source_scope.is_some()
+            && !matches!(
+                request.action,
+                Action::Activity | Action::Locate | Action::Search | Action::Read
+            )
+        || request
+            .source_scope
+            .as_ref()
+            .is_some_and(|s| s.len() != 64 || !s.bytes().all(|c| c.is_ascii_hexdigit()))
+    {
+        return Err(error("INVALID_ARGUMENT"));
+    }
     if let Some(id) = &request.selection.operation_id
         && (id.is_empty()
             || id.len() > 4096
@@ -166,7 +207,7 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
     {
         return Err(error("INVALID_ARGUMENT"));
     }
-    if request.action == Action::Search && request.query.is_none()
+    if request.action == Action::Search && request.query.is_none() && request.terms.is_none()
         || request.query.is_some()
             && !matches!(
                 request.action,
@@ -175,13 +216,28 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
         || request
             .query
             .as_ref()
-            .is_some_and(|q| q.is_empty() || q.len() > 4096)
+            .is_some_and(|q| q.is_empty() || q.len() > MAX_TERM_BYTES)
         || request.action == Action::Search
             && request.selection.threads.is_empty()
             && request.selection.projects.is_empty()
             && (request.selection.since.is_none() || request.selection.until.is_none())
     {
         return Err(error("INVALID_ARGUMENT"));
+    }
+    if let Some(terms) = &request.terms
+        && (request.action != Action::Search
+            || request.query.is_some()
+            || terms.is_empty()
+            || terms.len() > MAX_SEARCH_TERMS
+            || terms
+                .iter()
+                .any(|term| term.trim().is_empty() || term.len() > MAX_TERM_BYTES))
+    {
+        return Err(crate::dto::operation_error_with_details(
+            "INVALID_ARGUMENT",
+            "Invalid conversation request at /terms",
+            serde_json::json!({"fields":[{"path":"/terms","reason":"search accepts up to 16 nonblank literal terms of at most 4096 UTF-8 bytes each, without query"}],"schemaCommand":"wombat system api conversation --json"}),
+        ));
     }
     if request.action == Action::Resolve
         && (request.query.is_none()
@@ -198,7 +254,7 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
     }
     if request.action == Action::Read {
         if request.targets.is_empty()
-            || request.targets.len() > 20
+            || request.targets.len() > MAX_READ_TARGETS
             || request.cursor.is_some()
             || request.limit.is_some()
         {
@@ -209,6 +265,12 @@ pub(crate) fn validate(request: &Request) -> Result<()> {
                 || target.before > 20
                 || target.after > 20
                 || target.cursor.as_ref().is_some_and(|s| s.len() > MAX_CURSOR)
+                || target.evidence.event_id.len() != 64
+                || !target
+                    .evidence
+                    .event_id
+                    .bytes()
+                    .all(|c| c.is_ascii_hexdigit())
             {
                 return Err(error("INVALID_ARGUMENT"));
             }
@@ -223,6 +285,91 @@ fn event_target(evidence: &Evidence) -> EventTarget {
         thread_id: evidence.thread_id.clone(),
         turn_id: evidence.turn_id.clone(),
     }
+}
+fn partition_in_scope(
+    partition: &crate::usage_store::EventPartition,
+    selection: &Selection,
+    projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
+) -> bool {
+    let target = &partition.target;
+    (selection.threads.is_empty()
+        || target
+            .thread_id
+            .as_ref()
+            .is_some_and(|id| selection.threads.contains(id)))
+        && (selection.turns.is_empty()
+            || target
+                .turn_id
+                .as_ref()
+                .is_some_and(|id| selection.turns.contains(id)))
+        && (selection.projects.is_empty()
+            || target
+                .thread_id
+                .as_deref()
+                .is_some_and(|id| projects.contains_key(id)))
+        && (selection.sources.is_empty()
+            || partition
+                .native_boundary
+                .source_instance_id
+                .as_ref()
+                .is_none_or(|id| selection.sources.contains(id)))
+}
+
+fn scope_changed() -> anyhow::Error {
+    crate::dto::operation_error_with_details(
+        "SOURCE_CHANGED",
+        "The fixed evidence scope changed. Restart the export with the original filters and no cursor or scope token.",
+        serde_json::json!({"fields":[{"path":"/sourceScope","reason":"restart the export with its original filters and without the cursor or scope token"}],"schemaCommand":"wombat system api conversation --json"}),
+    )
+}
+
+fn fixed_source_scope(
+    snapshot: &Snapshot,
+    request: &Request,
+    index: &crate::usage_store::EventIndex,
+    projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
+    calendar: &Calendar,
+    cancelled: &AtomicBool,
+) -> Result<Option<String>> {
+    if !request.fixed_scope && request.source_scope.is_none() {
+        return Ok(None);
+    }
+    let sources: Vec<_> = snapshot
+        .manifest
+        .sources
+        .iter()
+        .filter(|s| {
+            request.selection.sources.is_empty() || request.selection.sources.contains(&s.source.id)
+        })
+        .map(|s| (&s.source.id, &s.status))
+        .collect();
+    let mut hash = Sha256::new();
+    hash.update(serde_json::to_vec(&(
+        1,
+        &request.roots,
+        &request.selection,
+        sources,
+    ))?);
+    for partition in &index.partitions {
+        check(cancelled)?;
+        if partition_in_scope(partition, &request.selection, projects)
+            && partition
+                .chunks
+                .iter()
+                .any(|c| calendar.matches_range(&request.selection, &c.inspection.time))
+        {
+            hash.update(partition.sha256.as_bytes());
+        }
+    }
+    let scope = format!("{:x}", hash.finalize());
+    if request
+        .source_scope
+        .as_ref()
+        .is_some_and(|previous| previous != &scope)
+    {
+        return Err(scope_changed());
+    }
+    Ok(Some(scope))
 }
 fn event(snapshot: &Snapshot, evidence: &Evidence, cancelled: &AtomicBool) -> Result<Arc<Event>> {
     if evidence.event_id.len() != 64
@@ -427,6 +574,7 @@ fn activity(
     Activity {
         record: None,
         read_cursor: None,
+        matched_term: None,
         evidence: Evidence {
             event_id: event.id().into(),
             source_instance_id: event.position().source_instance_id.to_string(),
@@ -473,7 +621,24 @@ fn fragment(
     operation: Option<&OperationSelection>,
 ) -> Result<Fragment> {
     let event = event(snapshot, &target.evidence, cancelled)?;
-    if !selected(&event, &request.selection, projects, calendar, operation)? {
+    fragment_for_event(
+        snapshot, request, target, projects, reader, cancelled, calendar, operation, &event,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fragment_for_event(
+    snapshot: &Snapshot,
+    request: &Request,
+    target: &ReadTarget,
+    projects: &BTreeMap<&str, &crate::usage_store::ThreadEntry>,
+    reader: &mut Reader<'_>,
+    cancelled: &AtomicBool,
+    calendar: &Calendar,
+    operation: Option<&OperationSelection>,
+    event: &Event,
+) -> Result<Fragment> {
+    if !selected(event, &request.selection, projects, calendar, operation)? {
         return Err(error("NOT_FOUND"));
     }
     let content = event
@@ -497,6 +662,7 @@ fn fragment(
             chunk: 0,
             offset: 0,
             separator: false,
+            match_bytes: None,
         }
     };
     if state.binding != key
@@ -505,18 +671,55 @@ fn fragment(
     {
         return Err(error("CURSOR_MISMATCH"));
     }
-    let max = target.max_bytes.unwrap_or(8192);
+    let max = target.max_bytes.unwrap_or(READ_DEFAULT_BYTES);
     let mut text = String::new();
     let mut locations = vec![];
+    let mut match_range = None;
+    let mut first_chunk = None;
+    if let Some(length) = state.match_bytes.take() {
+        if length == 0 || length > MAX_TERM_BYTES || state.separator {
+            return Err(error("CURSOR_MISMATCH"));
+        }
+        if length > max {
+            return Err(error("RESOURCE_LIMIT"));
+        }
+        let chunk = content
+            .chunks
+            .get(state.chunk)
+            .ok_or_else(|| error("CURSOR_MISMATCH"))?;
+        let decoded = reader.chunk(event, chunk, cancelled)?;
+        let prefix = decoded
+            .0
+            .get(..state.offset)
+            .ok_or_else(|| error("CURSOR_MISMATCH"))?;
+        (text, locations) = source::match_prefix(
+            reader,
+            event,
+            content,
+            state.chunk,
+            prefix,
+            ((max - length) / 2).min(512),
+            cancelled,
+        )?;
+        match_range = Some(MatchRange {
+            start: text.len(),
+            end: text.len() + length,
+        });
+        first_chunk = Some(decoded);
+    }
     while state.chunk < content.chunks.len() {
         check(cancelled)?;
         let chunk = &content.chunks[state.chunk];
-        if !text.is_empty()
+        if match_range.is_none()
+            && !text.is_empty()
             && max.saturating_sub(text.len()) < chunk.bytes as usize + usize::from(state.separator)
         {
             break;
         }
-        let (value, location) = reader.chunk(&event, chunk, cancelled)?;
+        let (value, location) = match first_chunk.take() {
+            Some(decoded) => decoded,
+            None => reader.chunk(event, chunk, cancelled)?,
+        };
         if state.offset > value.len() || !value.is_char_boundary(state.offset) {
             return Err(error("INVALID_ARGUMENT"));
         }
@@ -553,6 +756,12 @@ fn fragment(
             break;
         }
     }
+    if match_range
+        .as_ref()
+        .is_some_and(|range| !text.is_char_boundary(range.end))
+    {
+        return Err(error("CURSOR_MISMATCH"));
+    }
     let next_cursor = (state.chunk < content.chunks.len())
         .then(|| serde_json::to_string(&state))
         .transpose()?;
@@ -582,20 +791,93 @@ fn fragment(
         }
     }
     Ok(Fragment {
+        target_indices: vec![],
         evidence: target.evidence.clone(),
         message: activity(
-            &event,
+            event,
             target.evidence.event_offset,
             projects,
             None,
             operation,
         ),
         text,
+        match_range,
         next_cursor,
         locations,
         context,
+        visible_context: None,
         partial: content.partial || !event.gaps().is_empty(),
+        also_at: vec![],
     })
+}
+
+fn unique_targets(targets: &[ReadTarget]) -> Vec<(ReadTarget, Vec<usize>)> {
+    let mut unique: Vec<(ReadTarget, Vec<usize>)> = Vec::with_capacity(targets.len());
+    for (index, target) in targets.iter().enumerate() {
+        if let Some((previous, indices)) = unique.iter_mut().find(|(previous, _)| {
+            previous.evidence == target.evidence
+                && previous.cursor == target.cursor
+                && previous.max_bytes.unwrap_or(READ_DEFAULT_BYTES)
+                    == target.max_bytes.unwrap_or(READ_DEFAULT_BYTES)
+        }) {
+            previous.before = previous.before.max(target.before);
+            previous.after = previous.after.max(target.after);
+            indices.push(index);
+        } else {
+            unique.push((target.clone(), vec![index]));
+        }
+    }
+    unique
+}
+
+fn merge_fragment(
+    fragments: &mut Vec<Fragment>,
+    fragment: Fragment,
+    budget: &mut usize,
+) -> Result<bool> {
+    if let Some(previous) = fragments.iter_mut().find(|item| item.text == fragment.text) {
+        let occurrence = FragmentOccurrence {
+            target_indices: fragment.target_indices,
+            evidence: fragment.evidence,
+            message: fragment.message,
+            match_range: fragment.match_range,
+            next_cursor: fragment.next_cursor,
+            locations: fragment.locations,
+            context: fragment.context,
+            visible_context: fragment.visible_context,
+            partial: fragment.partial,
+        };
+        // Reserve the property name and array delimiters on the first repeat.
+        let size = serde_json::to_vec(&occurrence)?.len() + 16;
+        if size > *budget {
+            return Ok(false);
+        }
+        *budget -= size;
+        previous.also_at.push(occurrence);
+    } else {
+        let size = serde_json::to_vec(&fragment)?.len() + 1;
+        if size > *budget {
+            return Ok(false);
+        }
+        *budget -= size;
+        fragments.push(fragment);
+    }
+    Ok(true)
+}
+
+fn read_issue(error: &anyhow::Error) -> Option<&'static str> {
+    let code = error.downcast_ref::<crate::dto::OperationError>()?.code;
+    matches!(
+        code,
+        "NOT_FOUND"
+            | "SOURCE_CHANGED"
+            | "SOURCE_UNREADABLE"
+            | "CONTENT_UNAVAILABLE"
+            | "CURSOR_MISMATCH"
+            | "INVALID_ARGUMENT"
+            | "RESOURCE_LIMIT"
+    )
+    .then_some(code)
 }
 
 pub(crate) fn query(
@@ -604,7 +886,12 @@ pub(crate) fn query(
     request: &Request,
     cancelled: &AtomicBool,
 ) -> Result<Response> {
-    query_with_scan_budget(snapshot, baseline, request, cancelled, SCAN_MILLIS)
+    let millis = if request.complete {
+        COMPLETE_SCAN_MILLIS
+    } else {
+        SCAN_MILLIS
+    };
+    query_with_scan_budget(snapshot, baseline, request, cancelled, millis)
 }
 
 fn query_with_scan_budget(
@@ -657,8 +944,16 @@ fn query_with_scan_budget(
             snapshot_id: request.snapshot_id.clone(),
             baseline_snapshot_id: None,
             selection: request.selection.clone(),
+            roots: request.roots.clone(),
             items: vec![],
             fragments: vec![],
+            neighbors: vec![],
+            source_hits: vec![],
+            source_files: vec![],
+            source_neighbors: vec![],
+            next_search: None,
+            read_issues: vec![],
+            source_scope: None,
             next_cursor: None,
             scan_complete: true,
             partial: false,
@@ -693,6 +988,14 @@ fn query_with_scan_budget(
         }
         projects.insert(thread.thread.id.as_str(), thread.as_ref());
     }
+    let source_scope = fixed_source_scope(
+        snapshot,
+        request,
+        event_index,
+        &projects,
+        &calendar,
+        cancelled,
+    )?;
     let operation = OperationSelection::resolve(snapshot, &request.selection, &projects)?;
     let operation = operation.as_ref();
     let mut reader = Reader::new(snapshot, request.max_scan_bytes.unwrap_or(8 * 1024 * 1024));
@@ -703,8 +1006,16 @@ fn query_with_scan_budget(
         snapshot_id: request.snapshot_id.clone(),
         baseline_snapshot_id: request.baseline_snapshot_id.clone(),
         selection: request.selection.clone(),
+        roots: request.roots.clone(),
         items: vec![],
         fragments: vec![],
+        neighbors: vec![],
+        source_hits: vec![],
+        source_files: vec![],
+        source_neighbors: vec![],
+        next_search: None,
+        read_issues: vec![],
+        source_scope,
         next_cursor: None,
         scan_complete: true,
         partial: snapshot.manifest.sources.iter().any(|s| {
@@ -762,19 +1073,74 @@ fn query_with_scan_budget(
             radius,
         });
     } else if request.action == Action::Read {
-        for target in &request.targets {
-            response.fragments.push(fragment(
+        let mut output_budget = MAX_OUTPUT
+            .checked_sub(serde_json::to_vec(&response)?.len() + 512 + request.targets.len() * 160)
+            .ok_or_else(|| error("OUTPUT_LIMIT"))?;
+        for (target, indices) in unique_targets(&request.targets) {
+            let result = fragment(
                 snapshot,
                 request,
-                target,
+                &target,
                 &projects,
                 &mut reader,
                 cancelled,
                 &calendar,
                 operation,
-            )?);
+            );
+            let issue = match result {
+                Ok(mut item) => {
+                    item.target_indices.clone_from(&indices);
+                    let partial = item.partial;
+                    if merge_fragment(&mut response.fragments, item, &mut output_budget)? {
+                        response.partial |= partial;
+                        continue;
+                    }
+                    if request.targets.len() == 1 {
+                        return Err(error("OUTPUT_LIMIT"));
+                    }
+                    ReadIssue {
+                        target_indices: indices,
+                        event_id: target.evidence.event_id,
+                        code: "OUTPUT_LIMIT".into(),
+                        deferred: true,
+                    }
+                }
+                Err(err) => {
+                    let Some(code) = read_issue(&err).filter(|_| request.targets.len() > 1) else {
+                        return Err(err);
+                    };
+                    ReadIssue {
+                        target_indices: indices,
+                        event_id: target.evidence.event_id,
+                        code: code.into(),
+                        deferred: false,
+                    }
+                }
+            };
+            response.partial = true;
+            response.read_issues.push(issue);
+        }
+        if let Some(count) = request.context_messages {
+            neighbors::attach(
+                snapshot,
+                request,
+                &projects,
+                &calendar,
+                &mut reader,
+                cancelled,
+                count,
+                &mut output_budget,
+                &mut response,
+            )?;
         }
     } else {
+        let terms = source::SearchTerms::new(
+            request
+                .query
+                .iter()
+                .chain(request.terms.iter().flatten())
+                .map(String::as_str),
+        );
         let key = binding(request)?;
         let mut state = request
             .cursor
@@ -783,10 +1149,14 @@ fn query_with_scan_budget(
             .transpose()?
             .unwrap_or(ScanCursor {
                 binding: key.clone(),
+                source_scope: response.source_scope.clone(),
                 ..Default::default()
             });
         if state.binding != key {
             return Err(error("CURSOR_MISMATCH"));
+        }
+        if state.source_scope != response.source_scope {
+            return Err(scope_changed());
         }
         if request.cursor.is_some() {
             let target = state
@@ -846,32 +1216,20 @@ fn query_with_scan_budget(
             None
         };
         let excluded = |partition: &crate::usage_store::EventPartition| {
-            let t = &partition.target;
             (matches!(request.action, Action::Locate | Action::Search)
                 && !request.selection.include_tool_output
                 && partition.native_boundary.message_count == 0)
-                || (!request.selection.threads.is_empty()
-                    && t.thread_id
-                        .as_ref()
-                        .is_none_or(|id| !request.selection.threads.contains(id))
-                    || !request.selection.turns.is_empty()
-                        && t.turn_id
-                            .as_ref()
-                            .is_none_or(|id| !request.selection.turns.contains(id))
-                    || !request.selection.projects.is_empty()
-                        && t.thread_id
-                            .as_deref()
-                            .and_then(|id| projects.get(id))
-                            .and_then(|t| t.thread.project.as_ref())
-                            .is_none_or(|p| !request.selection.projects.contains(p)))
+                || !partition_in_scope(partition, &request.selection, &projects)
         };
         let started = Instant::now();
         let limit = request.limit.unwrap_or(20);
+        let max_events = if request.complete { 50_000 } else { MAX_EVENTS };
+        let max_metadata = if request.complete { 100_000 } else { 10_000 };
         let mut metadata = 0;
         'scan: while state.partition < event_index.partitions.len() {
             check(cancelled)?;
-            if response.scanned_events >= MAX_EVENTS
-                || metadata >= 10000
+            if response.scanned_events >= max_events
+                || metadata >= max_metadata
                 || metadata > 0 && started.elapsed().as_millis() >= scan_millis
             {
                 response.limits.push("scan_budget".into());
@@ -946,7 +1304,7 @@ fn query_with_scan_budget(
             };
             for (offset, e) in &events {
                 state.offset = *offset;
-                if response.scanned_events >= MAX_EVENTS
+                if response.scanned_events >= max_events
                     // Decoding a single frame can consume the cooperative slice.
                     // Still visit one fact so its continuation cannot stall.
                     || response.scanned_events > 0
@@ -985,19 +1343,19 @@ fn query_with_scan_budget(
                 {
                     if request.action == Action::Search {
                         if let Some(content) = e.original_content() {
-                            let needle = request.query.as_deref().unwrap();
                             let before_chunk = state.chunk;
                             match source::search(
                                 &mut reader,
                                 e,
                                 content,
-                                needle,
+                                &terms,
                                 &mut state.chunk,
                                 cancelled,
                             ) {
-                                Ok(Some((chunk, byte))) => {
+                                Ok(Some((chunk, byte, term))) => {
                                     let mut item =
                                         activity(e, offset, &projects, change, operation);
+                                    item.matched_term = Some(term.into());
                                     let key = crate::hash(serde_json::to_vec(&(
                                         &request.selection,
                                         &item.evidence,
@@ -1008,6 +1366,7 @@ fn query_with_scan_budget(
                                             chunk,
                                             offset: byte,
                                             separator: false,
+                                            match_bytes: Some(term.len()),
                                         })?);
                                     response.items.push(item);
                                 }
@@ -1072,8 +1431,14 @@ fn query_with_scan_budget(
         response.next_cursor = (!response.scan_complete)
             .then(|| serde_json::to_string(&state))
             .transpose()?;
+        if request.action == Action::Search && response.next_cursor.is_some() {
+            let mut next = request.clone();
+            next.cursor.clone_from(&response.next_cursor);
+            next.source_scope.clone_from(&response.source_scope);
+            response.next_search = Some(next);
+        }
     }
-    response.partial |= response.fragments.iter().any(|f| f.partial) || !response.limits.is_empty();
+    response.partial |= !response.limits.is_empty();
     response.source_bytes_read = reader.bytes;
     response.limits.sort();
     response.limits.dedup();

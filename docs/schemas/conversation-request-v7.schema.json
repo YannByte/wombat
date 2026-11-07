@@ -63,6 +63,16 @@
         "null"
       ]
     },
+    "terms": {
+      "description": "Search only. Match any of 1–16 literal terms. Supply this or query.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "targets": {
       "type": "array",
       "items": {
@@ -77,6 +87,39 @@
       ],
       "minimum": 0,
       "maximum": 9007199254740991
+    },
+    "complete": {
+      "description": "Use the extended foreground scan budget for search or location.",
+      "type": "boolean"
+    },
+    "contextMessages": {
+      "description": "Read this many visible messages on either side of each read target or direct source hit.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "excerptBytes": {
+      "description": "Maximum UTF-8 bytes per direct source hit.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "fixedScope": {
+      "description": "Pin an evidence scan to its first observed source scope.",
+      "type": "boolean"
+    },
+    "sourceScope": {
+      "description": "Use the scope returned by the initial scan when reading export evidence.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "anchor": {
       "anyOf": [
@@ -122,6 +165,11 @@
           "description": "Resolve an exact canonical or upstream identity without scanning activity or text.",
           "type": "string",
           "const": "resolve"
+        },
+        {
+          "description": "Search visible Codex source text and return excerpts without an index.",
+          "type": "string",
+          "const": "source_search"
         }
       ]
     },
@@ -321,5 +369,5 @@
       ]
     }
   },
-  "$comment": "Wombat request protocol 3"
+  "$comment": "Wombat request protocol 7"
 }

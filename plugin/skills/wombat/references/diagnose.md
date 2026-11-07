@@ -2,7 +2,7 @@
 
 | User task | Start with | Next decision |
 |---|---|---|
-| Explain development obstacles or improve Agent work | Project/date-scoped `history search`, then bounded `history read` | Recover the request, failure and subsequent handling before selecting execution analysis or current-code checks |
+| Explain development obstacles or improve Agent work | Project/date-scoped `history search --context 2`. Use bounded `history read` for exact operations or tool output | Recover the request, failure and subsequent handling before selecting execution analysis or current-code checks |
 | Diagnose this project | `check --project PATH --json` | Use separate checks, configuration, recent-work and artifact sections to select consequential paths |
 | Investigate recorded repeated work | `check --task RECORD --turn TURN --json` | Inspect the original failure, selected turns and current owner/caller |
 | Investigate a known current defect | Native project reads | Trace the reachable trigger and existing protections; query history only if it could change the judgment |

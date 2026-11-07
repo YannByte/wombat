@@ -138,7 +138,7 @@ export type Reason =
   | "removal_failed";
 export type RecheckState = "unchanged" | "changed" | "gone" | "unavailable";
 export type Removal = "removed" | "already_absent" | "skipped" | "failed";
-export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve";
+export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -418,8 +418,32 @@ export interface Request3 {
   offset?: number | null;
   cursor?: string | null;
   query?: string | null;
+  /**
+   * Search only. Match any of 1–16 literal terms. Supply this or query.
+   */
+  terms?: string[] | null;
   targets?: ReadTarget[];
   maxScanBytes?: number | null;
+  /**
+   * Use the extended foreground scan budget for search or location.
+   */
+  complete?: boolean;
+  /**
+   * Read this many visible messages on either side of each read target or direct source hit.
+   */
+  contextMessages?: number | null;
+  /**
+   * Maximum UTF-8 bytes per direct source hit.
+   */
+  excerptBytes?: number | null;
+  /**
+   * Pin an evidence scan to its first observed source scope.
+   */
+  fixedScope?: boolean;
+  /**
+   * Use the scope returned by the initial scan when reading export evidence.
+   */
+  sourceScope?: string | null;
   anchor?: Evidence | null;
   radius?: number | null;
 }
