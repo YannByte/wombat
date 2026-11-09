@@ -1,5 +1,6 @@
 import {writeHelp} from './help.js';
 import path from 'node:path';
+import {createReadStream} from 'node:fs';
 import {CoreError, parseConversationResult, type UsageClient, type UsageScope, type HistoryRead, type ConversationRequest, type ConversationResult} from '@wombat/client';
 import {createNodeClient} from '@wombat/client/node';
 import {t,messageOriginText} from '@wombat/client/locale';
@@ -51,8 +52,11 @@ type Occurrence = Omit<ConversationResult['fragments'][number],'text'>;
 function historyOutput(result: ConversationResult, request: ConversationRequest, nextLocations?: ConversationRequest | null): HistoryRead {
   const targets = request.targets ?? [];
   const deferred = (result.readIssues ?? []).filter(issue=>issue.deferred).flatMap(issue=>issue.targetIndices);
-  const retryRead = deferred.length ? {...request,targets:deferred.map(i=>targets[i])} : undefined;
-  return {outputVersion:3,result,nextLocations,retryRead};
+  const sourceTargets = request.sourceTargets ?? [];
+  const deferredSource = (result.sourceReadIssues ?? []).filter(issue=>issue.deferred).map(issue=>sourceTargets[issue.targetIndex]);
+  const retryRead = deferredSource.length ? {...request,sourceTargets:deferredSource}
+    : deferred.length ? {...request,targets:deferred.map(i=>targets[i])} : undefined;
+  return {outputVersion:4,result,nextLocations,retryRead,...(sourceTargets.length?{sourceTargets}:{})};
 }
 
 function renderFragments(result: ConversationResult, writeOccurrence?: (fragment: Occurrence) => void): void {
@@ -80,44 +84,110 @@ function renderFragments(result: ConversationResult, writeOccurrence?: (fragment
   }
 }
 
-async function readSearchInput(client: UsageClient, signal: AbortSignal, json: boolean, maxBytes: number, contextMessages?: number): Promise<number> {
-  if (process.stdin.isTTY) invalidInput('--from - requires search JSON on stdin');
+async function readSearchInput(client: UsageClient, signal: AbortSignal, json: boolean, maxBytes: number, contextMessages: number | undefined, hitNumbers: string[]): Promise<number> {
+  if (process.stdin.isTTY) invalidInput('--from - requires history JSON on stdin');
   const search = await parseConversationResult(await readJsonInput(process.stdin,signal,OUTPUT_BYTES));
-  if (search.action !== 'search') invalidInput('--from - requires JSON from history search --locate');
-  const targets = search.items.filter(item=>item.hasTextLocator)
-    .map(item=>({evidence:item.evidence,cursor:item.readCursor,maxBytes}));
-  if (!targets.length) {
-    const output:HistoryRead = {outputVersion:3,result:search,nextLocations:search.nextSearch};
+  const direct = search.action === 'source_search' || search.action === 'source_scan';
+  if (!direct && search.action !== 'search') invalidInput('--from - requires JSON from history search or history read --incremental');
+  if (direct && contextMessages) invalidInput('--context: request context on history search before reading direct hits');
+  const count = direct ? search.sourceHits?.length ?? 0 : search.items.length;
+  const selected = hitNumbers.length ? [...new Set(hitNumbers.map(n=>pageNumber(n,0,1,count)-1))] : Array.from({length:count},(_,i)=>i);
+  const request:ConversationRequest = direct ? {
+    action:'source_read', roots:search.roots, selection:search.selection, excerptBytes:maxBytes,
+    sourceTargets:selected.map(index=>{
+      const hit=search.sourceHits![index], source=search.sourceFiles?.[hit.fileIndex];
+      if(!source) invalidInput('sourceHits.fileIndex');
+      return {source,byteStart:hit.byteStart,byteEnd:hit.byteEnd,sha256:hit.sha256,matchedTerm:hit.matchedTerm};
+    }),
+  } : {
+    action:'read',roots:search.roots,selection:search.selection,sourceScope:search.sourceScope,contextMessages,
+    targets:selected.map(i=>search.items[i]).filter(item=>item.hasTextLocator)
+      .map(item=>({evidence:item.evidence,cursor:item.readCursor,maxBytes})),
+  };
+  if (!request.targets?.length && !request.sourceTargets?.length) {
+    const output = historyOutput(search,request,search.nextSearch);
     process.stdout.write(json?JSON.stringify(output)+'\n':t('cli.history.noText')+'\n');
     return search.partial || !search.scanComplete ? 2 : 0;
   }
-  const request:ConversationRequest = {action:'read',roots:search.roots,selection:search.selection,
-    sourceScope:search.sourceScope,contextMessages,targets};
   const result=await client.conversation!(request,{signal});
   const output=historyOutput(result,request,search.nextSearch);
   if(json) process.stdout.write(JSON.stringify(output)+'\n');
   else {
-    renderFragments(result,f=>process.stdout.write(f.locations.map(l=>`${terminalText(l.file)}:${l.byteStart}-${l.byteEnd}`).join('\n')+'\n'));
-    for(const issue of result.readIssues??[])process.stdout.write(t('cli.history.readIssue',{id:issue.eventId,code:issue.code})+'\n');
+    if (direct) {
+      for (const fragment of result.sourceFragments ?? []) {
+        process.stdout.write(terminalBlock(fragment.text)+'\n');
+        for (const occurrence of fragment.occurrences) {
+          const target = request.sourceTargets![occurrence.targetIndex];
+          process.stdout.write(`${occurrence.timestamp??'—'} · ${messageOriginText(occurrence.origin)} · ${terminalText(target.source.file)}:${target.byteStart}-${target.byteEnd}\n`);
+        }
+        if(fragment.truncated)process.stdout.write(t('cli.history.clipped')+'\n');
+      }
+      for(const issue of result.sourceReadIssues??[])process.stdout.write(t('cli.history.readIssue',{id:String(issue.targetIndex+1),code:issue.code})+'\n');
+    } else {
+      renderFragments(result,f=>process.stdout.write(f.locations.map(l=>`${terminalText(l.file)}:${l.byteStart}-${l.byteEnd}`).join('\n')+'\n'));
+      for(const issue of result.readIssues??[])process.stdout.write(t('cli.history.readIssue',{id:issue.eventId,code:issue.code})+'\n');
+    }
     if(!search.scanComplete || output.retryRead)process.stdout.write(t('cli.history.more')+'\n');
   }
   return result.partial || search.partial || !search.scanComplete ? 2 : 0;
+}
+
+function renderSourceHits(result:ConversationResult):void {
+  let currentFile=-1;
+  const shown=new Set<number>();
+  const showNeighbors=(indices:number[] = [])=>{
+    for(const index of indices){
+      if(shown.has(index))continue;
+      shown.add(index);
+      const n=result.sourceNeighbors![index];
+      process.stdout.write(`${n.timestamp??'—'} · ${messageOriginText(n.origin)} · ${n.byteStart}-${n.byteEnd}\n${terminalBlock(n.text)}\n\n`);
+    }
+  };
+  for(const hit of result.sourceHits??[]){
+    if(currentFile!==hit.fileIndex){
+      currentFile=hit.fileIndex;
+      const file=result.sourceFiles![currentFile];
+      process.stdout.write(`${terminalText(file.file)} · ${file.threadId}\n`);
+    }
+    showNeighbors(hit.context?.before);
+    process.stdout.write(`${hit.timestamp??'—'} · ${messageOriginText(hit.origin)} · ${hit.byteStart}-${hit.byteEnd}\n${terminalBlock(hit.text)}\n\n`);
+    if(hit.truncated)process.stdout.write(t('cli.history.clipped')+'\n');
+    showNeighbors(hit.context?.after);
+  }
+}
+
+async function readCheckpoint(filename:string, signal:AbortSignal):Promise<string>{
+  const stream=createReadStream(filename);
+  try {
+    const result=await parseConversationResult(await readJsonInput(stream,signal,OUTPUT_BYTES));
+    if(result.action!=='source_scan'||!result.scanComplete||result.partial||!result.nextCheckpoint)
+      invalidInput('--checkpoint requires a completed project scan');
+    return result.nextCheckpoint;
+  } finally {
+    stream.destroy();
+  }
 }
 
 export async function runHistoryCli(argv: readonly string[]): Promise<number> {
   return withCancellation(async signal=>{
     const args = [...argv], action = args[0] && !args[0].startsWith('-') ? args.shift()! : 'list';
     if (!['list','search','show','read'].includes(action)) invalidInput(action);
-    const p = parseOptions(args,['--project','--since','--until','--timezone','--source','--root','--limit','--offset','--turn','--find','--cursor','--event','--event-offset','--event-source','--event-turn','--max-bytes','--operation','--source-scope','--from','--context','--speaker'],['--all-time','--tools','--fixed','--complete','--locate'],['--root','--find']);
+    const p = parseOptions(args,['--project','--since','--until','--timezone','--source','--root','--limit','--offset','--turn','--find','--cursor','--event','--event-offset','--event-source','--event-turn','--max-bytes','--operation','--source-scope','--from','--context','--speaker','--checkpoint','--hit'],['--all-time','--tools','--fixed','--complete','--locate','--incremental'],['--root','--find','--hit']);
     if(p.help){writeHelp('history',argv);return 0;}
     const maxBytes = pageNumber(p.get('--max-bytes'),8192,1,65536);
     const contextMessages = p.values.has('--context') ? pageNumber(p.get('--context'),1,1,5) : undefined;
     if (p.values.has('--from')) {
       if (action!=='read' || p.get('--from')!=='-' || p.positionals.length ||
-          [...p.values.keys()].some(k=>!['--from','--max-bytes','--context'].includes(k)) ||
+          [...p.values.keys()].some(k=>!['--from','--max-bytes','--context','--hit'].includes(k)) ||
           [...p.flags].some(k=>!['--json','--no-input'].includes(k))) invalidInput('--from -');
-      return readSearchInput(createNodeClient({automaticPrices:false}),signal,p.json,maxBytes,contextMessages);
+      return readSearchInput(createNodeClient({automaticPrices:false}),signal,p.json,maxBytes,contextMessages,p.all('--hit'));
     }
+    const incremental = p.flags.has('--incremental');
+    const checkpointFile = p.get('--checkpoint');
+    if (p.values.has('--hit') || checkpointFile && !incremental) invalidInput('--hit requires --from -; --checkpoint requires --incremental');
+    if (incremental && (action!=='read' || p.positionals.length || !p.get('--project') ||
+      [...p.values.keys()].some(k=>!['--project','--since','--until','--timezone','--root','--source','--speaker','--limit','--max-bytes','--cursor','--source-scope','--checkpoint'].includes(k)) ||
+      [...p.flags].some(k=>!['--incremental','--all-time','--json','--no-input'].includes(k)))) invalidInput('--incremental requires a project and no record argument');
     const locate = p.flags.has('--locate');
     if (locate && action !== 'search') invalidInput('--locate');
     const direct = action === 'search' && !locate;
@@ -125,9 +195,9 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
     if (complete && action !== 'search') invalidInput('--complete');
     if (contextMessages && (!direct && action !== 'read' || p.values.has('--operation'))) invalidInput('--context');
     const speaker=p.get('--speaker');
-    if(speaker && (action!=='search'||!['user','assistant'].includes(speaker)))invalidInput('--speaker');
+    if(speaker && ((!incremental&&action!=='search')||!['user','assistant'].includes(speaker)))invalidInput('--speaker');
     if(p.flags.has('--tools')&&action!=='read')invalidInput('--tools');
-    if (action==='search'?p.positionals.length===0:p.positionals.length!==(action==='list'?0:1)) invalidInput(action);
+    if (!incremental && (action==='search'?p.positionals.length===0:p.positionals.length!==(action==='list'?0:1))) invalidInput(action);
     if (action !== 'read' && ['--find','--event','--event-offset','--event-source','--event-turn','--operation'].some(k=>p.values.has(k))) invalidInput(action);
     if (p.values.has('--max-bytes') && action !== 'read' && !direct) invalidInput('--max-bytes');
     if(['list','search'].includes(action)&&p.values.has('--turn'))invalidInput('--turn');
@@ -143,10 +213,26 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
     const findTerms=p.all('--find');
     const search=searchInput(action==='search'?p.positionals:findTerms);
     const explicitDates = p.values.has('--since') || p.values.has('--until') || p.flags.has('--all-time');
-    const scope: UsageScope = {...dateWindow({since:p.get('--since'),until:p.get('--until'),timezone:p.get('--timezone'),allTime:p.flags.has('--all-time') || undefined},'recent'),...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),...(p.get('--source')?{sourceInstanceId:p.get('--source')}: {})};
+    const scope: UsageScope = {...dateWindow({since:p.get('--since'),until:p.get('--until'),timezone:p.get('--timezone'),allTime:p.flags.has('--all-time') || (incremental && !explicitDates) || undefined},'recent'),...(p.get('--project')?{project:projectFilter(p.get('--project')!)}:{}),...(p.get('--source')?{sourceInstanceId:p.get('--source')}: {})};
     const roots = p.all('--root').length?p.all('--root').map(r=>path.resolve(r)):undefined;
     const client = createNodeClient({automaticPrices:false}), options = {signal};
-    const limit = action==='read'?pageNumber(p.get('--limit'),p.get('--operation')?4:1,1,20):pageNumber(p.get('--limit'),complete?200:20,1,200);
+    const limit = action==='read'&&!incremental?pageNumber(p.get('--limit'),p.get('--operation')?4:1,1,20):pageNumber(p.get('--limit'),complete?200:20,1,200);
+    const origins = speaker === 'user' ? ['user_input','user_unclassified'] as const :
+      speaker === 'assistant' ? ['assistant_visible'] as const : [];
+    if (incremental) {
+      const checkpoint=checkpointFile?await readCheckpoint(checkpointFile,signal):undefined;
+      const r=await client.conversation!({action:'source_scan',roots,selection:{...selection(scope),origins:[...origins]},
+        checkpoint,excerptBytes:maxBytes,limit,cursor:p.get('--cursor'),sourceScope},options);
+      if(p.json) process.stdout.write(JSON.stringify(r)+'\n');
+      else {
+        renderSourceHits(r);
+        process.stdout.write(t(r.scanComplete?'cli.history.complete':'cli.history.more')+'\n');
+        if(r.nextCursor)process.stdout.write(commandLine(['history','read','--incremental',...scopeArgs(scope,roots),
+          ...(checkpointFile?['--checkpoint',checkpointFile]:[]),...(speaker?['--speaker',speaker]:[]),
+          '--max-bytes',String(maxBytes),'--limit',String(limit),'--cursor',r.nextCursor,'--source-scope',r.sourceScope!])+'\n');
+      }
+      return r.partial?2:0;
+    }
     if (action === 'list') {
       const r=await client.conversation!({action:'records',roots,selection:selection(scope),limit,offset:pageNumber(p.get('--offset'),0),cursor:p.get('--cursor')},options);
       process.stdout.write(p.json?JSON.stringify(r)+'\n':r.items.map(i=>`${terminalText(i.title??i.evidence.threadId??'—')}\t${terminalText(i.project??'—')}\t${i.record?.lastActivityAt??'—'}\t${i.evidence.threadId}`).join('\n')+'\n'+t(r.scanComplete?'cli.history.complete':'cli.history.more')+'\n');
@@ -154,32 +240,11 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
       return r.partial?2:0;
     }
     if (action === 'search') {
-      const origins = speaker === 'user' ? ['user_input','user_unclassified'] as const :
-        speaker === 'assistant' ? ['assistant_visible'] as const : [];
       const r = await client.conversation!({action:direct?'source_search':'search',excerptBytes:direct?maxBytes:undefined,contextMessages,roots,selection:{...selection(scope),origins:[...origins]},...search,limit,cursor:p.get('--cursor'),fixedScope,sourceScope,complete},options);
       if (p.json) process.stdout.write(JSON.stringify(r)+'\n');
       else {
         if (direct) {
-          let currentFile = -1;
-          const shown = new Set<number>();
-          const showNeighbors = (indices: number[] = []) => {
-            for (const index of indices) {
-              if (shown.has(index)) continue;
-              shown.add(index);
-              const n = r.sourceNeighbors![index];
-              process.stdout.write(`${n.timestamp ?? '—'} · ${messageOriginText(n.origin)} · ${n.byteStart}-${n.byteEnd}\n${terminalBlock(n.text)}\n\n`);
-            }
-          };
-          for (const hit of r.sourceHits ?? []) {
-            if (currentFile !== hit.fileIndex) {
-              currentFile = hit.fileIndex;
-              const file = r.sourceFiles![currentFile];
-              process.stdout.write(`${terminalText(file.file)} · ${file.threadId}\n`);
-            }
-            showNeighbors(hit.context?.before);
-            process.stdout.write(`${hit.timestamp ?? '—'} · ${messageOriginText(hit.origin)} · ${hit.byteStart}-${hit.byteEnd}\n${terminalBlock(hit.text)}\n\n`);
-            showNeighbors(hit.context?.after);
-          }
+          renderSourceHits(r);
         } else {
           for (const item of r.items) {
             process.stdout.write(`${terminalText(item.title ?? item.evidence.threadId ?? '—')}\t${item.timestamp ?? '—'}\t${item.evidence.threadId}\t${item.evidence.turnId ?? '—'}\t${item.evidence.eventId}\t${terminalText(item.matchedTerm ?? '—')}\n`);
@@ -217,7 +282,7 @@ export async function runHistoryCli(argv: readonly string[]): Promise<number> {
       const item=locations.items.find(i=>i.hasTextLocator);evidence=item?.evidence;
       if(locations.nextCursor)nextLocations={...locationQuery,cursor:locations.nextCursor,sourceScope};
       if (!evidence) {
-        process.stdout.write(p.json?JSON.stringify({outputVersion:3,result:locations,nextLocations} satisfies HistoryRead)+'\n':t('cli.history.noText')+'\n');
+        process.stdout.write(p.json?JSON.stringify({outputVersion:4,result:locations,nextLocations} satisfies HistoryRead)+'\n':t('cli.history.noText')+'\n');
         if(!p.json&&locations.nextCursor)continueLocations(locations.nextCursor);
         return locations.partial?2:0;
       }

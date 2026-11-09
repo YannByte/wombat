@@ -16,7 +16,7 @@ export type { Response as ConversationResult } from './generated/conversation-re
 export type ConversationTransport = (request: ConversationRequest, options: QueryOptions) => Promise<unknown>;
 export async function parseConversationResult(value: unknown): Promise<ConversationResult> {
   const {validate} = await import('./generated/validate-conversation-response.js');
-  if (!validate(value)) throw new CoreError('INVALID_ARGUMENT', 'Expected JSON from wombat history search --json');
+  if (!validate(value)) throw new CoreError('INVALID_ARGUMENT', 'Expected a Wombat history result in JSON');
   return value;
 }
 import type { Request as MonitorRequest } from './generated/monitor-request.js';
@@ -268,7 +268,7 @@ export function createUsageClient(transports: ClientTransports): UsageClient {
         if (!input(request)) throw requestError('conversation',input.errors);
         const result = await transports.conversation!(request, options);
         throwIfCancelled(options);
-        if (!output(result) || !matchesConversationSelection(request, result) || result.action !== request.action || !result.snapshotId || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || result.scanComplete !== (result.nextCursor == null)) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
+        if (!output(result) || !matchesConversationSelection(request, result) || result.action !== request.action || !result.snapshotId || (request.action === 'read' && result.items.length !== 0) || (request.action !== 'read' && result.fragments.length !== 0) || (request.action !== 'source_read' && result.scanComplete !== (result.nextCursor == null))) throw new CoreError('PROTOCOL_ERROR', 'Invalid conversation response');
         return result;
       },
     } : {}),
@@ -1166,7 +1166,8 @@ function matchesConversationSelection(request: ConversationRequest, result: Conv
   if (JSON.stringify(request.roots ?? []) !== JSON.stringify(result.roots ?? [])) return false;
   if (Boolean(request.anchor) !== Boolean(result.window)) return false;
   if (request.anchor && result.window && (!sameConversationEvidence(request.anchor,result.window.anchor) || result.window.radius !== (request.radius ?? 20))) return false;
-  const direct = request.action === 'source_search';
+  const scan = request.action === 'source_scan';
+  const direct = request.action === 'source_search' || scan;
   const fixed = direct || Boolean(request.fixedScope || request.sourceScope);
   if (fixed !== (result.sourceScope != null) ||
       (result.sourceScope != null && !/^[a-f0-9]{64}$/.test(result.sourceScope)) ||
@@ -1179,14 +1180,32 @@ function matchesConversationSelection(request: ConversationRequest, result: Conv
       JSON.stringify(next.roots ?? []) !== JSON.stringify(result.roots ?? []) ||
       JSON.stringify(next.selection) !== JSON.stringify(result.selection) ||
       (next.query ?? null) !== (request.query ?? null) ||
+      (next.checkpoint ?? null) !== (request.checkpoint ?? null) ||
       JSON.stringify(next.terms ?? []) !== JSON.stringify(request.terms ?? []))) return false;
   const s=request.selection ?? {}, has=(values: readonly string[] | undefined, value: string | null | undefined) => !values?.length || (value != null && values.includes(value));
+  if (Boolean(result.nextCheckpoint) !== (scan && result.scanComplete && !result.partial) ||
+      (result.nextCheckpoint?.length ?? 0) > 256 * 1024) return false;
+  if (request.action === 'source_read') {
+    if (result.items.length || result.fragments.length || result.sourceHits?.length || result.sourceFiles?.length ||
+        result.sourceNeighbors?.length || result.nextCursor != null) return false;
+    const targets = request.sourceTargets ?? [], seen = new Set<number>();
+    const accept = (index:number) => Boolean(targets[index]) && !seen.has(index) && Boolean(seen.add(index));
+    const encoder = new TextEncoder();
+    for (const fragment of result.sourceFragments ?? []) {
+      if (!fragment.occurrences.length || encoder.encode(fragment.text).length > (request.excerptBytes ?? 8192) ||
+          fragment.occurrences.some(o=>!accept(o.targetIndex) || !has(s.origins,o.origin))) return false;
+    }
+    const issues=result.sourceReadIssues ?? [];
+    if (issues.some(i=>!accept(i.targetIndex)) || seen.size !== targets.length) return false;
+    return result.partial === Boolean(issues.length) && result.scanComplete === !issues.some(i=>i.deferred);
+  }
+  if (result.sourceFragments?.length || result.sourceReadIssues?.length) return false;
   if (direct) {
     const terms = new Set(request.terms ?? [request.query]);
     const encoder = new TextEncoder(), decoder = new TextDecoder("utf-8", {ignoreBOM:true});
     const hits = result.sourceHits ?? [], files = result.sourceFiles ?? [];
     if (new Set(hits.map(i => i.fileIndex)).size !== files.length ||
-        files.some(f => !f.file || !has(s.sources,f.sourceInstanceId) || !has(s.projects,f.project) || !has(s.threads,f.threadId))) return false;
+        files.some(f => !f.file || !f.generation || !has(s.sources,f.sourceInstanceId) || !has(s.projects,f.project) || !has(s.threads,f.threadId))) return false;
     const neighbors = result.sourceNeighbors ?? [], seen = new Set<number>();
     const count = request.contextMessages ?? 0;
     const validPosition = (i: {fileIndex:number;byteStart:number;byteEnd:number;sha256:string}) =>
@@ -1195,10 +1214,15 @@ function matchesConversationSelection(request: ConversationRequest, result: Conv
         neighbors.length > 128 || neighbors.some(i => !validPosition(i) ||
           !['user_unclassified','assistant_visible'].includes(i.origin) || encoder.encode(i.text).length > 1024)) return false;
     for (const i of hits) {
-      const bytes = encoder.encode(i.text), {start,end} = i.matchRange;
-      if (!validPosition(i) || !has(s.origins,i.origin) || !terms.has(i.matchedTerm) ||
-          bytes.length > (request.excerptBytes ?? 8192) || start < 0 || start >= end || end > bytes.length ||
-          decoder.decode(bytes.subarray(start,end)) !== i.matchedTerm) return false;
+      const bytes = encoder.encode(i.text);
+      if (!validPosition(i) || !has(s.origins,i.origin) || bytes.length > (request.excerptBytes ?? 8192)) return false;
+      if (scan) {
+        if (i.matchedTerm != null || i.matchRange != null) return false;
+      } else {
+        const range=i.matchRange;
+        if (!range || !i.matchedTerm || !terms.has(i.matchedTerm) || range.start < 0 || range.start >= range.end ||
+            range.end > bytes.length || decoder.decode(bytes.subarray(range.start,range.end)) !== i.matchedTerm) return false;
+      }
       const context = i.context;
       if (!context) {
         if (count && !result.partial) return false;

@@ -1,6 +1,6 @@
 //! Public conversation access contract. Source bodies require explicit read/search.
-pub const REQUEST_VERSION: u32 = 7;
-pub const OUTPUT_VERSION: u32 = 7;
+pub const REQUEST_VERSION: u32 = 8;
+pub const OUTPUT_VERSION: u32 = 8;
 pub(crate) const MAX_READ_TARGETS: usize = 200;
 pub(crate) const MAX_SEARCH_TERMS: usize = 16;
 pub(crate) const MAX_TERM_BYTES: usize = 4096;
@@ -50,8 +50,20 @@ pub enum Action {
     Search,
     /// Search visible Codex source text and return excerpts without an index.
     SourceSearch,
+    /// Read new visible messages from a selected project's source files.
+    SourceScan,
+    /// Reopen exact source records from a search or scan.
+    SourceRead,
     #[schemars(skip)]
     Changes,
+}
+impl Action {
+    pub(crate) fn reads_source_directly(self) -> bool {
+        matches!(
+            self,
+            Self::SourceSearch | Self::SourceScan | Self::SourceRead
+        )
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -112,6 +124,10 @@ pub struct Request {
     /// Use the scope returned by the initial scan when reading export evidence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_targets: Vec<SourceReadTarget>,
     pub anchor: Option<Evidence>,
     pub radius: Option<usize>,
 }
@@ -216,7 +232,7 @@ pub struct Neighbor {
     pub locations: Vec<ContentLocation>,
     pub partial: bool,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SourceSearchFile {
     pub source_instance_id: String,
@@ -224,6 +240,7 @@ pub struct SourceSearchFile {
     pub upstream_id: String,
     pub project: Option<String>,
     pub file: String,
+    pub generation: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -236,11 +253,50 @@ pub struct SourceHit {
     pub byte_end: u64,
     /// Digest of the complete original JSONL record.
     pub sha256: String,
-    pub matched_term: String,
-    pub match_range: MatchRange,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_term: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_range: Option<MatchRange>,
     pub text: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<SourceContext>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceReadTarget {
+    pub source: SourceSearchFile,
+    pub byte_start: u64,
+    pub byte_end: u64,
+    pub sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_term: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceReadFragment {
+    pub text: String,
+    pub truncated: bool,
+    pub occurrences: Vec<SourceReadOccurrence>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceReadOccurrence {
+    /// Index into the original source targets. Equal complete texts share a body.
+    pub target_index: usize,
+    pub timestamp: Option<String>,
+    pub origin: crate::session_events::MessageOrigin,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceReadIssue {
+    pub target_index: usize,
+    pub code: String,
+    pub deferred: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -313,6 +369,13 @@ pub struct Response {
     pub source_files: Vec<SourceSearchFile>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source_neighbors: Vec<SourceNeighbor>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_fragments: Vec<SourceReadFragment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_read_issues: Vec<SourceReadIssue>,
+    /// Reuse only after the selected project scan is complete and readable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_checkpoint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_search: Option<Request>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

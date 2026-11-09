@@ -1,5 +1,7 @@
 //! Read-only visible text search. It owns no product storage or ledger.
+mod checkpoint;
 mod context;
+mod read;
 use super::*;
 use crate::{conversation_dto::*, dto::operation_error, file_metadata::FileMetadata};
 use anyhow::Result;
@@ -26,6 +28,7 @@ struct Cursor {
     binding: String,
     file: usize,
     offset: u64,
+    partial: bool,
 }
 
 struct SourceFile {
@@ -33,6 +36,8 @@ struct SourceFile {
     root: String,
     path: PathBuf,
     meta: FileMetadata,
+    reference: SourceSearchFile,
+    header_end: u64,
 }
 
 #[derive(Default, Deserialize)]
@@ -89,20 +94,22 @@ fn err(code: &'static str, message: &'static str) -> anyhow::Error {
     operation_error(code, message)
 }
 
-fn inventory(request: &Request) -> (Vec<SourceFile>, bool) {
+fn inventory(request: &Request) -> (Vec<SourceFile>, bool, u64) {
     let discovered = CodexAdapter.discover(&DiscoveryRequest {
         roots: request.roots.iter().map(PathBuf::from).collect(),
     });
     let mut partial = !discovered.issues.is_empty();
     let mut files = Vec::new();
-    for source in discovered.sources {
+    let mut bytes = 0;
+    let mut visited_files = 0;
+    'sources: for source in discovered.sources {
         if !request.selection.sources.is_empty() && !request.selection.sources.contains(&source.id)
         {
             continue;
         }
         let root = Path::new(&source.root);
         let context = RunContext {
-            max_files: MAX_FILES.saturating_sub(files.len()),
+            max_files: MAX_FILES.saturating_sub(visited_files),
             ..Default::default()
         };
         let mut report = SourceReport {
@@ -128,19 +135,103 @@ fn inventory(request: &Request) -> (Vec<SourceFile>, bool) {
             );
         }
         partial |= !report.issues.is_empty();
+        visited_files += paths.len();
         for path in paths {
-            match FileMetadata::read(&path) {
-                Ok(meta) if meta.is_file() => files.push(SourceFile {
-                    source: source.id.clone(),
-                    root: source.root.clone(),
-                    path,
-                    meta,
-                }),
-                _ => partial = true,
+            if bytes >= MAX_SOURCE_BYTES {
+                partial = true;
+                break 'sources;
+            }
+            match source_file(&source, &path, &mut bytes) {
+                Ok(file)
+                    if (request.selection.projects.is_empty()
+                        || file
+                            .reference
+                            .project
+                            .as_ref()
+                            .is_some_and(|p| request.selection.projects.contains(p)))
+                        && (request.selection.threads.is_empty()
+                            || request
+                                .selection
+                                .threads
+                                .contains(&file.reference.thread_id)) =>
+                {
+                    files.push(file);
+                }
+                Ok(_) => {}
+                Err(_) => partial = true,
             }
         }
     }
-    (files, partial)
+    (files, partial, bytes)
+}
+
+fn is_rollout(root: &Path, path: &Path) -> bool {
+    path.extension().is_some_and(|e| e == "jsonl")
+        && ["sessions", "archived_sessions"].iter().any(|d| {
+            path.strip_prefix(root.join(d)).is_ok_and(|p| {
+                p.components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_)))
+            })
+        })
+}
+
+fn source_file(source: &SourceInstance, path: &Path, bytes: &mut u64) -> Result<SourceFile> {
+    let path = dunce::canonicalize(path)?;
+    anyhow::ensure!(is_rollout(Path::new(&source.root), &path));
+    anyhow::ensure!(fs::symlink_metadata(&path)?.is_file());
+    let file = File::open(&path)?;
+    let meta = FileMetadata::from_file(&file)?;
+    anyhow::ensure!(meta.is_file());
+    let mut line = Vec::new();
+    let header_end = BufReader::with_capacity(4096, file.take(meta.len()))
+        .take(MAX_LINE_BYTES)
+        .read_until(b'\n', &mut line)? as u64;
+    *bytes += header_end;
+    anyhow::ensure!(line.ends_with(b"\n"));
+    let envelope: Envelope<'_> = serde_json::from_slice(&line)?;
+    anyhow::ensure!(envelope.kind == "session_meta");
+    let header: Header<'_> = serde_json::from_str(envelope.payload.get())?;
+    let upstream = header
+        .id
+        .or(header.session_id)
+        .ok_or_else(|| anyhow::anyhow!("Missing Codex session identity"))?;
+    let reference = SourceSearchFile {
+        source_instance_id: source.id.clone(),
+        thread_id: thread_identity(&source.id, &upstream),
+        upstream_id: upstream.into_owned(),
+        project: header.cwd.map(Cow::into_owned),
+        file: path.to_string_lossy().into_owned(),
+        generation: crate::adapters::stable_id(&[&source.id, &meta.physical]),
+    };
+    Ok(SourceFile {
+        source: source.id.clone(),
+        root: source.root.clone(),
+        path,
+        meta,
+        reference,
+        header_end,
+    })
+}
+
+fn open(file: &SourceFile) -> Result<File> {
+    // Recheck containment before reopening a path learned from discovery.
+    let path = dunce::canonicalize(&file.path)?;
+    if path != file.path || !path.starts_with(Path::new(&file.root)) {
+        return Err(err("SOURCE_CHANGED", "Log path left its source root"));
+    }
+    let opened = File::open(path)?;
+    let observed = FileMetadata::from_file(&opened)?;
+    if observed.physical != file.meta.physical
+        || observed.len() < file.meta.len()
+        || observed.len() == file.meta.len()
+            && observed.modified().ok() != file.meta.modified().ok()
+    {
+        return Err(err(
+            "SOURCE_CHANGED",
+            "Log was replaced, truncated or rewritten",
+        ));
+    }
+    Ok(opened)
 }
 
 struct Message<'a> {
@@ -310,6 +401,27 @@ fn compact_candidate(line: &[u8], users: bool, assistants: bool) -> Option<bool>
     )
 }
 
+fn message_prefix(parts: &[TextPart<'_>], cap: usize) -> (String, bool) {
+    let mut text = String::new();
+    for (i, part) in parts.iter().enumerate() {
+        if i > 0 {
+            if text.len() == cap {
+                return (text, true);
+            }
+            text.push('\n');
+        }
+        let mut end = part.text.len().min(cap - text.len());
+        while !part.text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.push_str(&part.text[..end]);
+        if end < part.text.len() {
+            return (text, true);
+        }
+    }
+    (text, false)
+}
+
 fn excerpt(text: &str, start: usize, length: usize, cap: usize) -> (String, MatchRange) {
     let before = ((cap - length) / 2).min(512);
     let mut left = start.saturating_sub(before);
@@ -329,7 +441,55 @@ fn excerpt(text: &str, start: usize, length: usize, cap: usize) -> (String, Matc
     )
 }
 
+struct Calendar {
+    since: Option<chrono::NaiveDate>,
+    until: Option<chrono::NaiveDate>,
+    zone: chrono_tz::Tz,
+    include_undated: bool,
+}
+impl Calendar {
+    fn new(selection: &Selection) -> Result<Self> {
+        let date = |value: &Option<String>| {
+            value
+                .as_deref()
+                .map(crate::usage_app::scope::date)
+                .transpose()
+        };
+        let (since, until) = (date(&selection.since)?, date(&selection.until)?);
+        if since.is_some() != until.is_some() || since.zip(until).is_some_and(|(a, b)| a >= b) {
+            return Err(err(
+                "INVALID_ARGUMENT",
+                "Set both dates and place the start before the exclusive end",
+            ));
+        }
+        let zone = crate::usage_app::scope::timezone(&crate::usage_app_dto::Scope {
+            timezone: selection.timezone.clone(),
+            ..Default::default()
+        })?;
+        Ok(Self {
+            since,
+            until,
+            zone,
+            include_undated: selection.include_undated,
+        })
+    }
+
+    fn contains(&self, time: Option<&str>) -> bool {
+        let day = time
+            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
+            .map(|t| t.with_timezone(&self.zone).date_naive());
+        match day {
+            Some(day) => self.since.is_none_or(|x| day >= x) && self.until.is_none_or(|x| day < x),
+            None => self.since.is_none() || self.include_undated,
+        }
+    }
+}
+
 pub(crate) fn query(request: &Request) -> Result<Response> {
+    if request.action == Action::SourceRead {
+        return read::query(request);
+    }
+    let scan = request.action == Action::SourceScan;
     let s = &request.selection;
     let cap = request.excerpt_bytes.unwrap_or(8192);
     let limit = request.limit.unwrap_or(200);
@@ -339,7 +499,10 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
         .chain(request.terms.iter().flatten())
         .map(String::as_str)
         .collect();
-    if terms.is_empty()
+    if (!scan && (terms.is_empty() || request.checkpoint.is_some()))
+        || (scan
+            && (!terms.is_empty() || s.projects.len() != 1 || request.context_messages.is_some()))
+        || !request.source_targets.is_empty()
         || terms.len() > MAX_SEARCH_TERMS
         || terms
             .iter()
@@ -374,35 +537,22 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
             "Direct search requires literal terms and reads visible messages only.",
         ));
     }
-    let date = |value: &Option<String>| {
-        value
-            .as_deref()
-            .map(crate::usage_app::scope::date)
-            .transpose()
+    let calendar = Calendar::new(s)?;
+    let in_calendar = |time: Option<&str>| calendar.contains(time);
+    let (files, mut partial, mut source_bytes) = inventory(request);
+    let baseline = if scan {
+        Some(checkpoint::open(request, &files, &mut source_bytes)?)
+    } else {
+        None
     };
-    let (since, until) = (date(&s.since)?, date(&s.until)?);
-    if since.is_some() != until.is_some() || since.zip(until).is_some_and(|(a, b)| a >= b) {
-        return Err(err(
-            "INVALID_ARGUMENT",
-            "Set both search dates and place the start before the exclusive end",
-        ));
-    }
-    let zone = crate::usage_app::scope::timezone(&crate::usage_app_dto::Scope {
-        timezone: s.timezone.clone(),
-        ..Default::default()
-    })?;
-    let in_calendar = |time: Option<&str>| {
-        let day = time
-            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
-            .map(|t| t.with_timezone(&zone).date_naive());
-        match day {
-            Some(day) => since.is_none_or(|x| day >= x) && until.is_none_or(|x| day < x),
-            None => since.is_none() && until.is_none() || s.include_undated,
-        }
-    };
-    let (files, mut partial) = inventory(request);
     let mut scope = Sha256::new();
-    scope.update(serde_json::to_vec(&(1, &request.roots, s))?);
+    scope.update(serde_json::to_vec(&(
+        2,
+        request.action,
+        &request.roots,
+        s,
+        &request.checkpoint,
+    ))?);
     for f in &files {
         scope.update(serde_json::to_vec(&(
             &f.source,
@@ -427,7 +577,12 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
             "Direct source range changed. Restart with the original filters and no cursor.",
         ));
     }
-    let binding = crate::hash(serde_json::to_vec(&(&scope, &terms))?);
+    let binding = crate::hash(serde_json::to_vec(&(
+        &scope,
+        &terms,
+        request.context_messages,
+        request.excerpt_bytes,
+    ))?);
     let mut cursor = match &request.cursor {
         Some(value) => serde_json::from_str::<Cursor>(value)
             .map_err(|_| err("INVALID_ARGUMENT", "Malformed direct search cursor"))?,
@@ -435,6 +590,7 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
             binding: binding.clone(),
             file: 0,
             offset: 0,
+            partial: false,
         },
     };
     if cursor.binding != binding || cursor.file > files.len() {
@@ -452,11 +608,11 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
     let mut hits = Vec::new();
     let mut source_files = Vec::new();
     let mut context = request.context_messages.map(context::ReadContext::new);
-    let mut source_bytes = 0;
     let mut inspected = 0;
     let mut rows = 0;
+    // Leave room for the echoed request or completed checkpoint.
     let mut output =
-        serde_json::to_vec(&(&request.roots, s, &request.query, &request.terms))?.len() + 8192;
+        serde_json::to_vec(request)?.len() + 8192 + if scan { checkpoint::MAX_BYTES } else { 0 };
     let mut limits = Vec::new();
     let started = Instant::now();
     let mut line = Vec::new();
@@ -465,61 +621,24 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
             limits.push("source_scan_budget".into());
             break;
         }
-        let path = dunce::canonicalize(&f.path)?;
-        if !path.starts_with(Path::new(&f.root)) {
-            return Err(err("SOURCE_CHANGED", "Log path left its source root"));
-        }
-        let file = File::open(&path)?;
-        let observed = FileMetadata::from_file(&file)?;
-        if observed.physical != f.meta.physical || observed.len() < f.meta.len() {
-            return Err(err(
-                "SOURCE_CHANGED",
-                "Log was replaced or truncated during direct search",
-            ));
-        }
-        let mut header_reader = BufReader::with_capacity(16 * 1024, file.take(f.meta.len()));
-        line.clear();
-        let header_n = header_reader
-            .by_ref()
-            .take(MAX_LINE_BYTES)
-            .read_until(b'\n', &mut line)? as u64;
-        source_bytes += header_n;
-        let header = line
-            .ends_with(b"\n")
-            .then(|| serde_json::from_slice::<Envelope>(&line).ok())
-            .flatten()
-            .filter(|e| e.kind == "session_meta")
-            .and_then(|e| serde_json::from_str::<Header>(e.payload.get()).ok());
-        let Some((upstream, project)) =
-            header.and_then(|h| h.id.or(h.session_id).map(|id| (id, h.cwd)))
-        else {
-            partial = true;
-            cursor.file += 1;
-            cursor.offset = 0;
-            continue;
-        };
-        let upstream = upstream.into_owned();
-        let project = project.map(Cow::into_owned);
-        if !s.projects.is_empty() && !project.as_ref().is_some_and(|p| s.projects.contains(p)) {
+        let header_n = f.header_end;
+        let upstream = &f.reference.upstream_id;
+        let mut offset = cursor
+            .offset
+            .max(header_n)
+            .max(baseline.as_ref().map_or(0, |baseline| baseline.offset(f)));
+        if offset == f.meta.len() {
             cursor.file += 1;
             cursor.offset = 0;
             continue;
         }
-        let thread = thread_identity(&f.source, &upstream);
-        if !s.threads.is_empty() && !s.threads.contains(&thread) {
-            cursor.file += 1;
-            cursor.offset = 0;
-            continue;
-        }
-        let mut offset = cursor.offset.max(header_n);
         if offset > f.meta.len() {
             return Err(err(
                 "SOURCE_CHANGED",
                 "Direct cursor is outside the source file",
             ));
         }
-        // Avoid filling a large body buffer for files excluded by project or chat.
-        let mut file = header_reader.into_inner().into_inner();
+        let mut file = open(f)?;
         if offset > header_n {
             file.seek(SeekFrom::Start(offset - 1))?;
             let mut boundary = [0];
@@ -587,8 +706,9 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
             let Message {
                 origin: speaker,
                 parts,
+                partial: message_partial,
                 ..
-            } = match origin_and_text(&envelope, &upstream) {
+            } = match origin_and_text(&envelope, upstream) {
                 Ok(Some(found)) => found,
                 Ok(None) => continue,
                 Err(_) => {
@@ -600,24 +720,30 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
                 continue;
             }
             inspected += 1;
-            let Some((part, start, term)) = parts.iter().find_map(|part| {
-                query
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, finder)| finder.find(part.text.as_bytes()).map(|pos| (pos, i)))
-                    .min()
-                    .map(|(start, index)| (part, start, terms[index]))
-            }) else {
-                continue;
+            let (text, matched_term, match_range, truncated) = if scan {
+                if parts.is_empty() {
+                    continue;
+                }
+                let (text, truncated) = message_prefix(&parts, cap);
+                (text, None, None, truncated)
+            } else {
+                let Some((part, start, term)) = parts.iter().find_map(|part| {
+                    query
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, finder)| {
+                            finder.find(part.text.as_bytes()).map(|pos| (pos, i))
+                        })
+                        .min()
+                        .map(|(start, index)| (part, start, terms[index]))
+                }) else {
+                    continue;
+                };
+                let (text, range) = excerpt(&part.text, start, term.len(), cap);
+                let truncated = text.len() < part.text.len() || parts.len() > 1;
+                (text, Some(term.into()), Some(range), truncated)
             };
-            let (text, match_range) = excerpt(&part.text, start, term.len(), cap);
-            let new_file = file_index.is_none().then(|| SourceSearchFile {
-                source_instance_id: f.source.clone(),
-                thread_id: thread.clone(),
-                upstream_id: upstream.clone(),
-                project: project.clone(),
-                file: path.to_string_lossy().into_owned(),
-            });
+            let new_file = file_index.is_none().then(|| f.reference.clone());
             let hit = SourceHit {
                 file_index: file_index.unwrap_or(source_files.len()),
                 timestamp: envelope.timestamp.map(str::to_owned),
@@ -625,9 +751,10 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
                 byte_start: at,
                 byte_end: offset,
                 sha256: crate::hash(&line),
-                matched_term: term.into(),
+                matched_term,
                 match_range,
                 text,
+                truncated: truncated || message_partial,
                 context: None,
             };
             let mut size = serde_json::to_vec(&hit)?.len() + 1;
@@ -664,12 +791,12 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
                 file.take(f.meta.len() - header_n),
                 header_n,
                 &mut hits[first_hit..],
-                &upstream,
+                upstream,
                 &in_calendar,
                 &mut output,
             )?;
         }
-        let after = FileMetadata::read(&path)?;
+        let after = FileMetadata::read(&f.path)?;
         if after.physical != f.meta.physical
             || after.len() < f.meta.len()
             || after.len() == f.meta.len() && after.modified().ok() != f.meta.modified().ok()
@@ -688,6 +815,12 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
         }
     }
     let done = cursor.file == files.len();
+    cursor.partial |= partial;
+    let next_checkpoint = if scan && done && !cursor.partial {
+        Some(checkpoint::capture(request, &files, &mut source_bytes)?)
+    } else {
+        None
+    };
     let next_cursor = (!done)
         .then(|| serde_json::to_string(&cursor))
         .transpose()?;
@@ -706,7 +839,7 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
     Ok(Response {
         record: None,
         output_version: OUTPUT_VERSION,
-        action: Action::SourceSearch,
+        action: request.action,
         snapshot_id: format!("source:{scope}"),
         baseline_snapshot_id: None,
         selection: s.clone(),
@@ -717,12 +850,15 @@ pub(crate) fn query(request: &Request) -> Result<Response> {
         source_hits: hits,
         source_files,
         source_neighbors,
+        source_fragments: vec![],
+        source_read_issues: vec![],
+        next_checkpoint,
         next_search,
         read_issues: vec![],
         source_scope: Some(scope),
         next_cursor,
         scan_complete: done,
-        partial: partial || !limits.is_empty(),
+        partial: cursor.partial || !limits.is_empty(),
         limits,
         scanned_events: inspected,
         source_bytes_read: source_bytes + context_bytes,

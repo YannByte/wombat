@@ -91,7 +91,11 @@ fn binding(request: &Request) -> Result<String> {
     ))?))
 }
 pub(crate) fn validate(request: &Request) -> Result<()> {
-    if request.excerpt_bytes.is_some() && request.action != Action::SourceSearch {
+    if request.excerpt_bytes.is_some()
+        || request.checkpoint.is_some()
+        || !request.source_targets.is_empty()
+        || request.action.reads_source_directly()
+    {
         return Err(error("INVALID_ARGUMENT"));
     }
     if request.complete
@@ -951,6 +955,9 @@ fn query_with_scan_budget(
             source_hits: vec![],
             source_files: vec![],
             source_neighbors: vec![],
+            source_fragments: vec![],
+            source_read_issues: vec![],
+            next_checkpoint: None,
             next_search: None,
             read_issues: vec![],
             source_scope: None,
@@ -1013,6 +1020,9 @@ fn query_with_scan_budget(
         source_hits: vec![],
         source_files: vec![],
         source_neighbors: vec![],
+        source_fragments: vec![],
+        source_read_issues: vec![],
+        next_checkpoint: None,
         next_search: None,
         read_issues: vec![],
         source_scope,

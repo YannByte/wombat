@@ -372,7 +372,8 @@ export type Item2 =
     };
 export type QualityIssueScope = "index";
 export type QualityQueryImpact = "none" | "unknown";
-export type Action4 = ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search";
+export type Action4 =
+  ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search" | "source_scan" | "source_read";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -1985,7 +1986,7 @@ export interface Section4 {
 }
 export interface Response5 {
   record?: ResolvedRecord | null;
-  outputVersion: 7;
+  outputVersion: 8;
   action: Action4;
   snapshotId: string;
   selection: Selection;
@@ -1999,6 +2000,12 @@ export interface Response5 {
   sourceHits?: SourceHit[];
   sourceFiles?: SourceSearchFile[];
   sourceNeighbors?: SourceNeighbor[];
+  sourceFragments?: SourceReadFragment[];
+  sourceReadIssues?: SourceReadIssue[];
+  /**
+   * Reuse only after the selected project scan is complete and readable.
+   */
+  nextCheckpoint?: string | null;
   nextSearch?: Request2 | null;
   readIssues?: ReadIssue[];
   sourceScope?: string | null;
@@ -2157,9 +2164,10 @@ export interface SourceHit {
    * Digest of the complete original JSONL record.
    */
   sha256: string;
-  matchedTerm: string;
-  matchRange: MatchRange;
+  matchedTerm?: string | null;
+  matchRange?: MatchRange | null;
   text: string;
+  truncated?: boolean;
   context?: SourceContext2 | null;
 }
 export interface SourceContext2 {
@@ -2176,6 +2184,7 @@ export interface SourceSearchFile {
   upstreamId: string;
   project?: string | null;
   file: string;
+  generation: string;
 }
 export interface SourceNeighbor {
   fileIndex: number;
@@ -2186,6 +2195,24 @@ export interface SourceNeighbor {
   sha256: string;
   text: string;
   partial: boolean;
+}
+export interface SourceReadFragment {
+  text: string;
+  truncated: boolean;
+  occurrences: SourceReadOccurrence[];
+}
+export interface SourceReadOccurrence {
+  /**
+   * Index into the original source targets. Equal complete texts share a body.
+   */
+  targetIndex: number;
+  timestamp?: string | null;
+  origin: MessageOrigin;
+}
+export interface SourceReadIssue {
+  targetIndex: number;
+  code: string;
+  deferred: boolean;
 }
 export interface Request2 {
   action: Action4;
@@ -2224,6 +2251,8 @@ export interface Request2 {
    * Use the scope returned by the initial scan when reading export evidence.
    */
   sourceScope?: string | null;
+  checkpoint?: string | null;
+  sourceTargets?: SourceReadTarget[];
   anchor?: Evidence2 | null;
   radius?: number | null;
 }
@@ -2233,6 +2262,13 @@ export interface ReadTarget {
   maxBytes?: number | null;
   before?: number;
   after?: number;
+}
+export interface SourceReadTarget {
+  source: SourceSearchFile;
+  byteStart: number;
+  byteEnd: number;
+  sha256: string;
+  matchedTerm?: string | null;
 }
 export interface ReadIssue {
   targetIndices: number[];

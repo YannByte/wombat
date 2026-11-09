@@ -97,13 +97,30 @@ wombat history search "验收" --project "/path/to/project" --fixed --json
 
 Pass up to 16 literal terms. Search reads Codex logs directly and returns a visible message excerpt with its source file and byte range. Quote phrases that contain spaces. Search defaults to the last 30 days. For older content, set dates or use `--all-time`.
 
-Use `--speaker user` for decisions stated by the user and `--max-bytes` to bound each excerpt. The default page holds 20 hits. Use `--complete` for up to 200. If the scan has more pages, keep the same filters and follow `nextSearch` in JSON or the continuation command in text. If the log inventory changes between pages, restart from the first page.
+Use `--speaker user` for decisions stated by the user and `--max-bytes` to bound each excerpt. The default page holds 20 hits. Use `--complete` for up to 200. If the scan has more pages, keep the same filters and follow `nextSearch` in JSON or the continuation command in text. If the selected project logs change between pages, restart from the first page. An append in another project does not interrupt the current scan.
 
 Add `--context 1..5` to read visible messages before and after each hit, including across turns in the same source log. Both speakers can appear in the context. The CLI reads the original logs and shares repeated neighboring messages within a page. Use `--locate` when an automation specifically needs indexed event IDs.
 
 ```sh
 wombat history search "保留" "删除" --project . --speaker user --complete --context 2 --json
 ```
+
+### Read original quotes from search hits in one batch
+
+```sh
+wombat history search SQLite --project . --speaker user --json | wombat history read --from - --hit 1 --json
+```
+
+`--from -` accepts one JSON page from default search, an incremental scan or `--locate`. Repeat `--hit N` to select several positions on the page, numbered from 1. Omit it to read all hits on the page. Direct reads verify the original log identity, byte range and row digest. Equal complete quotes share one text body and retain all source positions. A failed item leaves the other results available. The output marks text clipped at `--max-bytes`. Request neighboring messages with `--context` on the direct search.
+
+### Read new messages for a project
+
+```sh
+wombat history read --incremental --project . --speaker user --json
+wombat history read --incremental --project . --speaker user --checkpoint scan.json --json
+```
+
+The first query reads visible project messages without search terms. It includes all available history when you omit dates. Keep the filters and follow `nextSearch` on each page. Save the completed page with `nextCheckpoint` as `scan.json`. Pass that file on a later scan to read only appends and new conversations in the same scope. Continue when a page reaches its budget. The checkpoint does not advance if a record is incomplete or a source cannot be read. It requires no service or conversation index. Start a new scan if the filters change or the original log is replaced.
 
 ### Inspect a record
 
@@ -483,7 +500,7 @@ Exact IDs resolve metadata without scanning activity; date filters still apply t
 |---|---|---|
 | `usage` | `usage`, `threads`, `turns`, `steps`, `statistics`, `compare`, `investigate`, `trajectory`, `resources`, `review`, `context` | Current usage/analysis, returning `result` and data status |
 | `project` | Assemble current project evidence | Configuration, checks, records, original usage and cleanup candidates; independent status/read versions without project edits |
-| `conversation` | `resolve`, `records`, `activity`, `locate`, `search`, `read` | Activity, locations and source text; records are not accepted code delivery |
+| `conversation` | `resolve`, `records`, `activity`, `locate`, `search`, `read`, `source_search`, `source_scan`, `source_read` | Activity, locations and source text; records are not accepted code delivery |
 | `config` | `list`, `detail`, `evidence`, `related_scopes`, `capabilities` | Read-only configuration, measurements, native observations and associated use |
 | `optimize` | `list`, `detail`, `checks`, `activity`, `capabilities`, `recheck`, `keep`, `not_applicable` | Checks and comparisons; only explicit decisions write user storage |
 | `artifacts` | `inspect`, `recheck`, `apply` | Cleanup observations and protected Codex removal, without conversation indexing |

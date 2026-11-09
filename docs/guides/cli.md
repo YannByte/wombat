@@ -97,13 +97,30 @@ wombat history search "验收" --project "/path/to/project" --fixed --json
 
 一次可传入最多 16 个字面搜索词。搜索直接读取 Codex 日志，返回可见消息的原文片段、来源文件和字节范围。含空格的短语要加引号。默认查最近 30 日。查更早的内容时，指定日期或使用 `--all-time`。
 
-找用户明确表达的决策时，用 `--speaker user`。用 `--max-bytes` 限制每段原文的长度。默认每页 20 条，用 `--complete` 可取到每页最多 200 条。扫描有后续页时，保留筛选条件，使用 JSON 中的 `nextSearch` 或终端给出的命令继续。日志清单在翻页期间发生变化时，从第一页重新查询。
+找用户明确表达的决策时，用 `--speaker user`。用 `--max-bytes` 限制每段原文的长度。默认每页 20 条，用 `--complete` 可取到每页最多 200 条。扫描有后续页时，保留筛选条件，使用 JSON 中的 `nextSearch` 或终端给出的命令继续。所选项目的日志在翻页期间发生变化时，从第一页重新查询。其他项目的日志追加不会中断当前续页。
 
 用 `--context 1..5` 查看命中前后的可见消息，支持在同一份日志内跨轮查看，前后可以包含双方消息。CLI 直接读取原始日志，并在同一页内合并重复的相邻消息。自动化流程确实需要索引事件 ID 时，用 `--locate`。
 
 ```sh
 wombat history search "保留" "删除" --project . --speaker user --complete --context 2 --json
 ```
+
+### 批读搜索命中的原话
+
+```sh
+wombat history search SQLite --project . --speaker user --json | wombat history read --from - --hit 1 --json
+```
+
+`--from -` 接收一页默认直搜、增量读取或 `--locate` 的 JSON。重复传入 `--hit N` 可以选择本页的多个位置，编号从 1 开始。省略它则读取本页全部命中。直读校验原日志的物理身份、字节范围和记录摘要。相同的完整原话共享一份正文，各来源位置仍分别保留。一条证据失效时，其他证据仍可返回。超过 `--max-bytes` 时标记片段截断。若需要命中前后的消息，在直搜阶段加 `--context`。
+
+### 按项目增量读取
+
+```sh
+wombat history read --incremental --project . --speaker user --json
+wombat history read --incremental --project . --speaker user --checkpoint scan.json --json
+```
+
+第一次查询按项目读取可见消息，无需搜索词。未指定日期时查询全部可用历史。保留筛选条件并执行每页的 `nextSearch`，将带有 `nextCheckpoint` 的完成页保存为 `scan.json`。下次传入该文件后，只读取同一范围内原日志新增的部分和新会话。输出达到分页预算时可继续。原日志存在不完整记录或读取缺口时，不推进检查点。检查点不建立服务或会话索引。变更筛选条件或遇到原日志被替换时，重新开始一次扫描。
 
 ### 查看一条记录
 

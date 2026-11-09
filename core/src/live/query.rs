@@ -482,9 +482,7 @@ pub fn dispatch(value: Value) -> Result<Value> {
     let needs_index = match &message {
         Message::Usage(request) => !direct_report(request),
         Message::Project(_) => true,
-        Message::Conversation { conversation } => {
-            conversation.action != crate::conversation_dto::Action::SourceSearch
-        }
+        Message::Conversation { conversation } => !conversation.action.reads_source_directly(),
         Message::Config(m) => m.config.action != crate::config_dto::Action::Capabilities,
         Message::Optimize(m) => m.optimize.action != crate::optimize_dto::Action::Capabilities,
         Message::Timing { timing } => {
@@ -553,7 +551,7 @@ pub fn dispatch(value: Value) -> Result<Value> {
             )?)?)
         }
         Message::Conversation { mut conversation } => {
-            if conversation.action == crate::conversation_dto::Action::SourceSearch {
+            if conversation.action.reads_source_directly() {
                 return Ok(serde_json::to_value(
                     crate::adapters::codex::direct_search::query(&conversation)?,
                 )?);

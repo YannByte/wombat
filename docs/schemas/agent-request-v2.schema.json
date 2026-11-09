@@ -964,6 +964,18 @@
             "null"
           ]
         },
+        "checkpoint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceTargets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceReadTarget"
+          }
+        },
         "anchor": {
           "anyOf": [
             {
@@ -1013,6 +1025,16 @@
           "description": "Search visible Codex source text and return excerpts without an index.",
           "type": "string",
           "const": "source_search"
+        },
+        {
+          "description": "Read new visible messages from a selected project's source files.",
+          "type": "string",
+          "const": "source_scan"
+        },
+        {
+          "description": "Reopen exact source records from a search or scan.",
+          "type": "string",
+          "const": "source_read"
         }
       ]
     },
@@ -1209,6 +1231,74 @@
         "eventId",
         "sourceInstanceId",
         "eventOffset"
+      ]
+    },
+    "SourceReadTarget": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/SourceSearchFile"
+        },
+        "byteStart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "byteEnd": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "matchedTerm": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "byteStart",
+        "byteEnd",
+        "sha256"
+      ]
+    },
+    "SourceSearchFile": {
+      "type": "object",
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        },
+        "upstreamId": {
+          "type": "string"
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "threadId",
+        "upstreamId",
+        "file",
+        "generation"
       ]
     },
     "Request4": {

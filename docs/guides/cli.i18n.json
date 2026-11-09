@@ -38,8 +38,16 @@
       "en": "5174ac478f9acdaf96cd3c818d941fd6185bc43b1719e3fbce12309067c6a44f"
     },
     "/complete-wombat-cli-guide/find-work-records-history/search-earlier-discussions": {
-      "zh": "f959e3792932bea2bef7c7326a0ae8abc22f4ce247b50dd757e9a429cc4df135",
-      "en": "1b8e47faff31f7751c211ed6a0a825f9a5eb410cf944298e7e3ee20dadd16eea"
+      "zh": "c3280954bc75d4dae90954829aa8d54a04316a4caf3908e0b4244e1ea69afedb",
+      "en": "6b6245addd157b652015dbcc36027e39d789c675a24fa8a484ae5a5e824c5950"
+    },
+    "/complete-wombat-cli-guide/find-work-records-history/read-original-quotes-from-search-hits-in-one-batch": {
+      "zh": "c9ea612857a926fbff4bd5e0b9727e3a6e919a211afb0696a44dff40858b5dd8",
+      "en": "c2595e43492de119ed5c220d9382a75a288a72c5c3d6afbe53144837efd0d293"
+    },
+    "/complete-wombat-cli-guide/find-work-records-history/read-new-messages-for-a-project": {
+      "zh": "9de5fba26e57aa3820a00b87e8d7994ab9c53985e17d9ac80d3ca5525a1e2247",
+      "en": "08a9cce65ef549ace5934f13bbe62b25aac1c3cf131ed5ad1551f5b0babe09fd"
     },
     "/complete-wombat-cli-guide/find-work-records-history/inspect-a-record": {
       "zh": "c59a1d4cba43a057627e9f06adb21264ed0309d2ff4db3029c9d29dd8a69e30f",
@@ -159,7 +167,7 @@
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/complete-method-scope": {
       "zh": "a33b47628b91dccc69a4255de1ae877ff6d6210e30676cd346498474ba77b11d",
-      "en": "4a204741156915c4b173032de9195e2104cc2397ccefdd4ead34df7329d81c65"
+      "en": "6a941dd18fdc2ed32c8057f2592255c122f6e1e5073b38a921184330970bab62"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/retain-scope-and-handle-failures": {
       "zh": "4cc3f789fa9371d60290c8d5bae7240d06a178e363477ad64340a2e34077d096",

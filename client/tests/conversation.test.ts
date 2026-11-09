@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createUsageClient, type ConversationRequest, type ConversationResult } from '@wombat/client';
 const request: ConversationRequest = { action:'locate',selection:{projects:['/synthetic']} };
-const response: ConversationResult = { outputVersion:7, action:'locate',snapshotId:'fixed',selection:{projects:['/synthetic']},items:[],fragments:[],nextCursor:null,scanComplete:true,partial:false,limits:[],scannedEvents:0,sourceBytesRead:0,freshness:null,window:null };
+const response: ConversationResult = { outputVersion:8, action:'locate',snapshotId:'fixed',selection:{projects:['/synthetic']},items:[],fragments:[],nextCursor:null,scanComplete:true,partial:false,limits:[],scannedEvents:0,sourceBytesRead:0,freshness:null,window:null };
 test('conversation responses require a revision and preserve filters and completion semantics',async()=>{
  for(const changed of [{...response,snapshotId:''}, {...response,selection:{projects:['/other']}}, {...response,scanComplete:false}, {...response,window:{anchor:{eventId:'x',sourceInstanceId:'source',eventOffset:0},radius:20}}]) {
   const client=createUsageClient({query:async()=>({}),conversation:async()=>changed});

@@ -19,7 +19,7 @@ const request: ConversationRequest = {
 };
 function result(): ConversationResult {
   return {
-    outputVersion: 7,
+    outputVersion: 8,
     action: "locate",
     snapshotId: "fixed",
     selection: request.selection!,

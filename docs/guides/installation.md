@@ -2,7 +2,7 @@
 
 中文 | [English](installation.en.md)
 
-Wombat `v0.7.0` 支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。安装内容已包含运行所需组件，无需开发工具或 API Key。
+Wombat `v0.7.1` 支持 macOS arm64/x64、Linux glibc arm64/x64 和 Windows x64。安装内容已包含运行所需组件，无需开发工具或 API Key。
 
 ## 安装运行时与插件
 
@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/instal
 插件阶段失败时，已安装的 Wombat 和数据会保留。错误提示会给出失败阶段、错误码、恢复操作和私有诊断摘要的路径。发现检查遇到权限不足、连接断开或超时时，先处理提示中的问题，再只运行 `wombat system doctor --project PATH --json`，无需重装。Skill 被禁用或存在冲突时，先检查 Codex 中该项目的插件设置，再执行同一只读检查。只有插件安装失败或已确认版本、内容不匹配时，才使用安装器的 `--plugin-only`（macOS/Linux）或 `-PluginOnly`（PowerShell）；保留自定义安装目录选项。此模式复用当前运行时，不重复下载，也不修改 PATH；不要附加版本或下载源选项。向 [Issues](https://github.com/YannByte/wombat/issues) 附加诊断摘要前，请先检查其内容：摘要包含本机项目和 Skill 路径，但不包含原始命令输出或 Hook 配置。
 
 
-安装仅提供 CLI 与 Skill，不启动索引、常驻服务或自动启动。首次查询在前台准备内部索引，后续查询复用已提交事实并采集增量，不需要初始化命令。如果旧版曾明确启用自动启动，请先用旧版停用；新版不管理旧服务注册。
+安装提供 CLI 和 Skill。查询按需运行，无需初始化。普通用量查询和默认历史搜索可以直接读取原始记录。需要索引证据的命令会在使用时准备索引。如果曾在旧版启用自动启动，请在升级前用旧版停用。
 
 ## 更新
 

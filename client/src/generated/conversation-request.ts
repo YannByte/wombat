@@ -1,6 +1,7 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search";
+export type Action =
+  ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search" | "source_scan" | "source_read";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -54,6 +55,8 @@ export interface Request {
    * Use the scope returned by the initial scan when reading export evidence.
    */
   sourceScope?: string | null;
+  checkpoint?: string | null;
+  sourceTargets?: SourceReadTarget[];
   anchor?: Evidence | null;
   radius?: number | null;
 }
@@ -94,4 +97,19 @@ export interface Evidence {
    * Exact position in the fixed target partition, not a raw file offset.
    */
   eventOffset: number;
+}
+export interface SourceReadTarget {
+  source: SourceSearchFile;
+  byteStart: number;
+  byteEnd: number;
+  sha256: string;
+  matchedTerm?: string | null;
+}
+export interface SourceSearchFile {
+  sourceInstanceId: string;
+  threadId: string;
+  upstreamId: string;
+  project?: string | null;
+  file: string;
+  generation: string;
 }

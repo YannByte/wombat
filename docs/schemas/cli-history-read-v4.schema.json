@@ -6,8 +6,8 @@
   "properties": {
     "outputVersion": {
       "type": "integer",
-      "minimum": 3,
-      "maximum": 3
+      "minimum": 4,
+      "maximum": 4
     },
     "result": {
       "$ref": "#/definitions/Response"
@@ -32,6 +32,12 @@
           "type": "null"
         }
       ]
+    },
+    "sourceTargets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SourceReadTarget"
+      }
     }
   },
   "additionalProperties": false,
@@ -56,7 +62,7 @@
         "outputVersion": {
           "type": "integer",
           "minimum": 0,
-          "const": 7,
+          "const": 8,
           "maximum": 4294967295
         },
         "action": {
@@ -110,6 +116,25 @@
           "items": {
             "$ref": "#/definitions/SourceNeighbor"
           }
+        },
+        "sourceFragments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceReadFragment"
+          }
+        },
+        "sourceReadIssues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceReadIssue"
+          }
+        },
+        "nextCheckpoint": {
+          "description": "Reuse only after the selected project scan is complete and readable.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "nextSearch": {
           "anyOf": [
@@ -256,6 +281,16 @@
           "description": "Search visible Codex source text and return excerpts without an index.",
           "type": "string",
           "const": "source_search"
+        },
+        {
+          "description": "Read new visible messages from a selected project's source files.",
+          "type": "string",
+          "const": "source_scan"
+        },
+        {
+          "description": "Reopen exact source records from a search or scan.",
+          "type": "string",
+          "const": "source_read"
         }
       ]
     },
@@ -870,13 +905,26 @@
           "type": "string"
         },
         "matchedTerm": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "matchRange": {
-          "$ref": "#/definitions/MatchRange"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MatchRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "text": {
           "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
         },
         "context": {
           "anyOf": [
@@ -896,8 +944,6 @@
         "byteStart",
         "byteEnd",
         "sha256",
-        "matchedTerm",
-        "matchRange",
         "text"
       ]
     },
@@ -952,6 +998,9 @@
         },
         "file": {
           "type": "string"
+        },
+        "generation": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -959,7 +1008,8 @@
         "sourceInstanceId",
         "threadId",
         "upstreamId",
-        "file"
+        "file",
+        "generation"
       ]
     },
     "SourceNeighbor": {
@@ -1008,6 +1058,76 @@
         "sha256",
         "text",
         "partial"
+      ]
+    },
+    "SourceReadFragment": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "occurrences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceReadOccurrence"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "truncated",
+        "occurrences"
+      ]
+    },
+    "SourceReadOccurrence": {
+      "type": "object",
+      "properties": {
+        "targetIndex": {
+          "description": "Index into the original source targets. Equal complete texts share a body.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "$ref": "#/definitions/MessageOrigin"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "targetIndex",
+        "origin"
+      ]
+    },
+    "SourceReadIssue": {
+      "type": "object",
+      "properties": {
+        "targetIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "code": {
+          "type": "string"
+        },
+        "deferred": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "targetIndex",
+        "code",
+        "deferred"
       ]
     },
     "Request": {
@@ -1131,6 +1251,18 @@
             "null"
           ]
         },
+        "checkpoint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceTargets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceReadTarget"
+          }
+        },
         "anchor": {
           "anyOf": [
             {
@@ -1191,6 +1323,40 @@
       "additionalProperties": false,
       "required": [
         "evidence"
+      ]
+    },
+    "SourceReadTarget": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/SourceSearchFile"
+        },
+        "byteStart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "byteEnd": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "matchedTerm": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "byteStart",
+        "byteEnd",
+        "sha256"
       ]
     },
     "ReadIssue": {

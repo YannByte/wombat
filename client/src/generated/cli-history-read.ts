@@ -1,6 +1,7 @@
 /* Generated from Rust. Run pnpm contracts:generate. */
 
-export type Action = ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search";
+export type Action =
+  ("activity" | "locate" | "read" | "search") | "records" | "resolve" | "source_search" | "source_scan" | "source_read";
 /**
  * Source-backed provenance only; an unclassified user record is not authorization.
  */
@@ -30,10 +31,11 @@ export interface HistoryRead {
    * Original read targets deferred by the response budget.
    */
   retryRead?: Request | null;
+  sourceTargets?: SourceReadTarget[];
 }
 export interface Response {
   record?: ResolvedRecord | null;
-  outputVersion: 7;
+  outputVersion: 8;
   action: Action;
   snapshotId: string;
   selection: Selection;
@@ -47,6 +49,12 @@ export interface Response {
   sourceHits?: SourceHit[];
   sourceFiles?: SourceSearchFile[];
   sourceNeighbors?: SourceNeighbor[];
+  sourceFragments?: SourceReadFragment[];
+  sourceReadIssues?: SourceReadIssue[];
+  /**
+   * Reuse only after the selected project scan is complete and readable.
+   */
+  nextCheckpoint?: string | null;
   nextSearch?: Request | null;
   readIssues?: ReadIssue[];
   sourceScope?: string | null;
@@ -205,9 +213,10 @@ export interface SourceHit {
    * Digest of the complete original JSONL record.
    */
   sha256: string;
-  matchedTerm: string;
-  matchRange: MatchRange;
+  matchedTerm?: string | null;
+  matchRange?: MatchRange | null;
   text: string;
+  truncated?: boolean;
   context?: SourceContext | null;
 }
 export interface SourceContext {
@@ -224,6 +233,7 @@ export interface SourceSearchFile {
   upstreamId: string;
   project?: string | null;
   file: string;
+  generation: string;
 }
 export interface SourceNeighbor {
   fileIndex: number;
@@ -234,6 +244,24 @@ export interface SourceNeighbor {
   sha256: string;
   text: string;
   partial: boolean;
+}
+export interface SourceReadFragment {
+  text: string;
+  truncated: boolean;
+  occurrences: SourceReadOccurrence[];
+}
+export interface SourceReadOccurrence {
+  /**
+   * Index into the original source targets. Equal complete texts share a body.
+   */
+  targetIndex: number;
+  timestamp?: string | null;
+  origin: MessageOrigin;
+}
+export interface SourceReadIssue {
+  targetIndex: number;
+  code: string;
+  deferred: boolean;
 }
 export interface Request {
   action: Action;
@@ -272,6 +300,8 @@ export interface Request {
    * Use the scope returned by the initial scan when reading export evidence.
    */
   sourceScope?: string | null;
+  checkpoint?: string | null;
+  sourceTargets?: SourceReadTarget[];
   anchor?: Evidence | null;
   radius?: number | null;
 }
@@ -281,6 +311,13 @@ export interface ReadTarget {
   maxBytes?: number | null;
   before?: number;
   after?: number;
+}
+export interface SourceReadTarget {
+  source: SourceSearchFile;
+  byteStart: number;
+  byteEnd: number;
+  sha256: string;
+  matchedTerm?: string | null;
 }
 export interface ReadIssue {
   targetIndices: number[];

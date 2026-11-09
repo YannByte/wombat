@@ -109,11 +109,15 @@ resetCredits保留来源availableCount，不以明细数量替代；credits=null
 
 setup 版本 1 默认只检查插件发现与运行时。`includeHooks` 默认为 false；显式请求后独立查询 Hook 注册。可选探测失败不掩盖已完成的发现和兼容性结果。CLI 对应 `setup --hooks`，具体步骤见 [CLI 指南](../guides/cli.md)。
 
-对话请求和结果版本 7 新增 `source_search`。其 `sourceHits` 返回原文片段、UTF-8 命中范围、原始 JSONL 字节范围及该行摘要。各条命中通过 `fileIndex` 引用共享的 `sourceFiles` 条目。续页时，`sourceScope` 绑定日志清单。直搜设置 `contextMessages` 后，各命中的 `context` 按来源顺序引用共享的 `sourceNeighbors`。每条相邻消息保留自己的原始记录范围和摘要。索引查询 `search` 对每个命中的事件返回一条结果。搜索接受单个 `query` 或 `terms` 数组。续页时保留词及其顺序。用 `readCursor` 回读命中，片段带回原文上下文和 `matchRange`。该范围按返回文本内的 UTF-8 字节计算。
+对话请求和结果版本 8 包含 `source_search`、`source_scan` 和 `source_read`。其 `sourceHits` 返回原文片段、UTF-8 命中范围、原始 JSONL 字节范围及该行摘要。各条命中通过 `fileIndex` 引用共享的 `sourceFiles` 条目。续页时，`sourceScope` 把项目和会话范围绑定到匹配的日志。直搜设置 `contextMessages` 后，各命中的 `context` 按来源顺序引用共享的 `sourceNeighbors`。每条相邻消息保留自己的原始记录范围和摘要。索引查询 `search` 对每个命中的事件返回一条结果。搜索接受单个 `query` 或 `terms` 数组。续页时保留词及其顺序。用 `readCursor` 回读命中，片段带回原文上下文和 `matchRange`。该范围按返回文本内的 UTF-8 字节计算。
 
 用 `complete` 采用扩展扫描预算。搜索结果保留原 `roots` 和 `selection`，扫描未完成时通过 `nextSearch` 返回完整续查请求。读取时可用 `contextMessages` 请求可见消息窗口。各位置按事件 ID 引用共享的 `neighbors`。
 
-每个读取目标通过从零开始的 `targetIndices` 映射到一个原文位置或一个 `readIssues` 条目。相同文本可以共享一份正文，各个 `alsoAt` 位置和游标分别保留。推迟条目对应原读取目标。`history read` 封装版本 3 通过 `retryRead` 提供推迟目标的读取请求，通过 `nextLocations` 提供下一页位置请求。
+每个读取目标通过从零开始的 `targetIndices` 映射到一个原文位置或一个 `readIssues` 条目。相同文本可以共享一份正文，各个 `alsoAt` 位置和游标分别保留。推迟条目对应原读取目标。`history read` 封装版本 4 通过 `retryRead` 提供推迟目标的读取请求，通过 `nextLocations` 提供下一页位置请求。
+
+按项目执行 `source_scan`，会按来源顺序返回可见消息，结果没有命中范围。扫描完成后，后续请求可将 `nextCheckpoint` 作为 `checkpoint`，并保留原来源根目录和筛选条件。检查点将追加位置绑定到文件身份和边界字节。扫描有缺口时不生成新检查点。
+
+`source_read` 接收含来源、原始字节范围和摘要的 `sourceTargets`。`sourceFragments` 合并相同的完整正文。每个原文位置或 `sourceReadIssues` 条目都引用输入序号。`history read` 的封装也包含原始目标。推迟的目标可通过 `retryRead` 提交。每条回读独立校验，不依赖搜索页游标。
 
 在活动、定位或搜索扫描中设置 `fixedScope`，获取 `sourceScope`。扫描游标带有相同的范围。回读导出证据时，传入这个 `sourceScope`，并保留相同的来源根目录和筛选条件。范围变化时，核心返回 `SOURCE_CHANGED`，调用方应从第一页重新开始导出。
 

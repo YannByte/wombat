@@ -1,13 +1,13 @@
 {
-  "summary": "Find and quote past Codex decisions with fewer steps, and get current Token usage without waiting for a full index. This stable release is for Codex users who review project history and usage on their own machine.",
+  "summary": "Review what changed in a Codex project and reopen the original evidence without rebuilding a history index. This stable release adds incremental project history and batch reading for direct search results.",
   "highlights": [
-    "Search original conversation logs with several alternative terms in one command. Request surrounding messages to read the discussion across turns, and keep the original location for each quote.",
-    "Read multiple located excerpts in one request. Repeated text shares one copy while retaining its source locations, and an unreadable item does not stop the remaining items. Continue through long searches while keeping the original source scope.",
-    "Get ordinary usage results directly from current logs on the first query and after logs grow. Repeated slow queries over stable historical logs can reuse a compact accounting cache prepared in the background on macOS, Linux, and Windows. The worker exits after the attempt. Token totals and pricing rules are unchanged."
+    "Read visible messages for one project without choosing search terms. Save a completed checkpoint to read only appended messages and new conversations on the next scan.",
+    "Send default history search results to history read --from -. Select several hits, reopen their original text, and keep each source location when identical quotes share one body. A failed item does not discard the other results.",
+    "Continue a project search after another project creates or appends logs. The search binds pagination to the selected project records."
   ],
   "knownLimitations": [
-    "Direct history search covers visible messages. Use indexed lookup for operation IDs and tool evidence.",
-    "Usage comparison uses the last committed full index by default. Add --fresh when comparing current records.",
-    "Conversation automation uses request and response protocol v7, and structured CLI history read output uses v3. Update integrations alongside the CLI and plugin."
+    "A change to a selected log during pagination can require restarting the scan. Reuse a completed checkpoint only with the same project and filters.",
+    "Direct history reads cover visible messages. Use indexed lookup for operation IDs and tool evidence.",
+    "Conversation automation uses request and response protocol v8. Structured history read output uses v4. Update integrations with the CLI and plugin."
   ]
 }
