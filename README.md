@@ -15,7 +15,7 @@ Wombat calculates usage from local Codex records and locates evidence. It also r
 
 ## Install Wombat for Codex
 
-**Stable: [`v0.7.1`](https://github.com/YannByte/wombat/releases/tag/v0.7.1).**
+**Stable: [`v0.8.0`](https://github.com/YannByte/wombat/releases/tag/v0.8.0).**
 
 Install a version of Codex that supports native plugins, with the `codex` command available locally. Wombat's local analysis needs no separate API key or development tools.
 

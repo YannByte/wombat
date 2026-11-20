@@ -15,7 +15,7 @@ Wombat 从本机 Codex 记录计算用量、定位证据，也会提供可复查
 
 ## 为 Codex 安装 Wombat
 
-**正式版：[`v0.7.1`](https://github.com/YannByte/wombat/releases/tag/v0.7.1)。**
+**正式版：[`v0.8.0`](https://github.com/YannByte/wombat/releases/tag/v0.8.0)。**
 
 先安装支持原生插件的 Codex，并确保本机可用 `codex` 命令。Wombat 本机分析无需单独配置 API Key 或安装开发工具。
 
