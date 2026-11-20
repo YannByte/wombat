@@ -11,6 +11,7 @@ type Method =
   | 'config/read'
   | 'thread/start'
   | 'turn/start'
+  | 'model/list'
   | 'account/read'
   | 'account/rateLimits/read'
   | 'account/usage/read';
@@ -22,9 +23,11 @@ type Pending = {
 const MAX_BYTES = 8 * 1024 * 1024;
 
 /** Native JSON-RPC only. No generic RPC method crosses the product boundary. */
-export async function connectCodex(query: QueryOptions, options: CodexOptions, invocation?: CodexInvocation, onTurnCompleted?: (params: unknown) => void) {
+type TrialNotification = 'turn/completed' | 'item/completed';
+
+export async function connectCodex(query: QueryOptions, options: CodexOptions, invocation?: CodexInvocation, onTrialEvent?: (method: TrialNotification, params: unknown) => void) {
   if (query.signal?.aborted) throw new CoreError('CANCELLED', 'Cancelled');
-  const child = spawnCodex(['app-server'], options, invocation);
+  const child = spawnCodex(['app-server', ...(invocation?.appServerConfig ?? []).flatMap(value => ['--config', value])], options, invocation);
   const exited = new Promise<void>(resolve => child.once('close', () => resolve()));
   let recordDisconnection!: (error: Error) => void;
   const disconnectedWith = new Promise<Error>(resolve => { recordDisconnection = resolve; });
@@ -70,7 +73,8 @@ export async function connectCodex(query: QueryOptions, options: CodexOptions, i
     }
     if (!message || typeof message !== 'object') return;
     if (!('id' in message)) {
-      if ('method' in message && message.method === 'turn/completed' && 'params' in message) onTurnCompleted?.(message.params);
+      if ('method' in message && (message.method === 'turn/completed' || message.method === 'item/completed') && 'params' in message)
+        onTrialEvent?.(message.method, message.params);
       return;
     }
     if (typeof message.id !== 'number') return;

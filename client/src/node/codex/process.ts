@@ -4,7 +4,7 @@ import type {QueryOptions} from '../../client.js';
 import {NativeDiagnostics} from '../local-access.js';
 
 export interface CodexOptions { codexBinaryPath?: string; codexTimeoutMs?: number; codexHome?: string }
-export interface CodexInvocation { cwd?: string; env?: NodeJS.ProcessEnv }
+export interface CodexInvocation { cwd?: string; env?: NodeJS.ProcessEnv; appServerConfig?: readonly string[] }
 
 export function spawnCodex(args: string[], options: CodexOptions, invocation: CodexInvocation = {}): ChildProcessWithoutNullStreams {
   const binary=options.codexBinaryPath ?? process.env.WOMBAT_CODEX_BIN ?? 'codex';

@@ -40,6 +40,8 @@ Wombat 已能定位原始任务、检查配置并复查原问题。一次规则�
 
 开发验证入口为 `corepack pnpm verify:harness-trial -- --codex-bin <绝对路径>`。它启动独立的 Codex 会话，逐个核对模型、权限和指令来源，再在通过预检的同一会话内用本机模拟服务驱动工具调用。验收要求匹配会话与轮次、边界检查通过并收回正确的产物。原版应重现错误结果，候选版应通过正确性检查。已登录会话中的模型调用和安装后的对话入口另行验收。
 
+真实文件任务的开发入口为 `corepack pnpm harness:trial -- --manifest TASK.json --output DIRECTORY`。在 macOS arm64 上使用已登录的本机 Codex。清单提供任务、现行指令、同目录内明确选定的文本文件和可独立运行的文本检查。执行器固定同一个模型，分别收回原版、通用候选、领域候选和组合版的 Markdown 交付物。报告记录输入指纹、执行事件摘要、检查结果和组合理由。未选择的全局指令会阻止提交任务，确认参与的指令路径通过 `--allow-instruction` 单次选入。报告供审阅，候选直接应用、撤销和安装后的对话入口仍需验收。
+
 启动会话时也要核对加载的指令。用合成全局 `AGENTS.md` 实测，`codex exec --ignore-user-config` 仍把全局指令送进模型请求。App Server 的 `thread/start` 可以在发送任务前返回 `instructionSources`，作为核对所选材料的预检入口。若宿主加载了未纳入试跑的指令，继续保持待处理。参见 [Codex App Server 会话接口](https://learn.chatgpt.com/docs/app-server)。
 
 ### 第二阶段：项目 Harness 版本

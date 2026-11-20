@@ -93,6 +93,12 @@ test('a trial sends one turn to the validated thread and requires its completion
         });
         if (request.method !== 'turn/start') return;
         if (request.params.threadId !== 'trial-thread' || request.params.input[0].text !== 'synthetic task') process.exit(2);
+        if (process.env.MODE === 'structured') {
+          if (request.params.outputSchema?.properties?.rationale?.type !== 'string') process.exit(3);
+          send({ method: 'item/completed', params: { threadId: 'trial-thread', turnId: 'one', item: {
+            type: 'agentMessage', phase: 'final_answer', text: JSON.stringify({ rationale: 'Observed behavior' }),
+          } } });
+        }
         send({ method: 'turn/completed', params: { threadId: 'unrelated', turn: { id: 'other', status: 'completed' } } });
         if (process.env.MODE !== 'no-completion') send({ method: 'turn/completed', params: {
           threadId: 'trial-thread', turn: { id: process.env.MODE === 'other-turn' ? 'other' : 'one', status: process.env.MODE === 'failed' ? 'failed' : 'completed' },
@@ -100,9 +106,12 @@ test('a trial sends one turn to the validated thread and requires its completion
         result({ turn: { id: 'one' } });
       });
     `);
-    const run = (mode: string) => runTrialSession(expected, {}, { codexBinaryPath, codexTimeoutMs: 750 },
+    const run = (mode: string) => runTrialSession(mode === 'structured' ? { ...expected, outputFields: ['rationale'] } : expected, {}, { codexBinaryPath, codexTimeoutMs: 750 },
       { cwd: workspace, env: { ...process.env, MODE: mode } }, 'synthetic task');
     await run('ok');
+    assert.deepEqual(await run('structured'), {
+      items: [{ type: 'agentMessage' }], truncated: false, finalText: '{"rationale":"Observed behavior"}',
+    });
     await assert.rejects(run('other-turn'), { code: 'TRIAL_SESSION_PROTOCOL' });
     await assert.rejects(run('failed'), { code: 'TRIAL_TURN_FAILED' });
     await assert.rejects(run('no-completion'), { code: 'CODEX_TIMEOUT' });
