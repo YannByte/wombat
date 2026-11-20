@@ -14,6 +14,8 @@ Ship one main Skill and one plugin. Codex owns interpretation, authorized edits,
 
 This replaces Wombat-owned task sending and automatic review/adoption lifecycle in the [native handoff decision](2026-10-03-native-codex-handoff.en.md), [optimization proposal](../../proposed/product/2026-10-03-optimization-lifecycle.en.md), and [Skill proposal](../../proposed/product/2026-10-04-codex-skill.en.md). Their source-read-only, evidence and native execution rationale remains applicable. Other unfinished evidence requirements remain proposals, not shipped capabilities.
 
+The [Harness improvement proposal](../../proposed/product/2026-11-20-harness-improvement.en.md) proposes a specific execution and persistence boundary for user-initiated trials, application, and undo.
+
 ## Alternatives considered
 
 Retaining the lifecycle and multiple installation modes preserves more state and ambiguity. Returning only current checks loses the original comparison condition. The retained-view baseline keeps that condition without another persistent store. Its cost is explicit expiry, rather than an unsupported repair claim.

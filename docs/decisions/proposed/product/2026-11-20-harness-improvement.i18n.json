@@ -1,0 +1,45 @@
+{
+  "version": 2,
+  "sections": {
+    "/decision-note-harness-improvement-implementation-plan": {
+      "zh": "0eaa7665858f7fe166e8195a4ffde4a4aa68c0f8dc793a47a90305dcec8f882c",
+      "en": "b7e66531dd83e58980953fe2895f585fb250cd523cb0930c2f5ef995697f0b13"
+    },
+    "/decision-note-harness-improvement-implementation-plan/problem": {
+      "zh": "9f869b49e7a099d2cde6021d7bbfced2aac4847b6ceddd62c885b11c73b196cb",
+      "en": "b78ad060b9601b0339524e5c1cbfd396ac02c97f711d2409bb2b3caf7022cb0b"
+    },
+    "/decision-note-harness-improvement-implementation-plan/proposal": {
+      "zh": "639c53de1663e02600432a0e05db74d55f7e24f5dc2a469e64af04955bb54aba",
+      "en": "107090ceaaef0c1bb7fb8a73a44802963356aac858565119175516a8587978b8"
+    },
+    "/decision-note-harness-improvement-implementation-plan/proposal/phase-one-from-a-previous-task-to-a-reversible-change": {
+      "zh": "62c13f4bb78c6842cd306a73e69e948106c75cadc875981d37468da1676633af",
+      "en": "37e5f6a0a76d97e9009b57869054311a71f0daad67cf21e1b07ae7ae7bd0ab42"
+    },
+    "/decision-note-harness-improvement-implementation-plan/proposal/interfaces-and-state": {
+      "zh": "4634f0010e945b374855e4965d775a47b5c32d55e28a8eee67dc0efee26c7fa7",
+      "en": "1119b46f70adfe687a16460149c78487a0c54a537bfe2536a937748d204db2a4"
+    },
+    "/decision-note-harness-improvement-implementation-plan/proposal/implementation-order": {
+      "zh": "234d2016595c7cba40b564f8c8358bed9e62a9d235243c1201776d87b7b55169",
+      "en": "65961e890f22fab121a16a3abde6a8a2f731e4ca37f33ff1e3ca689a5515f5c1"
+    },
+    "/decision-note-harness-improvement-implementation-plan/proposal/phase-two-project-harness-versions": {
+      "zh": "48d8695548f7736010257ec5c689545c87cfc653a2ae39257dbf4af52da6c141",
+      "en": "3352268ead21f8eac28c1a3b5bdf6da3713a933e61d0c5bfdf86da0d55195c9f"
+    },
+    "/decision-note-harness-improvement-implementation-plan/proposal/phase-three-use-experience-in-later-improvements": {
+      "zh": "5893388de012cf6181b3a4664f92a46f62e96238fd2a230220d11bdc70d0f397",
+      "en": "4b7399a798166a9d1dab4ad9c737c105c7074d2e38c91adfb38928db3039c891"
+    },
+    "/decision-note-harness-improvement-implementation-plan/alternatives-considered": {
+      "zh": "44619d90e76b80ecfd221aa25cc1bef31d3ca3e3c1098545d7981905d8b0b3cc",
+      "en": "f6887eb4e3b097cfa69cca517c96c0139bb100fba665c031fd70430021c3dee2"
+    },
+    "/decision-note-harness-improvement-implementation-plan/acceptance-criteria": {
+      "zh": "958032852e3d0c836468c34aaaebe730b6cde2e06291919e2ea52d9c4c8607b7",
+      "en": "82dbe14c1178638ef5861b81a9164f509d88ba8bab285c908548c780a61c1b28"
+    }
+  }
+}

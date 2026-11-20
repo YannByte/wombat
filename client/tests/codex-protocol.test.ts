@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { connectCodex } from '../src/node/codex/rpc.js';
@@ -133,4 +133,48 @@ test('diagnostics preserve bounded lines and distinguish recovered warnings from
   assert.equal(diagnostics.error('CODEX_DISCONNECTED','Disconnected').code,'LOCAL_ACCESS_DENIED');
   diagnostics.clear();
   assert.equal(diagnostics.error('CODEX_DISCONNECTED','Disconnected').code,'CODEX_DISCONNECTED');
+  diagnostics.write(Buffer.from('sandbox-exec: sandbox_apply: Operation not permitted\n'));
+  assert.equal(diagnostics.error('CODEX_UNAVAILABLE','Unavailable').code,'LOCAL_ACCESS_DENIED');
+});
+
+test('native command invocation uses only the explicit directory and environment when supplied', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'wombat-native-invocation-'));
+  const binary = path.join(dir, 'codex.cjs');
+  try {
+    await writeFile(binary, `console.log(JSON.stringify([process.cwd(), process.env.CODEX_HOME, process.env.WOMBAT_CANARY]));`);
+    const codexHome = path.join(dir, 'codex-home');
+    const result = JSON.parse(await runCodex([], {}, { codexBinaryPath: binary, codexHome }, {
+      cwd: dir, env: { WOMBAT_CANARY: 'synthetic' },
+    }));
+    assert.deepEqual(result, [await realpath(dir), codexHome, 'synthetic']);
+
+    await writeFile(binary, `setInterval(() => {}, 50);`);
+    await assert.rejects(runCodex([], {}, { codexBinaryPath: binary, codexTimeoutMs: 35 }), { code: 'CODEX_TIMEOUT' });
+    const controller = new AbortController();
+    const pending = runCodex([], { signal: controller.signal }, { codexBinaryPath: binary });
+    controller.abort();
+    await assert.rejects(pending, { code: 'CANCELLED' });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('native timeout stops the owned POSIX group after the leader exits', { skip: process.platform === 'win32' }, async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'wombat-native-group-'));
+  const binary = path.join(dir, 'codex.cjs');
+  try {
+    await writeFile(binary, `
+      const { spawn } = require('node:child_process');
+      const child = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setTimeout(() => {}, 5500);"], {
+        stdio: ['ignore', 'inherit', 'inherit'],
+      });
+      child.unref();
+      process.exit(0);
+    `);
+    const started = performance.now();
+    await assert.rejects(runCodex([], {}, { codexBinaryPath: binary, codexTimeoutMs: 500 }), { code: 'CODEX_TIMEOUT' });
+    assert.ok(performance.now() - started < 4500, 'the descendant should be stopped before its own timer');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

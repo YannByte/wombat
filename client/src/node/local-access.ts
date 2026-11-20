@@ -38,7 +38,8 @@ export class NativeDiagnostics {
           this.truncated = true;
         } else {
           // Node's syscall diagnostic, or the equivalent native OS diagnostic.
-          this.denied ||= /^Error: (?:(?:listen|connect|bind|spawn) (?:EPERM|EACCES)\b|(?:EPERM|EACCES): .*\b(?:open|listen|connect|bind|spawn)\b)/.test(this.tail) ||
+          this.denied ||= /^sandbox-exec: sandbox_apply: (?:Operation not permitted|Permission denied)$/.test(this.tail) ||
+            /^Error: (?:(?:listen|connect|bind|spawn) (?:EPERM|EACCES)\b|(?:EPERM|EACCES): .*\b(?:open|listen|connect|bind|spawn)\b)/.test(this.tail) ||
             /^Error: .*\b(?:bind|listen|connect|spawn)\b.*(?:Operation not permitted \(os error 1\)|Permission denied \(os error 13\))/.test(this.tail);
         }
       }

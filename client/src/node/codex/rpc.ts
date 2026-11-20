@@ -2,13 +2,15 @@ import { StringDecoder } from 'node:string_decoder';
 import packageMetadata from '../../../package.json' with { type: 'json' };
 import { CoreError } from '../../errors.js';
 import type { QueryOptions } from '../../client.js';
-import { spawnCodex, stopCodex, type CodexOptions } from './process.js';
+import { spawnCodex, stopCodex, type CodexInvocation, type CodexOptions } from './process.js';
 import { NativeDiagnostics } from '../local-access.js';
 
 type Method =
   | 'skills/list'
   | 'hooks/list'
   | 'config/read'
+  | 'thread/start'
+  | 'turn/start'
   | 'account/read'
   | 'account/rateLimits/read'
   | 'account/usage/read';
@@ -20,9 +22,12 @@ type Pending = {
 const MAX_BYTES = 8 * 1024 * 1024;
 
 /** Native JSON-RPC only. No generic RPC method crosses the product boundary. */
-export async function connectCodex(query: QueryOptions, options: CodexOptions) {
+export async function connectCodex(query: QueryOptions, options: CodexOptions, invocation?: CodexInvocation, onTurnCompleted?: (params: unknown) => void) {
   if (query.signal?.aborted) throw new CoreError('CANCELLED', 'Cancelled');
-  const child = spawnCodex(['app-server'], options);
+  const child = spawnCodex(['app-server'], options, invocation);
+  const exited = new Promise<void>(resolve => child.once('close', () => resolve()));
+  let recordDisconnection!: (error: Error) => void;
+  const disconnectedWith = new Promise<Error>(resolve => { recordDisconnection = resolve; });
   const pending = new Map<number, Pending>();
   const diagnostics = new NativeDiagnostics();
   let terminalError: Error | undefined;
@@ -33,6 +38,7 @@ export async function connectCodex(query: QueryOptions, options: CodexOptions) {
     if (closed) return;
     closed = true;
     terminalError = error;
+    recordDisconnection(error);
     for (const w of pending.values()) {
       clearTimeout(w.timer);
       w.reject(error);
@@ -43,7 +49,7 @@ export async function connectCodex(query: QueryOptions, options: CodexOptions) {
   };
   const abort = () => fail(new CoreError('CANCELLED', 'Cancelled'));
   const disconnected = () => terminalError ?? diagnostics.error('CODEX_DISCONNECTED', 'Codex disconnected');
-  const close = () => fail(disconnected());
+  const close = () => { fail(disconnected()); return exited; };
   const cleanup = () => {
     query.signal?.removeEventListener('abort', abort);
     process.off('SIGINT', abort);
@@ -62,13 +68,12 @@ export async function connectCodex(query: QueryOptions, options: CodexOptions) {
       fail(new CoreError('NATIVE_PROTOCOL_ERROR', 'Invalid native response'));
       return;
     }
-    if (
-      !message ||
-      typeof message !== 'object' ||
-      !('id' in message) ||
-      typeof message.id !== 'number'
-    )
+    if (!message || typeof message !== 'object') return;
+    if (!('id' in message)) {
+      if ('method' in message && message.method === 'turn/completed' && 'params' in message) onTurnCompleted?.(message.params);
       return;
+    }
+    if (typeof message.id !== 'number') return;
     const w = pending.get(message.id);
     if (!w) return;
     pending.delete(message.id);
@@ -141,9 +146,9 @@ export async function connectCodex(query: QueryOptions, options: CodexOptions) {
       capabilities: { experimentalApi: true },
     });
     send({ jsonrpc: '2.0', method: 'initialized' });
-    return { request: (method: Method, params: unknown) => request(method, params), close };
+    return { request: (method: Method, params: unknown) => request(method, params), close, disconnectedWith };
   } catch (error) {
-    close();
+    await close();
     throw error;
   }
 }

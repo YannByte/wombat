@@ -53,6 +53,7 @@
     "verify:onboarding": "node --import tsx scripts/verify-onboarding.ts",
     "verify:agent-query": "node --import tsx scripts/verify-agent-query.ts",
     "verify:query-flow": "node --import tsx --test tests/e2e/query-flow.test.ts",
+    "verify:harness-trial": "node --import tsx scripts/verify-harness-trial.ts",
     "skill:build": "node scripts/build-skill.ts",
     "verify:skill-conversation": "node --import tsx scripts/verify-skill-conversation.ts",
     "installers:generate": "node scripts/generate-installers.ts",

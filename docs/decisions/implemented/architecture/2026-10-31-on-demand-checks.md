@@ -14,6 +14,8 @@ Status: implemented
 
 本决策替代[原生交接决策](2026-10-03-native-codex-handoff.md)、[优化提案](../../proposed/product/2026-10-03-optimization-lifecycle.md)和 [Skill 提案](../../proposed/product/2026-10-04-codex-skill.md)中 Wombat 负责发送任务、自动检查历史与采用跟踪的部分。来源只读、证据与原生执行归属的理由继续有效；其他未完成证据要求仍为提案，不是已交付能力。
 
+[Harness 改进提案](../../proposed/product/2026-11-20-harness-improvement.md)为用户主动发起的试跑、应用与撤销提出专用的执行和持久记录边界。
+
 ## 考虑过的方案
 
 保留生命周期和多种安装方式会保留更多状态与歧义。只返回当前检查会失去原比较条件。保留视图的基线无需新增持久化存储即可固定该条件，代价是明确过期，而非作出无依据的修复声明。
