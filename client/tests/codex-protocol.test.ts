@@ -143,10 +143,12 @@ test('native command invocation uses only the explicit directory and environment
   try {
     await writeFile(binary, `console.log(JSON.stringify([process.cwd(), process.env.CODEX_HOME, process.env.WOMBAT_CANARY]));`);
     const codexHome = path.join(dir, 'codex-home');
-    const result = JSON.parse(await runCodex([], {}, { codexBinaryPath: binary, codexHome }, {
+    const [cwd, activeCodexHome, canary] = JSON.parse(await runCodex([], {}, { codexBinaryPath: binary, codexHome }, {
       cwd: dir, env: { WOMBAT_CANARY: 'synthetic' },
     }));
-    assert.deepEqual(result, [await realpath(dir), codexHome, 'synthetic']);
+    assert.equal(await realpath(cwd), await realpath(dir));
+    assert.equal(activeCodexHome, codexHome);
+    assert.equal(canary, 'synthetic');
 
     await writeFile(binary, `setInterval(() => {}, 50);`);
     await assert.rejects(runCodex([], {}, { codexBinaryPath: binary, codexTimeoutMs: 35 }), { code: 'CODEX_TIMEOUT' });
