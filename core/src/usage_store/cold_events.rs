@@ -130,12 +130,13 @@ impl ColdEvents {
             let mut after = (-1, -1);
             loop {
                 let page = {
-                    let db = self
+                    let mut db = self
                         .0
                         .lock()
                         .map_err(|_| corrupt("cold measurement lock unavailable"))?;
+                    let budget = crate::usage_app::query_work::SqlBudget::new(&mut db)?;
                     super::ledger_projection::group_page(
-                        &db,
+                        budget.connection(),
                         &source.source.id,
                         thread,
                         turn,

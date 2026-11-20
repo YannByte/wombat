@@ -19,7 +19,7 @@ impl Population {
         self.tasks
             .update(thread, || Aggregate::new(&[]), |task| task.combine(value))
     }
-    fn finish(&self) -> Result<TaskPopulation> {
+    fn finish(&mut self) -> Result<TaskPopulation> {
         let mut measured = 0;
         let mut totals = vec![];
         let mut sum = Some(0_u64);
@@ -233,7 +233,7 @@ pub(super) fn execute(request: Request, snapshot: &Snapshot, tz: Tz) -> Result<R
     let mut total = 0;
     let mut result_groups = vec![];
     let mut active: Option<(Option<String>, Population)> = None;
-    let mut finish = |key: Option<String>, pop: Population| -> Result<()> {
+    let mut finish = |key: Option<String>, mut pop: Population| -> Result<()> {
         if total >= offset && result_groups.len() < limit {
             result_groups.push(TaskStatisticsGroup {
                 key,

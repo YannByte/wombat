@@ -412,7 +412,6 @@ pub(super) fn group_page(
     scan: Scan<'_>,
 ) -> Result<Vec<StoredGroup>> {
     crate::usage_app::query_work::charge(0, 0)?;
-    let _budget = crate::usage_app::query_work::SqlBudget::new(db)?;
     let sql = format!(
         "SELECT block,part,version,bytes,digest,CASE WHEN ?6 THEN NULL ELSE data END,thread,targets,count,catalog,catalog_digest FROM measurement_summaries WHERE source=?1 AND (?2 IS NULL OR thread=?2) AND (?3 IS NULL OR EXISTS(SELECT 1 FROM json_each(targets) j WHERE j.value=?3 OR (?3='unassigned' AND j.value IS NULL))) AND (block,part)>(?4,?5) {} ORDER BY block,part LIMIT ?7",
         scan.filter.sql()

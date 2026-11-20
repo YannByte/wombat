@@ -81,11 +81,14 @@ pub(crate) fn lock<T>(mutex: &Mutex<T>) -> Result<std::sync::MutexGuard<'_, T>> 
         }
     }
 }
-pub(crate) struct SqlBudget<'a>(&'a rusqlite::Connection);
+pub(crate) struct SqlBudget<'a>(&'a mut rusqlite::Connection);
 impl<'a> SqlBudget<'a> {
-    pub(crate) fn new(db: &'a rusqlite::Connection) -> Result<Self> {
+    pub(crate) fn new(db: &'a mut rusqlite::Connection) -> Result<Self> {
         db.progress_handler(1000, Some(expired))?;
         Ok(Self(db))
+    }
+    pub(crate) fn connection(&self) -> &rusqlite::Connection {
+        self.0
     }
 }
 impl Drop for SqlBudget<'_> {
@@ -124,12 +127,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     #[test]
     fn sqlite_deadline_interrupts_computation_and_clears_its_handler() {
-        let db = rusqlite::Connection::open_in_memory().unwrap();
+        let mut db = rusqlite::Connection::open_in_memory().unwrap();
         let budget = Budget::enter();
         WORK.with_borrow_mut(|work| work.as_mut().unwrap().deadline = Instant::now());
         let error = {
-            let _sql = SqlBudget::new(&db).unwrap();
-            db.query_row("WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<10000000) SELECT sum(x) FROM n", [], |r| r.get::<_, i64>(0)).unwrap_err()
+            let sql = SqlBudget::new(&mut db).unwrap();
+            sql.connection().query_row("WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<10000000) SELECT sum(x) FROM n", [], |r| r.get::<_, i64>(0)).unwrap_err()
         };
         assert_eq!(
             query_error(error.into())

@@ -167,13 +167,13 @@ impl<K: Ord + Serialize + DeserializeOwned, V: Clone + Serialize + DeserializeOw
         Ok(self.memory.get(key).map(|(v, _)| v.clone()))
     }
     pub(super) fn each(
-        &self,
+        &mut self,
         prefix: Option<&str>,
         mut consume: impl FnMut(&K, &V) -> Result<()>,
     ) -> Result<()> {
         super::query_work::charge(0, 0)?;
-        if let Some(disk) = &self.disk {
-            let _budget = super::query_work::SqlBudget::new(&disk.db)?;
+        if let Some(disk) = &mut self.disk {
+            let budget = super::query_work::SqlBudget::new(&mut disk.db)?;
             let sql = format!(
                 "SELECT key,payload FROM reductions {} ORDER BY {}",
                 if prefix.is_some() {
@@ -183,7 +183,7 @@ impl<K: Ord + Serialize + DeserializeOwned, V: Clone + Serialize + DeserializeOw
                 },
                 self.order.sql()
             );
-            let mut query = disk.db.prepare(&sql)?;
+            let mut query = budget.connection().prepare(&sql)?;
             let mut cursor = if let Some(prefix) = prefix {
                 query.query([prefix])?
             } else {

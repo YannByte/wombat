@@ -1,6 +1,7 @@
 {
   "summary": "This stable release improves cleanup for local Codex requests and adds source-checkout tooling for controlled Harness trials.",
   "highlights": [
+    "Update the bundled SQLite dependency to a release that fixes CVE-2026-119375.",
     "When a local Codex request times out or is cancelled on macOS or Linux, Wombat can stop remaining processes in the owned group after the main process exits.",
     "From a source checkout on macOS arm64, use the real-task Harness trial to compare the baseline, two instruction candidates, and a composed version on one selected text task. The report includes deliverables, independent checks, and the rationale for the proposed changes."
   ],
