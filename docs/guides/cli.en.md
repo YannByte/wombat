@@ -67,15 +67,17 @@ If the current project cannot be identified, inspection and cleanup explain the 
 
 ## All commands
 
-The five top-level entries are `history`, `usage`, `check`, `clean` and `system`. This table lists the guide's complete set of operations. Detailed data capabilities remain available through `system api` and `system call` without more top-level entries.
+Choose a command for the problem you want to solve. The five top-level entries are `history`, `usage`, `check`, `clean`, and `system`.
 
-| Entry | Operations | Default result |
+| Goal | Entry | Result |
 |---|---|---|
-| `history` | List, `search`, `show`, `read` | Recent work, matching positions, record information or source fragments |
-| `usage` | Time selection, `top`, `stats`, `compare`, `alerts` | Totals, task rankings, task distributions, scope comparisons or budget alerts |
-| `check` | Project inspection, `skills`, `mcp`, `rules`, `hooks`, `--task`, `verify` | Problems, observations, review leads or original-condition comparisons |
-| `clean` | Project preview, `--codex`, `verify`, `--apply` | Candidates and protection reasons, or explicitly selected cleanup results |
-| `system` | `doctor`, `update`, `api`, `call`, `hook codex` | Maintenance, interface discovery or integration input |
+| Find a task to review | `history`, `usage`, `usage top`, `usage stats`, `usage compare` | Recent work, task rankings and distributions, and comparisons across time windows or tasks. |
+| Diagnose a harness problem | `check`, `check --task`, `check skills`, `check mcp`, `check rules`, `check hooks` | Project and task checks and observations about configuration, loading, use, and references. |
+| Select items to clean up | `clean`, `clean --codex`, `clean --wombat-temp`, `clean --codex --apply` | Preview candidates and reasons for protection. Confirm selected supported Codex artifacts for permanent deletion. Codex makes authorized project edits and removes project outputs. |
+| Verify a change | `check verify`, `clean verify` | Recheck selected items against the original check or cleanup list. |
+| Recover a decision and resume work | `history search`, `history show`, `history read` | Find matching locations, work records, and excerpts to use when resuming work or writing a report. |
+| Manage budgets and installation | `usage alerts`, `system doctor`, `system update` | Read budget alerts, check the runtime and plugin discovery, and check or update the runtime. |
+| Use automation interfaces | `system api`, `system call`, `system hook codex` | Discover contracts, run structured requests, and receive integration input. See [complete method scope](#api-methods). |
 
 ## Find work records: history
 
@@ -143,6 +145,8 @@ After explicitly selecting a record without date bounds, you can inspect its com
 To resume work, use `history search` to find the record, `show` to locate operations, then `read` when needed to confirm the original discussion, delivery locations and unfinished work. A recorded completion claim is evidence to check. Actual files and tests still need verification.
 
 Daily and weekly reports combine work records and usage under the same dates and project. In Codex, ask for this week's project work, Tokens, unverified items and record locations. The Skill reads relevant fragments and separates user requests, recorded actions and verified outcomes. Knowledge documents use the same evidence and a user-selected destination rather than automatically creating another knowledge base.
+
+<a id="usage"></a>
 
 ## Inspect usage: usage
 
@@ -492,26 +496,28 @@ Input is one object up to 1 MiB, read within ten seconds; output is at most 2 Mi
 
 Exact IDs resolve metadata without scanning activity; date filters still apply to the subsequent text read. A budgeted title lookup returns `SCAN_INCOMPLETE` with a continuation request in `error.details.next`. Execute it through `system call`. This state differs from data readiness and does not require an index refresh.
 
+<a id="api-methods"></a>
+
 ### Complete method scope
 
 `history read` JSON contains `result` with bounded text, speaker, time and fragment cursors. Check `alsoAt` for other locations that share the same excerpt. `nextLocations` is a request for the next page of locations. Use it with the `conversation` method of `system call`. To continue a text excerpt, use its cursor and evidence. Check `readIssues` for failed or deferred targets. Find shared context bodies in `neighbors`. Each occurrence lists their IDs in `visibleContext`. Pass the optional `retryRead` through `system call` for the targets deferred by the response limit.
 
-| Method | Actions | Purpose and boundary |
-|---|---|---|
-| `usage` | `usage`, `threads`, `turns`, `steps`, `statistics`, `compare`, `investigate`, `trajectory`, `resources`, `review`, `context` | Current usage/analysis, returning `result` and data status |
-| `project` | Assemble current project evidence | Configuration, checks, records, original usage and cleanup candidates; independent status/read versions without project edits |
-| `conversation` | `resolve`, `records`, `activity`, `locate`, `search`, `read`, `source_search`, `source_scan`, `source_read` | Activity, locations and source text; records are not accepted code delivery |
-| `config` | `list`, `detail`, `evidence`, `related_scopes`, `capabilities` | Read-only configuration, measurements, native observations and associated use |
-| `optimize` | `list`, `detail`, `checks`, `activity`, `capabilities`, `recheck`, `keep`, `not_applicable` | Checks and comparisons; only explicit decisions write user storage |
-| `artifacts` | `inspect`, `recheck`, `apply` | Cleanup observations and protected Codex removal, without conversation indexing |
-| `timing` | `summary`, `evidence`, `capabilities` | Exact task/turn process evidence, without replacing missing time with zero |
-| `setup` | Observe runtime and native integration | Compatibility and discovery, not installation or model work |
-| `account` | `read`, `refresh`, `history` | Account and allowance observations, not a project's inferred subscription balance |
-| `monitor` | `list`, `upsert`, `remove`, `check`, `acknowledge` | Budget plans and notices; saving a plan does not start alert monitoring |
-| `prices` | `status`, `update`, `auto_update` | Auxiliary pricing; failures preserve prices and do not change raw Tokens |
-| `directories` | `list`, `authorize`, `revoke` | Explicit path/purpose directory grants |
-| `preferences` | `get`, `set` | Supported preferences such as presentation language, without source-text changes |
-| `collection` | `status`, `events`, `configure`, `pause`, `resume` | Optional receipt observations/control, not proof of complete history |
+| Goal | Method | Actions | Purpose and boundary |
+|---|---|---|---|
+| Find task evidence | `conversation` | `resolve`, `records`, `activity`, `locate`, `search`, `read`, `source_search`, `source_scan`, `source_read` | Activity, locations and source text; records are not accepted code delivery |
+| Find task evidence | `usage` | `usage`, `threads`, `turns`, `steps`, `statistics`, `compare`, `investigate`, `trajectory`, `resources`, `review`, `context` | Current usage/analysis, returning `result` and data status |
+| Find task evidence | `timing` | `summary`, `evidence`, `capabilities` | Exact task/turn process evidence, without replacing missing time with zero |
+| Diagnose the harness | `project` | Assemble current project evidence | Configuration, checks, records, original usage and cleanup candidates; independent status/read versions without project edits |
+| Diagnose the harness | `config` | `list`, `detail`, `evidence`, `explain`, `related_scopes`, `capabilities` | Read-only configuration, measurements, native observations and associated use |
+| Check changes | `optimize` | `list`, `detail`, `checks`, `activity`, `capabilities`, `recheck`, `keep`, `not_applicable` | Checks and comparisons; only explicit decisions write user storage |
+| Check changes | `artifacts` | `inspect`, `recheck`, `apply` | Cleanup observations and protected Codex removal, without conversation indexing |
+| Manage usage | `account` | `read`, `refresh`, `history` | Account and allowance observations, not a project's inferred subscription balance |
+| Manage usage | `monitor` | `list`, `upsert`, `remove`, `check`, `acknowledge` | Budget plans and notices; saving a plan does not start alert monitoring |
+| Manage usage | `prices` | `status`, `update`, `auto_update` | Auxiliary pricing; failures preserve prices and do not change raw Tokens |
+| Maintain the local environment | `setup` | Observe runtime and native integration | Compatibility and discovery, not installation or model work |
+| Maintain the local environment | `directories` | `list`, `authorize`, `revoke` | Explicit path/purpose directory grants |
+| Maintain the local environment | `collection` | `status`, `events`, `configure`, `pause`, `resume` | Optional receipt observations/control, not proof of complete history |
+| Maintain the local environment | `preferences` | `get`, `set` | Supported preferences such as presentation language, without source-text changes |
 
 Generated Schemas own concrete fields, combinations, versions and limits. Do not invent params from this table. Selection structures for `usage`, `conversation` and `timing` are distinct. Keep full identities, original filters and each cursor independently.
 

@@ -5,113 +5,71 @@
   </picture>
 </p>
 
-# Wombat for Codex project usage and conversation history
+# Wombat · Improve your Codex harness
 
 English | [中文](README.zh-CN.md)
 
-Wombat is a local CLI and plugin for OpenAI Codex. See how many Tokens a project used, find the tasks that used the most, and go back to the original messages to see what happened.
+Wombat is a local Codex plugin that uses your work history to find changes worth making. When Codex gets stuck, skips a check, or needs repeated corrections, look up the original conversation and inspect the relevant project instructions, skills, tool settings, and verification steps. Together they make up your Codex harness.
 
-Wombat calculates usage from local Codex records and locates evidence. It also returns project findings and cleanup lists that you can recheck. Codex uses that evidence to explain what happened and make authorized project changes.
+Wombat provides evidence and check results. Choose what to change, then let Codex make the edit and repeat the check with the same scope and rules.
 
-## Install Wombat for Codex
+## Install Wombat
 
 **Stable: [`v0.8.0`](https://github.com/YannByte/wombat/releases/tag/v0.8.0).**
 
-Install a version of Codex that supports native plugins, with the `codex` command available locally. Wombat's local analysis needs no separate API key or development tools.
+Install a version of Codex that supports native plugins and provides the local `codex` command. Wombat's local analysis needs no separate API key or development tools.
 
-On macOS or Linux, install Wombat and its plugin:
+Install Wombat and its plugin on macOS or Linux.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/install/install.sh | sh -s -- --plugin
 ```
 
-On Windows PowerShell:
+Install in Windows PowerShell.
 
 ```powershell
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/YannByte/wombat/main/scripts/install/install.ps1))) -Plugin
 ```
 
-1. Open your project in Codex.
-2. Start a new conversation.
-3. Ask this question.
+## Start with a task that keeps going wrong
 
-> $wombat:wombat How many Tokens did this project use today? Show the three tasks that used the most and quote the original request for the top task.
+Open a project you have worked on in Codex. Start a new conversation and ask:
 
-The answer shows the date range, project total, task ranking, original message location and any gaps in the records. If installation fails, follow the recovery step in the output. See the [installation guide](docs/guides/installation.en.md).
+> $wombat:wombat Review this project's Codex history for the last 7 days. Find one task that failed repeatedly or needed several corrections. Quote the original message, inspect the related project instructions and verification steps, and suggest one specific change and how to check it.
 
-## See the result
+**Example project.** Two release tasks stopped at the installation check. In turn 18 of the most recent conversation, you said, “We still can't find the installation checklist. Hold the release.” The current `AGENTS.md` still links to the removed `docs/release-checklist.md`. The same installation steps are now in `docs/install-checks.md`. The suggested fix is to update that one link and run the same check again.
 
-### Find the tasks that used the most Tokens
+After reviewing the evidence, you can say:
 
-> Which three tasks used the most Tokens in this project this week? Show me the original request and what happened next for the top task.
+> Update only the checklist link. Run the original check again and tell me what still needs verification.
 
-**Example answer.** This project recorded 1.4 million Tokens this week. The three highest-usage tasks were installer troubleshooting (900,000), Windows test fixes (180,000) and release notes (120,000).
+**Example result.** Codex updated the link. The original reference check passed, and the current checklist opens. Installing the latest version still needs a separate check.
 
-In turn 18 of “Installer troubleshooting,” the request was “Retest the installer in a clean directory.” Turns 19–21 record the failed installation check and a retry with a different installation path.
+If the selected dates have no usable records, extend the date range or ask Wombat to inspect the current project instructions first. If the plugin does not appear, see the [installation guide](docs/guides/installation.en.md).
 
-Run the ranking directly from the project directory.
+## Use Wombat to improve your harness
 
-```sh
-wombat usage top week --project . --limit 3
-```
-
-### Recheck a specific project finding
-
-> Check this project's release instructions. Show any broken references and how to verify the fix.
-
-**Example finding.** Wombat located a link in `AGENTS.md` to the missing `docs/release-checklist.md`. The finding includes the project scope and the rule that flagged it.
-
-> Restore the checklist and rerun the original check.
-
-**Example recheck.** After Codex restored the checklist, Wombat reran the same reference check in the same project. The missing-file finding cleared.
-
-### Review what can be cleaned up
-
-> Check the build outputs and temporary files in this project. Keep the release package in `dist/` and show the cleanup list first.
-
-**Example preview.** Wombat lists the paths, observed sizes and evidence for cleanup.
-
-- `target/` is a 2.4 GB Cargo build cache that can be regenerated.
-- `.tmp/test-run-42/` contains 180 MB of files. Its ownership is unclear, so Wombat marks it for review.
-- `dist/` is marked to keep because it contains the release package.
-
-> Remove only `target/`, then verify the original path.
-
-**Example recheck.** After Codex removed the approved directory, Wombat checked the original cleanup list and confirmed that `target/` was gone.
-
-## More ways to use it
-
-Ask with `$wombat:wombat`, for example:
-
-| Task | Example request |
+| What you want to solve | How Wombat helps |
 |---|---|
-| Compare project usage | Compare the last two completed weeks for this project. Which tasks and models account for the largest differences? |
-| Review a high-usage task | How much of this task's usage was cached input? Show the original request and the turns that record the work. |
-| Find a decision across conversations | Search this month's conversations in this project for what I said about retries, timeouts or backoff. Give me the original quotes and their locations. |
-| Investigate a recurring failure | Find earlier occurrences of this installer failure. Show the original error, what was tried and any recorded result. |
-| Recheck a finding | Run the same check on the same project after the fix. Is the finding still present? |
-| Review cleanup candidates | Which build outputs can be regenerated? List their paths and the reason each is a candidate. Keep the deliverables. |
+| Find a task worth reviewing | Start with failures, retries, usage, or changes in elapsed time. Find the related task and original conversation. |
+| Diagnose a harness problem | Review how a task ran. Inspect project instructions, skills, MCP, hooks, and project verification steps. Check the evidence for configuration and actual use. |
+| Choose and make a change | Review the evidence, scope, and verification steps. Choose what to change or keep, then let Codex make the authorized project changes. Preview cleanup candidates and confirm specific items before deletion. Deletion is permanent. |
+| Check whether the change worked | Repeat the check for the original problem or cleanup items with the same scope and rules. See which tests ran and what still needs verification. Assess the longer-term effect on later tasks with comparable workloads and acceptance criteria. |
+| Use what you learned next time | Recover past decisions, resume unfinished work, or add findings with sources to project documentation. |
 
-Use these examples as a starting point. Add a project, date range or specific problem to narrow the scope. Follow up with “Show the original quote” or “Run the same check again.”
+Find example prompts and expected results for each step. [Plugin guide](docs/guides/plugin.en.md#harness-workflow)
 
-See the [plugin guide](docs/guides/plugin.en.md) for more uses, or the [CLI guide](docs/guides/cli.en.md) for direct queries.
+## Manage usage, installation, and integration
 
-## Common questions
+- **Manage usage.** View Token usage, estimated costs, available account allowance records, and budget alerts. [CLI usage and budgets](docs/guides/cli.en.md#usage)
+- **Maintain the local installation.** Check the runtime and plugin discovery. To use only the CLI, omit `--plugin` or `-Plugin` from the install command. [Installation and troubleshooting](docs/guides/installation.en.md)
+- **Connect scripts.** Query in JSON or use the structured interface. Dedicated methods cover directory access, optional collection, and display preferences. [Automation interface](docs/guides/cli.en.md#automation)
 
-### How do I find the original conversation for a task?
+## Platforms and privacy
 
-Ask `$wombat:wombat` to quote the conversation behind a task in the ranking, or provide the project, date range and words you remember. Wombat returns matching passages and their original locations.
+Release packages support macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Codex artifact cleanup currently targets macOS layouts.
 
-### Can I use Wombat without the plugin?
-
-Yes. Omit `--plugin` or `-Plugin` when installing and use the CLI directly. CLI queries support JSON output; see the [CLI guide](docs/guides/cli.en.md).
-
-## Before you use it
-
-- CLI analysis stays local and makes no model calls. Selected Skill evidence enters the current Codex conversation and consumes Tokens; see [privacy](docs/reference/privacy.en.md).
-- Cleanup needs authorization for the selected items. Deletion is permanent. Cleanup checks protect conversations, state, configuration and credentials. Changed or unknown conditions block deletion. See the [cleanup guide](docs/guides/cli.en.md).
-
-Release packages support macOS arm64/x64, Linux glibc arm64/x64, and Windows x64. Codex artifact cleanup currently targets macOS layouts. For unsupported record formats, see [format recovery](docs/reference/cli.en.md).
+CLI analysis stays local, sends no logs, and makes no model calls. Evidence selected by the skill enters the current Codex conversation and consumes Tokens. See [privacy](docs/reference/privacy.en.md).
 
 ## Update
 
@@ -121,9 +79,7 @@ See the [installation guide](docs/guides/installation.en.md) for update options 
 
 ## Help and contribution
 
-See the [CLI guide](docs/guides/cli.en.md) for direct queries, JSON output and budget controls. See [Contributing](.github/CONTRIBUTING.md) for source setup.
-
-[Report a problem or request](https://github.com/YannByte/wombat/issues). Describe what happened and the tools involved; no private logs are needed. Use the [security policy](.github/SECURITY.md) for security reports.
+When you [report a problem or request](https://github.com/YannByte/wombat/issues), describe what happened and the tools you used. You can omit private logs. Use the [security policy](.github/SECURITY.md) to report security problems. See [Contributing](.github/CONTRIBUTING.md) for source development.
 
 ## License
 

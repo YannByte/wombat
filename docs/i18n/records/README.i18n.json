@@ -5,59 +5,39 @@
       "zh": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562",
       "en": "57c39562c0f0f77cc65fa463f23b454371719cbbd2f408731a722d2d6e928562"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history": {
-      "zh": "79176433983cacf6a850c6f5c0ee4b41d9456efc1c605671520edd79086ed914",
-      "en": "2772423c0e8c0b838e30c9644b2cbd5d6f6f66e01b980d7acd8a2b961f3b7d70"
+    "/wombat-improve-your-codex-harness": {
+      "zh": "147ab8f4fd294acaf2a06d70239136b522b57f0d1e281e0df03358445925cb90",
+      "en": "26525570dec684073774288b0a413b535af30c9618d95aaeb3a0d5d1719e1a1d"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/install-wombat-for-codex": {
-      "zh": "9c0a37dcf1bde154febeca05d8868327fa83b0a1dc3d8e296cdd5f09d7f83930",
-      "en": "181f9d923e76c86bb829882d5fcddf68d0671d174aa89d6586fd4ca7a4915feb"
+    "/wombat-improve-your-codex-harness/install-wombat": {
+      "zh": "80fa903d16f35f7ce8a3483747fd8911daa7e3680d35cad21bf9ca866b384bea",
+      "en": "141e91929ec39dc5b7f05bb90653a026bee4afbe481364c1d95ca3a8a1babb63"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/see-the-result": {
-      "zh": "35497fb0468470974d5916fe615bf8d132b30133f0bb48e2f183553b08f6aa97",
-      "en": "7ed45431bf09970914b09efd485be60dd4e62f92884ac6be4afe935aaa53ad35"
+    "/wombat-improve-your-codex-harness/start-with-a-task-that-keeps-going-wrong": {
+      "zh": "5fb2bbc3e998f5459d7b563cb1eeb22909eca61df15ee4cd7c997d7daab48e03",
+      "en": "91f5fe142b387ff7083cddc2a94738329c2c54777b058308ebb70d8f432eadf6"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/see-the-result/find-the-tasks-that-used-the-most-tokens": {
-      "zh": "53bc59043af7e641517fb2ed3ca4bed5ef54b1e0c3be6c5bccabe9a2d9e70aa8",
-      "en": "2935fa842a41dc1407ccdc104eecaf1f149949684b77babc05550cc50cbae6fb"
+    "/wombat-improve-your-codex-harness/use-wombat-to-improve-your-harness": {
+      "zh": "bf29c380bbb2b6412694d7933f3b436a31c23b49d058002bfc59cb034e89b80b",
+      "en": "ccc52c48bfaf1599eba5601da04e1e460e120342b634b2aaaeba7220f33d1e02"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/see-the-result/recheck-a-specific-project-finding": {
-      "zh": "1348ae13c9a2c98328f0f5c82a510b5b0809642cf1e13b2a1d3455c7e0e362cd",
-      "en": "22c9f6ebea3b8596350e78f4cb8fc7ea826bd1cfbeabda010eef12e8cb787d95"
+    "/wombat-improve-your-codex-harness/manage-usage-installation-and-integration": {
+      "zh": "83c802197d9eae50ce4f0f6b5934fac523e088fd847e591ccd4be1ea0e098388",
+      "en": "9c081fad1617c0953c83272a410aa601f855d23562ac84a2f72688f2a4ce25ad"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/see-the-result/review-what-can-be-cleaned-up": {
-      "zh": "4d3e8535eda42c3c91dc57999c0a220d07ab8dfeb33fc383170cfb2304875cd8",
-      "en": "750511746ae0ba5487e555b50266ef895b9bf80c11a7f21f91fd9dd616d0ac16"
+    "/wombat-improve-your-codex-harness/platforms-and-privacy": {
+      "zh": "0c30bccf4df8d08e152fc2f4f669fb4e6878ae6f4a1528bff215fef5521531f5",
+      "en": "13e8f0aec69dbd055eb6fdec7c36ee5d40135c5052eee89e16b4514cb446b38f"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/more-ways-to-use-it": {
-      "zh": "abe5e3d61bf4fac2db38843030c74438776a13b7414f91c6f206323f916e2801",
-      "en": "5a1dea41e1c2d259f892ca414be798f89b4be72f4daf7c887b1c32d179ea300f"
-    },
-    "/wombat-for-codex-project-usage-and-conversation-history/common-questions": {
-      "zh": "3b30b685be5af364d8dcb66b9fbc097db7f4cf15e31d3c5289c2690594213ffb",
-      "en": "e671129eb69b047f7783e5fe07f7ede1cc402fbf166ba81912e9dc7208317005"
-    },
-    "/wombat-for-codex-project-usage-and-conversation-history/common-questions/how-do-i-find-the-original-conversation-for-a-task": {
-      "zh": "80a6079ee296fd2fc611ddf95aa3572b171e7cb6f92983b4c68378da3c015b2a",
-      "en": "50980e89a357f9185f9b4d60d34fd059f6b89459fba28071b7015ed7fe2bb0fb"
-    },
-    "/wombat-for-codex-project-usage-and-conversation-history/common-questions/can-i-use-wombat-without-the-plugin": {
-      "zh": "0b80a4e4ca1343c876a2af423a65a72496e580032b2bcdc37e48794f6b09c7db",
-      "en": "368e3879ca77c0b33692812038502a47b9096fd55bd453ac8a89b84148d905e5"
-    },
-    "/wombat-for-codex-project-usage-and-conversation-history/before-you-use-it": {
-      "zh": "fe16b885a02de36c13ad2d0e2884abc0c726a3e1186c4c8afa65cc3ad2c5d784",
-      "en": "44b98ddcb30eaddf43bae54f1d9f8b33894151cb21a82d7a998caafb23c4af6d"
-    },
-    "/wombat-for-codex-project-usage-and-conversation-history/update": {
+    "/wombat-improve-your-codex-harness/update": {
       "zh": "eb3aac893b74b463367812d1d741fd8003a9498496a5548a39563ad33642bf11",
       "en": "c76ae081dcfefcb0cf5e9c5431fd83814d72f7118a9f61c0acaf97ec4b541bf1"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/help-and-contribution": {
-      "zh": "b62520d7bfa4b8986a88fd71d51b751f683d0d2a03ffcd8990ce698df9ec498d",
-      "en": "486daa80433a71bf04ff954bb2d5c217e969b0bf803549ce75ad6bdc43942ad9"
+    "/wombat-improve-your-codex-harness/help-and-contribution": {
+      "zh": "d1b0db9e5e78c179eb4f060e1491a7a529fe28826473788740202ba6237c2a3c",
+      "en": "18ab4a41449a1df6125d3771dc51d74b2b5fd6f294d356d94449b030c5f76609"
     },
-    "/wombat-for-codex-project-usage-and-conversation-history/license": {
+    "/wombat-improve-your-codex-harness/license": {
       "zh": "3ae9b43b0b2ab0253c26742d9a180634319a002755081eaed0bdb18ba4a3c29d",
       "en": "1a044ed47f1540e7d83b3f35501b9a3475aa043c07bf24dbfd4d6cd9fabba51d"
     }

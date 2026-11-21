@@ -11,20 +11,21 @@ After following the [installation guide](installation.en.md), invoke Wombat in a
 
 No project initialization, full inspection sweep or workflow selection is required. Wombat retains the project, dates and authorization already established. It selects evidence for the task without requiring users to know which data to query first.
 
-| Task | Example request | Expected result |
-|---|---|---|
-| Recover a decision | Why did we change the release process? Find the key discussion. | The decision, original discussion locations and versions that must be distinguished |
-| Resume work | Continue yesterday's work after checking where we stopped. | Confirmed progress, delivery locations, unfinished work and the next action |
-| Read usage | How many Tokens did I use today? | Totals for the requested dates/scope and gaps affecting the conclusion |
-| Understand usage changes | Why did this week use more than last week? | Comparable-window changes, task counts versus per-task usage and records worth examining |
-| Find an engineering problem | Releases keep failing. Check what we tried before. | Failure positions, earlier attempts, current mechanisms and an evidenced minimal correction |
-| Improve project work | Find the most useful improvements for this project. | A few consequential problems, concrete owners and verification methods |
-| Review Skills or MCP | Which Skills have a large context footprint but little use? | Footprint estimates, use evidence, impact scope and individual choices |
-| Clean work artifacts | Clean this project's temporary/build files, keeping deliverables. | Exact paths, ownership and retention conditions; execution and recheck when authorized |
-| Verify results | Recheck the last change against the original problem. | Comparable verification, unrun checks and inconclusive evidence |
-| Organize reports or knowledge | Put this week's progress and decisions into project documentation. | Sourced content separating completed, unverified and continuing work |
+<a id="harness-workflow"></a>
 
-These tasks share one entry. A total-only question gets the total first without unrelated rankings, engineering checks or cleanup advice. Related results are combined when the task needs them.
+## Ask about the improvement you need
+
+Start with the step you need most. If the project, dates, or selected items are already clear, keep using them.
+
+| Goal | Example request | Expected result |
+|---|---|---|
+| Find a task worth reviewing | “Why was usage higher this week? Find a task with repeated retries and show me the original request and error.” | Comparison of usage, task counts, and usage per task over comparable dates, plus the relevant turns, retries, and observed time. |
+| Diagnose a harness problem | “Release verification keeps getting stuck. Check past failures and the current entry point, then inspect the related instructions, skill, MCP server, or hook.” | Failure locations and earlier attempts, where to make a change, evidence about configuration and use, and an improvement supported by the evidence. |
+| Choose and make a change | “Fix only the link to the release checklist. Show cleanup candidates first and keep the release packages.” | The authorized edit. For cleanup, see paths, why outputs can be rebuilt, and protection reasons. Deletion requires explicit authorization. |
+| Check the result | “Run the same check again. Tell me which tests ran and which still need to run.” | The recheck for the original problem and any selected cleanup items, related project test results, and any change in conditions or gaps in evidence. |
+| Use what you learned next time | “Find the decision to change the release process, resume the unfinished work, and document how to verify it.” | The decision and original locations, confirmed progress, unfinished work, and a draft with sources. |
+
+A question about usage starts with the total and coverage gaps for the requested scope. Ask about a cause or next step to bring in rankings, history, and project checks as needed.
 
 <a id="project-diagnosis"></a>
 

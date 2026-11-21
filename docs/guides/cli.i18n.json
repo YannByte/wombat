@@ -26,8 +26,8 @@
       "en": "c99997aee4b6e285200bb277fcc2f1dc4b48bcb1504a60949238f4e5cc60f223"
     },
     "/complete-wombat-cli-guide/all-commands": {
-      "zh": "06aa14e058be5ea7c1ecc01357b5113c296c442ab5a30a9aed3328ed024acb7f",
-      "en": "b6ee820fa2bdcc888704e3b5e83eee83179b4d3c62964bdf502d678fe7cd6e51"
+      "zh": "e3e4f12e497fbbfcd91b4ef880cf71c281f778ab04889a7727bb609d8e3f7a25",
+      "en": "f33239c45c20e5db712bbc950dbff15dafb4f16f4aa376f2dc597191d2a2c2ba"
     },
     "/complete-wombat-cli-guide/find-work-records-history": {
       "zh": "42c712013db613e22697d6dc52811bb902c8e64f53725ab3f70f327075e84aaa",
@@ -54,8 +54,8 @@
       "en": "4c9aee010ec59ee12ac5c949298fe856dab5bf4b6e8cde2fa915d118c46f17d9"
     },
     "/complete-wombat-cli-guide/find-work-records-history/resume-work-or-prepare-a-report": {
-      "zh": "715a0d951a4d4fb796247c41b61efd3c14f4ead9c547ded843b77e130f3f438e",
-      "en": "87491875f3cf83c93a59ae7030c5aa85809c312494012f591a05bb69ba7ac5b8"
+      "zh": "006492d6fb99b68ef3abf5f6e68d1a1989405f0073ae3765b79ed656a98fce1f",
+      "en": "a6e13c101191fe7e76ac13918c6b736b7948da73b8f67a97c02a1fff468676c4"
     },
     "/complete-wombat-cli-guide/inspect-usage-usage": {
       "zh": "e145039b65748a94128031925de38c6afa7b8d9cb69d94dac9944586a380c9ef",
@@ -162,12 +162,12 @@
       "en": "37a0a3349fa5bbe47f8058acaa62003306838ff399706975d25776f9ce704f4d"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/execute-structured-requests": {
-      "zh": "8f9eb2bf2a1f2a9e6ab29c4dfd2b73fbb4ea78a1de5d07b38e7e77af8559b8e3",
-      "en": "c2b434d0e10e0cd04c47a37552b3f2db04b18f89529a6a6ab575e939f1adc1e2"
+      "zh": "d7bebe9cdd90c29d3e623133bfadc55b463a334689787cca37bb35b9e382a403",
+      "en": "9c592394f9033b52646e27eb3e2c500b510c6fe996efbcaa4ddd62b714fbd067"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/complete-method-scope": {
-      "zh": "a33b47628b91dccc69a4255de1ae877ff6d6210e30676cd346498474ba77b11d",
-      "en": "6a941dd18fdc2ed32c8057f2592255c122f6e1e5073b38a921184330970bab62"
+      "zh": "c00331f2be1f874a135fb8cde3bb557cb60e04c2e5997e27a9dfeffd9085ab3e",
+      "en": "a73b937d9275e707f4d33fbd9b3a4c234f6c65d56d39b793d60e5745735fdc3c"
     },
     "/complete-wombat-cli-guide/skills-scripts-and-automation/retain-scope-and-handle-failures": {
       "zh": "4cc3f789fa9371d60290c8d5bae7240d06a178e363477ad64340a2e34077d096",

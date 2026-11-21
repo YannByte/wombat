@@ -67,15 +67,17 @@ Windows 路径可以写成 `"C:\Work\My Project"`。同一个 `--project` 同时
 
 ## 全部命令
 
-五个顶层入口分别是 `history`、`usage`、`check`、`clean` 和 `system`。下表列出本指南的全部操作；详细数据能力通过 `system api` 和 `system call` 提供，不增加顶层入口。
+按要解决的问题选择命令。CLI 的五个顶层入口是 `history`、`usage`、`check`、`clean` 和 `system`。
 
-| 入口 | 操作 | 默认结果 |
+| 目标 | 入口 | 结果 |
 |---|---|---|
-| `history` | 列表、`search`、`show`、`read` | 最近工作、匹配位置、记录信息或原文片段 |
-| `usage` | 时间选择、`top`、`stats`、`compare`、`alerts` | 总量、任务排行、任务分布、范围对比或预算提醒 |
-| `check` | 项目检查、`skills`、`mcp`、`rules`、`hooks`、`--task`、`verify` | 问题、观察依据、复核线索或原条件比较 |
-| `clean` | 项目预览、`--codex`、`verify`、`--apply` | 候选及保护原因，或明确选择的清理结果 |
-| `system` | `doctor`、`update`、`api`、`call`、`hook codex` | 维护、接口发现或集成输入 |
+| 找出需要复盘的任务 | `history`、`usage`、`usage top`、`usage stats`、`usage compare` | 最近工作、任务排行与分布、周期或任务对比。 |
+| 定位 Harness 的问题 | `check`、`check --task`、`check skills`、`check mcp`、`check rules`、`check hooks` | 项目和单项任务的检查，以及配置、加载、使用和引用的观察证据。 |
+| 选择清理对象 | `clean`、`clean --codex`、`clean --wombat-temp`、`clean --codex --apply` | 预览候选和保护理由。确认后可永久删除选中的、受支持的 Codex 产物。项目改动和项目产物删除由获授权的 Codex 执行。 |
+| 改完复查 | `check verify`、`clean verify` | 对照原检查或原清单复查指定对象。 |
+| 找回决定并接续工作 | `history search`、`history show`、`history read` | 查找匹配位置、工作记录和有界原文，供接续工作或写报告时引用。 |
+| 管理预算和安装 | `usage alerts`、`system doctor`、`system update` | 查看预算提醒，检查运行和插件发现状态，检查或更新运行时。 |
+| 调用自动化接口 | `system api`、`system call`、`system hook codex` | 发现契约、执行结构化请求、接收集成输入。见[完整方法范围](#api-methods)。 |
 
 ## 找回工作记录：history
 
@@ -143,6 +145,8 @@ wombat history read "发布流程" --find "验收" --find "validation" --limit 6
 接续工作时，先用 `history search` 找到相关记录，再用 `show` 查看操作位置，必要时用 `read` 确认原话、交付位置和未完成事项。记录中声称“完成”只是待核对的依据；实际文件和测试结果仍需检查。
 
 日报或周报需要把同一日期与项目范围内的工作记录和用量放在一起。可以在 Codex 中要求：“总结这周这个项目做了什么、用了多少 Token、还有哪些事项未验证，并给出记录位置。”Skill 只读取有关片段，并区分用户要求、已记录的动作与已验证的结果。整理知识文档也使用这些证据，写入位置由用户指定，不自动建立另一套知识库。
+
+<a id="usage"></a>
 
 ## 查看用量：usage
 
@@ -492,26 +496,28 @@ Get-Content -Raw -Encoding UTF8 request.json | wombat system call
 
 完整 ID 无需扫描活动即可定位元数据，日期筛选仍约束后续原文读取。标题查找达到预算上限时返回 `SCAN_INCOMPLETE`，并在 `error.details.next` 中提供续查请求，通过 `system call` 执行。该状态与数据准备状态不同，不要求刷新索引。
 
+<a id="api-methods"></a>
+
 ### 完整方法范围
 
 `history read` 的 JSON 在 `result` 中返回有界原文、说话者、时间与片段游标。在 `alsoAt` 中查看同一片段的其他位置。`nextLocations` 是下一页位置请求，可传给 `system call` 的 `conversation` 方法。续读原文时，使用对应位置的证据和游标。在 `readIssues` 中查看失败或推迟的目标。共用的上下文正文在 `neighbors` 中，各位置通过 `visibleContext` 引用消息 ID。遇到响应上限时，把返回的 `retryRead` 传给 `system call` 读取剩余目标。
 
-| 方法 | 可执行的动作 | 作用与边界 |
-|---|---|---|
-| `usage` | `usage`、`threads`、`turns`、`steps`、`statistics`、`compare`、`investigate`、`trajectory`、`resources`、`review`、`context` | 当前用量及分析；返回 `result` 和数据状态 |
-| `project` | 组合当前项目证据 | 配置、检查、工作记录、原用量及清理候选；各部分独立说明状态与读取版本，不修改项目 |
-| `conversation` | `resolve`、`records`、`activity`、`locate`、`search`、`read` | 活动、位置及原文；记录不等于已验收的代码交付 |
-| `config` | `list`、`detail`、`evidence`、`related_scopes`、`capabilities` | 配置清单、计量、原生观察及关联使用；只读 |
-| `optimize` | `list`、`detail`、`checks`、`activity`、`capabilities`、`recheck`、`keep`、`not_applicable` | 检查与比较；只有明确决策写入用户存储 |
-| `artifacts` | `inspect`、`recheck`、`apply` | 清理观察和受保护的 Codex 删除；不依赖会话索引 |
-| `timing` | `summary`、`evidence`、`capabilities` | 指定任务与轮次的过程证据，缺失时间不填零 |
-| `setup` | 观察运行与原生集成 | 检查兼容性与发现状态，不执行安装或模型任务 |
-| `account` | `read`、`refresh`、`history` | 账户及额度观察，不能推算某个项目的订阅余额 |
-| `monitor` | `list`、`upsert`、`remove`、`check`、`acknowledge` | 预算计划与提醒；保存计划不自动启动监视命令 |
-| `prices` | `status`、`update`、`auto_update` | 辅助计价资料；失败保留原价格，不修改原始 Token |
-| `directories` | `list`、`authorize`、`revoke` | 明确路径和用途的目录授权 |
-| `preferences` | `get`、`set` | 展示语言等受支持偏好，不修改来源文本 |
-| `collection` | `status`、`events`、`configure`、`pause`、`resume` | 可选接收观察与控制，不证明完整历史覆盖 |
+| 目标 | 方法 | 可执行的动作 | 作用与边界 |
+|---|---|---|---|
+| 查找任务证据 | `conversation` | `resolve`、`records`、`activity`、`locate`、`search`、`read`、`source_search`、`source_scan`、`source_read` | 活动、位置及原文；记录不等于已验收的代码交付 |
+| 查找任务证据 | `usage` | `usage`、`threads`、`turns`、`steps`、`statistics`、`compare`、`investigate`、`trajectory`、`resources`、`review`、`context` | 当前用量及分析；返回 `result` 和数据状态 |
+| 查找任务证据 | `timing` | `summary`、`evidence`、`capabilities` | 指定任务与轮次的过程证据，缺失时间不填零 |
+| 诊断 Harness | `project` | 组合当前项目证据 | 配置、检查、工作记录、原用量及清理候选；各部分独立说明状态与读取版本，不修改项目 |
+| 诊断 Harness | `config` | `list`、`detail`、`evidence`、`explain`、`related_scopes`、`capabilities` | 配置清单、计量、原生观察及关联使用；只读 |
+| 执行与复查 | `optimize` | `list`、`detail`、`checks`、`activity`、`capabilities`、`recheck`、`keep`、`not_applicable` | 检查与比较；只有明确决策写入用户存储 |
+| 执行与复查 | `artifacts` | `inspect`、`recheck`、`apply` | 清理观察和受保护的 Codex 删除；不依赖会话索引 |
+| 管理用量 | `account` | `read`、`refresh`、`history` | 账户及额度观察，不能推算某个项目的订阅余额 |
+| 管理用量 | `monitor` | `list`、`upsert`、`remove`、`check`、`acknowledge` | 预算计划与提醒；保存计划不自动启动监视命令 |
+| 管理用量 | `prices` | `status`、`update`、`auto_update` | 辅助计价资料；失败保留原价格，不修改原始 Token |
+| 维护本机环境 | `setup` | 观察运行与原生集成 | 检查兼容性与发现状态，不执行安装或模型任务 |
+| 维护本机环境 | `directories` | `list`、`authorize`、`revoke` | 明确路径和用途的目录授权 |
+| 维护本机环境 | `collection` | `status`、`events`、`configure`、`pause`、`resume` | 可选接收观察与控制，不证明完整历史覆盖 |
+| 维护本机环境 | `preferences` | `get`、`set` | 展示语言等受支持偏好，不修改来源文本 |
 
 具体字段、允许组合、版本与限制由对应生成 Schema 提供，不从表格自行拼接未知参数。`usage`、`conversation` 和 `timing` 的选择结构不同，不能互换；完整身份、原始筛选、来源位置和每种游标各自保留。
 
