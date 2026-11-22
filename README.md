@@ -15,7 +15,7 @@ Wombat provides evidence and check results. Choose what to change, then let Code
 
 ## Install Wombat
 
-**Stable: [`v0.8.0`](https://github.com/YannByte/wombat/releases/tag/v0.8.0).**
+**Stable: [`v0.9.0`](https://github.com/YannByte/wombat/releases/tag/v0.9.0).**
 
 Install a version of Codex that supports native plugins and provides the local `codex` command. Wombat's local analysis needs no separate API key or development tools.
 
@@ -56,6 +56,8 @@ If the selected dates have no usable records, extend the date range or ask Womba
 | Choose and make a change | Review the evidence, scope, and verification steps. Choose what to change or keep, then let Codex make the authorized project changes. Preview cleanup candidates and confirm specific items before deletion. Deletion is permanent. |
 | Check whether the change worked | Repeat the check for the original problem or cleanup items with the same scope and rules. See which tests ran and what still needs verification. Assess the longer-term effect on later tasks with comparable workloads and acceptance criteria. |
 | Use what you learned next time | Recover past decisions, resume unfinished work, or add findings with sources to project documentation. |
+
+On Apple silicon Macs, run the same real task with four versions of the project instructions. Apply a reviewed change and check that a new session loads it. [Real-task trials](docs/guides/plugin.en.md#harness-trial)
 
 Find example prompts and expected results for each step. [Plugin guide](docs/guides/plugin.en.md#harness-workflow)
 

@@ -1,12 +1,12 @@
 {
-  "summary": "This stable release improves cleanup for local Codex requests and adds source-checkout tooling for controlled Harness trials.",
+  "summary": "Wombat now brings real-task Harness trials to the installed Codex plugin on Apple silicon Macs. Compare project instructions, confirm a change, and check it in a fresh session.",
   "highlights": [
-    "Update the bundled SQLite dependency to a release that fixes CVE-2026-119375.",
-    "When a local Codex request times out or is cancelled on macOS or Linux, Wombat can stop remaining processes in the owned group after the main process exits.",
-    "From a source checkout on macOS arm64, use the real-task Harness trial to compare the baseline, two instruction candidates, and a composed version on one selected text task. The report includes deliverables, independent checks, and the rationale for the proposed changes."
+    "Run the same selected task with the original instructions, a general candidate, a domain candidate, and a composed version. Compare actual deliverables and independent checks.",
+    "Apply a reviewed version of the project instructions, confirm that a new Codex session loads it, and undo the change. Wombat reports a conflict if the target file has changed since application.",
+    "Start from the existing Wombat Skill. Trial sessions reuse the current Codex login and use separate writable workspaces with read-only selected inputs."
   ],
   "knownLimitations": [
-    "Harness trials require a source checkout and an existing Codex login. The installed CLI and plugin ship the existing analysis and cleanup workflows.",
-    "Trial reports support manual review. Applying or undoing candidate instructions and starting trials from the installed conversation entry remain planned."
+    "Trials require an Apple silicon Mac and an existing Codex login. They compare the project-root AGENTS.md using selected UTF-8 inputs.",
+    "One trial uses four task runs and two editorial sessions. Existing global instructions require trial-specific approval."
   ]
 }

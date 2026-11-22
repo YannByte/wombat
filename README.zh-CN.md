@@ -15,7 +15,7 @@ Wombat 提供证据和检查结果。你选定要改的地方后，Codex 执行�
 
 ## 安装 Wombat
 
-**正式版：[`v0.8.0`](https://github.com/YannByte/wombat/releases/tag/v0.8.0)。**
+**正式版：[`v0.9.0`](https://github.com/YannByte/wombat/releases/tag/v0.9.0)。**
 
 先安装支持原生插件的 Codex，确保本机可用 `codex` 命令。Wombat 的本地分析无需单独配置 API Key 或安装开发工具。
 
@@ -56,6 +56,8 @@ curl -fsSL https://raw.githubusercontent.com/YannByte/wombat/main/scripts/instal
 | 选择并落实改动 | 查看证据、影响范围和复查办法。由你决定修改或保留什么，再由 Codex 执行获准的项目改动。清理先预览候选，确认具体对象后才删除。删除后无法恢复。 |
 | 改完确认有没有解决 | 在原范围按原规则复查问题或清理对象，查看做过的测试和待验证项。要判断长期效果，再比较工作量和验收条件相近的后续任务。 |
 | 把经验带到下一次 | 找回过去的决定，接续未完成的工作，或把有来源的结论整理进项目文档。 |
+
+在 Apple 芯片 Mac 上，可以用同一个真实任务对照四套项目指令，应用验证过的改动并确认新会话加载。[真实任务试跑](docs/guides/plugin.md#harness-trial)
 
 查看各阶段的提问方式和预期结果。[插件指南](docs/guides/plugin.md#harness-workflow)
 
