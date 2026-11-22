@@ -256,13 +256,17 @@ fn read_regular(file: &Path, limit: usize) -> Result<String> {
     Ok(contents)
 }
 
-fn root() -> Result<PathBuf> {
-    let dir = storage::data_home()?.join("harness-v1");
+fn create_private_directory(path: &Path, recursive: bool) -> std::io::Result<()> {
     let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
+    builder.recursive(recursive);
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
-    builder.create(&dir)?;
+    builder.create(path)
+}
+
+fn root() -> Result<PathBuf> {
+    let dir = storage::data_home()?.join("harness-v1");
+    create_private_directory(&dir, true)?;
     if fs::symlink_metadata(&dir)?.file_type().is_symlink() {
         return Err(conflict());
     }
@@ -391,10 +395,7 @@ fn plan(
         ));
     }
     let root = data.join(&trial_id);
-    let mut builder = fs::DirBuilder::new();
-    #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
-    builder.create(&root)?;
+    create_private_directory(&root, false)?;
     let state = Response {
         output_version: FORMAT,
         trial_id,
