@@ -44,6 +44,8 @@ Use `corepack pnpm harness:trial -- --manifest TASK.json --output DIRECTORY` to 
 
 Check loaded instructions at session startup as well. A test with a synthetic global `AGENTS.md` showed that `codex exec --ignore-user-config` still included those instructions in the model request. App Server `thread/start` can return `instructionSources` before submitting the task, providing a preflight for the selected materials. Keep the run pending when the host loads instructions outside the trial scope. See the [Codex App Server thread interface](https://learn.chatgpt.com/docs/app-server).
 
+The first installed entry uses the structured `harness` method and the existing Wombat Skill. It uses the existing root `AGENTS.md`, selected UTF-8 files, and explicit checks. A command check uses a successful execution event in the same workspace of the real session. A file check reads the actual output in the isolated workspace. Application and undo use the trial revision. A fresh session checks the instruction source. Use `corepack pnpm verify:harness-installed` to exercise installation and the real-model comparison. Full project snapshots, multi-file candidates, trial recovery, other platforms, and the experience library have separate acceptance criteria.
+
 ### Phase two: project Harness versions
 
 Provide project history, comparison previews, load checks, and selective undo. Bring trial status, candidate differences, and actual deliverables into one comparison view. Test whether the installed host can support these actions. Use subsequent natural tasks to observe whether similar problems recur, with the corresponding configuration version, evidence, and quality conditions. Show the affected scope before applying changes across projects or globally.

@@ -56,6 +56,10 @@ export type Request =
   | {
       method: "monitor";
       params: Request15;
+    }
+  | {
+      method: "harness";
+      params: Request16;
     };
 export type Request2 =
   | {
@@ -331,6 +335,49 @@ export type Request15 =
       action: "acknowledge";
     };
 export type Period = "day" | "week" | "month";
+export type Request16 =
+  | {
+      project: string;
+      task: string;
+      files: string[];
+      checks: Check[];
+      includeGlobalInstructions?: boolean;
+      action: "plan";
+    }
+  | {
+      trialId: string;
+      action: "run";
+    }
+  | {
+      trialId: string;
+      action: "status";
+    }
+  | {
+      trialId: string;
+      revision: string;
+      action: "apply";
+    }
+  | {
+      trialId: string;
+      action: "verify";
+    }
+  | {
+      trialId: string;
+      revision: string;
+      action: "undo";
+    };
+export type Check =
+  | {
+      id: string;
+      command: string;
+      kind: "command";
+    }
+  | {
+      id: string;
+      path: string;
+      equals: string;
+      kind: "file";
+    };
 
 export interface Request1 {
   projectRoot: string;

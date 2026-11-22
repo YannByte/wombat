@@ -253,6 +253,24 @@
         "params"
       ],
       "additionalProperties": false
+    },
+    {
+      "description": "Prepare, run, review, apply, verify or undo a project-scoped Codex Harness trial.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "harness"
+        },
+        "params": {
+          "$ref": "#/definitions/Request16"
+        }
+      },
+      "required": [
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -5082,6 +5100,195 @@
         "day",
         "week",
         "month"
+      ]
+    },
+    "Request16": {
+      "oneOf": [
+        {
+          "description": "Freeze project files and checks for explicit review before starting model calls.",
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "task": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Check"
+              }
+            },
+            "includeGlobalInstructions": {
+              "type": "boolean",
+              "default": false
+            },
+            "action": {
+              "type": "string",
+              "const": "plan"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "project",
+            "task",
+            "files",
+            "checks"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trialId": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "const": "run"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "trialId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trialId": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "const": "status"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "trialId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trialId": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "const": "apply"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "trialId",
+            "revision"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trialId": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "const": "verify"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "trialId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trialId": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "const": "undo"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "trialId",
+            "revision"
+          ]
+        }
+      ]
+    },
+    "Check": {
+      "oneOf": [
+        {
+          "description": "Exact observed shell invocation. Wombat compares evidence and never runs this string.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "command"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "command"
+          ]
+        },
+        {
+          "description": "Exact content of a named output within the isolated workspace.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "equals": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "path",
+            "equals"
+          ]
+        }
       ]
     }
   },

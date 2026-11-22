@@ -511,6 +511,7 @@ Get-Content -Raw -Encoding UTF8 request.json | wombat system call
 | 诊断 Harness | `config` | `list`、`detail`、`evidence`、`explain`、`related_scopes`、`capabilities` | 配置清单、计量、原生观察及关联使用；只读 |
 | 执行与复查 | `optimize` | `list`、`detail`、`checks`、`activity`、`capabilities`、`recheck`、`keep`、`not_applicable` | 检查与比较；只有明确决策写入用户存储 |
 | 执行与复查 | `artifacts` | `inspect`、`recheck`、`apply` | 清理观察和受保护的 Codex 删除；不依赖会话索引 |
+| 执行与复查 | `harness` | `plan`、`run`、`status`、`apply`、`verify`、`undo` | 独立试跑项目指令。只应用已验证的候选，并在新会话检查加载。 |
 | 管理用量 | `account` | `read`、`refresh`、`history` | 账户及额度观察，不能推算某个项目的订阅余额 |
 | 管理用量 | `monitor` | `list`、`upsert`、`remove`、`check`、`acknowledge` | 预算计划与提醒；保存计划不自动启动监视命令 |
 | 管理用量 | `prices` | `status`、`update`、`auto_update` | 辅助计价资料；失败保留原价格，不修改原始 Token |

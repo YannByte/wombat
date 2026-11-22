@@ -41,6 +41,8 @@ pub enum Request {
     Collection(crate::collection::Request),
     /// Save token budgets and review schedules, inspect notifications, or check selected plans at a recent usage view.
     Monitor(crate::monitor::Request),
+    /// Prepare, run, review, apply, verify or undo a project-scoped Codex Harness trial.
+    Harness(crate::harness::Request),
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

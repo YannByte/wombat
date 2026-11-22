@@ -10,8 +10,12 @@
       "en": "51ec9fff6bd9b934d0bb1aaaa14e1d99b28ff2f257526028591ef4d32ace490a"
     },
     "/use-wombat/ask-about-the-improvement-you-need": {
-      "zh": "59f4abd505222c37a32643d729d4502216fa71f0243fa1ddea8774362ef17f60",
-      "en": "698a3b56603d21be9074a7143f5187596d3e7831d27d55e2ada58ffff586479a"
+      "zh": "e4e297046f3c30518c226b9186b8ae821187b7afe5984f9adf41db198d381633",
+      "en": "bfd3bfff155bacf5d864918e2a5ffe87df7531fb6ceeac78e26a01841aa600ad"
+    },
+    "/use-wombat/run-the-same-task-to-compare-project-instructions": {
+      "zh": "0d76ab3a1909620e3da67120c8b49c4500c610a716f50a16a69b15b1c70fc730",
+      "en": "bf936da40d5b0cdfcea9d91cd8219511d7c9f6159aeff419bdabad0b77d2fefd"
     },
     "/use-wombat/diagnose-a-project-once-then-apply-selected-improvements": {
       "zh": "813fa63e06b52307fe2d2e6a33290fe88bed7faeb7e4c0182ef813078059ced1",

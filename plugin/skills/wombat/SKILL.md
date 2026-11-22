@@ -1,6 +1,6 @@
 ---
 name: wombat
-description: Diagnose projects with local work history, usage, AI configuration and cleanup evidence; propose concrete improvements and verify authorized changes.
+description: Diagnose projects with local work history, usage, AI configuration and cleanup evidence; propose concrete improvements, trial project instructions, and verify authorized changes.
 ---
 
 # Wombat
@@ -15,7 +15,7 @@ Read the reference for the task, adding another only when needed:
 | Diagnose this project, investigate failures or identify improvements | [Diagnose](references/diagnose.md) |
 | Review Skills, MCP, rules or Hooks | [AI environment](references/environment.md) |
 | Review or remove temporary and build artifacts | [Cleanup](references/cleanup.md) |
-| Apply selected improvements, recover or verify the original problem | [Execute and verify](references/verify.md) |
+| Compare Harness changes on the same task, apply or undo a verified change, or recheck the original problem | [Execute and verify](references/verify.md) |
 
 Use the known Wombat executable and JSON results. Call known commands directly. If the human syntax is unfamiliar, read the selected command’s `--help --json` once; do not fetch every help page. For unfamiliar structured fields, use `system api METHOD --json`; `system call` accepts one generated request on stdin. Use `system doctor` for runtime/discovery trouble, not before ordinary queries. No project initialization or full evidence sweep is required.
 

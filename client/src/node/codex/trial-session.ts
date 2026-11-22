@@ -3,8 +3,8 @@ import { CoreError } from '../../errors.js';
 import type { CodexInvocation, CodexOptions } from './process.js';
 import { connectCodex } from './rpc.js';
 
-type TrialSession = { workspace: string; profile: string; provider: string; model: string; developerInstructions?: string; instructionSources?: readonly string[]; disabledFeatures?: readonly string[]; outputFields?: readonly string[]; effort?: 'low' };
-type TrialItem = { type: string; status?: string; exitCode?: number };
+type TrialSession = { workspace: string; profile: string; provider: string; model: string; developerInstructions?: string; instructionSources?: readonly string[]; disabledFeatures?: readonly string[]; outputFields?: readonly string[]; effort?: 'low'; observedCommands?: readonly string[] };
+type TrialItem = { type: string; status?: string; exitCode?: number; observedCommand?: string };
 type TrialExecution = { items: TrialItem[]; truncated: boolean; finalText?: string };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -89,6 +89,30 @@ export async function selectTrialModel(workspace: string, query: QueryOptions, o
   }
 }
 
+/** Start a fresh thread and inspect its applied instruction sources without sending a turn. */
+export async function inspectTrialInstructions(workspace: string, target: string, profile: string, query: QueryOptions, options: CodexOptions, invocation: CodexInvocation) {
+  const rpc = await connectCodex(query, options, invocation);
+  try {
+    const result = await rpc.request('thread/start', {
+      cwd: workspace, runtimeWorkspaceRoots: [workspace], permissions: profile,
+      approvalPolicy: 'never', ephemeral: true,
+    });
+    if (!record(result) || result.cwd !== workspace || !Array.isArray(result.instructionSources) ||
+        !result.instructionSources.includes(target) || !record(result.activePermissionProfile) ||
+        result.activePermissionProfile.id !== profile)
+      throw new CoreError('TRIAL_SESSION_INSTRUCTIONS', 'The new Codex session did not load the applied project instructions');
+  } finally {
+    await rpc.close();
+  }
+}
+
+function matchesShellInvocation(raw: string, expected: string): boolean {
+  if (raw === expected) return true;
+  const quoted = "'" + expected.replaceAll("'", "'\\''") + "'";
+  return ['/bin/zsh', '/bin/bash', '/bin/sh'].some(shell =>
+    ['-c', '-lc'].some(flag => raw === `${shell} ${flag} ${quoted}` || raw === `${shell} ${flag} ${JSON.stringify(expected)}`));
+}
+
 export async function runTrialSession(expected: TrialSession, query: QueryOptions, options: CodexOptions, invocation: CodexInvocation, prompt: string): Promise<TrialExecution> {
   let threadId: string | undefined;
   let complete!: (turn: unknown) => void;
@@ -106,8 +130,13 @@ export async function runTrialSession(expected: TrialSession, query: QueryOption
       typeof item.text === 'string' && Buffer.byteLength(item.text) <= 96 * 1024)
       finalMessage = { turnId: params.turnId, text: item.text };
     if (observed.length >= 128) { truncated = true; return; }
+    const command = item.command;
+    const observedCommand = method === 'item/completed' && item.type === 'commandExecution' && item.cwd === expected.workspace &&
+      typeof command === 'string' && command.length <= 8192
+      ? expected.observedCommands?.find(candidate => matchesShellInvocation(command, candidate)) : undefined;
     observed.push({ turnId: params.turnId, item: {
       type: item.type,
+      ...(observedCommand ? { observedCommand } : {}),
       ...(typeof item.status === 'string' && /^[a-zA-Z]{1,32}$/.test(item.status) ? { status: item.status } : {}),
       ...(typeof item.exitCode === 'number' && Number.isSafeInteger(item.exitCode) ? { exitCode: item.exitCode } : {}),
     } });

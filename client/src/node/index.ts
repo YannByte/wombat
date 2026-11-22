@@ -35,3 +35,7 @@ export function createNodeClient(options: NodeClientOptions = {}): UsageClient {
 
 export {skillCapabilities} from './skill-runtime.js';
 export {discoverWombatSkill} from './codex/skills.js';
+
+export async function requestHarness(request: Extract<import('../generated/agent-request.js').Request, { method: 'harness' }>['params'], query: import('../client.js').QueryOptions) {
+  return (await import('./harness.js')).runHarness(request, query);
+}

@@ -8,7 +8,7 @@ import {
   type UsageClient,
   type QueryOptions,
 } from "@wombat/client";
-import { createNodeClient } from "@wombat/client/node";
+import { createNodeClient, requestHarness } from "@wombat/client/node";
 import { t } from "@wombat/client/locale";
 import { configureLanguage } from "./locale.js";
 import { resultExitCode } from "./exit-codes.js";
@@ -88,6 +88,10 @@ async function call(
     throw new CoreError("CORE_UNAVAILABLE", "Method unavailable");
   };
   switch (request.method) {
+    case "harness": {
+      const result = await requestHarness(request.params, options);
+      return { result, exitCode: result.phase === "incomplete" && request.params.action === "run" ? 2 : 0 };
+    }
     case "project": {
       const r=await(client.project?.(request.params,options)??unavailable());
       return {result:r,exitCode:r.partial?2:0};

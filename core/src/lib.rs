@@ -29,6 +29,7 @@ pub mod conversation_source;
 pub mod directories;
 pub mod dto;
 mod file_metadata;
+pub mod harness;
 mod host_environment;
 mod host_process;
 pub mod live;
@@ -122,6 +123,14 @@ pub fn dispatch(op: &str, args: &Value) -> Result<Value> {
                 .into_generator()
                 .into_root_schema_for::<agent_dto::ErrorOutput>(),
         )?),
+        "schema_harness_response" => Ok(serde_json::to_value(
+            schemars::generate::SchemaSettings::draft07()
+                .into_generator()
+                .into_root_schema_for::<harness::Response>(),
+        )?),
+        "harness_state" => Ok(serde_json::to_value(harness::dispatch(
+            serde_json::from_value(args.clone())?,
+        )?)?),
         "schema_agent_request" => contract_schema::<agent_dto::Request>(agent_dto::REQUEST_VERSION),
         "schema_agent_description" => Ok(serde_json::to_value(
             schemars::generate::SchemaSettings::draft07()

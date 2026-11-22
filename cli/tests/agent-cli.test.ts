@@ -18,6 +18,7 @@ test('invalid continuation names its nested field without echoing request values
 });
 
 const requests = [
+  {method:'harness',params:{action:'status',trialId:'00000000-0000-4000-8000-000000000000'}},
   {method:'project',params:{projectRoot:'/synthetic',since:'2026-10-01',until:'2026-11-01',timezone:'UTC'}},
   { method: "artifacts", params: { action: "inspect", projectRoot: "/synthetic" } },
   {

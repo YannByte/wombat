@@ -511,6 +511,7 @@ Exact IDs resolve metadata without scanning activity; date filters still apply t
 | Diagnose the harness | `config` | `list`, `detail`, `evidence`, `explain`, `related_scopes`, `capabilities` | Read-only configuration, measurements, native observations and associated use |
 | Check changes | `optimize` | `list`, `detail`, `checks`, `activity`, `capabilities`, `recheck`, `keep`, `not_applicable` | Checks and comparisons; only explicit decisions write user storage |
 | Check changes | `artifacts` | `inspect`, `recheck`, `apply` | Cleanup observations and protected Codex removal, without conversation indexing |
+| Check changes | `harness` | `plan`, `run`, `status`, `apply`, `verify`, `undo` | Trial project instructions independently. Apply a reviewed candidate and check loading in a fresh session. |
 | Manage usage | `account` | `read`, `refresh`, `history` | Account and allowance observations, not a project's inferred subscription balance |
 | Manage usage | `monitor` | `list`, `upsert`, `remove`, `check`, `acknowledge` | Budget plans and notices; saving a plan does not start alert monitoring |
 | Manage usage | `prices` | `status`, `update`, `auto_update` | Auxiliary pricing; failures preserve prices and do not change raw Tokens |

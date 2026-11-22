@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { runHarnessTask } from '../src/node/codex/task-trial.js';
+import { systemTrialProxy } from '../src/node/codex/trial-network.js';
 
 test('task trial runs four versions against the same inputs and keeps independent checks outside the runner', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wombat-task-flow-'));
@@ -55,4 +56,22 @@ test('task trial runs four versions against the same inputs and keeps independen
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('model host uses enabled manual proxy settings without routing loopback through the proxy', () => {
+  const settings = [
+    '  HTTPEnable : 0',
+    '  HTTPProxy : unused.example',
+    '  HTTPPort : 8080',
+    '  HTTPSEnable : 1',
+    '  HTTPSProxy : ::1',
+    '  HTTPSPort : 7897',
+    '  ExceptionsList : <array> {',
+    '    0 : *.local',
+    '  }',
+  ].join('\n');
+  assert.deepEqual(systemTrialProxy(settings), {
+    HTTPS_PROXY: 'http://[::1]:7897', NO_PROXY: 'localhost,127.0.0.1,::1,*.local',
+  });
+  assert.deepEqual(systemTrialProxy(settings.replace('7897', '70000')), {});
 });

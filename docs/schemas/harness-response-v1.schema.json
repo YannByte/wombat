@@ -1,0 +1,301 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Response",
+  "type": "object",
+  "properties": {
+    "outputVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "trialId": {
+      "type": "string"
+    },
+    "directory": {
+      "type": "string"
+    },
+    "phase": {
+      "$ref": "#/definitions/Phase"
+    },
+    "plan": {
+      "$ref": "#/definitions/Plan"
+    },
+    "original": {
+      "type": "string"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Outcome"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recommendation": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Recommendation"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "loaded": {
+      "type": "boolean"
+    },
+    "failure": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "failedStage": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "outputVersion",
+    "trialId",
+    "directory",
+    "phase",
+    "plan",
+    "original",
+    "loaded"
+  ],
+  "definitions": {
+    "Phase": {
+      "type": "string",
+      "enum": [
+        "planned",
+        "running",
+        "incomplete",
+        "complete",
+        "applying",
+        "applied",
+        "undoing",
+        "undone"
+      ]
+    },
+    "Plan": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "task": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "originalSha256": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Input"
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Check"
+          }
+        },
+        "includeGlobalInstructions": {
+          "type": "boolean"
+        },
+        "globalInstructionSources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Input"
+          }
+        },
+        "executions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "editorialSessions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "turnTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "task",
+        "target",
+        "originalSha256",
+        "inputs",
+        "checks",
+        "includeGlobalInstructions",
+        "globalInstructionSources",
+        "executions",
+        "editorialSessions",
+        "turnTimeoutSeconds"
+      ]
+    },
+    "Input": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ]
+    },
+    "Check": {
+      "oneOf": [
+        {
+          "description": "Exact observed shell invocation. Wombat compares evidence and never runs this string.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "command"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "command"
+          ]
+        },
+        {
+          "description": "Exact content of a named output within the isolated workspace.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "equals": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "path",
+            "equals"
+          ]
+        }
+      ]
+    },
+    "Outcome": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Stage"
+          }
+        },
+        "candidate": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "report": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "stages",
+        "candidate",
+        "rationale",
+        "report"
+      ]
+    },
+    "Stage": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Observation"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "checks"
+      ]
+    },
+    "Observation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "passed"
+      ]
+    },
+    "Recommendation": {
+      "type": "string",
+      "enum": [
+        "review_composed",
+        "keep_baseline"
+      ]
+    }
+  }
+}

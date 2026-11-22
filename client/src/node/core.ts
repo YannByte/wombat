@@ -39,7 +39,7 @@ export function decode<T>(output: string): T {
 export function invokePricesCore(request: PricingRequest & { document?: string; attempt_id?: string; error_code?: string }, options: QueryOptions, processOptions: CoreProcessOptions): Promise<unknown> {
   return invokeOperation('prices', request, options, processOptions);
 }
-export function invokeOperation(op: 'cleanup_rebuild' | 'local_query' | 'collection' | 'collection_ingest' | 'prices' | 'preferences' | 'directories' | 'account_history' | 'native_account' | 'native_hook_context', request: ConversationRequest | CollectionRequest | TimingRequest | Request | PricingRequest | PreferencesRequest | DirectoriesRequest | Record<string, unknown>, options: QueryOptions, processOptions: CoreProcessOptions, environment:NodeJS.ProcessEnv=process.env): Promise<unknown> {
+export function invokeOperation(op: 'cleanup_rebuild' | 'local_query' | 'collection' | 'collection_ingest' | 'prices' | 'preferences' | 'directories' | 'account_history' | 'native_account' | 'native_hook_context' | 'harness_state', request: ConversationRequest | CollectionRequest | TimingRequest | Request | PricingRequest | PreferencesRequest | DirectoriesRequest | Record<string, unknown>, options: QueryOptions, processOptions: CoreProcessOptions, environment:NodeJS.ProcessEnv=process.env): Promise<unknown> {
   if (options.signal?.aborted) return Promise.reject(new CoreError('CANCELLED', '已取消'));
   const binary = binaryPath(processOptions.binaryPath);
   const requestId=op==='local_query' && 'rebuild' in request && request.rebuild===true?randomUUID():undefined;

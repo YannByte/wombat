@@ -5,7 +5,8 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { CoreError } from '../../errors.js';
 import { runCodex, type CodexOptions } from './process.js';
-import { disabledTrialMcp, runTrialSession, selectTrialModel } from './trial-session.js';
+import { trialNetwork } from './trial-network.js';
+import { disabledTrialMcp, inspectTrialInstructions, runTrialSession, selectTrialModel } from './trial-session.js';
 
 const instructionLimit = 16 * 1024;
 const fileLimit = 256 * 1024;
@@ -15,7 +16,9 @@ const fileName = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}\.(txt|md|csv|tsv|json)$/;
 const features = ['apps', 'browser_use', 'computer_use', 'hooks', 'memories', 'multi_agent', 'plugins', 'shell_snapshot'];
 
 type File = { name: string; bytes: Buffer };
-type Check = { id: string; contains: string };
+type Check = { id: string; contains: string } | ProjectCheck;
+export type ProjectCheck = { kind: 'command'; id: string; command: string } | { kind: 'file'; id: string; path: string; equals: string };
+type Task = { task: string; instructions: string; checks: Check[] };
 type Manifest = { task: string; instructions: string; files: string[]; checks: Check[] };
 type InstructionSource = { path: string; sha256: string };
 type Result = { stage: string; artifact: string; sha256: string; checks: { id: string; passed: boolean }[]; execution: Omit<Awaited<ReturnType<typeof runTrialSession>>, 'finalText'> };
@@ -26,6 +29,9 @@ export type TaskTrialOptions = {
   codexHome?: string;
   codexBinaryPath?: string;
   allowedInstructionSources?: readonly string[];
+  expectedInstructionSources?: readonly InstructionSource[];
+  stageTimeoutMs?: number;
+  modelNetwork?: NodeJS.ProcessEnv;
   signal: AbortSignal;
 };
 type ResolvedTrialOptions = TaskTrialOptions & { model: string };
@@ -112,15 +118,26 @@ function hostConfig(profile: string, work: string, inputs: string) {
 function hostProcess(options: TaskTrialOptions, scratch: string) {
   const codexHome = options.codexHome ?? process.env.CODEX_HOME ?? path.join(homedir(), '.codex');
   const env: NodeJS.ProcessEnv = { HOME: homedir(), PATH: '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin', TMPDIR: scratch };
-  // The host may need a user's network route. Shell tools inherit no environment and use a no-network profile.
-  for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY']) if (process.env[key]) env[key] = process.env[key];
-  const nativeOptions: CodexOptions = { codexHome, codexBinaryPath: options.codexBinaryPath, codexTimeoutMs: 150_000 };
+  // Shell tools inherit no environment and use a no-network profile.
+  Object.assign(env, options.modelNetwork);
+  const nativeOptions: CodexOptions = { codexHome, codexBinaryPath: options.codexBinaryPath, codexTimeoutMs: options.stageTimeoutMs ?? 150_000 };
   return { env, nativeOptions };
+}
+
+async function checkFile(work: string, relative: string, expected: string) {
+  const file = path.join(work, relative);
+  try {
+    return await realpath(file) === file && asText(await readRegular(file, fileLimit)) === expected;
+  } catch (error) {
+    if (isRecord(error) && ['ENOENT', 'ELOOP', 'ENOTDIR', 'EISDIR'].includes(String(error.code))) return false;
+    if (error instanceof CoreError && error.code === 'TRIAL_FILE') return false;
+    throw error;
+  }
 }
 
 async function runStage(
   root: string, stage: string, files: readonly File[], prompt: string, instructions: string,
-  options: ResolvedTrialOptions, runner: Runner, sources: readonly InstructionSource[], outputFields?: readonly string[],
+  options: ResolvedTrialOptions, runner: Runner, sources: readonly InstructionSource[], outputFields?: readonly string[], checks: readonly Check[] = [],
 ) {
   if (options.signal.aborted) throw new CoreError('CANCELLED', 'Cancelled');
   const stageRoot = path.join(root, stage);
@@ -133,7 +150,11 @@ async function runStage(
   await writeFile(protectedFile, 'Wombat trial boundary control\n', { mode: 0o600, flag: 'wx' });
   const inputControl = path.join(inputs, '.wombat-control');
   await writeFile(inputControl, 'Wombat intended input\n', { mode: 0o600, flag: 'wx' });
-  for (const file of files) await writeFile(path.join(inputs, file.name), file.bytes, { mode: 0o600, flag: 'wx' });
+  for (const file of files) {
+    const selected = path.join(inputs, file.name);
+    await mkdir(path.dirname(selected), { recursive: true, mode: 0o700 });
+    await writeFile(selected, file.bytes, { mode: 0o600, flag: 'wx' });
+  }
 
   const profile = `wombat_trial_${randomUUID().replaceAll('-', '')}`;
   const { env, nativeOptions } = hostProcess(options, stageRoot);
@@ -157,16 +178,27 @@ async function runStage(
     }
     const execution = await runner(
       { workspace: work, profile, provider: 'openai', model: options.model, developerInstructions: instructions,
-        instructionSources: sources.map(source => source.path), disabledFeatures: features, outputFields, effort: 'low' },
+        instructionSources: sources.map(source => source.path), disabledFeatures: features, outputFields, effort: 'low',
+        observedCommands: checks.flatMap(check => 'kind' in check && check.kind === 'command' ? [check.command] : []) },
       { signal: options.signal }, nativeOptions, { cwd: work, env, appServerConfig: config },
       `Official task inputs are in the adjacent read-only directory ../inputs. ${outputFields ? 'Return your result in the provided JSON schema.' : 'Write the requested output to deliverable.md in the current directory.'}\n\n${prompt}`,
     );
     await checkSources();
     if (outputFields) {
       if (!execution.finalText) throw new CoreError('TRIAL_EDIT', 'Codex did not return a structured editor result');
-      return { bytes: Buffer.from(execution.finalText), execution };
+      return { bytes: Buffer.from(execution.finalText), execution, checks: [] };
     }
-    return { bytes: await readRegular(path.join(work, 'deliverable.md'), fileLimit), execution };
+    const bytes = await readRegular(path.join(work, 'deliverable.md'), fileLimit);
+    const text = asText(bytes);
+    if (execution.truncated && checks.some(check => 'kind' in check && check.kind === 'command'))
+      throw new CoreError('TRIAL_EVIDENCE_LIMIT', 'The trial recorded too many events to verify commands');
+    const observed = await Promise.all(checks.map(async check => ({
+      id: check.id,
+      passed: 'contains' in check ? text.includes(check.contains) : check.kind === 'command'
+        ? execution.items.some(item => item.observedCommand === check.command && item.exitCode === 0 && item.status === 'completed')
+        : await checkFile(work, check.path, check.equals),
+    })));
+    return { bytes, execution, checks: observed };
   } finally {
     await rm(stageRoot, { recursive: true, force: true, maxRetries: 3 });
   }
@@ -201,32 +233,96 @@ export async function runHarnessTask(manifestPath: string, outputParent: string,
     if (total > totalLimit) throw new CoreError('TRIAL_FILE', 'Selected material exceeds the total byte limit');
     inputs.push({ name, bytes });
   }
+  const parent = await realpath(outputParent);
+  if (parent === root || parent.startsWith(root + path.sep))
+    throw new CoreError('TRIAL_OUTPUT', 'Choose an output directory outside the task input directory');
+  return executeTask(spec, inputs, parent, options, runner);
+}
+
+export async function projectInstructionSources(codexHome?: string): Promise<{ path: string; sha256: string }[]> {
+  const home = codexHome ?? process.env.CODEX_HOME ?? path.join(homedir(), '.codex');
+  for (const name of ['AGENTS.override.md', 'AGENTS.md']) {
+    const file = path.resolve(home, name);
+    try {
+      const bytes = await readRegular(file, fileLimit);
+      if (asText(bytes).trim()) return [{ path: await realpath(file), sha256: digest(bytes) }];
+    } catch (error) {
+      if (!isRecord(error) || error.code !== 'ENOENT') throw error;
+    }
+  }
+  return [];
+}
+
+export async function runProjectHarnessTask(plan: {
+  project: string; task: string; original: string; inputs: readonly { path: string; sha256: string }[];
+  checks: ProjectCheck[]; includeGlobalInstructions: boolean; globalInstructionSources: readonly InstructionSource[];
+}, output: string, options: TaskTrialOptions) {
+  const inputs: File[] = [];
+  let total = 0;
+  for (const input of plan.inputs) {
+    const file = path.join(plan.project, input.path);
+    if (await realpath(file) !== file) throw new CoreError('TRIAL_CONFLICT', 'A selected project path changed');
+    const bytes = await readRegular(file, fileLimit);
+    total += bytes.length;
+    if (digest(bytes) !== input.sha256 || total > totalLimit) throw new CoreError('TRIAL_CONFLICT', 'The selected project materials changed');
+    inputs.push({ name: input.path, bytes });
+  }
+  const selected = await projectInstructionSources(options.codexHome);
+  if (JSON.stringify(selected) !== JSON.stringify(plan.globalInstructionSources) ||
+      (selected.length && !plan.includeGlobalInstructions))
+    throw new CoreError('TRIAL_SESSION_INSTRUCTIONS', 'Confirm whether the current global instructions may be used during the trial');
+  const task = plan.task + '\n\nThe selected existing project files are in ../inputs. Use those paths for any supplied checks or scripts. Keep outputs in the current directory.';
+  return executeTask({ task, instructions: plan.original, checks: plan.checks }, inputs, output, { ...options, allowedInstructionSources: selected.map(source => source.path), expectedInstructionSources: selected }, runTrialSession);
+}
+
+export async function verifyProjectHarnessLoad(project: string, expectedPath: string, revision: string, options: TaskTrialOptions) {
+  const scratch = await mkdtemp(path.join(await realpath(tmpdir()), 'wombat-harness-load-'));
+  try {
+    if (digest(await readRegular(expectedPath, instructionLimit)) !== revision)
+      throw new CoreError('TRIAL_CONFLICT', 'The applied project instructions changed');
+    const { env, nativeOptions } = hostProcess(options, scratch);
+    const profile = 'wombat_harness_load';
+    const config = hostConfig(profile, scratch, project).map(value => value === 'project_doc_max_bytes=0' ? 'project_doc_max_bytes=32768' : value);
+    const invocation = { cwd: project, env, appServerConfig: config };
+    const query = { signal: options.signal };
+    config.push(...await disabledTrialMcp(project, query, nativeOptions, invocation));
+    await inspectTrialInstructions(project, expectedPath, profile, query, nativeOptions, invocation);
+    if (digest(await readRegular(expectedPath, instructionLimit)) !== revision)
+      throw new CoreError('TRIAL_CONFLICT', 'The applied project instructions changed');
+  } finally {
+    await rm(scratch, { recursive: true, force: true, maxRetries: 3 });
+  }
+}
+
+async function executeTask(spec: Task, inputs: File[], outputParent: string, options: TaskTrialOptions, runner: Runner) {
+  if (runner === runTrialSession) options = { ...options, modelNetwork: await trialNetwork(options.signal) };
+  if (options.model !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}$/.test(options.model))
+    throw new CoreError('TRIAL_MODEL', 'Provide a fixed Codex model name');
   const sources: InstructionSource[] = [];
   for (const selected of options.allowedInstructionSources ?? []) {
     const canonical = await realpath(selected);
     if (await lstat(selected).then(info => !info.isFile())) throw new CoreError('TRIAL_SESSION_INSTRUCTIONS', 'Select regular instruction files');
     sources.push({ path: canonical, sha256: digest(await readRegular(canonical, fileLimit)) });
   }
+  if (options.expectedInstructionSources && JSON.stringify(sources) !== JSON.stringify(options.expectedInstructionSources))
+    throw new CoreError('TRIAL_SESSION_INSTRUCTIONS', 'An approved global instruction file changed before the trial');
   const parent = await realpath(outputParent);
-  if (parent === root || parent.startsWith(root + path.sep))
-    throw new CoreError('TRIAL_OUTPUT', 'Choose an output directory outside the task input directory');
   const report = await mkdtemp(path.join(parent, 'wombat-harness-task-'));
   const scratch = await mkdtemp(path.join(await realpath(tmpdir()), 'wombat-harness-stage-'));
   const results: Result[] = [];
   let stage = 'host';
   let model = options.model;
-  const run = (stageName: string, sourcesToRead: readonly File[], prompt: string, instructions: string, outputFields?: readonly string[]) => {
+  const run = (stageName: string, sourcesToRead: readonly File[], prompt: string, instructions: string, outputFields?: readonly string[], checks: readonly Check[] = []) => {
     stage = stageName;
     if (!model) throw new CoreError('TRIAL_MODEL', 'The trial model is unresolved');
-    return runStage(scratch, stage, sourcesToRead, prompt, instructions, { ...options, model }, runner, sources, outputFields);
+    return runStage(scratch, stage, sourcesToRead, prompt, instructions, { ...options, model }, runner, sources, outputFields, checks);
   };
   const taskPrompt = `${spec.task}\n\nUse the selected input files as data. Produce the task deliverable in Markdown.`;
   const execution = async (name: string, instructions: string) => {
-    const { bytes, execution: { items, truncated } } = await run(name, inputs, taskPrompt, instructions);
+    const { bytes, execution: { items, truncated }, checks } = await run(name, inputs, taskPrompt, instructions, undefined, spec.checks);
     const artifact = name + '.md';
-    const text = asText(bytes);
     await writeFile(path.join(report, artifact), bytes, { mode: 0o600, flag: 'wx' });
-    results.push({ stage: name, artifact, sha256: digest(bytes), execution: { items, truncated }, checks: spec.checks.map(check => ({ id: check.id, passed: text.includes(check.contains) })) });
+    results.push({ stage: name, artifact, sha256: digest(bytes), execution: { items, truncated }, checks });
     return { name: '_' + artifact, bytes };
   };
   const editorFile = (name: string, value: object): File => ({ name, bytes: Buffer.from(JSON.stringify(value)) });
@@ -237,8 +333,9 @@ export async function runHarnessTask(manifestPath: string, outputParent: string,
         cwd: scratch, env, appServerConfig: features.map(feature => `features.${feature}=false`),
       }, model);
     }
+    if (!model) throw new CoreError('TRIAL_MODEL', 'The trial model is unresolved');
     const base = await execution('baseline', spec.instructions);
-    const taskContext = editorFile('_task-context.json', { task: spec.task, currentInstructions: spec.instructions, files: spec.files, checks: results[0].checks });
+    const taskContext = editorFile('_task-context.json', { task: spec.task, currentInstructions: spec.instructions, files: inputs.map(input => input.name), checks: results[0].checks, execution: results[0].execution });
     const proposed = asText((await run('propose', [...inputs, taskContext, base],
       'Read _task-context.json, _baseline.md, and the selected task materials. Propose two independent ways to revise the current instructions. Use JSON keys general for cross-task planning, tool use or validation, and domain for this task domain. Each is the complete replacement instruction text.',
       editorInstructions, ['general', 'domain'])).bytes);
@@ -263,7 +360,7 @@ export async function runHarnessTask(manifestPath: string, outputParent: string,
       inputs: inputs.map(input => ({ name: input.name, sha256: digest(input.bytes) })),
       instructionSources: sources, results, candidates: { baseline: spec.instructions, general, domain, composed: successor }, rationale,
     });
-    return { status: 'complete', report: path.join(report, 'report.json'), recommendation, results };
+    return { status: 'complete', report: path.join(report, 'report.json'), recommendation, results, model, candidate: successor, rationale };
   } catch (error) {
     const code = error instanceof CoreError ? error.code : 'TRIAL_EXECUTION';
     const failure = error instanceof CoreError ? error.details : undefined;

@@ -27,6 +27,16 @@ Start with the step you need most. If the project, dates, or selected items are 
 
 A question about usage starts with the total and coverage gaps for the requested scope. Ask about a cause or next step to bring in rankings, history, and project checks as needed.
 
+<a id="harness-trial"></a>
+
+## Run the same task to compare project instructions
+
+On an Apple silicon Mac, use a signed-in Codex and a Wombat installation candidate that includes trials. Open the target project and select a task in a Wombat conversation. For example, “Compare the original and revised project instructions on this release task that skipped installation validation. Keep regular packaging working.”
+
+Wombat shows the task, selected project files, behavior to preserve, and independent checks before starting. This version compares the root `AGENTS.md` and uses its current content as the baseline. After confirmation, Wombat runs the baseline, general candidate, domain candidate, and composed version in separate writable directories. It keeps the original project in place and reads selected trial inputs without modifying them. Two additional model sessions propose and combine candidates. Confirm the use of any existing global instructions before the trial.
+
+The results show each run's checks, deliverable, and suggested change. After reviewing them, ask, “Apply this version and check whether a new Codex session loads it.” Wombat reports the write and load results separately. To restore the original, ask to undo that application. If the project file has changed, Wombat reports a conflict for review.
+
 <a id="project-diagnosis"></a>
 
 ## Diagnose a project once, then apply selected improvements
