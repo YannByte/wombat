@@ -1,7 +1,7 @@
 {
   "interface": {
     "display_name": "Wombat",
-    "short_description": "Diagnose projects and verify concrete improvements",
-    "default_prompt": "Use $wombat to help with my project or work-history question, give evidence-backed actions when useful, and verify selected improvements after authorization."
+    "short_description": "Improve your Codex harness with real-task trials",
+    "default_prompt": "Use $wombat to find a task worth improving, diagnose my Codex harness, and verify a selected change."
   }
 }

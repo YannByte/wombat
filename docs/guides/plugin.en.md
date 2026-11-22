@@ -31,7 +31,7 @@ A question about usage starts with the total and coverage gaps for the requested
 
 ## Run the same task to compare project instructions
 
-On an Apple silicon Mac, use a signed-in Codex and a Wombat installation candidate that includes trials. Open the target project and select a task in a Wombat conversation. For example, “Compare the original and revised project instructions on this release task that skipped installation validation. Keep regular packaging working.”
+On an Apple silicon Mac, install Wombat 0.9.0 or later and sign in to Codex. Open the target project and select a task in a Wombat conversation. For example, “Compare the original and revised project instructions on this release task that skipped installation validation. Keep regular packaging working.”
 
 Wombat shows the task, selected project files, behavior to preserve, and independent checks before starting. This version compares the root `AGENTS.md` and uses its current content as the baseline. After confirmation, Wombat runs the baseline, general candidate, domain candidate, and composed version in separate writable directories. It keeps the original project in place and reads selected trial inputs without modifying them. Two additional model sessions propose and combine candidates. Confirm the use of any existing global instructions before the trial.
 
